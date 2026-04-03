@@ -73,7 +73,17 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
 
     require_login($course, true, $cm);
 
-    $itemid = array_shift($args);
+    $itemid = (int) array_shift($args);
+
+    // Prevent non-managers from accessing files tied to disabled notices via direct URLs.
+    $notice = \local_awareness\persistent\awareness::get_record(['id' => $itemid]);
+    if (!$notice) {
+        return false;
+    }
+    if (!has_capability('local/awareness:manage', \context_system::instance()) && !$notice->get('enabled')) {
+        return false;
+    }
+
     $filename = array_pop($args);
     if (!$args) {
         $filepath = '/';
