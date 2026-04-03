@@ -54,6 +54,8 @@ class external extends external_api {
      * @return array
      */
     public static function dismiss_notice(int $noticeid): array {
+        self::validate_context(\context_system::instance());
+
         $params = self::validate_parameters(
             self::dismiss_notice_parameters(),
             ['noticeid' => $noticeid]
@@ -105,6 +107,8 @@ class external extends external_api {
      * @return array
      */
     public static function acknowledge_notice(int $noticeid): array {
+        self::validate_context(\context_system::instance());
+
         $params = self::validate_parameters(
             self::acknowledge_notice_parameters(),
             ['noticeid' => $noticeid]
@@ -155,6 +159,8 @@ class external extends external_api {
      * @return array
      */
     public static function track_link(int $linkid): array {
+        self::validate_context(\context_system::instance());
+
         $params = self::validate_parameters(self::track_link_parameters(), ['linkid' => $linkid]);
         return helper::track_link($params['linkid']);
     }
@@ -193,6 +199,8 @@ class external extends external_api {
      * @return array
      */
     public static function get_notices(string $pageurl = '', int $courseid = 0): array {
+        self::validate_context(\context_system::instance());
+
         $params = self::validate_parameters(
             self::get_notices_parameters(),
             ['pageurl' => $pageurl, 'courseid' => $courseid]
@@ -251,6 +259,10 @@ class external extends external_api {
      */
     public static function search_courses(string $query = ''): array {
         global $DB;
+
+        $syscontext = \context_system::instance();
+        self::validate_context($syscontext);
+        require_capability('local/awareness:manage', $syscontext);
 
         $params = self::validate_parameters(
             self::search_courses_parameters(),

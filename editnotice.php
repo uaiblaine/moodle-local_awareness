@@ -41,8 +41,9 @@ $PAGE->navbar->add(get_string('notice:notice', 'local_awareness'));
 $noticeid = optional_param('noticeid', 0, PARAM_INT);
 $action = optional_param('action', 'create', PARAM_TEXT);
 
-// Only require sesskey for form submissions or destructive actions, not on plain GET page loads.
-if ($_SERVER['REQUEST_METHOD'] === 'POST' || in_array($action, ['delete', 'confirmeddelete'])) {
+// Enforce sesskey on any state-changing action to prevent CSRF.
+$actionsrequiressesskey = ['disable', 'enable', 'reset', 'unconfirmeddelete', 'confirmeddelete'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' || in_array($action, $actionsrequiressesskey, true)) {
     require_sesskey();
 }
 
