@@ -1,6 +1,6 @@
 /**
  * User interaction with notice
- * Originally developed by Jwalit Shah <jwalitshah@catalyst-au.net> (Catalyst IT).
+ * Originally developed by Jwalit Shah <jwalitshah@catalyst-au.net> (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>

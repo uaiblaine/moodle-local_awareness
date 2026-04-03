@@ -1,101 +1,96 @@
-[![ci](https://github.com/catalyst/moodle-local_awareness/actions/workflows/ci.yml/badge.svg?branch=MOODLE_403_STABLE)](https://github.com/catalyst/moodle-local_awareness/actions/workflows/ci.yml)
+[![ci](https://github.com/uaiblaine/moodle-local_awareness/actions/workflows/ci.yml/badge.svg)](https://github.com/uaiblaine/moodle-local_awareness/actions/workflows/ci.yml)
 
-# Site Notice
-This plugin displays notices to users.
+# Awareness
 
-## Features
- * Site wide notices displayed in a modal pop up.
- * Ability to limit your notices to a specific cohort.
- * Re display a notice in a configurable period of time.
- * Set a start date and expiry date for a notice
- * Keep displaying a notice until a specific course is completed.
- * Optionally request users to accept a notice, or they will be logged out from LMS.
- * Force users to be logged out after seeing a notice.
- * Reporting on who accepted / dismissed a notice. 
+Awareness is a Moodle local plugin to display policy, compliance, communication, and onboarding notices in modal form.
 
-## Branches
+The plugin supports mandatory acknowledgement workflows, optional forced logout, audience targeting, and reporting for dismissed and acknowledged interactions.
 
-| Moodle version   | Branch            |
-|------------------|-------------------|
-| Moodle 3.9 - 4.1 | MOODLE_39_STABLE  |
-| Moodle 4.3+      | MOODLE_403_STABLE |
+## Project origin and credits
 
-## Configuration 
+This project is a derivative fork based on:
 
-### Enable the plugin
-Site administration > Site Notice > Settings: "Enabled"
+https://github.com/catalyst/moodle-local_sitenotice
 
-### Allow updating notices
-Site administration > Site Notice > Settings: "Allow notice update"
-If the config is enabled, user will be able to update existing notice.
+It has been adapted and evolved with a new direction under the Awareness name.
 
-### Allow deleting notices
-Site administration > Site Notice > Settings: "Allow notice deletion"
-If the config is enabled, user will be able to delete existing notice.
+## Feature overview
 
-### Clean up other related data when deleting a notice
-Site administration > Site Notice > Settings: "Clean up info related to the deleted notice"
-If the config is enabled (and "notice deletion" is also allowed), when deleting a notice, other records related to the notice
- in hyperlinks, hyperlinks history, acknowledgement, user last view will also be deleted.
+- Site-wide modal notices.
+- Optional mandatory acknowledgement before users can continue.
+- Optional force logout after dismissal or acknowledgement, depending on settings.
+- Audience targeting by cohort.
+- Optional requirement to complete a selected course before the notice stops appearing.
+- URL path matching to scope notices to specific pages.
+- Scheduling via start date and expiry date.
+- Perpetual notices (always active while enabled).
+- Recurring re-display using reset intervals.
+- Hyperlink extraction and click tracking from notice content.
+- Reports for acknowledgements and dismissals with export options.
+- Optional clean-up of related tracking/interaction data when deleting notices.
+- Optional modal background image.
+- Optional modal dimensions (width and height).
+- Outside-click close behavior control.
+- Session-based optimization through cached user notice resolution.
 
-## Usage
+## Compatibility
 
-### Create new notice
-* Go to Manage Notices: Site administration > Site Notice > Manage Notice
-* Click on "Create New Notice"
-* Enter Title
-* Enter Content
-* Set up reset interval ('reset every') if required. The notice will be displayed to user again once the specified period elapses.
-* Set up start and end dates if required. Set "Is perpetual" to "Yes" and start/end dates will become available.
-* Requires Acknowledgement: If enabled, the user will need to accept the notice before they can continue to use the LMS site.
-* Forece logout: If enabled, the user will be logged out of the site after closing the notice.
-If the user does not accept the notice, he/she will be logged out of the site.
-* Set up target cohort(s). 
+This repository is maintained for modern Moodle branches through CI matrix testing. Check the CI badge and workflow matrix for currently validated combinations.
 
-### Edit Notice (Requires "Allow notice update")
-* Go to Manage Notices: Site administration > Site Notice > Manage Notice
-* Click on the gear icon to view existing notice.
+## Administration paths
 
-### Disabled Notice
-* Go to Manage Notices: Site administration > Site Notice > Manage Notice
-* Click on the 'eye' icon to disable/enable notice
+- Settings: Site administration > Awareness > Settings
+- Management: Site administration > Awareness > Manage notice
 
-### Reset Notice
-* Go to Manage Notices: Site administration > Site Notice > Manage Notice
-* Click on the 'load/reload' icon to reset notice
+## Configuration
 
-### Delete Notice (Requires "Allow notice deletion")
-* Go to Manage Notices: Site administration > Site Notice > Manage Notice
-* Click on the 'trash' icon to delete notice
+### Enable plugin
+- Setting: Enabled
+- Effect: enables Awareness notices site-wide.
 
-### View/Download Notice Acknowledgement Report
-* Go to Manage Notices: Site administration > Site Notice > Manage Notice
-* Click on the 'chart' icon to view notice report
-* Apply "Date range" filter if required
-* Choose a file format and click on download button
+### Allow notice update
+- Setting: Allow notice update
+- Effect: permits editing existing notices.
 
-### View/Download Notice Dismiss Report
-* Go to Manage Notices: Site administration > Site Notice > Manage Notice
-* Click on the 'risk' icon to view notice report
-* Apply "Date range" filter if required
-* Choose a file format and click on download button
+### Allow notice deletion
+- Setting: Allow notice deletion
+- Effect: permits deleting notices.
 
-# Crafted by Catalyst IT
+### Clean up deleted notice data
+- Setting: Clean up info related to the deleted notice
+- Effect: when deletion is allowed, removes related records such as hyperlinks, hyperlink history, acknowledgements, and last view records.
 
-This plugin was developed by Catalyst IT Australia:
+## Notice authoring
 
-https://www.catalyst-au.net/
+When creating or editing a notice, you can configure:
 
+- Title and rich content.
+- Start/end window and perpetual mode.
+- Reset interval.
+- Force logout behavior.
+- Acknowledgement requirement.
+- Cohort visibility.
+- Required course completion.
+- URL path matching.
+- Modal presentation options (background image, width, height, outside click).
 
-# Contributing and Support
+## Reports
 
-Issues, and pull requests using github are welcome and encouraged!
+From Manage notice, each notice provides access to:
 
-https://github.com/catalyst/moodle-local_awareness/issues
+- Acknowledgement report.
+- Dismiss report.
 
-If you would like commercial support or would like to sponsor additional improvements
-to this plugin please contact us:
+Reports include filtering and downloadable exports.
 
-https://www.catalyst-au.net/contact-us
+## Development notes
 
-<img alt="Catalyst IT" src="https://cdn.rawgit.com/CatalystIT-AU/moodle-auth_saml2/MOODLE_39_STABLE/pix/catalyst-logo.svg" width="400">
+- PHPUnit and Behat tests are available under tests.
+- CI uses reusable Moodle plugin workflows.
+- For release automation, tags matching `v*` trigger the Moodle Plugin Release workflow.
+
+## Contributing
+
+Issues and pull requests are welcome:
+
+https://github.com/uaiblaine/moodle-local_awareness/issues

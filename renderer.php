@@ -22,7 +22,7 @@ use local_awareness\table\all_notices;
  * Plugin's renderer.
  *
  * @package   local_awareness
- * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (Catalyst IT).
+ * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>

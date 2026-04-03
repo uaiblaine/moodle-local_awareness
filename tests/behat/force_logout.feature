@@ -10,7 +10,7 @@ Feature: Users are forcibly logged out after closing a notice
       | bilbo    | Bilbo     | Baggins  | bilbo@westfarthing.invalid |
     And I change window size to "large"
     And I log in as "admin"
-    And I navigate to "Site notice > Settings" in site administration
+    And I navigate to "Awareness > Settings" in site administration
     And I click on "Enabled" "checkbox"
     And I click on "Save changes" "button"
 
