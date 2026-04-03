@@ -34,6 +34,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
 
         ModalNotice.TYPE = 'local_awareness';
         ModalNotice.TEMPLATE = 'local_awareness/modal_notice';
+        ModalNotice.create = Modal.create;
 
         ModalNotice.prototype = Object.create(Modal.prototype);
         ModalNotice.prototype.constructor = ModalNotice;
