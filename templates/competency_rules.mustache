@@ -1,0 +1,65 @@
+{{!
+    @template local_awareness/competency_rules
+
+    Selected competency rules displayed on the notice form.
+
+    Context variables required for this template:
+    * hasRules        - Boolean, true when rules array is non-empty
+    * rules           - Array of rule objects
+    * rules.index     - Numeric index
+    * rules.name      - Competency shortname
+    * rules.proficientSelected - Boolean, true when proficient === 1
+    * proficientLabel - Label text
+    * yesLabel        - "Yes" text
+    * noLabel         - "No" text
+    * removeLabel     - Remove button tooltip
+
+    Example context (json):
+    {
+        "hasRules": true,
+        "proficientLabel": "Proficient",
+        "yesLabel": "Yes",
+        "noLabel": "No",
+        "removeLabel": "Remove",
+        "rules": [
+            {"index": 0, "name": "Comp A", "proficientSelected": true}
+        ]
+    }
+}}
+{{#hasRules}}
+<div class="card shadow-sm">
+    <ul class="list-group list-group-flush">
+        {{#rules}}
+        <li class="list-group-item d-flex align-items-center gap-2 py-2 awareness-competency-row"
+            data-index="{{index}}">
+            <span class="badge bg-primary rounded-pill flex-shrink-0">
+                {{name}}
+            </span>
+            <div class="d-flex align-items-center gap-2 ms-auto flex-shrink-0">
+                <label class="mb-0 small text-muted d-none d-sm-inline"
+                       for="awareness-cp-prof-{{index}}">
+                    {{proficientLabel}}
+                </label>
+                <select id="awareness-cp-prof-{{index}}"
+                        class="form-select form-select-sm awareness-competency-proficient"
+                        style="width: auto; min-width: 80px;">
+                    <option value="1" {{#proficientSelected}}selected{{/proficientSelected}}>
+                        {{yesLabel}}
+                    </option>
+                    <option value="0" {{^proficientSelected}}selected{{/proficientSelected}}>
+                        {{noLabel}}
+                    </option>
+                </select>
+                <button type="button"
+                        class="btn btn-sm btn-outline-danger awareness-competency-remove p-1 lh-1"
+                        data-index="{{index}}"
+                        title="{{removeLabel}}"
+                        aria-label="{{removeLabel}} {{name}}">
+                    {{#pix}}t/delete, core{{/pix}}
+                </button>
+            </div>
+        </li>
+        {{/rules}}
+    </ul>
+</div>
+{{/hasRules}}

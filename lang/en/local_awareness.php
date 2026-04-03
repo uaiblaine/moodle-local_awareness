@@ -17,7 +17,6 @@
 /**
  * English language file
  * @package local_awareness
- * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -49,11 +48,21 @@ $string['event:timecreated'] = 'Time';
 $string['event:update'] = 'update';
 $string['filter_category'] = 'Category';
 $string['filter_competency'] = 'Competencies';
+$string['filter_competency_help'] = 'Filters this notification based on the user’s competency proficiency. This filter only works on course pages (requires course context).
+
+When competencies are selected, each rule checks whether the user is proficient in a given competency within the current course. In the default mode, the user’s proficiency status must exactly match the configuration defined for each rule.
+
+When “Proficient in all” is enabled, the user must be proficient in all selected competencies, regardless of the individual rule settings.';
 $string['filter_competency_add'] = 'Add competencies';
 $string['filter_competency_proficient'] = 'Proficient';
 $string['filter_competency_remove'] = 'Remove';
 $string['filter_competency_requireall'] = 'Proficient in all selected competencies';
 $string['filter_competency_requireall_help'] = 'When enabled and more than one competency is selected, the notice is shown only if the user is proficient in all selected competencies.';
+$string['filter_competency_picker_title'] = 'Select competencies';
+$string['filter_competency_picker_framework'] = 'Competency framework';
+$string['filter_competency_picker_noframeworks'] = 'No competency frameworks available.';
+$string['filter_competency_picker_nocompetencies'] = 'No competencies found.';
+$string['filter_competency_picker_addselected'] = 'Add selected';
 $string['filter_course'] = 'Courses';
 $string['filter_courseformat'] = 'Course format';
 $string['filter_role'] = 'Role';
@@ -130,10 +139,10 @@ $string['privacy:metadata:local_awareness_lastview'] = 'Notice last view';
 $string['privacy:metadata:userid'] = 'User ID';
 $string['privacy:metadata:username'] = 'Username';
 $string['report:acknowledge_desc'] = 'List of users who acknowledged the notice.';
-$string['report:acknowledged'] = 'notice_acknowledged_{$a}';
-$string['report:button:ack'] = 'Notice acknowledgement report';
-$string['report:button:dis'] = 'Notice dismiss report';
-$string['report:dismissed'] = 'notice_dismissed_{$a}';
+$string['report:acknowledged'] = 'Notices acknowledged for: {$a}';
+$string['report:button:ack'] = 'Notice acknowledgement system report';
+$string['report:button:dis'] = 'Notice dismiss system report';
+$string['report:dismissed'] = 'Notices dismissed for: {$a}';
 $string['report:dismissed_desc'] = 'List of users who dismissed the notice.';
 $string['report:timecreated_server'] = 'Server time';
 $string['report:timecreated_spreadsheet'] = 'Spreadsheet timestamp';
@@ -151,3 +160,55 @@ $string['setting:enableddesc'] = 'Enable site notice';
 $string['setting:managenotice'] = 'Manage notice';
 $string['setting:settings'] = 'Settings';
 $string['timeformat:resetinterval'] = '%a day(s), %h hour(s), %i minute(s) and %s second(s)';
+
+// Report Builder — entity names.
+$string['entity_notice']          = 'Notice';
+$string['entity_acknowledgement'] = 'Acknowledgement';
+$string['entity_noticeview']      = 'Notice view';
+$string['entity_linkhistory']     = 'Link click';
+
+// Report Builder — datasource names.
+$string['datasource:allnotices']          = 'All notices';
+$string['datasource:acknowledgednotices'] = 'Acknowledged notices';
+$string['datasource:dismissednotices']    = 'Dismissed notices';
+$string['datasource:noticeviews']         = 'Notice views';
+$string['datasource:linkhistory']         = 'Link click history';
+
+// Report Builder — notice entity columns / filters.
+$string['report_notice:title']         = 'Notice title';
+$string['report_notice:enabled']       = 'Enabled';
+$string['report_notice:reqack']        = 'Requires acknowledgement';
+$string['report_notice:reqcourse']     = 'Requires course completion';
+$string['report_notice:forcelogout']   = 'Force logout';
+$string['report_notice:timestart']     = 'Active from';
+$string['report_notice:timeend']       = 'Expiry';
+$string['report_notice:timecreated']   = 'Date created';
+$string['report_notice:timemodified']  = 'Date modified';
+$string['report_notice:resetinterval'] = 'Reset interval';
+$string['report_notice:content']       = 'Content';
+$string['report_notice:ack_count']     = 'Acknowledged count';
+$string['report_notice:dismiss_count'] = 'Dismissed count';
+
+// Report Builder — acknowledgement entity columns / filters.
+$string['report_ack:username']             = 'Username';
+$string['report_ack:firstname']            = 'First name';
+$string['report_ack:lastname']             = 'Last name';
+$string['report_ack:idnumber']             = 'ID number';
+$string['report_ack:noticetitle']          = 'Notice title (snapshot)';
+$string['report_ack:action']               = 'Action';
+$string['report_ack:timecreated']          = 'Date';
+$string['report_ack:action_dismissed']     = 'Dismissed';
+$string['report_ack:action_acknowledged']  = 'Acknowledged';
+
+// Report Builder — noticeview entity columns / filters.
+$string['report_nv:action']       = 'Last action';
+$string['report_nv:timecreated']  = 'First seen';
+$string['report_nv:timemodified'] = 'Last seen';
+
+// Report Builder — linkhistory entity columns / filters.
+$string['report_lh:timecreated'] = 'Click date';
+$string['report_lh:linktext']    = 'Link text';
+$string['report_lh:linkurl']     = 'Link URL';
+
+// Report Builder — awareness:viewreports capability string.
+$string['awareness:viewreports'] = 'View awareness reports';

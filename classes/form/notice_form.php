@@ -25,7 +25,6 @@ require_once($CFG->libdir . '/formslib.php');
 /**
  * Form to create new notice
  * @package local_awareness
- * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -280,13 +279,23 @@ class notice_form extends \core\form\persistent {
             }
 
             $mform->addElement('static', 'filter_competency_label', get_string('filter_competency', 'local_awareness'), '');
+            $mform->addHelpButton('filter_competency_label', 'filter_competency', 'local_awareness');
             $mform->addElement(
                 'html',
-                '<div id="awareness-competency-filter" class="mb-3" data-contextid="' . (int) \context_system::instance()->id . '"
+                '<div id="awareness-competency-filter" class="mb-3"
+                    data-contextid="' . (int) \context_system::instance()->id . '"
                     data-proficient-label="' . s(get_string('filter_competency_proficient', 'local_awareness')) . '"
                     data-yes-label="' . s(get_string('booleanformat:true', 'local_awareness')) . '"
                     data-no-label="' . s(get_string('booleanformat:false', 'local_awareness')) . '"
-                    data-remove-label="' . s(get_string('filter_competency_remove', 'local_awareness')) . '">
+                    data-remove-label="' . s(get_string('filter_competency_remove', 'local_awareness')) . '"
+                    data-picker-title="' . s(get_string('filter_competency_picker_title', 'local_awareness')) . '"
+                    data-picker-framework="' . s(get_string('filter_competency_picker_framework', 'local_awareness')) . '"
+                    data-picker-search="' . s(get_string('search')) . '"
+                    data-picker-noframeworks="' . s(get_string('filter_competency_picker_noframeworks', 'local_awareness')) . '"
+                    data-picker-nocompetencies="' . s(get_string('filter_competency_picker_nocompetencies', 'local_awareness')) . '"
+                    data-picker-loading="' . s(get_string('loading', 'admin')) . '"
+                    data-picker-addselected="' . s(get_string('filter_competency_picker_addselected', 'local_awareness')) . '"
+                    data-picker-cancel="' . s(get_string('cancel')) . '">
                     <button type="button" id="id_awareness_add_competencies" class="btn btn-secondary">' .
                         s(get_string('filter_competency_add', 'local_awareness')) . '
                     </button>

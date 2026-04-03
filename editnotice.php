@@ -17,7 +17,6 @@
 /**
  * To create, view notice
  * @package local_awareness
- * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -116,11 +115,11 @@ if (!$awareness) {
 
 switch ($action) {
     case 'dismissed_report':
-        $reportpage = new moodle_url('/local/awareness/report/dismissed_report.php', ["noticeid" => $noticeid]);
+        $reportpage = new moodle_url('/local/awareness/report/dismissed_systemreport.php', ["noticeid" => $noticeid]);
         redirect($reportpage);
         break;
     case 'acknowledged_report':
-        $reportpage = new moodle_url('/local/awareness/report/acknowledged_report.php', ["noticeid" => $noticeid]);
+        $reportpage = new moodle_url('/local/awareness/report/acknowledged_systemreport.php', ["noticeid" => $noticeid]);
         redirect($reportpage);
         break;
     case 'reset':

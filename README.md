@@ -6,13 +6,16 @@ Awareness is a Moodle local plugin to display policy, compliance, communication,
 
 The plugin supports mandatory acknowledgement workflows, optional forced logout, audience targeting, and reporting for dismissed and acknowledged interactions.
 
-## Project origin and credits
+## Credits
 
-This project is a derivative fork based on:
+This plugin is a derivative work based on:
 
 https://github.com/catalyst/moodle-local_sitenotice
 
-It has been adapted and evolved with a new direction under the Awareness name.
+Original project and historical contributors include Catalyst IT and contributors from the fork history
+(such as Nathan Nguyen, Jwalit Shah, Dmitrii Metelkin, and Cameron Ball).
+
+This repository is currently maintained and evolved under the Awareness direction.
 
 ## Feature overview
 
@@ -27,6 +30,9 @@ It has been adapted and evolved with a new direction under the Awareness name.
 - Recurring re-display using reset intervals.
 - Hyperlink extraction and click tracking from notice content.
 - Reports for acknowledgements and dismissals with export options.
+- Report Builder integration for custom report creation.
+- System reports for acknowledged and dismissed interactions, integrated into notice management actions.
+- Additional report data sources for notice views and hyperlink click history.
 - Optional clean-up of related tracking/interaction data when deleting notices.
 - Optional modal background image.
 - Optional modal dimensions (width and height).
@@ -36,6 +42,10 @@ It has been adapted and evolved with a new direction under the Awareness name.
 ## Compatibility
 
 This repository is maintained for modern Moodle branches through CI matrix testing. Check the CI badge and workflow matrix for currently validated combinations.
+
+Current declared support in plugin metadata:
+
+- Moodle 4.5 to 5.1
 
 ## Administration paths
 
@@ -83,11 +93,26 @@ From Manage notice, each notice provides access to:
 
 Reports include filtering and downloadable exports.
 
+### Report Builder
+
+Awareness also provides Report Builder entities and data sources for:
+
+- all notices
+- acknowledged notices
+- dismissed notices
+- notice views
+- hyperlink click history
+
+This enables custom report composition with filters, columns, export, and reuse of core Report Builder capabilities.
+
 ## Development notes
 
 - PHPUnit and Behat tests are available under tests.
 - CI uses reusable Moodle plugin workflows.
 - For release automation, tags matching `v*` trigger the Moodle Plugin Release workflow.
+- Local Makefile targets include datasource-focused validation:
+	- `make ci-awareness-datasource-tests`
+	- `make ci-awareness-datasource-tests-quick`
 
 ## Contributing
 

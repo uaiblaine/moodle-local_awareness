@@ -18,7 +18,6 @@
  * Version details.
  *
  * @package    local_awareness
- * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -29,8 +28,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_awareness'; // Full name of the plugin (used for diagnostics).
-$plugin->version = 2026030401;         // The current module version (Date: YYYYMMDDXX).
-$plugin->release = '2026030401';
+$plugin->version = 2026040301;         // The current module version (Date: YYYYMMDDXX).
+$plugin->release = '2026040301';
 $plugin->requires = 2024100700;          // Requires Moodle 4.5 or later.
-$plugin->supported = [405, 502];  // Supported from Moodle 4.5 to 5.2.
+$plugin->supported = [405, 501];  // Supported from Moodle 4.5 to 5.1.
 $plugin->maturity = MATURITY_STABLE;

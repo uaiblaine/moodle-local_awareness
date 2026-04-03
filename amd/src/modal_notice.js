@@ -1,7 +1,5 @@
 /**
  * Notice modal.
- * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net>
- * (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -27,17 +25,19 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
         };
 
         var ModalNotice = function(root) {
-            Modal.call(this, root);
-            this.reqack = false;
-            this.outsideclick = true;
+            var self = Reflect.construct(Modal, [root], ModalNotice);
+            self.reqack = false;
+            self.outsideclick = true;
+            return self;
         };
+
+        Object.setPrototypeOf(ModalNotice, Modal);
+        ModalNotice.prototype = Object.create(Modal.prototype);
+        ModalNotice.prototype.constructor = ModalNotice;
 
         ModalNotice.TYPE = 'local_awareness';
         ModalNotice.TEMPLATE = 'local_awareness/modal_notice';
         ModalNotice.create = Modal.create;
-
-        ModalNotice.prototype = Object.create(Modal.prototype);
-        ModalNotice.prototype.constructor = ModalNotice;
 
             /**
              * Get ID of close button.

@@ -17,7 +17,6 @@
 /**
  * Brazilian Portuguese language file
  * @package local_awareness
- * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -49,11 +48,21 @@ $string['event:timecreated'] = 'Hora';
 $string['event:update'] = 'atualizar';
 $string['filter_category'] = 'Categoria';
 $string['filter_competency'] = 'Competencias';
+$string['filter_competency_help'] = 'Filtra este aviso com base na proficiência do usuário em competências. Esse filtro funciona apenas em páginas de curso (requer contexto de curso).
+
+Quando competências são selecionadas, cada regra verifica se o usuário é proficiente ou não em determinada competência dentro do curso atual. No modo padrão, o status de proficiência do usuário deve corresponder exatamente à configuração definida em cada regra.
+
+Quando a opção “Proficiente em todas” está habilitada, o usuário deve ser proficiente em todas as competências selecionadas, independentemente das configurações individuais de cada regra.';
 $string['filter_competency_add'] = 'Adicionar competencias';
 $string['filter_competency_proficient'] = 'Proficiente';
 $string['filter_competency_remove'] = 'Remover';
 $string['filter_competency_requireall'] = 'Proficiente em todas as competencias selecionadas';
 $string['filter_competency_requireall_help'] = 'Quando habilitado e houver mais de uma competencia selecionada, o alerta sera exibido apenas se o usuario for proficiente em todas as competencias selecionadas.';
+$string['filter_competency_picker_title'] = 'Selecionar competencias';
+$string['filter_competency_picker_framework'] = 'Quadro de competencias';
+$string['filter_competency_picker_noframeworks'] = 'Nenhum quadro de competencias disponivel.';
+$string['filter_competency_picker_nocompetencies'] = 'Nenhuma competencia encontrada.';
+$string['filter_competency_picker_addselected'] = 'Adicionar selecionadas';
 $string['filter_course'] = 'Cursos';
 $string['filter_courseformat'] = 'Formato do curso';
 $string['filter_role'] = 'Papel';
@@ -130,10 +139,10 @@ $string['privacy:metadata:local_awareness_lastview'] = 'Última visualização d
 $string['privacy:metadata:userid'] = 'ID do usuário';
 $string['privacy:metadata:username'] = 'Nome de usuário';
 $string['report:acknowledge_desc'] = 'Lista de usuários que reconheceram o alerta.';
-$string['report:acknowledged'] = 'alerta_reconhecido_{$a}';
-$string['report:button:ack'] = 'Relatório de reconhecimento de alerta';
-$string['report:button:dis'] = 'Relatório de dispensa de alerta';
-$string['report:dismissed'] = 'alerta_dispensado_{$a}';
+$string['report:acknowledged'] = 'Alertas confirmados para: {$a}';
+$string['report:button:ack'] = 'System report de reconhecimento de alerta';
+$string['report:button:dis'] = 'System report de dispensa de alerta';
+$string['report:dismissed'] = 'Alertas dispensados para: {$a}';
 $string['report:dismissed_desc'] = 'Lista de usuários que dispensaram o alerta.';
 $string['report:timecreated_server'] = 'Hora do servidor';
 $string['report:timecreated_spreadsheet'] = 'Timestamp da planilha';
@@ -151,3 +160,55 @@ $string['setting:enableddesc'] = 'Habilitar alertas do site';
 $string['setting:managenotice'] = 'Gerenciar alerta';
 $string['setting:settings'] = 'Configurações';
 $string['timeformat:resetinterval'] = '%a dia(s), %h hora(s), %i minuto(s) e %s segundo(s)';
+
+// Report Builder — nomes das entidades.
+$string['entity_notice']          = 'Alerta';
+$string['entity_acknowledgement'] = 'Confirmação';
+$string['entity_noticeview']      = 'Visualização de alerta';
+$string['entity_linkhistory']     = 'Clique em link';
+
+// Report Builder — nomes dos datasources.
+$string['datasource:allnotices']          = 'Todos os alertas';
+$string['datasource:acknowledgednotices'] = 'Alertas confirmados';
+$string['datasource:dismissednotices']    = 'Alertas dispensados';
+$string['datasource:noticeviews']         = 'Visualizações de alertas';
+$string['datasource:linkhistory']         = 'Histórico de cliques em links';
+
+// Report Builder — colunas/filtros da entidade alerta.
+$string['report_notice:title']         = 'Título do alerta';
+$string['report_notice:enabled']       = 'Habilitado';
+$string['report_notice:reqack']        = 'Requer confirmação';
+$string['report_notice:reqcourse']     = 'Requer conclusão do curso';
+$string['report_notice:forcelogout']   = 'Forçar logout';
+$string['report_notice:timestart']     = 'Ativo a partir de';
+$string['report_notice:timeend']       = 'Expiração';
+$string['report_notice:timecreated']   = 'Data de criação';
+$string['report_notice:timemodified']  = 'Data de modificação';
+$string['report_notice:resetinterval'] = 'Intervalo de redefinição';
+$string['report_notice:content']       = 'Conteúdo';
+$string['report_notice:ack_count']     = 'Total de confirmações';
+$string['report_notice:dismiss_count'] = 'Total de dispensas';
+
+// Report Builder — colunas/filtros da entidade confirmação.
+$string['report_ack:username']             = 'Nome de usuário';
+$string['report_ack:firstname']            = 'Nome';
+$string['report_ack:lastname']             = 'Sobrenome';
+$string['report_ack:idnumber']             = 'Número de identificação';
+$string['report_ack:noticetitle']          = 'Título do alerta (instantâneo)';
+$string['report_ack:action']               = 'Ação';
+$string['report_ack:timecreated']          = 'Data';
+$string['report_ack:action_dismissed']     = 'Dispensado';
+$string['report_ack:action_acknowledged']  = 'Confirmado';
+
+// Report Builder — colunas/filtros da entidade visualização.
+$string['report_nv:action']       = 'Última ação';
+$string['report_nv:timecreated']  = 'Primeira visualização';
+$string['report_nv:timemodified'] = 'Última visualização';
+
+// Report Builder — colunas/filtros da entidade histórico de links.
+$string['report_lh:timecreated'] = 'Data do clique';
+$string['report_lh:linktext']    = 'Texto do link';
+$string['report_lh:linkurl']     = 'URL do link';
+
+// Report Builder — string da capability viewreports.
+$string['awareness:viewreports'] = 'Visualizar relatórios de alertas';

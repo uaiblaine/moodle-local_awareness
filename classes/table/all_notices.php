@@ -29,7 +29,6 @@ require_once($CFG->libdir . '/tablelib.php');
 /**
  * Table to show list of existing notices.
  * @package local_awareness
- * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -130,58 +129,76 @@ class all_notices extends table_sql implements renderable {
      */
     protected function col_actions(awareness $awareness): string {
         global $OUTPUT;
-        $links = null;
+        $links = '';
         $editnotice = '/local/awareness/editnotice.php';
+
+        $buildlink = static function (moodle_url $url, string $iconhtml, string $label, string $extraclass = ''): string {
+            $classes = trim('local-awareness-action ' . $extraclass);
+            $attrs = [
+                'title' => $label,
+                'aria-label' => $label,
+                'class' => $classes,
+            ];
+            return html_writer::link($url, $iconhtml, $attrs);
+        };
+
         // Edit.
         $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'edit', 'sesskey' => sesskey()];
         $editurl = new moodle_url($editnotice, $editparams);
-        $icon = $OUTPUT->pix_icon('t/edit', get_string('edit'));
-        $editlink = html_writer::link($editurl, $icon);
+        $label = get_string('edit');
+        $icon = $OUTPUT->pix_icon('t/edit', $label);
+        $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--edit');
         $links .= ' ' . $editlink;
 
         // Enable/Disable.
         if ($awareness->get('enabled')) {
             $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'disable', 'sesskey' => sesskey()];
             $editurl = new moodle_url($editnotice, $editparams);
-            $icon = $OUTPUT->pix_icon('t/hide', get_string('notice:disable', 'local_awareness'));
-            $editlink = html_writer::link($editurl, $icon);
+            $label = get_string('notice:disable', 'local_awareness');
+            $icon = $OUTPUT->pix_icon('t/hide', $label);
+            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--toggle');
         } else {
             $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'enable', 'sesskey' => sesskey()];
             $editurl = new moodle_url($editnotice, $editparams);
-            $icon = $OUTPUT->pix_icon('t/show', get_string('notice:enable', 'local_awareness'));
-            $editlink = html_writer::link($editurl, $icon);
+            $label = get_string('notice:enable', 'local_awareness');
+            $icon = $OUTPUT->pix_icon('t/show', $label);
+            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--toggle');
         }
         $links .= ' ' . $editlink;
 
         // Reset.
         $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'reset', 'sesskey' => sesskey()];
         $editurl = new moodle_url($editnotice, $editparams);
-        $icon = $OUTPUT->pix_icon('t/reset', get_string('notice:reset', 'local_awareness'));
-        $editlink = html_writer::link($editurl, $icon);
+        $label = get_string('notice:reset', 'local_awareness');
+        $icon = $OUTPUT->pix_icon('t/reset', $label);
+        $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--reset');
         $links .= ' ' . $editlink;
-
-        // Delete.
-        if (get_config('local_awareness', 'allow_delete')) {
-            $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'unconfirmeddelete', 'sesskey' => sesskey()];
-            $editurl = new moodle_url($editnotice, $editparams);
-            $icon = $OUTPUT->pix_icon('t/delete', get_string('notice:delete', 'local_awareness'));
-            $editlink = html_writer::link($editurl, $icon);
-            $links .= ' ' . $editlink;
-        }
 
         if ($awareness->get('reqack')) {
             // Acknowledge Report.
             $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'acknowledged_report', 'sesskey' => sesskey()];
             $editurl = new moodle_url($editnotice, $editparams);
-            $icon = $OUTPUT->pix_icon('i/report', get_string('report:button:ack', 'local_awareness'));
-            $editlink = html_writer::link($editurl, $icon);
+            $label = get_string('report:button:ack', 'local_awareness');
+            $icon = $OUTPUT->pix_icon('i/report', $label);
+            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--report local-awareness-action--report-start');
             $links .= ' ' . $editlink;
 
             // Dismiss Report.
             $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'dismissed_report', 'sesskey' => sesskey()];
             $editurl = new moodle_url($editnotice, $editparams);
-            $icon = $OUTPUT->pix_icon('i/risk_xss', get_string('report:button:dis', 'local_awareness'));
-            $editlink = html_writer::link($editurl, $icon);
+            $label = get_string('report:button:dis', 'local_awareness');
+            $icon = $OUTPUT->pix_icon('i/report', $label);
+            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--report');
+            $links .= ' ' . $editlink;
+        }
+
+        // Delete (kept last because it is destructive).
+        if (get_config('local_awareness', 'allow_delete')) {
+            $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'unconfirmeddelete', 'sesskey' => sesskey()];
+            $editurl = new moodle_url($editnotice, $editparams);
+            $label = get_string('notice:delete', 'local_awareness');
+            $icon = $OUTPUT->pix_icon('t/delete', $label);
+            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--delete');
             $links .= ' ' . $editlink;
         }
 

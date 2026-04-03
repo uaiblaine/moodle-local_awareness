@@ -1,7 +1,5 @@
 /**
- * User interaction with notice
- * Originally developed by Jwalit Shah <jwalitshah@catalyst-au.net>
- * (fork origin: https://github.com/catalyst/moodle-local_sitenotice).
+ * User interaction with notice form.
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -11,10 +9,6 @@
 
 define([], function () {
 
-    /**
-     * IDs of the form fields controlled by reqcourse selection.
-     * @type {object}
-     */
     var SELECTORS = {
         RESET_NUMBER: 'id_resetinterval_number',
         RESET_UNIT: 'id_resetinterval_timeunit',
@@ -28,43 +22,26 @@ define([], function () {
         COMPETENCY_REQUIREALL_WRAPPER: 'fitem_id_filter_competency_requireall'
     };
 
-    /**
-     * Default values applied when a course-completion course is chosen.
-     * @type {object}
-     */
     var DEFAULT_VALUES = {
         RESET_NUMBER: 0,
         RESET_UNIT: '60',
         REQACK: '0'
     };
 
-    /**
-     * Check whether a course is truly selected in the autocomplete.
-     *
-     * Moodle autocomplete with noselectionstring uses value "" (empty)
-     * when nothing is picked. Also treats "0" as no selection.
-     *
-     * @param {HTMLSelectElement} select
-     * @returns {boolean}
-     */
+    // ───────────────────────────────────────────
+    // Course-completion field logic
+    // ───────────────────────────────────────────
+
     var hasCourseSelected = function (select) {
         var val = select.value;
         return val !== '' && val !== '0' && parseInt(val, 10) > 0;
     };
 
-    /**
-     * Enable or disable the dependent fields.
-     *
-     * @param {boolean} disable
-     */
     var setDependentFields = function (disable) {
-        var pairs = [
-            { id: SELECTORS.RESET_NUMBER, def: DEFAULT_VALUES.RESET_NUMBER },
-            { id: SELECTORS.RESET_UNIT, def: DEFAULT_VALUES.RESET_UNIT },
-            { id: SELECTORS.REQACK, def: DEFAULT_VALUES.REQACK }
-        ];
-
-        pairs.forEach(function (pair) {
+        [{id: SELECTORS.RESET_NUMBER, def: DEFAULT_VALUES.RESET_NUMBER},
+         {id: SELECTORS.RESET_UNIT, def: DEFAULT_VALUES.RESET_UNIT},
+         {id: SELECTORS.REQACK, def: DEFAULT_VALUES.REQACK}
+        ].forEach(function (pair) {
             var el = document.getElementById(pair.id);
             if (!el) {
                 return;
@@ -76,40 +53,30 @@ define([], function () {
         });
     };
 
-    /**
-     * Attempt to bind the form logic.
-     * Returns true if the select was found and bound, false otherwise.
-     *
-     * @returns {boolean}
-     */
     var bind = function () {
         var select = document.getElementById(SELECTORS.REQCOURSE);
         if (!select) {
             return false;
         }
-
-        // Apply initial state.
+        if (select.getAttribute('data-awareness-bound') === '1') {
+            return true;
+        }
+        select.setAttribute('data-awareness-bound', '1');
         setDependentFields(hasCourseSelected(select));
-
-        // Listen to future changes (Moodle fires 'change' on the hidden select).
         select.addEventListener('change', function () {
             setDependentFields(hasCourseSelected(select));
         });
-
         return true;
     };
 
-    /**
-     * Safe JSON parser.
-     *
-     * @param {string} raw
-     * @returns {Array}
-     */
+    // ───────────────────────────────────────────
+    // Helpers
+    // ───────────────────────────────────────────
+
     var parseRules = function (raw) {
         if (!raw) {
             return [];
         }
-
         try {
             var parsed = JSON.parse(raw);
             return Array.isArray(parsed) ? parsed : [];
@@ -119,34 +86,71 @@ define([], function () {
     };
 
     /**
-     * Escape HTML entities.
+     * Flatten a competency tree into a list of items with indent levels
+     * suitable for the competency_picker_items template.
      *
-     * @param {string} value
-     * @returns {string}
+     * @param {Array} tree  Nodes from buildCompetencyTree
+     * @param {Array} existingIds  Already-selected competency IDs
+     * @param {number} depth  Current nesting depth
+     * @returns {Array}
      */
-    var escapeHtml = function (value) {
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+    var flattenTree = function (tree, existingIds, depth) {
+        depth = depth || 0;
+        var items = [];
+        tree.forEach(function (node) {
+            var comp = node.data;
+            items.push({
+                id: comp.id,
+                shortname: comp.shortname,
+                idnumber: comp.idnumber || '',
+                indent: 8 + (depth * 20),
+                existing: existingIds.indexOf(comp.id) !== -1,
+                parent: node.children.length > 0
+            });
+            if (node.children.length) {
+                items = items.concat(flattenTree(node.children, existingIds, depth + 1));
+            }
+        });
+        return items;
     };
 
-    /**
-     * Render and keep competency rules in sync with hidden inputs.
-     */
+    var buildCompetencyTree = function (flatList) {
+        var tree = [];
+        var map = {};
+        flatList.forEach(function (item) {
+            map[item.id] = {data: item, children: []};
+        });
+        flatList.forEach(function (item) {
+            var node = map[item.id];
+            if (item.parentid == 0 || !map[item.parentid]) {
+                tree.push(node);
+            } else {
+                map[item.parentid].children.push(node);
+            }
+        });
+        return tree;
+    };
+
+    // ───────────────────────────────────────────
+    // Competency filter
+    // ───────────────────────────────────────────
+
     var initCompetencyFilter = function () {
         var container = document.getElementById(SELECTORS.COMPETENCY_FILTER_CONTAINER);
         var addButton = document.getElementById(SELECTORS.COMPETENCY_ADD_BUTTON);
         var rulesContainer = document.getElementById(SELECTORS.COMPETENCY_RULES_CONTAINER);
-        var rulesInput = document.getElementById(SELECTORS.COMPETENCY_RULES_INPUT);
+        var rulesInput = document.getElementById(SELECTORS.COMPETENCY_RULES_INPUT)
+            || document.querySelector('input[name="filter_competency_rules"]');
         var requireAllInput = document.getElementById(SELECTORS.COMPETENCY_REQUIREALL_INPUT);
         var requireAllWrapper = document.getElementById(SELECTORS.COMPETENCY_REQUIREALL_WRAPPER);
 
         if (!container || !addButton || !rulesContainer || !rulesInput || !requireAllInput) {
-            return;
+            return false;
         }
+        if (container.getAttribute('data-initialized') === '1') {
+            return true;
+        }
+        container.setAttribute('data-initialized', '1');
 
         var proficientLabel = container.getAttribute('data-proficient-label') || 'Proficient';
         var yesLabel = container.getAttribute('data-yes-label') || 'Yes';
@@ -165,21 +169,15 @@ define([], function () {
         });
 
         var syncRulesInput = function () {
-            var serializable = rules.map(function (rule) {
-                return {
-                    id: rule.id,
-                    name: rule.name,
-                    proficient: rule.proficient
-                };
-            });
-            rulesInput.value = JSON.stringify(serializable);
+            rulesInput.value = JSON.stringify(rules.map(function (r) {
+                return {id: r.id, name: r.name, proficient: r.proficient};
+            }));
         };
 
         var toggleRequireAllVisibility = function () {
             if (!requireAllWrapper) {
                 return;
             }
-
             if (rules.length > 1) {
                 requireAllWrapper.style.display = '';
             } else {
@@ -190,21 +188,19 @@ define([], function () {
 
         var applyRequireAllMode = function () {
             var requireAll = parseInt(requireAllInput.value, 10) === 1;
-
-            var selects = rulesContainer.querySelectorAll('.awareness-competency-proficient');
-            selects.forEach(function (select, index) {
+            rulesContainer.querySelectorAll('.awareness-competency-proficient').forEach(function (sel, i) {
                 if (requireAll) {
-                    rules[index].proficient = 1;
-                    select.value = '1';
-                    select.disabled = true;
+                    rules[i].proficient = 1;
+                    sel.value = '1';
+                    sel.disabled = true;
                 } else {
-                    select.disabled = false;
+                    sel.disabled = false;
                 }
             });
-
             syncRulesInput();
         };
 
+        // ─── Rules rendering (Mustache template) ───
         var renderRules = function () {
             if (!rules.length) {
                 rulesContainer.innerHTML = '';
@@ -213,162 +209,312 @@ define([], function () {
                 return;
             }
 
-            var html = '<div class="border rounded p-2">';
-            rules.forEach(function (rule, index) {
-                html += '<div class="d-flex align-items-center gap-2 mb-2 awareness-competency-row" ' +
-                    'data-index="' + index + '">';
-                html += '<div class="flex-grow-1"><strong>' + escapeHtml(rule.name) + '</strong></div>';
-                html += '<label class="mb-0" for="awareness-competency-proficient-' + index + '">';
-                html += escapeHtml(proficientLabel) + '</label>';
-                html += '<select id="awareness-competency-proficient-' + index + '" ' +
-                    'class="form-select form-select-sm awareness-competency-proficient" ' +
-                    'style="max-width: 100px;">';
-                html += '<option value="1"' + (rule.proficient === 1 ? ' selected' : '') + '>' + escapeHtml(yesLabel) + '</option>';
-                html += '<option value="0"' + (rule.proficient === 0 ? ' selected' : '') + '>' + escapeHtml(noLabel) + '</option>';
-                html += '</select>';
-                html += '<button type="button" class="btn btn-link text-danger p-0 awareness-competency-remove" ' +
-                    'data-index="' + index + '">';
-                html += escapeHtml(removeLabel) + '</button>';
-                html += '</div>';
-            });
-            html += '</div>';
-            rulesContainer.innerHTML = html;
+            var context = {
+                hasRules: true,
+                proficientLabel: proficientLabel,
+                yesLabel: yesLabel,
+                noLabel: noLabel,
+                removeLabel: removeLabel,
+                rules: rules.map(function (rule, index) {
+                    return {
+                        index: index,
+                        name: rule.name,
+                        proficientSelected: rule.proficient === 1
+                    };
+                })
+            };
 
-            rulesContainer.querySelectorAll('.awareness-competency-proficient').forEach(function (select) {
-                select.addEventListener('change', function (event) {
-                    var row = event.target.closest('.awareness-competency-row');
-                    if (!row) {
-                        return;
-                    }
-                    var index = parseInt(row.getAttribute('data-index'), 10);
-                    rules[index].proficient = parseInt(event.target.value, 10) === 1 ? 1 : 0;
-                    syncRulesInput();
-                });
+            require(['core/templates'], function (Templates) {
+                Templates.renderForPromise('local_awareness/competency_rules', context)
+                    .then(function (result) {
+                        rulesContainer.innerHTML = result.html;
+                        if (result.js) {
+                            Templates.runTemplateJS(result.js);
+                        }
+                        toggleRequireAllVisibility();
+                        applyRequireAllMode();
+                        syncRulesInput();
+                        return null;
+                    })
+                    .catch(function () {
+                        // Fallback: basic rendering if template fails.
+                        rulesContainer.innerHTML = '<div class="alert alert-warning">Error rendering rules.</div>';
+                    });
             });
-
-            rulesContainer.querySelectorAll('.awareness-competency-remove').forEach(function (button) {
-                button.addEventListener('click', function (event) {
-                    var index = parseInt(event.currentTarget.getAttribute('data-index'), 10);
-                    rules.splice(index, 1);
-                    renderRules();
-                });
-            });
-
-            toggleRequireAllVisibility();
-            applyRequireAllMode();
-            syncRulesInput();
         };
+
+        // ─── Event delegation on rulesContainer (attach once) ───
+        rulesContainer.addEventListener('change', function (event) {
+            if (!event.target.matches('.awareness-competency-proficient')) {
+                return;
+            }
+            var row = event.target.closest('.awareness-competency-row');
+            if (row) {
+                var idx = parseInt(row.getAttribute('data-index'), 10);
+                rules[idx].proficient = parseInt(event.target.value, 10) === 1 ? 1 : 0;
+                syncRulesInput();
+            }
+        });
+
+        rulesContainer.addEventListener('click', function (event) {
+            var btn = event.target.closest('.awareness-competency-remove');
+            if (btn) {
+                var idx = parseInt(btn.getAttribute('data-index'), 10);
+                rules.splice(idx, 1);
+                renderRules();
+            }
+        });
 
         requireAllInput.addEventListener('change', function () {
             applyRequireAllMode();
         });
 
+        // ─── Add-from-picker helper ───
         var addRulesFromPicker = function (selectedRules) {
-            selectedRules.forEach(function (selectedRule) {
-                var exists = rules.some(function (rule) {
-                    return rule.id === selectedRule.id;
-                });
-                if (!exists) {
-                    rules.push(selectedRule);
+            selectedRules.forEach(function (sr) {
+                if (!rules.some(function (r) { return r.id === sr.id; })) {
+                    rules.push(sr);
                 }
             });
             renderRules();
         };
 
+        // ─── Competency picker modal (ModalSaveCancel + Mustache templates) ───
         addButton.addEventListener('click', function () {
             var contextid = parseInt(container.getAttribute('data-contextid'), 10);
             if (!contextid) {
                 return;
             }
 
-            require(['tool_lp/competencypicker', 'core/ajax', 'core/notification'], function (Picker, Ajax, Notification) {
-                try {
-                    var picker = new Picker(contextid, false, 'parents', true);
-                    picker.on('save', function (e, data) {
-                        var ids = Array.isArray(data.competencyIds) ? data.competencyIds : [];
-                        ids = ids.map(function (id) {
-                            return parseInt(id, 10);
-                        }).filter(function (id) {
-                            return id > 0;
-                        });
+            var labels = {
+                title: container.getAttribute('data-picker-title') || 'Select competencies',
+                framework: container.getAttribute('data-picker-framework') || 'Framework',
+                search: container.getAttribute('data-picker-search') || 'Search',
+                noFrameworks: container.getAttribute('data-picker-noframeworks') || 'No frameworks available.',
+                noCompetencies: container.getAttribute('data-picker-nocompetencies') || 'No competencies found.',
+                loading: container.getAttribute('data-picker-loading') || 'Loading...',
+                addSelected: container.getAttribute('data-picker-addselected') || 'Add selected'
+            };
 
-                        if (!ids.length) {
+            var existingIds = rules.map(function (r) { return r.id; });
+
+            require(
+                ['core/modal_save_cancel', 'core/modal_events', 'core/ajax', 'core/notification', 'core/templates'],
+                function (ModalSaveCancel, ModalEvents, Ajax, Notification, Templates) {
+
+                // Fetch frameworks, then open the modal.
+                Ajax.call([{
+                    methodname: 'core_competency_list_competency_frameworks',
+                    args: {
+                        sort: 'shortname', order: 'ASC', skip: 0, limit: 0,
+                        context: {contextid: contextid},
+                        includes: 'children', onlyvisible: true
+                    }
+                }])[0].then(function (frameworks) {
+                    if (!frameworks || !frameworks.length) {
+                        Notification.addNotification({message: labels.noFrameworks, type: 'warning'});
+                        return null;
+                    }
+
+                    var pickerContext = {
+                        frameworkLabel: labels.framework,
+                        searchLabel: labels.search,
+                        loadingLabel: labels.loading,
+                        frameworks: frameworks.map(function (fw) {
+                            return {id: fw.id, displayname: fw.shortname || fw.idnumber || ('#' + fw.id)};
+                        })
+                    };
+
+                    var bodyPromise = Templates.renderForPromise('local_awareness/competency_picker_body', pickerContext)
+                        .then(function (result) { return result.html; });
+
+                    return ModalSaveCancel.create({
+                        title: labels.title,
+                        body: bodyPromise,
+                        large: true,
+                        show: true,
+                        removeOnClose: true,
+                        buttons: {save: labels.addSelected}
+                    });
+                }).then(function (modal) {
+                    if (!modal) {
+                        return null;
+                    }
+
+                    // Disable save button initially.
+                    modal.setButtonDisabled('save', true);
+
+                    var root = modal.getRoot()[0];
+
+                    // ── Load competencies into the list ──
+                    var loadCompetencies = function (frameworkId, searchText) {
+                        var listEl = root.querySelector('[data-region="competency-list"]');
+                        if (!listEl) {
                             return;
                         }
+                        listEl.innerHTML =
+                            '<div class="p-3 text-center text-muted">' +
+                            '<div class="spinner-border spinner-border-sm" role="status"></div> ' +
+                            labels.loading + '</div>';
 
-                        var requests = ids.map(function (id) {
-                            return Ajax.call([{
-                                methodname: 'core_competency_read_competency',
-                                args: {id: id}
-                            }])[0];
+                        Ajax.call([{
+                            methodname: 'core_competency_search_competencies',
+                            args: {searchtext: searchText || '', competencyframeworkid: frameworkId}
+                        }])[0].then(function (competencies) {
+                            if (!competencies || !competencies.length) {
+                                var el = root.querySelector('[data-region="competency-list"]');
+                                if (el) {
+                                    el.innerHTML =
+                                        '<div class="p-3 text-center text-muted">' +
+                                        labels.noCompetencies + '</div>';
+                                }
+                                return null;
+                            }
+                            var tree = buildCompetencyTree(competencies);
+                            var itemsContext = {
+                                items: flattenTree(tree, existingIds),
+                                emptyMessage: labels.noCompetencies
+                            };
+                            return Templates.renderForPromise('local_awareness/competency_picker_items', itemsContext);
+                        }).then(function (result) {
+                            if (result) {
+                                var el = root.querySelector('[data-region="competency-list"]');
+                                if (el) {
+                                    el.innerHTML = result.html;
+                                    if (result.js) {
+                                        Templates.runTemplateJS(result.js);
+                                    }
+                                }
+                            }
+                            return null;
+                        }).catch(function () {
+                            var el = root.querySelector('[data-region="competency-list"]');
+                            if (el) {
+                                el.innerHTML =
+                                    '<div class="p-3 text-center text-danger">Error loading competencies.</div>';
+                            }
+                        });
+                    };
+
+                    // ── Attach body event listeners after body is rendered ──
+                    var setupBodyListeners = function () {
+                        var fwSelect = root.querySelector('[data-action="choose-framework"]');
+                        if (!fwSelect) {
+                            return; // Body not yet in DOM.
+                        }
+
+                        // Framework selector.
+                        fwSelect.addEventListener('change', function () {
+                            loadCompetencies(parseInt(fwSelect.value, 10), '');
+                            var si = root.querySelector('[data-action="search-input"]');
+                            if (si) {
+                                si.value = '';
+                            }
                         });
 
-                        Promise.all(requests).then(function (responses) {
-                            var selectedRules = ids.map(function (id, index) {
-                                var response = responses[index] || {};
-                                return {
-                                    id: id,
-                                    name: response.shortname || ('#' + id),
-                                    proficient: 1
-                                };
-                            });
-                            addRulesFromPicker(selectedRules);
-                            return null;
-                        }).catch(Notification.exception);
+                        // Auto-load first framework.
+                        if (fwSelect.value) {
+                            loadCompetencies(parseInt(fwSelect.value, 10), '');
+                        }
+                    };
+
+                    // Wait for the body to be rendered before binding to body elements.
+                    modal.getRoot().on(ModalEvents.bodyRendered, function () {
+                        setupBodyListeners();
+                    });
+                    // Also try immediately in case body was already rendered synchronously.
+                    setupBodyListeners();
+
+                    // ── Search (delegated on root — safe before body renders) ──
+                    root.addEventListener('click', function (e) {
+                        if (e.target.closest('[data-action="search-btn"]')) {
+                            var fwSel = root.querySelector('[data-action="choose-framework"]');
+                            var text = root.querySelector('[data-action="search-input"]');
+                            if (fwSel && text) {
+                                loadCompetencies(parseInt(fwSel.value, 10), text.value || '');
+                            }
+                        }
+                    });
+                    root.addEventListener('keydown', function (e) {
+                        if (e.target.matches && e.target.matches('[data-action="search-input"]') && e.key === 'Enter') {
+                            e.preventDefault();
+                            var fwSel = root.querySelector('[data-action="choose-framework"]');
+                            if (fwSel) {
+                                loadCompetencies(parseInt(fwSel.value, 10), e.target.value || '');
+                            }
+                        }
                     });
 
-                    picker.display();
-                } catch (error) {
-                    Notification.exception(error);
-                }
+                    // ── Checkbox toggle → enable/disable Save (delegated) ──
+                    root.addEventListener('change', function (e) {
+                        if (e.target.matches && e.target.matches('[data-competency-id]')) {
+                            var any = root.querySelectorAll('[data-competency-id]:checked:not(:disabled)').length > 0;
+                            modal.setButtonDisabled('save', !any);
+                        }
+                    });
+
+                    // ── Save event (ModalSaveCancel fires this) ──
+                    modal.getRoot().on(ModalEvents.save, function (evt) {
+                        evt.preventDefault();
+                        var checked = root.querySelectorAll('[data-competency-id]:checked:not(:disabled)');
+                        var selected = [];
+                        checked.forEach(function (cb) {
+                            selected.push({
+                                id: parseInt(cb.getAttribute('data-competency-id'), 10),
+                                name: cb.getAttribute('data-competency-name') || ('#' + cb.getAttribute('data-competency-id')),
+                                proficient: 1
+                            });
+                        });
+                        if (selected.length) {
+                            addRulesFromPicker(selected);
+                        }
+                        modal.destroy();
+                    });
+
+                    return null;
+                }).catch(Notification.exception);
             });
         });
 
         renderRules();
+        return true;
     };
 
-    return {
-        /**
-         * Entry-point called by Moodle js_call_amd.
-         *
-         * Because autocomplete elements are initialised asynchronously via
-         * their own AMD module, we must wait until the hidden <select> is
-         * actually present and has its final initial value.
-         *
-         * Strategy:
-         * 1. Try immediately (works on most pages).
-         * 2. Retry after a short delay (async AMD init).
-         * 3. Fall back to a MutationObserver that watches for the element
-         *    being inserted into the DOM.
-         */
-        init: function () {
-            initCompetencyFilter();
+    // ───────────────────────────────────────────
+    // Entry point
+    // ───────────────────────────────────────────
 
-            // Attempt 1: direct (DOM already complete).
-            if (bind()) {
+    return {
+        init: function () {
+            var competencyBound = initCompetencyFilter();
+
+            if (bind() && competencyBound) {
                 return;
             }
 
-            // Attempt 2: short delay after the current AMD queue finishes.
             setTimeout(function () {
                 if (bind()) {
+                    competencyBound = initCompetencyFilter() || competencyBound;
+                } else {
+                    competencyBound = initCompetencyFilter() || competencyBound;
+                }
+                if (bind() && competencyBound) {
                     return;
                 }
 
-                // Attempt 3: MutationObserver as a fallback.
                 var observer = new MutationObserver(function () {
-                    if (bind()) {
+                    var courseBound = bind();
+                    competencyBound = initCompetencyFilter() || competencyBound;
+                    if (courseBound && competencyBound) {
                         observer.disconnect();
                     }
                 });
-                observer.observe(document.body, { childList: true, subtree: true });
+                observer.observe(document.body, {childList: true, subtree: true});
 
-                // Safety: stop observing after 10 s to avoid memory leaks.
                 setTimeout(function () {
                     observer.disconnect();
                 }, 10000);
             }, 200);
-
         }
     };
 });

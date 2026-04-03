@@ -98,3 +98,46 @@
 #fitem_id_filter_course .form-autocomplete-downarrow {
     display: none;
 }
+
+/* Action links in manage-notice table */
+.local_awareness .local-awareness-action {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 0.2rem;
+}
+
+.local_awareness .local-awareness-action--report-start {
+    margin-left: 0.35rem;
+    padding-left: 0.45rem;
+    border-left: 1px solid #d5d9dd;
+}
+
+.local_awareness .local-awareness-action--delete {
+    margin-left: 0.35rem;
+    padding-left: 0.45rem;
+    border-left: 1px solid #d5d9dd;
+}
+
+.local_awareness .local-awareness-action--report:hover,
+.local_awareness .local-awareness-action--report:focus {
+    color: #0b5cad;
+    text-decoration: none;
+}
+
+.local_awareness .local-awareness-action--report:focus {
+    outline: 2px solid #0b5cad;
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+.local_awareness .local-awareness-action--delete:hover,
+.local_awareness .local-awareness-action--delete:focus {
+    color: #a10000;
+    text-decoration: none;
+}
+
+.local_awareness .local-awareness-action--delete:focus {
+    outline: 2px solid #c62828;
+    outline-offset: 2px;
+    border-radius: 3px;
+}

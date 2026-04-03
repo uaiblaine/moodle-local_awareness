@@ -1,0 +1,47 @@
+{{!
+    @template local_awareness/competency_picker_body
+
+    Competency picker modal body.
+
+    Context variables required for this template:
+    * frameworkLabel  - Label for the framework selector
+    * searchLabel     - Placeholder / button text for search
+    * loadingLabel    - Loading indicator text
+    * frameworks      - Array of {id, displayname}
+
+    Example context (json):
+    {
+        "frameworkLabel": "Competency framework",
+        "searchLabel": "Search",
+        "loadingLabel": "Loading...",
+        "frameworks": [{"id": 1, "displayname": "Framework A"}]
+    }
+}}
+<div data-region="awareness-competency-picker">
+    <div class="mb-3">
+        <label class="form-label fw-bold" for="awareness-cp-fw">
+            {{frameworkLabel}}
+        </label>
+        <select id="awareness-cp-fw" class="form-select" data-action="choose-framework">
+            {{#frameworks}}
+            <option value="{{id}}">{{displayname}}</option>
+            {{/frameworks}}
+        </select>
+    </div>
+    <div class="mb-3">
+        <div class="input-group">
+            <input type="text" class="form-control" data-action="search-input"
+                   placeholder="{{searchLabel}}" aria-label="{{searchLabel}}">
+            <button class="btn btn-outline-secondary" type="button" data-action="search-btn">
+                {{#pix}}a/search, core, {{searchLabel}}{{/pix}}
+            </button>
+        </div>
+    </div>
+    <div data-region="competency-list" class="border rounded"
+         style="max-height: 300px; overflow-y: auto; min-height: 100px;">
+        <div class="p-3 text-center text-muted">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            {{loadingLabel}}
+        </div>
+    </div>
+</div>

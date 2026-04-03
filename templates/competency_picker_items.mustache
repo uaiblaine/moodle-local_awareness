@@ -1,0 +1,39 @@
+{{!
+    @template local_awareness/competency_picker_items
+
+    Flat list of competencies for the picker modal.
+
+    Context variables required for this template:
+    * items         - Array of {id, shortname, idnumber, indent, existing, parent}
+    * emptyMessage  - Text shown when no competencies found
+
+    Example context (json):
+    {
+        "items": [
+            {"id": 1, "shortname": "Comp A", "idnumber": "CA", "indent": 8, "existing": false, "parent": true}
+        ],
+        "emptyMessage": "No competencies found."
+    }
+}}
+{{#items}}
+<div class="py-1 px-2 border-bottom competency-picker-item" style="padding-left: {{indent}}px !important;">
+    <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox"
+               data-competency-id="{{id}}"
+               data-competency-name="{{shortname}}"
+               id="awareness-cp-{{id}}"
+               {{#existing}}disabled checked{{/existing}}>
+        <label class="form-check-label {{#parent}}fw-semibold{{/parent}}" for="awareness-cp-{{id}}">
+            {{shortname}}
+            {{#idnumber}}
+                <small class="text-muted">({{idnumber}})</small>
+            {{/idnumber}}
+        </label>
+    </div>
+</div>
+{{/items}}
+{{^items}}
+<div class="p-3 text-center text-muted">
+    {{emptyMessage}}
+</div>
+{{/items}}

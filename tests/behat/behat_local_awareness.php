@@ -18,7 +18,6 @@
  * Steps definitions related to local_awareness.
  *
  * @package    local_awareness
- * Originally developed by Cameron Ball <cameron@cameron1729.xyz> (Catalyst IT Australia Pty Ltd).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
@@ -36,7 +35,6 @@ use Behat\Gherkin\Node\TableNode;
  * Site notice step definitions.
  *
  * @package    local_awareness
- * Originally developed by Cameron Ball <cameron@cameron1729.xyz> (Catalyst IT Australia Pty Ltd).
  * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
  *
  * @author    Anderson Blaine <anderson@blaine.com.br>
