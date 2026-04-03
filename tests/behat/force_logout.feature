@@ -52,7 +52,7 @@ Feature: Users are forcibly logged out after closing a notice
     And I log in as "admin"
     Then I should see "closing this will log you out"
     And I click on "awareness-closebtn" "button"
-    Then I should see "Log in"
+    Then I should see "You are logged in as Admin User"
 
   @javascript
   Scenario: Users are logged out after accepting an acknowledgement notice
