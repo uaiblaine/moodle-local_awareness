@@ -1,0 +1,228 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+namespace local_awareness\privacy;
+
+use core_privacy\local\metadata\collection;
+use core_privacy\local\request\approved_contextlist;
+use core_privacy\local\request\approved_userlist;
+use core_privacy\local\request\contextlist;
+use core_privacy\local\request\userlist;
+use core_privacy\local\request\writer;
+
+/**
+ * Privacy Subsystem implementation.
+ *
+ * @package    local_awareness
+ * Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (Catalyst IT).
+ * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
+ *
+ * @author    Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class provider implements
+    \core_privacy\local\metadata\provider,
+    \core_privacy\local\request\core_userlist_provider,
+    \core_privacy\local\request\plugin\provider {
+    /**
+     * Gets contexts for user.
+     *
+     * @param int $userid user ID.
+     * @return \core_privacy\local\request\contextlist
+     */
+    public static function get_contexts_for_userid(int $userid): contextlist {
+        $contextlist = new contextlist();
+        $sql = "SELECT DISTINCT c.id
+                  FROM {local_awareness_lastview} lw
+                  JOIN {context} c ON c.instanceid = lw.userid AND c.contextlevel = :contextuser
+                 WHERE lw.userid = :userid";
+
+        $params = [
+            'contextuser'   => CONTEXT_USER,
+            'userid'        => $userid,
+        ];
+
+        $contextlist->add_from_sql($sql, $params);
+
+        return $contextlist;
+    }
+
+    /**
+     * Exports user data.
+     *
+     * @param \core_privacy\local\request\approved_contextlist $contextlist Context list.
+     */
+    public static function export_user_data(approved_contextlist $contextlist) {
+        global $DB;
+
+        foreach ($contextlist->get_contexts() as $context) {
+            $user = $contextlist->get_user();
+
+            $sql1 = "SELECT lv.*
+                       FROM {local_awareness_lastview} lv
+                      WHERE lv.userid = :userid";
+
+            $sql2 = "SELECT ack.*
+                       FROM {local_awareness_ack} ack
+                      WHERE ack.userid = :userid";
+
+            $sql3 = "SELECT his.*
+                       FROM {local_awareness_hlinks_his} his
+                      WHERE his.userid = :userid";
+
+            $params = [
+                'userid' => $user->id,
+            ];
+
+            $lastview = $DB->get_records_sql($sql1, $params);
+            $acknowlegement = $DB->get_records_sql($sql2, $params);
+            $linktracking = $DB->get_records_sql($sql3, $params);
+
+            $data = (object)[
+                'lastview' => $lastview,
+                'acknowledgement' => $acknowlegement,
+                'linktracking' => $linktracking,
+            ];
+
+            $subcontext = [
+                get_string('pluginname', 'local_awareness'),
+            ];
+
+            writer::with_context($context)->export_data($subcontext, $data);
+        }
+    }
+
+    /**
+     * Delete all data for users in provided context.
+     *
+     * @param \context $context Context.
+     */
+    public static function delete_data_for_all_users_in_context(\context $context) {
+        global $DB;
+        if ($context->contextlevel !== CONTEXT_USER) {
+            return;
+        }
+        $userid = $context->instanceid;
+
+        $DB->delete_records('local_awareness_lastview', ['userid' => $userid]);
+        $DB->delete_records('local_awareness_hlinks_his', ['userid' => $userid]);
+        $DB->delete_records('local_awareness_ack', ['userid' => $userid]);
+    }
+
+    /**
+     * Delete data for a user.
+     *
+     * @param \core_privacy\local\request\approved_contextlist $contextlist Context list.
+     */
+    public static function delete_data_for_user(approved_contextlist $contextlist) {
+        global $DB;
+
+        $contexts = $contextlist->get_contexts();
+        if (count($contexts) == 0) {
+            return;
+        }
+        $context = reset($contexts);
+
+        if ($context->contextlevel !== CONTEXT_USER) {
+            return;
+        }
+        $userid = $context->instanceid;
+
+        $DB->delete_records('local_awareness_lastview', ['userid' => $userid]);
+        $DB->delete_records('local_awareness_hlinks_his', ['userid' => $userid]);
+        $DB->delete_records('local_awareness_ack', ['userid' => $userid]);
+    }
+
+    /**
+     * Gets users in a context.
+     *
+     * @param \core_privacy\local\request\userlist $userlist user list.
+     */
+    public static function get_users_in_context(userlist $userlist) {
+        $context = $userlist->get_context();
+
+        if (!$context instanceof \context_user) {
+            return;
+        }
+
+        $params = ['contextid' => $context->id, 'contextlevel' => CONTEXT_USER];
+
+        $sql = "SELECT lv.userid
+                  FROM {local_awareness_lastview} lv
+                  JOIN {context} c ON c.contextlevel = :contextlevel
+                   AND c.instanceid = lv.userid
+                 WHERE c.id = :contextid";
+
+        $userlist->add_from_sql('userid', $sql, $params);
+    }
+
+    /**
+     * Delete data for users.
+     *
+     * @param \core_privacy\local\request\approved_userlist $userlist User list.
+     */
+    public static function delete_data_for_users(approved_userlist $userlist) {
+        global $DB;
+
+        $context = $userlist->get_context();
+
+        if ($context instanceof \context_user) {
+            $userid = $context->instanceid;
+            $DB->delete_records('local_awareness_lastview', ['userid' => $userid]);
+            $DB->delete_records('local_awareness_hlinks_his', ['userid' => $userid]);
+            $DB->delete_records('local_awareness_ack', ['userid' => $userid]);
+        }
+    }
+
+    /**
+     * Returns metadata.
+     *
+     * @param \core_privacy\local\metadata\collection $collection Collection.
+     * @return \core_privacy\local\metadata\collection
+     */
+    public static function get_metadata(collection $collection): collection {
+        $collection->add_database_table(
+            'local_awareness_ack',
+            [
+                'userid' => 'privacy:metadata:userid',
+                'username' => 'privacy:metadata:username',
+                'firstname' => 'privacy:metadata:firstname',
+                'lastname' => 'privacy:metadata:lastname',
+                'idnumber' => 'privacy:metadata:idnumber',
+            ],
+            'privacy:metadata:local_awareness_ack'
+        );
+
+        $collection->add_database_table(
+            'local_awareness_hlinks_his',
+            [
+                'userid' => 'privacy:metadata:userid',
+            ],
+            'privacy:metadata:local_awareness_hlinks_his'
+        );
+
+        $collection->add_database_table(
+            'local_awareness_lastview',
+            [
+                'userid' => 'privacy:metadata:userid',
+            ],
+            'privacy:metadata:local_awareness_lastview'
+        );
+
+        return $collection;
+    }
+}

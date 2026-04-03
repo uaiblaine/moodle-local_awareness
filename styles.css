@@ -1,0 +1,100 @@
+/* Modern Modal Styles */
+.awareness .modal-content {
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.awareness .modal-header {
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    padding: 1rem 1.5rem;
+}
+
+.awareness .modal-footer {
+    border-top: 1px solid #dee2e6;
+    background-color: #fff;
+    padding: 1rem 1.5rem;
+}
+
+#awareness-modal-ackcheckbox {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+}
+
+.awareness .form-check-label {
+    font-size: 0.95rem;
+    color: #495057;
+    cursor: pointer;
+    user-select: none;
+}
+
+#awareness-acceptbtn {
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+}
+
+#awareness-acceptbtn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+/* Ensure focus visibility for accessibility */
+.awareness button:focus,
+.awareness input:focus {
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Background Image Modal Styles */
+.awareness .modal-content.has-bg-image {
+    position: relative;
+    overflow: hidden;
+}
+
+.awareness .modal-content.has-bg-image .modal-header {
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.awareness .modal-content.has-bg-image .modal-body {
+    background-color: rgba(255, 255, 255, 0.80);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+.awareness .modal-content.has-bg-image .modal-footer {
+    background-color: rgba(255, 255, 255, 0.90);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+/* Jelly bounce animation — plays when backdrop click is blocked */
+@keyframes awareness-jelly {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.awareness.jelly-anim .modal-dialog {
+    animation: awareness-jelly 0.4s ease-in-out;
+    transform-origin: center;
+}
+
+/* Hide the dropdown arrow on AJAX-powered course autocomplete fields */
+#fitem_id_reqcourse .form-autocomplete-downarrow,
+#fitem_id_filter_course .form-autocomplete-downarrow {
+    display: none;
+}
