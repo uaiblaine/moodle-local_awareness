@@ -39,7 +39,8 @@ class notice_form extends \core\form\persistent {
     /** @var array Fields to remove from the persistent validation. */
     protected static $foreignfields = [
         'perpetual', 'cohorts', 'filter_role', 'filter_category',
-        'filter_course', 'filter_format', 'filter_theme', 'bgimage',
+        'filter_course', 'filter_format', 'filter_theme', 'filter_competency_rules',
+        'filter_competency_requireall', 'bgimage',
     ];
 
     /**
@@ -258,6 +259,56 @@ class notice_form extends \core\form\persistent {
             ]
         );
 
+        if (helper::is_competency_filter_enabled()) {
+            $existingrules = [];
+            if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
+                $existingfilters = json_decode($persistent->get('filtervalues'), true);
+                $existingrules = helper::normalise_competency_rules($existingfilters['filter_competency_rules'] ?? []);
+
+                if (!empty($existingrules)) {
+                    $ids = array_map(function (array $rule): int {
+                        return (int) ($rule['id'] ?? 0);
+                    }, $existingrules);
+                    $names = helper::get_competency_names($ids);
+
+                    foreach ($existingrules as $index => $rule) {
+                        if (empty($existingrules[$index]['name']) && !empty($names[$rule['id']])) {
+                            $existingrules[$index]['name'] = $names[$rule['id']];
+                        }
+                    }
+                }
+            }
+
+            $mform->addElement('static', 'filter_competency_label', get_string('filter_competency', 'local_awareness'), '');
+            $mform->addElement(
+                'html',
+                '<div id="awareness-competency-filter" class="mb-3" data-contextid="' . (int) \context_system::instance()->id . '"
+                    data-proficient-label="' . s(get_string('filter_competency_proficient', 'local_awareness')) . '"
+                    data-yes-label="' . s(get_string('booleanformat:true', 'local_awareness')) . '"
+                    data-no-label="' . s(get_string('booleanformat:false', 'local_awareness')) . '"
+                    data-remove-label="' . s(get_string('filter_competency_remove', 'local_awareness')) . '">
+                    <button type="button" id="id_awareness_add_competencies" class="btn btn-secondary">' .
+                        s(get_string('filter_competency_add', 'local_awareness')) . '
+                    </button>
+                    <div id="id_awareness_competency_rules" class="mt-2"></div>
+                </div>'
+            );
+
+            $mform->addElement('hidden', 'filter_competency_rules', json_encode($existingrules));
+            $mform->setType('filter_competency_rules', PARAM_RAW);
+
+            $mform->addElement('selectyesno', 'filter_competency_requireall', get_string('filter_competency_requireall', 'local_awareness'));
+            $mform->setDefault('filter_competency_requireall', 0);
+            $mform->addHelpButton('filter_competency_requireall', 'filter_competency_requireall', 'local_awareness');
+
+            if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
+                $existingfilters = json_decode($persistent->get('filtervalues'), true);
+                if (!empty($existingfilters['filter_competency_requireall'])) {
+                    $mform->setDefault('filter_competency_requireall', 1);
+                }
+            }
+        }
+
         $mform->addElement('selectyesno', 'enabled', get_string('notice:enable', 'local_awareness'));
         $mform->setDefault('enabled', 1);
 
@@ -289,6 +340,10 @@ class notice_form extends \core\form\persistent {
             foreach ($filters as $key => $value) {
                 $data->$key = $value;
             }
+        }
+
+        if (isset($data->filter_competency_rules) && is_array($data->filter_competency_rules)) {
+            $data->filter_competency_rules = json_encode($data->filter_competency_rules);
         }
 
         return $data;

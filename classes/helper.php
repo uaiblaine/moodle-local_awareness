@@ -73,10 +73,23 @@ class helper {
 
         // Pack filter values.
         $filters = [];
-        $filterfields = ['filter_role', 'filter_category', 'filter_course', 'filter_format', 'filter_theme'];
+        $filterfields = [
+            'filter_role',
+            'filter_category',
+            'filter_course',
+            'filter_format',
+            'filter_theme',
+            'filter_competency_rules',
+            'filter_competency_requireall',
+        ];
         foreach ($filterfields as $field) {
             if (isset($data->$field)) {
                 $val = $data->$field;
+                if ($field === 'filter_competency_rules') {
+                    $val = self::normalise_competency_rules($val);
+                } else if ($field === 'filter_competency_requireall') {
+                    $val = empty($val) ? 0 : 1;
+                }
                 // Autocomplete may return special markers when nothing is selected.
                 if (is_array($val)) {
                     $val = array_filter($val, function ($v) {
@@ -124,10 +137,23 @@ class helper {
 
         // Pack filter values.
         $filters = [];
-        $filterfields = ['filter_role', 'filter_category', 'filter_course', 'filter_format', 'filter_theme'];
+        $filterfields = [
+            'filter_role',
+            'filter_category',
+            'filter_course',
+            'filter_format',
+            'filter_theme',
+            'filter_competency_rules',
+            'filter_competency_requireall',
+        ];
         foreach ($filterfields as $field) {
             if (isset($data->$field)) {
                 $val = $data->$field;
+                if ($field === 'filter_competency_rules') {
+                    $val = self::normalise_competency_rules($val);
+                } else if ($field === 'filter_competency_requireall') {
+                    $val = empty($val) ? 0 : 1;
+                }
                 // Autocomplete may return special markers when nothing is selected.
                 if (is_array($val)) {
                     $val = array_filter($val, function ($v) {
@@ -891,6 +917,125 @@ class helper {
     }
 
     /**
+     * Checks whether competency support is available and enabled.
+     *
+     * @return bool
+     */
+    public static function is_competency_filter_enabled(): bool {
+        if (!class_exists('\\core_competency\\api')) {
+            return false;
+        }
+
+        return \core_competency\api::is_enabled();
+    }
+
+    /**
+     * Normalize competency rules into a safe list of {id, proficient, name} items.
+     *
+     * @param mixed $rawrules
+     * @return array
+     */
+    public static function normalise_competency_rules($rawrules): array {
+        if (is_string($rawrules) && $rawrules !== '') {
+            $decoded = json_decode($rawrules, true);
+            $rawrules = is_array($decoded) ? $decoded : [];
+        }
+
+        if (!is_array($rawrules)) {
+            return [];
+        }
+
+        $normalised = [];
+        $seenids = [];
+        foreach ($rawrules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+
+            $id = (int) ($rule['id'] ?? ($rule['competencyid'] ?? 0));
+            if ($id <= 0) {
+                continue;
+            }
+
+            if (isset($seenids[$id])) {
+                continue;
+            }
+            $seenids[$id] = true;
+
+            $proficient = !empty($rule['proficient']) ? 1 : 0;
+            $name = isset($rule['name']) ? clean_param(trim((string) $rule['name']), PARAM_TEXT) : '';
+
+            $normalised[] = [
+                'id' => $id,
+                'proficient' => $proficient,
+                'name' => $name,
+            ];
+
+            // Guardrail: cap amount of competency rules per notice.
+            if (count($normalised) >= 25) {
+                break;
+            }
+        }
+
+        return $normalised;
+    }
+
+    /**
+     * Resolve display names for competencies.
+     *
+     * @param array $competencyids
+     * @return array<int, string>
+     */
+    public static function get_competency_names(array $competencyids): array {
+        global $DB;
+
+        $ids = array_values(array_unique(array_map('intval', $competencyids)));
+        $ids = array_filter($ids, function (int $id): bool {
+            return $id > 0;
+        });
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED);
+        $records = $DB->get_records_select('competency', "id {$insql}", $params, '', 'id, shortname');
+
+        $names = [];
+        foreach ($records as $record) {
+            $names[(int) $record->id] = format_string($record->shortname, true, ['context' => \context_system::instance()]);
+        }
+
+        return $names;
+    }
+
+    /**
+     * Get proficiency for a user in a competency within a course.
+     *
+     * @param int $userid
+     * @param int $courseid
+     * @param int $competencyid
+     * @return bool
+     */
+    private static function get_user_competency_proficiency(int $userid, int $courseid, int $competencyid): bool {
+        static $cache = [];
+
+        $cachekey = $userid . ':' . $courseid . ':' . $competencyid;
+        if (array_key_exists($cachekey, $cache)) {
+            return $cache[$cachekey];
+        }
+
+        try {
+            $usercompetency = \core_competency\api::get_user_competency_in_course($courseid, $userid, $competencyid);
+            $cache[$cachekey] = !empty($usercompetency) && !empty($usercompetency->get('proficiency'));
+        } catch (\Exception $e) {
+            $cache[$cachekey] = false;
+        }
+
+        return $cache[$cachekey];
+    }
+
+    /**
      * Check if the current page matches the path pattern.
      *
      * @param string $pathmatch The URL pattern.
@@ -964,7 +1109,10 @@ class helper {
 
         // Check if ALL filter arrays are empty — if so, no filtering needed.
         $hasanyfilter = false;
-        foreach ($filters as $values) {
+        foreach ($filters as $key => $values) {
+            if ($key === 'filter_competency_requireall') {
+                continue;
+            }
             if (!empty($values)) {
                 $hasanyfilter = true;
                 break;
@@ -1053,6 +1201,39 @@ class helper {
             }
             if (!empty($currenttheme) && !in_array($currenttheme, $filters['filter_theme'])) {
                 return false;
+            }
+        }
+
+        // 6. Competency filter.
+        if (!empty($filters['filter_competency_rules'])) {
+            if (!self::is_competency_filter_enabled()) {
+                return false;
+            }
+
+            if (!$course) {
+                return false;
+            }
+
+            $rules = self::normalise_competency_rules($filters['filter_competency_rules']);
+            if (!empty($rules)) {
+                $requireall = !empty($filters['filter_competency_requireall']);
+
+                foreach ($rules as $rule) {
+                    $competencyid = (int) $rule['id'];
+                    $requiredproficient = !empty($rule['proficient']) ? 1 : 0;
+                    $isproficient = self::get_user_competency_proficiency($USER->id, (int) $course->id, $competencyid) ? 1 : 0;
+
+                    if ($requireall) {
+                        if ($isproficient !== 1) {
+                            return false;
+                        }
+                        continue;
+                    }
+
+                    if ($isproficient !== $requiredproficient) {
+                        return false;
+                    }
+                }
             }
         }
 

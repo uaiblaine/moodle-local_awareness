@@ -114,4 +114,57 @@ final class helper_test extends \advanced_testcase {
         $options = helper::built_cohorts_options();
         $this->assertEquals(2, count($options));
     }
+
+    /**
+     * Test competency rule normalisation with JSON input, duplicates and invalid rows.
+     */
+    public function test_normalise_competency_rules_with_json_input(): void {
+        $rawrules = json_encode([
+            ['id' => '10', 'proficient' => 1, 'name' => '  Competency A  '],
+            ['competencyid' => 11, 'proficient' => 0, 'name' => '<b>Competency B</b>'],
+            ['id' => 10, 'proficient' => 0, 'name' => 'Duplicate should be ignored'],
+            ['id' => 0, 'proficient' => 1, 'name' => 'Invalid ID'],
+            'invalid-row',
+        ]);
+
+        $actual = helper::normalise_competency_rules($rawrules);
+
+        $this->assertCount(2, $actual);
+        $this->assertSame(10, $actual[0]['id']);
+        $this->assertSame(1, $actual[0]['proficient']);
+        $this->assertSame('Competency A', $actual[0]['name']);
+
+        $this->assertSame(11, $actual[1]['id']);
+        $this->assertSame(0, $actual[1]['proficient']);
+        $this->assertSame('Competency B', $actual[1]['name']);
+    }
+
+    /**
+     * Test competency rules are capped to a safe maximum amount.
+     */
+    public function test_normalise_competency_rules_cap_amount(): void {
+        $rawrules = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $rawrules[] = ['id' => $i, 'proficient' => 1, 'name' => 'Competency ' . $i];
+        }
+
+        $actual = helper::normalise_competency_rules($rawrules);
+
+        $this->assertCount(25, $actual);
+        $this->assertSame(1, $actual[0]['id']);
+        $this->assertSame(25, $actual[24]['id']);
+    }
+
+    /**
+     * Test requireall key alone does not accidentally activate filters.
+     */
+    public function test_check_filters_with_only_requireall_key(): void {
+        $this->resetAfterTest();
+
+        $filtervalues = json_encode([
+            'filter_competency_requireall' => 1,
+        ]);
+
+        $this->assertTrue(helper::check_filters($filtervalues));
+    }
 }
