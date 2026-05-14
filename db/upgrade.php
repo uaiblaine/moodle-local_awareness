@@ -107,5 +107,31 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026030401, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026051401) {
+        $table = new xmldb_table('local_awareness_audience_jobs');
+
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('jobid', XMLDB_TYPE_CHAR, '36', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('criteriahash', XMLDB_TYPE_CHAR, '64', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('criteria', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+            $table->add_field('status', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, 'pending');
+            $table->add_field('resultcount', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $table->add_field('breakdown', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('errormsg', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('timecompleted', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('jobid_uq', XMLDB_INDEX_UNIQUE, ['jobid']);
+            $table->add_index('criteriahash_ix', XMLDB_INDEX_NOTUNIQUE, ['criteriahash']);
+
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(true, 2026051401, 'local', 'awareness');
+    }
+
     return true;
 }

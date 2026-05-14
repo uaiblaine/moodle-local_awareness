@@ -70,4 +70,22 @@ $functions = [
         'loginrequired' => true,
         'ajax' => true,
     ],
+
+    'local_awareness_estimate_audience' => [
+        'classname' => 'local_awareness\external',
+        'methodname' => 'estimate_audience',
+        'description' => 'Enqueue an asynchronous audience-estimate job',
+        'type' => 'write',
+        'loginrequired' => true,
+        'ajax' => true,
+    ],
+
+    'local_awareness_get_estimate' => [
+        'classname' => 'local_awareness\external',
+        'methodname' => 'get_estimate',
+        'description' => 'Poll an audience-estimate job',
+        'type' => 'read',
+        'loginrequired' => true,
+        'ajax' => true,
+    ],
 ];

@@ -1,0 +1,96 @@
+{{!
+    @template local_awareness/editor/audience_panel
+
+    Asynchronous audience-estimate widget. Renders an idle state on first load;
+    audience_estimator.js takes over from there, transitioning between
+    idle / queued / cached / error / timeout states.
+
+    Context variables required:
+    * audience.autotrigger (bool) — true when ≤3 audience-shaping rules
+    * audience.summary (array of {labelkey, value})
+    * audience.initialcount (int|null)
+    * audience.initialstate (string) — idle|cached|...
+    * audience.contextrules (array of {key, label})
+    * audience.threshold (int) — used by JS via data attribute
+    * audience.poll_interval_ms (int)
+    * audience.poll_max (int)
+
+    Example context (json):
+    {
+        "audience": {
+            "autotrigger": true,
+            "summary": [{"labelkey": "audience:summary:cohorts", "value": 0}],
+            "initialcount": null,
+            "initialstate": "idle",
+            "contextrules": [],
+            "threshold": 3,
+            "poll_interval_ms": 10000,
+            "poll_max": 30
+        }
+    }
+}}
+<section class="la-audience"
+         data-region="la-audience"
+         data-threshold="{{audience.threshold}}"
+         data-poll-interval-ms="{{audience.poll_interval_ms}}"
+         data-poll-max="{{audience.poll_max}}"
+         aria-labelledby="la-audience-title">
+    <header class="la-audience__head">
+        <h3 id="la-audience-title" class="la-audience__title">
+            <i class="fa fa-bullseye" aria-hidden="true"></i>
+            {{#str}}audience:title, local_awareness{{/str}}
+        </h3>
+    </header>
+
+    <dl class="la-audience__summary" data-slot="summary">
+        {{#audience.summary}}
+            <div class="la-audience__summary-item">
+                <dt>{{#str}}{{labelkey}}, local_awareness{{/str}}</dt>
+                <dd data-summary-key="{{key}}">{{value}}</dd>
+            </div>
+        {{/audience.summary}}
+    </dl>
+
+    <div class="la-audience__reach" data-slot="reach"
+         aria-live="polite" aria-atomic="true">
+        <div class="la-audience__reach-meta">
+            <span class="la-audience__reach-label">{{#str}}audience:reach:label, local_awareness{{/str}}</span>
+            <span class="la-audience__reach-state" data-slot="state">
+                {{#audience.initialstate_idle}}{{#str}}audience:state:idle, local_awareness{{/str}}{{/audience.initialstate_idle}}
+                {{#audience.initialstate_cached}}{{audience.cachedlabel}}{{/audience.initialstate_cached}}
+            </span>
+        </div>
+        <div class="la-audience__reach-value" data-slot="value">
+            {{#audience.initialcount}}{{audience.initialcountformatted}}{{/audience.initialcount}}
+            {{^audience.initialcount}}—{{/audience.initialcount}}
+        </div>
+    </div>
+
+    <div class="la-audience__actions" data-slot="actions">
+        <button type="button" class="la-btn la-btn--brand" data-action="calculate"
+                {{#audience.autotrigger}}hidden{{/audience.autotrigger}}>
+            <i class="fa fa-bolt" aria-hidden="true"></i>
+            {{#str}}audience:btn:calculate, local_awareness{{/str}}
+        </button>
+        <button type="button" class="la-btn la-btn--ghost" data-action="retry" hidden>
+            <i class="fa fa-refresh" aria-hidden="true"></i>
+            {{#str}}audience:btn:retry, local_awareness{{/str}}
+        </button>
+    </div>
+
+    <div class="la-audience__breakdown" data-slot="breakdown" hidden></div>
+
+    <div class="la-audience__context" data-slot="context"
+         {{^audience.contextrules}}hidden{{/audience.contextrules}}>
+        <h4 class="la-audience__context-title">
+            <i class="fa fa-filter" aria-hidden="true"></i>
+            {{#str}}audience:context_restrictions:title, local_awareness{{/str}}
+        </h4>
+        <p class="la-audience__context-hint">{{#str}}audience:context_restrictions:hint, local_awareness{{/str}}</p>
+        <ul class="la-audience__chips" data-slot="contextchips">
+            {{#audience.contextrules}}
+                <li class="la-chip" data-key="{{key}}">{{label}}</li>
+            {{/audience.contextrules}}
+        </ul>
+    </div>
+</section>

@@ -1,0 +1,49 @@
+{{!
+    @template local_awareness/editor/action_bar
+
+    Sticky bottom action bar. The buttons are linked to the hidden moodleform
+    via the `form` attribute, so a click submits the same POST that
+    editnotice.php already handles.
+
+    Context variables required:
+    * actionbar.formid (string) — id of the (hidden) moodleform <form>
+    * actionbar.cancelurl (string)
+    * actionbar.cansavedraft (bool)
+    * actionbar.canpublish (bool)
+    * actionbar.disablepublish (bool)
+
+    Example context (json):
+    {
+        "actionbar": {
+            "formid": "mform1",
+            "cancelurl": "/local/awareness/managenotice.php",
+            "cansavedraft": true,
+            "canpublish": true,
+            "disablepublish": false
+        }
+    }
+}}
+<footer class="la-actionbar" data-region="la-actionbar">
+    <div class="la-actionbar__left">
+        <span class="la-actionbar__ok" aria-hidden="true"></span>
+        <span>{{#str}}editor:action:saved_local, local_awareness{{/str}}</span>
+    </div>
+    <div class="la-actionbar__right">
+        <a class="la-btn la-btn--ghost" href="{{actionbar.cancelurl}}">
+            <i class="fa fa-times" aria-hidden="true"></i> {{#str}}editor:action:cancel, local_awareness{{/str}}
+        </a>
+        <button type="button" class="la-btn la-btn--soft" data-action="preview-fullscreen">
+            <i class="fa fa-eye" aria-hidden="true"></i> {{#str}}editor:action:preview, local_awareness{{/str}}
+        </button>
+        {{#actionbar.cansavedraft}}
+            <button type="submit" form="{{actionbar.formid}}" class="la-btn la-btn--soft" data-action="save-draft" name="submitbutton" value="savedraft">
+                <i class="fa fa-floppy-o" aria-hidden="true"></i> {{#str}}editor:action:save_draft, local_awareness{{/str}}
+            </button>
+        {{/actionbar.cansavedraft}}
+        {{#actionbar.canpublish}}
+            <button type="submit" form="{{actionbar.formid}}" class="la-btn la-btn--brand" data-action="publish" name="submitbutton" value="publish" {{#actionbar.disablepublish}}disabled{{/actionbar.disablepublish}}>
+                <i class="fa fa-check-circle" aria-hidden="true"></i> {{#str}}editor:action:save_publish, local_awareness{{/str}}
+            </button>
+        {{/actionbar.canpublish}}
+    </div>
+</footer>

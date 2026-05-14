@@ -212,3 +212,83 @@ $string['report_lh:linkurl']     = 'Link URL';
 
 // Report Builder — awareness:viewreports capability string.
 $string['awareness:viewreports'] = 'View awareness reports';
+
+// Notice editor — section titles & descriptions.
+$string['editor:section:content']         = 'Notice content';
+$string['editor:section:content:desc']    = 'What will be shown in the modal to the user.';
+$string['editor:section:behavior']        = 'Behaviour';
+$string['editor:section:behavior:desc']   = 'How the notice appears, repeats and is dismissed.';
+$string['editor:section:appearance']      = 'Modal appearance';
+$string['editor:section:appearance:desc'] = 'Size and visual fit of the modal window.';
+$string['editor:section:audience']        = 'Audience';
+$string['editor:section:audience:desc']   = 'Who the notice will be shown to. Filters combine with AND (intersection).';
+$string['editor:section:filters']         = 'Display restrictions';
+$string['editor:section:filters:desc']    = 'Refine where on the platform the notice fires.';
+
+// Notice editor — page chrome.
+$string['editor:title:create']     = 'Create notice';
+$string['editor:title:edit']       = 'Edit notice';
+$string['editor:subtitle']         = 'Build a contextual modal that will be shown to users when the rules below match.';
+$string['editor:status:draft']     = 'Draft · not published';
+$string['editor:status:live']      = 'Live · being shown';
+$string['editor:autosaved']        = 'auto-saved {$a} ago';
+$string['editor:nav:howitworks']   = 'How it works';
+$string['editor:nav:howitworks:body'] = 'Filters combine by <b>intersection</b> — all must match. Cohorts and individual courses combine by <b>union</b> within their own field.';
+$string['editor:requirements']     = 'Required fields are missing: {$a}. Complete them before enabling the notice.';
+
+// Notice editor — action bar.
+$string['editor:action:cancel']       = 'Cancel';
+$string['editor:action:preview']      = 'Preview';
+$string['editor:action:save_draft']   = 'Save draft';
+$string['editor:action:save_publish'] = 'Save & publish';
+$string['editor:action:saved_local']  = 'Changes saved locally';
+
+// Preview card.
+$string['editor:preview:title']           = 'Preview';
+$string['editor:preview:tab:desktop']     = 'Desktop';
+$string['editor:preview:tab:mobile']      = 'Mobile';
+$string['editor:preview:placeholder:title']   = 'Notice title';
+$string['editor:preview:placeholder:content'] = 'Your notice content will appear here. Write a clear, direct message for the user.';
+$string['editor:preview:btn:later']     = 'Later';
+$string['editor:preview:btn:gotit']     = 'Got it';
+$string['editor:preview:btn:iam_aware'] = 'I am aware';
+$string['editor:preview:meta:frequency']      = 'Frequency';
+$string['editor:preview:meta:dismissable']    = 'Dismissable';
+$string['editor:preview:meta:acknowledgement'] = 'Acknowledgement';
+$string['editor:preview:meta:logout']         = 'Logout';
+$string['editor:preview:meta:required']       = 'Required';
+$string['editor:preview:meta:optional']       = 'Optional';
+$string['editor:preview:meta:forced']         = 'Forced';
+$string['editor:preview:meta:no']             = 'No';
+$string['editor:preview:meta:yes']            = 'Yes';
+
+// Audience estimate panel.
+$string['audience:title']               = 'Audience estimate';
+$string['audience:summary:cohorts']     = 'Cohorts';
+$string['audience:summary:courses']     = 'Courses';
+$string['audience:summary:role']        = 'Role';
+$string['audience:summary:competencies'] = 'Competencies';
+$string['audience:reach:label']         = 'Estimated reach';
+$string['audience:reach:value']         = '~ {$a} users';
+$string['audience:state:idle']          = 'Set at least one audience filter (cohorts, role or required course) to estimate reach.';
+$string['audience:state:auto_pending']  = 'Computing — refreshing as you change the filters…';
+$string['audience:state:manual_ready']  = 'Click "Calculate reach" when you are ready.';
+$string['audience:state:queued']        = 'Calculating in the background…';
+$string['audience:state:cached']        = 'Result computed at {$a}.';
+$string['audience:state:timeout']       = 'Calculation took longer than expected. Try again.';
+$string['audience:state:error']         = 'Estimate failed: {$a}';
+$string['audience:btn:calculate']       = 'Calculate reach';
+$string['audience:btn:retry']           = 'Try again';
+$string['audience:context_restrictions:title'] = 'Display restrictions';
+$string['audience:context_restrictions:hint']  = 'These rules narrow when and where the notice appears, but do not change the audience size.';
+$string['audience:rule:cohorts']                  = 'Member of selected cohorts';
+$string['audience:rule:filter_role']              = 'Has selected roles';
+$string['audience:rule:reqcourse']                = 'Has not completed required course';
+$string['audience:rule:pathmatch']                = 'On URL path: {$a}';
+$string['audience:rule:filter_category']          = 'Course category: {$a}';
+$string['audience:rule:filter_course']            = 'Course: {$a}';
+$string['audience:rule:filter_format']            = 'Course format: {$a}';
+$string['audience:rule:filter_theme']             = 'Theme: {$a}';
+$string['audience:rule:filter_competency_rules']  = 'Competency requirement(s)';
+$string['audience:job_not_found']                 = 'Audience job not found.';
+$string['audience:rules_too_many']                = 'Too many filter rules to estimate automatically — click "Calculate reach" to run on demand.';

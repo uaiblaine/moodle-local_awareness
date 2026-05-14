@@ -26,6 +26,7 @@
 
 use local_awareness\form\notice_form;
 use local_awareness\helper;
+use local_awareness\output\editor_page;
 use local_awareness\persistent\awareness;
 
 require_once(__DIR__ . '/../../config.php');
@@ -49,7 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || in_array($action, $actionsrequiress
 $managenoticepage = new moodle_url('/local/awareness/managenotice.php');
 $thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid]);
 $PAGE->set_url($thispage);
-$PAGE->requires->js_call_amd('local_awareness/notice_form', 'init', []);
+// notice_editor handles field relocation, side-nav, live preview and audience estimator.
+// It internally calls notice_form/init() once the form fields have been moved into cards.
+$PAGE->requires->js_call_amd('local_awareness/notice_editor', 'init', [[
+    'formSourceId' => 'la-moodleform-source',
+    'threshold' => editor_page::RULE_THRESHOLD,
+    'pollIntervalMs' => editor_page::POLL_INTERVAL_MS,
+    'pollMax' => editor_page::POLL_MAX,
+]]);
 
 $awareness = awareness::get_record(['id' => $noticeid]);
 $customdata = [
@@ -95,11 +103,31 @@ if ($formdata = $mform->get_data()) {
     redirect($managenoticepage);
 }
 
+/**
+ * Capture the moodleform's HTML so the new editor shell can render it inside
+ * a hidden container; the JS module then walks the form-rows and moves them
+ * into the cards. Validation, file API, autocompletes and CSRF stay intact.
+ *
+ * @param notice_form $mform
+ * @return array{0: string, 1: string} [html, formid]
+ */
+$render_moodleform_for_shell = function (notice_form $mform): array {
+    ob_start();
+    $mform->display();
+    $html = (string) ob_get_clean();
+    $formid = '';
+    if (preg_match('/<form\b[^>]*\bid="([^"]+)"/', $html, $m)) {
+        $formid = $m[1];
+    }
+    return [$html, $formid];
+};
+
 // Display form for new notice.
 if ($noticeid == 0 && $action == 'create') {
+    [$formhtml, $formid] = $render_moodleform_for_shell($mform);
+    $output = $PAGE->get_renderer('local_awareness');
     echo $OUTPUT->header();
-    echo $OUTPUT->heading(get_string('notice:create', 'local_awareness'));
-    $mform->display();
+    echo $output->render_editor_page(new editor_page(null, $formhtml, $formid, $managenoticepage));
     echo $OUTPUT->footer();
     die;
 }
@@ -162,8 +190,6 @@ switch ($action) {
         break;
     case 'edit':
         if (get_config('local_awareness', 'allow_update')) {
-            echo $OUTPUT->header();
-            echo $OUTPUT->heading(get_string('notice:view', 'local_awareness'));
             $mform = new notice_form($thispage, $customdata);
             // Re-prepare draft area for bgimage for the edit form.
             $bgdraft = file_get_submitted_draft_itemid('bgimage');
@@ -176,7 +202,10 @@ switch ($action) {
                 ['maxfiles' => 1, 'accepted_types' => ['image']]
             );
             $mform->set_data(['bgimage' => $bgdraft]);
-            $mform->display();
+            [$formhtml, $formid] = $render_moodleform_for_shell($mform);
+            $output = $PAGE->get_renderer('local_awareness');
+            echo $OUTPUT->header();
+            echo $output->render_editor_page(new editor_page($awareness, $formhtml, $formid, $managenoticepage));
             echo $OUTPUT->footer();
         } else {
             redirect($managenoticepage, get_string('notification:noupdateallowed', 'local_awareness'));

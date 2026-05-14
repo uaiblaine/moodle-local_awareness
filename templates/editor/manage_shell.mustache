@@ -1,0 +1,66 @@
+{{!
+    @template local_awareness/editor/manage_shell
+
+    Light-touch wrapper that gives the manage page the same chrome (top bar,
+    page heading, brand) as the editor. The actual table is passed in as raw
+    HTML via {{{tablehtml}}}.
+
+    Context variables required:
+    * pagetitle (string)
+    * subtitle (string)
+    * createurl (string)
+    * createlabel (string)
+    * topbar (object) — same shape as in editor/shell.mustache
+    * tablehtml (raw)
+
+    Example context (json):
+    {
+        "pagetitle": "Avisos",
+        "subtitle": "Gerencie os avisos cadastrados.",
+        "createurl": "/local/awareness/editnotice.php",
+        "createlabel": "Cadastrar aviso",
+        "topbar": {"brand": "Local Awareness", "breadcrumbs": [{"label": "Administração"}, {"label": "Avisos", "current": true}]},
+        "tablehtml": "<table>...</table>"
+    }
+}}
+<div class="local-awareness-editor local-awareness-editor--manage">
+
+    <header class="la-topbar">
+        <div class="la-topbar__inner">
+            <div class="la-topbar__left">
+                <div class="la-brand">
+                    <span class="la-brand__dot" aria-hidden="true"></span>
+                    <span class="la-brand__name">{{topbar.brand}}</span>
+                </div>
+                <nav class="la-crumbs" aria-label="breadcrumb">
+                    {{#topbar.breadcrumbs}}
+                        {{^current}}<span class="la-crumbs__item">{{label}}</span>{{/current}}
+                        {{#current}}<span class="la-crumbs__item la-crumbs__item--current">{{label}}</span>{{/current}}
+                    {{/topbar.breadcrumbs}}
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="la-shell la-shell--single">
+        <main class="la-shell__main">
+            <div class="la-pagehead">
+                <div class="la-pagehead__title">
+                    <h1>{{pagetitle}}</h1>
+                    <p class="la-pagehead__sub">{{subtitle}}</p>
+                </div>
+                <div class="la-pagehead__meta">
+                    <a class="la-btn la-btn--brand" href="{{createurl}}">
+                        <i class="fa fa-plus" aria-hidden="true"></i> {{createlabel}}
+                    </a>
+                </div>
+            </div>
+
+            <div class="la-card la-card--plain">
+                <div class="la-card__body">
+                    {{{tablehtml}}}
+                </div>
+            </div>
+        </main>
+    </div>
+</div>

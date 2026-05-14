@@ -18,8 +18,12 @@ namespace local_awareness;
 
 use local_awareness\helper;
 use local_awareness\persistent\awareness;
+use local_awareness\persistent\audience_job;
+use local_awareness\audience\estimator;
+use local_awareness\task\estimate_audience as estimate_audience_task;
 use core_external\external_api;
 use core_external\external_function_parameters;
+use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
 
@@ -298,6 +302,166 @@ class external extends external_api {
     public static function search_courses_returns(): external_single_structure {
         return new external_single_structure([
             'courses' => new external_value(PARAM_RAW, 'JSON array of {id, fullname}', VALUE_DEFAULT, '[]'),
+        ]);
+    }
+
+    /**
+     * Parameters for estimate_audience.
+     *
+     * @return external_function_parameters
+     */
+    public static function estimate_audience_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'criteria' => new external_value(
+                PARAM_RAW,
+                'JSON object of audience and context criteria',
+                VALUE_REQUIRED
+            ),
+        ]);
+    }
+
+    /**
+     * Enqueue (or reuse) an audience-estimate job. Returns the job id the
+     * client should poll.
+     *
+     * @param string $criteria JSON-encoded criteria object
+     * @return array
+     */
+    public static function estimate_audience(string $criteria): array {
+        global $USER;
+
+        $syscontext = \context_system::instance();
+        self::validate_context($syscontext);
+        require_capability('local/awareness:manage', $syscontext);
+
+        $params = self::validate_parameters(
+            self::estimate_audience_parameters(),
+            ['criteria' => $criteria]
+        );
+
+        $raw = json_decode($params['criteria'], true);
+        if (!is_array($raw)) {
+            $raw = [];
+        }
+
+        $normalised = estimator::normalise($raw);
+        $hash = estimator::hash($normalised);
+
+        // Reuse a recently-completed job for the same criteria, if any.
+        if ($existing = audience_job::find_reusable($hash)) {
+            return [
+                'jobid' => $existing->get('jobid'),
+                'status' => $existing->get('status'),
+                'reused' => true,
+            ];
+        }
+
+        $job = new audience_job(0, (object) [
+            'jobid' => audience_job::new_jobid(),
+            'userid' => (int) $USER->id,
+            'criteriahash' => $hash,
+            'criteria' => json_encode($normalised),
+            'status' => audience_job::STATUS_PENDING,
+        ]);
+        $job->create();
+
+        $task = new estimate_audience_task();
+        $task->set_custom_data(['jobid' => $job->get('jobid')]);
+        $task->set_userid((int) $USER->id);
+        \core\task\manager::queue_adhoc_task($task);
+
+        return [
+            'jobid' => $job->get('jobid'),
+            'status' => audience_job::STATUS_PENDING,
+            'reused' => false,
+        ];
+    }
+
+    /**
+     * Return parameters for estimate_audience.
+     *
+     * @return external_single_structure
+     */
+    public static function estimate_audience_returns(): external_single_structure {
+        return new external_single_structure([
+            'jobid' => new external_value(PARAM_ALPHANUMEXT, 'Job identifier'),
+            'status' => new external_value(PARAM_ALPHA, 'pending|ready|error'),
+            'reused' => new external_value(PARAM_BOOL, 'true if a cached result was returned'),
+        ]);
+    }
+
+    /**
+     * Parameters for get_estimate.
+     *
+     * @return external_function_parameters
+     */
+    public static function get_estimate_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'jobid' => new external_value(PARAM_ALPHANUMEXT, 'Job identifier', VALUE_REQUIRED),
+        ]);
+    }
+
+    /**
+     * Poll the result of an audience-estimate job.
+     *
+     * @param string $jobid
+     * @return array
+     */
+    public static function get_estimate(string $jobid): array {
+        $syscontext = \context_system::instance();
+        self::validate_context($syscontext);
+        require_capability('local/awareness:manage', $syscontext);
+
+        $params = self::validate_parameters(
+            self::get_estimate_parameters(),
+            ['jobid' => $jobid]
+        );
+
+        $job = audience_job::get_record(['jobid' => $params['jobid']]);
+        if (!$job) {
+            return [
+                'jobid' => $params['jobid'],
+                'status' => 'error',
+                'count' => null,
+                'breakdown' => '[]',
+                'context_only_filters' => '[]',
+                'has_audience_rules' => false,
+                'errormsg' => get_string('audience:job_not_found', 'local_awareness'),
+                'timecompleted' => null,
+            ];
+        }
+
+        $criteria = json_decode($job->get('criteria'), true) ?: [];
+        $hasaudience = !empty(estimator::audience_rules_in($criteria));
+        $contextrules = estimator::context_rules_in($criteria);
+
+        return [
+            'jobid' => $job->get('jobid'),
+            'status' => $job->get('status'),
+            'count' => $job->get('resultcount'),
+            'breakdown' => $job->get('breakdown') ?: '[]',
+            'context_only_filters' => json_encode($contextrules),
+            'has_audience_rules' => $hasaudience,
+            'errormsg' => $job->get('errormsg'),
+            'timecompleted' => $job->get('timecompleted'),
+        ];
+    }
+
+    /**
+     * Return parameters for get_estimate.
+     *
+     * @return external_single_structure
+     */
+    public static function get_estimate_returns(): external_single_structure {
+        return new external_single_structure([
+            'jobid' => new external_value(PARAM_ALPHANUMEXT, 'Job identifier'),
+            'status' => new external_value(PARAM_ALPHA, 'pending|ready|error'),
+            'count' => new external_value(PARAM_INT, 'Audience size when ready', VALUE_DEFAULT, null, NULL_ALLOWED),
+            'breakdown' => new external_value(PARAM_RAW, 'JSON list of {key, count} per audience-shaping rule'),
+            'context_only_filters' => new external_value(PARAM_RAW, 'JSON list of {key, values} for context-only restrictions'),
+            'has_audience_rules' => new external_value(PARAM_BOOL, 'false when no audience-shaping rule is set'),
+            'errormsg' => new external_value(PARAM_RAW, 'Error message when status=error', VALUE_DEFAULT, null, NULL_ALLOWED),
+            'timecompleted' => new external_value(PARAM_INT, 'Unix ts of completion', VALUE_DEFAULT, null, NULL_ALLOWED),
         ]);
     }
 }

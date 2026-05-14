@@ -1,0 +1,113 @@
+{{!
+    @template local_awareness/editor/shell
+
+    Three-column shell that wraps the (hidden) moodleform and provides the new
+    notice-editor UX: side nav, section cards, sticky preview rail and action bar.
+
+    Context variables required:
+    * pagetitle (string) — heading shown above the shell
+    * subtitle (string)
+    * statuslabel (string), statusislive (bool)
+    * autosaved (string)
+    * formhtml (raw) — rendered moodleform (kept hidden, fields relocated by JS)
+    * sections (array of {id, num, icon, title, desc})
+    * preview (object) — see preview_card.mustache
+    * audience (object) — see audience_panel.mustache
+    * actionbar (object) — see action_bar.mustache
+    * topbar (object) — {brand, breadcrumbs:[{label, current}]}
+    * sidenav (object) — see sidenav.mustache
+
+    Example context (json):
+    {
+        "pagetitle": "Cadastrar aviso",
+        "subtitle": "Crie um modal contextual.",
+        "statuslabel": "Rascunho",
+        "statusislive": false,
+        "autosaved": "salvo automaticamente há 2 min",
+        "formhtml": "<form>...</form>",
+        "sections": [{"id": "sec-content", "num": "01", "icon": "fa-file-text-o", "title": "Conteúdo", "desc": "..."}],
+        "preview": {},
+        "audience": {},
+        "actionbar": {},
+        "topbar": {"brand": "Local Awareness", "breadcrumbs": [{"label": "Administração"}, {"label": "Avisos"}, {"label": "Novo aviso", "current": true}]},
+        "sidenav": {}
+    }
+}}
+<div class="local-awareness-editor" data-region="la-editor">
+
+    <header class="la-topbar">
+        <div class="la-topbar__inner">
+            <div class="la-topbar__left">
+                <div class="la-brand">
+                    <span class="la-brand__dot" aria-hidden="true"></span>
+                    <span class="la-brand__name">{{topbar.brand}}</span>
+                </div>
+                <nav class="la-crumbs" aria-label="breadcrumb">
+                    {{#topbar.breadcrumbs}}
+                        {{^current}}<span class="la-crumbs__item">{{label}}</span>{{/current}}
+                        {{#current}}<span class="la-crumbs__item la-crumbs__item--current">{{label}}</span>{{/current}}
+                    {{/topbar.breadcrumbs}}
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="la-shell">
+
+        <aside class="la-shell__nav">
+            {{> local_awareness/editor/sidenav }}
+        </aside>
+
+        <main class="la-shell__main">
+
+            <div class="la-pagehead">
+                <div class="la-pagehead__title">
+                    <h1>{{pagetitle}}</h1>
+                    <p class="la-pagehead__sub">{{subtitle}}</p>
+                </div>
+                <div class="la-pagehead__meta">
+                    <span class="la-status-badge {{#statusislive}}la-status-badge--live{{/statusislive}}">
+                        <span class="la-status-badge__ping" aria-hidden="true"></span>
+                        {{statuslabel}}
+                    </span>
+                    {{#autosaved}}<span class="la-pagehead__autosaved">{{autosaved}}</span>{{/autosaved}}
+                </div>
+            </div>
+
+            {{#requirements}}
+                <div class="la-req-banner" role="status">
+                    <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+                    <span>{{requirements}}</span>
+                </div>
+            {{/requirements}}
+
+            <div id="la-moodleform-source" class="la-moodleform-source" data-region="la-form-source" hidden>
+                {{{formhtml}}}
+            </div>
+
+            {{#sections}}
+                <section class="la-card" id="{{id}}" role="region" aria-labelledby="{{id}}-title">
+                    <header class="la-card__head">
+                        <span class="la-card__icon" aria-hidden="true"><i class="fa {{icon}}"></i></span>
+                        <div class="la-card__meta">
+                            <h2 id="{{id}}-title" class="la-card__title">{{title}}</h2>
+                            <p class="la-card__desc">{{desc}}</p>
+                        </div>
+                        <span class="la-card__num" aria-hidden="true">{{num}}</span>
+                    </header>
+                    <div class="la-card__body" data-region="la-card-body" data-section="{{id}}">
+                        {{!-- moodleform fields are moved here by notice_editor JS at init --}}
+                    </div>
+                </section>
+            {{/sections}}
+
+            {{> local_awareness/editor/action_bar }}
+
+        </main>
+
+        <aside class="la-shell__rail">
+            {{> local_awareness/editor/preview_card }}
+            {{> local_awareness/editor/audience_panel }}
+        </aside>
+    </div>
+</div>

@@ -93,5 +93,27 @@
         <INDEX NAME="user_notice_uq" UNIQUE="true" FIELDS="userid, noticeid"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="local_awareness_audience_jobs" COMMENT="Audience estimate jobs (async).">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="jobid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="Public UUID-style token used by the AJAX poller."/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="User who requested the estimate."/>
+        <FIELD NAME="criteriahash" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="SHA-256 of the normalised criteria, for dedup."/>
+        <FIELD NAME="criteria" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="JSON of the normalised criteria sent to the estimator."/>
+        <FIELD NAME="status" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="pending" SEQUENCE="false" COMMENT="pending|ready|error"/>
+        <FIELD NAME="resultcount" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Estimated audience count."/>
+        <FIELD NAME="breakdown" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="JSON breakdown per audience-shaping rule."/>
+        <FIELD NAME="errormsg" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Error message when status=error."/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timecompleted" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="jobid_uq" UNIQUE="true" FIELDS="jobid"/>
+        <INDEX NAME="criteriahash_ix" UNIQUE="false" FIELDS="criteriahash"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

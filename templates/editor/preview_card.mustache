@@ -1,0 +1,105 @@
+{{!
+    @template local_awareness/editor/preview_card
+
+    Static-HTML mock of the end-user notice modal. The live_preview.js AMD
+    module updates the data slots in place as the form changes.
+
+    Context variables required:
+    * preview.title (string)
+    * preview.contentpreview (string)
+    * preview.bgimageurl (string|empty)
+    * preview.modal_width (string)
+    * preview.modal_height (string)
+    * preview.reqack (bool)
+    * preview.outsideclick (bool)
+    * preview.forcelogout (bool)
+    * preview.frequency (string) — formatted "0 minutes"
+    * preview.statusislive (bool)
+
+    Example context (json):
+    {
+        "preview": {
+            "title": "Manutenção",
+            "contentpreview": "Mensagem...",
+            "bgimageurl": "",
+            "modal_width": "auto",
+            "modal_height": "auto",
+            "reqack": false,
+            "outsideclick": true,
+            "forcelogout": false,
+            "frequency": "0 minutos",
+            "statusislive": false
+        }
+    }
+}}
+<section class="la-preview" data-region="la-preview" aria-label="{{#str}}editor:preview:title, local_awareness{{/str}}">
+    <header class="la-preview__head">
+        <h3 class="la-preview__title">
+            <i class="fa fa-desktop" aria-hidden="true"></i>
+            {{#str}}editor:preview:title, local_awareness{{/str}}
+        </h3>
+        <span class="la-preview__pill" data-slot="status">
+            {{#preview.statusislive}}{{#str}}editor:status:live, local_awareness{{/str}}{{/preview.statusislive}}
+            {{^preview.statusislive}}{{#str}}editor:status:draft, local_awareness{{/str}}{{/preview.statusislive}}
+        </span>
+    </header>
+
+    <div class="la-preview__tabs" role="tablist">
+        <button type="button" class="la-preview__tab is-on" data-tab="desktop" role="tab" aria-selected="true">
+            <i class="fa fa-laptop" aria-hidden="true"></i> {{#str}}editor:preview:tab:desktop, local_awareness{{/str}}
+        </button>
+        <button type="button" class="la-preview__tab" data-tab="mobile" role="tab" aria-selected="false">
+            <i class="fa fa-mobile" aria-hidden="true"></i> {{#str}}editor:preview:tab:mobile, local_awareness{{/str}}
+        </button>
+    </div>
+
+    <div class="la-preview__stage" data-slot="stage">
+        <div class="la-mockmodal" data-slot="mockmodal" style="{{#preview.modal_width}}max-width:{{preview.modal_width}};{{/preview.modal_width}}">
+            <div class="la-mockmodal__hero" data-slot="hero" style="{{#preview.bgimageurl}}background-image:url('{{preview.bgimageurl}}');{{/preview.bgimageurl}}">
+                <span class="la-mockmodal__tag">{{#str}}notice:notice, local_awareness{{/str}}</span>
+                <span class="la-mockmodal__close" aria-hidden="true">×</span>
+            </div>
+            <div class="la-mockmodal__body">
+                <h4 data-slot="title">{{preview.title}}</h4>
+                <p data-slot="content">{{preview.contentpreview}}</p>
+            </div>
+            <div class="la-mockmodal__actions" data-slot="actions">
+                {{#preview.reqack}}
+                    <button type="button" class="la-btn la-btn--brand">{{#str}}editor:preview:btn:iam_aware, local_awareness{{/str}}</button>
+                {{/preview.reqack}}
+                {{^preview.reqack}}
+                    <button type="button" class="la-btn la-btn--ghost">{{#str}}editor:preview:btn:later, local_awareness{{/str}}</button>
+                    <button type="button" class="la-btn la-btn--brand">{{#str}}editor:preview:btn:gotit, local_awareness{{/str}}</button>
+                {{/preview.reqack}}
+            </div>
+        </div>
+    </div>
+
+    <dl class="la-preview__meta">
+        <div class="la-preview__meta-item">
+            <dt>{{#str}}editor:preview:meta:frequency, local_awareness{{/str}}</dt>
+            <dd data-slot="meta-frequency">{{preview.frequency}}</dd>
+        </div>
+        <div class="la-preview__meta-item">
+            <dt>{{#str}}editor:preview:meta:dismissable, local_awareness{{/str}}</dt>
+            <dd data-slot="meta-outsideclick">
+                {{#preview.outsideclick}}{{#str}}editor:preview:meta:yes, local_awareness{{/str}}{{/preview.outsideclick}}
+                {{^preview.outsideclick}}{{#str}}editor:preview:meta:no, local_awareness{{/str}}{{/preview.outsideclick}}
+            </dd>
+        </div>
+        <div class="la-preview__meta-item">
+            <dt>{{#str}}editor:preview:meta:acknowledgement, local_awareness{{/str}}</dt>
+            <dd data-slot="meta-reqack">
+                {{#preview.reqack}}{{#str}}editor:preview:meta:required, local_awareness{{/str}}{{/preview.reqack}}
+                {{^preview.reqack}}{{#str}}editor:preview:meta:optional, local_awareness{{/str}}{{/preview.reqack}}
+            </dd>
+        </div>
+        <div class="la-preview__meta-item">
+            <dt>{{#str}}editor:preview:meta:logout, local_awareness{{/str}}</dt>
+            <dd data-slot="meta-forcelogout">
+                {{#preview.forcelogout}}{{#str}}editor:preview:meta:forced, local_awareness{{/str}}{{/preview.forcelogout}}
+                {{^preview.forcelogout}}{{#str}}editor:preview:meta:no, local_awareness{{/str}}{{/preview.forcelogout}}
+            </dd>
+        </div>
+    </dl>
+</section>

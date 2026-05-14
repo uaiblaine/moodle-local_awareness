@@ -212,3 +212,83 @@ $string['report_lh:linkurl']     = 'URL do link';
 
 // Report Builder — string da capability viewreports.
 $string['awareness:viewreports'] = 'Visualizar relatórios de alertas';
+
+// Editor de aviso — títulos e descrições das seções.
+$string['editor:section:content']         = 'Conteúdo do aviso';
+$string['editor:section:content:desc']    = 'O que será exibido no modal para o usuário.';
+$string['editor:section:behavior']        = 'Comportamento';
+$string['editor:section:behavior:desc']   = 'Como o aviso aparece, repete e é dispensado.';
+$string['editor:section:appearance']      = 'Aparência do modal';
+$string['editor:section:appearance:desc'] = 'Tamanho e ajuste visual da janela exibida.';
+$string['editor:section:audience']        = 'Público-alvo';
+$string['editor:section:audience:desc']   = 'Para quem o aviso será exibido. Os filtros se combinam com E (interseção).';
+$string['editor:section:filters']         = 'Filtros de exibição';
+$string['editor:section:filters:desc']    = 'Refine onde, na plataforma, o aviso é disparado.';
+
+// Editor de aviso — chrome da página.
+$string['editor:title:create']     = 'Cadastrar aviso';
+$string['editor:title:edit']       = 'Editar aviso';
+$string['editor:subtitle']         = 'Crie um modal contextual que aparecerá para os usuários conforme as regras estabelecidas abaixo.';
+$string['editor:status:draft']     = 'Rascunho · não publicado';
+$string['editor:status:live']      = 'Ao vivo · em exibição';
+$string['editor:autosaved']        = 'salvo automaticamente há {$a}';
+$string['editor:nav:howitworks']   = 'Como funciona';
+$string['editor:nav:howitworks:body'] = 'Os filtros combinam por <b>interseção</b> — todos precisam casar. Coortes e cursos individuais usam <b>união</b> dentro do próprio campo.';
+$string['editor:requirements']     = 'Faltam campos obrigatórios: {$a}. Conclua-os antes de habilitar o aviso.';
+
+// Editor de aviso — barra de ações.
+$string['editor:action:cancel']       = 'Cancelar';
+$string['editor:action:preview']      = 'Pré-visualizar';
+$string['editor:action:save_draft']   = 'Salvar rascunho';
+$string['editor:action:save_publish'] = 'Salvar e publicar';
+$string['editor:action:saved_local']  = 'Alterações salvas localmente';
+
+// Cartão de pré-visualização.
+$string['editor:preview:title']           = 'Pré-visualização';
+$string['editor:preview:tab:desktop']     = 'Desktop';
+$string['editor:preview:tab:mobile']      = 'Mobile';
+$string['editor:preview:placeholder:title']   = 'Título do aviso';
+$string['editor:preview:placeholder:content'] = 'O conteúdo do aviso aparecerá aqui. Escreva uma mensagem clara e direta para o usuário.';
+$string['editor:preview:btn:later']     = 'Mais tarde';
+$string['editor:preview:btn:gotit']     = 'Entendi';
+$string['editor:preview:btn:iam_aware'] = 'Estou ciente';
+$string['editor:preview:meta:frequency']      = 'Frequência';
+$string['editor:preview:meta:dismissable']    = 'Dispensável';
+$string['editor:preview:meta:acknowledgement'] = 'Reconhecimento';
+$string['editor:preview:meta:logout']         = 'Logout';
+$string['editor:preview:meta:required']       = 'Obrigatório';
+$string['editor:preview:meta:optional']       = 'Opcional';
+$string['editor:preview:meta:forced']         = 'Forçado';
+$string['editor:preview:meta:no']             = 'Não';
+$string['editor:preview:meta:yes']            = 'Sim';
+
+// Painel de estimativa de público.
+$string['audience:title']               = 'Estimativa de público';
+$string['audience:summary:cohorts']     = 'Coortes';
+$string['audience:summary:courses']     = 'Cursos';
+$string['audience:summary:role']        = 'Papel';
+$string['audience:summary:competencies'] = 'Competências';
+$string['audience:reach:label']         = 'Alcance estimado';
+$string['audience:reach:value']         = '~ {$a} usuários';
+$string['audience:state:idle']          = 'Defina pelo menos um filtro de público (coortes, papel ou curso obrigatório) para estimar o alcance.';
+$string['audience:state:auto_pending']  = 'Calculando — atualizando conforme você ajusta os filtros…';
+$string['audience:state:manual_ready']  = 'Clique em "Calcular alcance" quando estiver pronto.';
+$string['audience:state:queued']        = 'Calculando em segundo plano…';
+$string['audience:state:cached']        = 'Resultado calculado em {$a}.';
+$string['audience:state:timeout']       = 'O cálculo demorou mais do que o esperado. Tente novamente.';
+$string['audience:state:error']         = 'Falha ao estimar: {$a}';
+$string['audience:btn:calculate']       = 'Calcular alcance';
+$string['audience:btn:retry']           = 'Tentar novamente';
+$string['audience:context_restrictions:title'] = 'Restrições de exibição';
+$string['audience:context_restrictions:hint']  = 'Estas regras restringem quando e onde o aviso aparece, mas não alteram o tamanho do público.';
+$string['audience:rule:cohorts']                  = 'Pertence às coortes selecionadas';
+$string['audience:rule:filter_role']              = 'Possui os papéis selecionados';
+$string['audience:rule:reqcourse']                = 'Não concluiu o curso obrigatório';
+$string['audience:rule:pathmatch']                = 'Na URL: {$a}';
+$string['audience:rule:filter_category']          = 'Categoria: {$a}';
+$string['audience:rule:filter_course']            = 'Curso: {$a}';
+$string['audience:rule:filter_format']            = 'Formato do curso: {$a}';
+$string['audience:rule:filter_theme']             = 'Tema: {$a}';
+$string['audience:rule:filter_competency_rules']  = 'Requisito(s) de competência';
+$string['audience:job_not_found']                 = 'Trabalho de estimativa não encontrado.';
+$string['audience:rules_too_many']                = 'Há muitos filtros para estimar automaticamente — clique em "Calcular alcance" para rodar sob demanda.';

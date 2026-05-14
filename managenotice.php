@@ -27,6 +27,7 @@
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/adminlib.php');
 use local_awareness\helper;
+use local_awareness\output\manage_page;
 use local_awareness\table\all_notices;
 admin_externalpage_setup('local_awareness_managenotice');
 helper::check_manage_capability();
@@ -42,10 +43,10 @@ $PAGE->requires->js_call_amd('local_awareness/preview', 'init');
 $table = new all_notices('all_notices_table', new moodle_url($thispage), $page);
 
 $output = $PAGE->get_renderer('local_awareness');
+$tablehtml = $output->render($table);
+
+$newnoticeurl = new moodle_url($editnotice, ['noticeid' => 0, 'sesskey' => sesskey()]);
+
 echo $output->header();
-echo $output->heading(get_string('setting:managenotice', 'local_awareness'));
-$newnoticeparams = ['noticeid' => 0, 'sesskey' => sesskey()];
-$newnoticeurl = new moodle_url($editnotice, $newnoticeparams);
-echo $OUTPUT->single_button($newnoticeurl, get_string('notice:create', 'local_awareness'));
-echo $output->render($table);
+echo $output->render_manage_page(new manage_page($tablehtml, $newnoticeurl->out(false)));
 echo $output->footer();

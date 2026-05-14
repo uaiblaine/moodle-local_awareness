@@ -1,0 +1,36 @@
+{{!
+    @template local_awareness/editor/sidenav
+
+    Sticky numbered nav for the notice-editor shell. Anchors are real <a href> so
+    keyboard navigation works without JS; the AMD module enhances them with
+    smooth scroll + scroll-spy `aria-current` updates.
+
+    Context variables required:
+    * sidenav.items (array of {id, num, icon, label})
+    * sidenav.activeid (string)
+    * sidenav.helptitle (string)
+    * sidenav.helpbody (raw — may include <b>)
+
+    Example context (json):
+    {
+        "sidenav": {
+            "items": [{"id": "sec-content", "num": "01", "icon": "fa-file-text-o", "label": "Conteúdo"}],
+            "activeid": "sec-content",
+            "helptitle": "Como funciona",
+            "helpbody": "Os filtros combinam por <b>interseção</b>."
+        }
+    }
+}}
+<nav class="la-sidenav" data-region="la-sidenav" aria-label="{{sidenav.helptitle}}">
+    {{#sidenav.items}}
+        <a href="#{{id}}" data-target="{{id}}" class="la-sidenav__link" {{#active}}aria-current="step"{{/active}}>
+            <span class="la-sidenav__num" aria-hidden="true">{{num}}</span>
+            <i class="fa {{icon}} la-sidenav__icon" aria-hidden="true"></i>
+            <span class="la-sidenav__label">{{label}}</span>
+        </a>
+    {{/sidenav.items}}
+</nav>
+<div class="la-navhelp" role="note">
+    <h3 class="la-navhelp__title"><i class="fa fa-info-circle" aria-hidden="true"></i> {{sidenav.helptitle}}</h3>
+    <div class="la-navhelp__body">{{{sidenav.helpbody}}}</div>
+</div>

@@ -17,6 +17,8 @@
 use local_awareness\table\dismissed_notice;
 use local_awareness\table\acknowledged_notice;
 use local_awareness\table\all_notices;
+use local_awareness\output\editor_page;
+use local_awareness\output\manage_page;
 
 /**
  * Plugin's renderer.
@@ -66,5 +68,25 @@ class local_awareness_renderer extends plugin_renderer_base {
         $o = ob_get_contents();
         ob_end_clean();
         return $o;
+    }
+
+    /**
+     * Render the redesigned notice editor page.
+     *
+     * @param editor_page $page renderable
+     * @return string
+     */
+    public function render_editor_page(editor_page $page) {
+        return $this->render_from_template('local_awareness/editor/shell', $page->export_for_template($this));
+    }
+
+    /**
+     * Render the manage notices page wrapper.
+     *
+     * @param manage_page $page renderable
+     * @return string
+     */
+    public function render_manage_page(manage_page $page) {
+        return $this->render_from_template('local_awareness/editor/manage_shell', $page->export_for_template($this));
     }
 }
