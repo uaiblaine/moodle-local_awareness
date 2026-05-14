@@ -3,7 +3,7 @@
 
     Light-touch wrapper that gives the manage page the same chrome (top bar,
     page heading, brand) as the editor. The actual table is passed in as raw
-    HTML via {{{tablehtml}}}.
+    HTML via the tablehtml context variable.
 
     Context variables required:
     * pagetitle (string)
@@ -11,17 +11,7 @@
     * createurl (string)
     * createlabel (string)
     * topbar (object) — same shape as in editor/shell.mustache
-    * tablehtml (raw)
-
-    Example context (json):
-    {
-        "pagetitle": "Avisos",
-        "subtitle": "Gerencie os avisos cadastrados.",
-        "createurl": "/local/awareness/editnotice.php",
-        "createlabel": "Cadastrar aviso",
-        "topbar": {"brand": "Local Awareness", "breadcrumbs": [{"label": "Administração"}, {"label": "Avisos", "current": true}]},
-        "tablehtml": "<table>...</table>"
-    }
+    * tablehtml (raw HTML)
 }}
 <div class="local-awareness-editor local-awareness-editor--manage">
 
