@@ -232,6 +232,8 @@
 
 .la-shell-main {
     min-width: 0;
+    /* Scroll clearance so the sticky action bar never overlaps the last fields. */
+    padding-bottom: 160px;
 }
 
 /* Page head */
