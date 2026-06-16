@@ -35,38 +35,38 @@
          data-poll-interval-ms="{{audience.poll_interval_ms}}"
          data-poll-max="{{audience.poll_max}}"
          aria-labelledby="la-audience-title">
-    <header class="la-audience__head">
-        <h3 id="la-audience-title" class="la-audience__title">
+    <header class="la-audience-head">
+        <h3 id="la-audience-title" class="la-audience-title">
             <i class="fa fa-bullseye" aria-hidden="true"></i>
             {{#str}}audience:title, local_awareness{{/str}}
         </h3>
     </header>
 
-    <dl class="la-audience__summary" data-slot="summary">
+    <dl class="la-audience-summary" data-slot="summary">
         {{#audience.summary}}
-            <div class="la-audience__summary-item">
+            <div class="la-audience-summary-item">
                 <dt>{{label}}</dt>
                 <dd data-summary-key="{{key}}">{{value}}</dd>
             </div>
         {{/audience.summary}}
     </dl>
 
-    <div class="la-audience__reach" data-slot="reach"
+    <div class="la-audience-reach" data-slot="reach"
          aria-live="polite" aria-atomic="true">
-        <div class="la-audience__reach-meta">
-            <span class="la-audience__reach-label">{{#str}}audience:reach:label, local_awareness{{/str}}</span>
-            <span class="la-audience__reach-state" data-slot="state">
+        <div class="la-audience-reach-meta">
+            <span class="la-audience-reach-label">{{#str}}audience:reach:label, local_awareness{{/str}}</span>
+            <span class="la-audience-reach-state" data-slot="state">
                 {{#audience.initialstate_idle}}{{#str}}audience:state:idle, local_awareness{{/str}}{{/audience.initialstate_idle}}
                 {{#audience.initialstate_cached}}{{audience.cachedlabel}}{{/audience.initialstate_cached}}
             </span>
         </div>
-        <div class="la-audience__reach-value" data-slot="value">
+        <div class="la-audience-reach-value" data-slot="value">
             {{#audience.initialcount}}{{audience.initialcountformatted}}{{/audience.initialcount}}
             {{^audience.initialcount}}—{{/audience.initialcount}}
         </div>
     </div>
 
-    <div class="la-audience__actions" data-slot="actions">
+    <div class="la-audience-actions" data-slot="actions">
         <button type="button" class="la-btn la-btn--brand" data-action="calculate"
                 {{#audience.autotrigger}}hidden{{/audience.autotrigger}}>
             <i class="fa fa-bolt" aria-hidden="true"></i>
@@ -78,16 +78,16 @@
         </button>
     </div>
 
-    <div class="la-audience__breakdown" data-slot="breakdown" hidden></div>
+    <div class="la-audience-breakdown" data-slot="breakdown" hidden></div>
 
-    <div class="la-audience__context" data-slot="context"
+    <div class="la-audience-context" data-slot="context"
          {{^audience.contextrules}}hidden{{/audience.contextrules}}>
-        <h4 class="la-audience__context-title">
+        <h4 class="la-audience-context-title">
             <i class="fa fa-filter" aria-hidden="true"></i>
             {{#str}}audience:context_restrictions:title, local_awareness{{/str}}
         </h4>
-        <p class="la-audience__context-hint">{{#str}}audience:context_restrictions:hint, local_awareness{{/str}}</p>
-        <ul class="la-audience__chips" data-slot="contextchips">
+        <p class="la-audience-context-hint">{{#str}}audience:context_restrictions:hint, local_awareness{{/str}}</p>
+        <ul class="la-audience-chips" data-slot="contextchips">
             {{#audience.contextrules}}
                 <li class="la-chip" data-key="{{key}}">{{label}}</li>
             {{/audience.contextrules}}

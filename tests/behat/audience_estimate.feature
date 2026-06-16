@@ -34,4 +34,4 @@ Feature: The audience estimate panel calculates how many users a notice will rea
     And I run all adhoc tasks
     # Re-trigger so the panel polls and renders the cached result.
     And I press "Calcular alcance"
-    Then I should see "2" in the ".la-audience__reach-value" "css_element"
+    Then I should see "2" in the ".la-audience-reach-value" "css_element"

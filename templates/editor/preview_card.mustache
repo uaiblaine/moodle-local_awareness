@@ -33,37 +33,37 @@
     }
 }}
 <section class="la-preview" data-region="la-preview" aria-label="{{#str}}editor:preview:title, local_awareness{{/str}}">
-    <header class="la-preview__head">
-        <h3 class="la-preview__title">
+    <header class="la-preview-head">
+        <h3 class="la-preview-title">
             <i class="fa fa-desktop" aria-hidden="true"></i>
             {{#str}}editor:preview:title, local_awareness{{/str}}
         </h3>
-        <span class="la-preview__pill" data-slot="status">
+        <span class="la-preview-pill" data-slot="status">
             {{#preview.statusislive}}{{#str}}editor:status:live, local_awareness{{/str}}{{/preview.statusislive}}
             {{^preview.statusislive}}{{#str}}editor:status:draft, local_awareness{{/str}}{{/preview.statusislive}}
         </span>
     </header>
 
-    <div class="la-preview__tabs" role="tablist">
-        <button type="button" class="la-preview__tab is-on" data-tab="desktop" role="tab" aria-selected="true">
+    <div class="la-preview-tabs" role="tablist">
+        <button type="button" class="la-preview-tab is-on" data-tab="desktop" role="tab" aria-selected="true">
             <i class="fa fa-laptop" aria-hidden="true"></i> {{#str}}editor:preview:tab:desktop, local_awareness{{/str}}
         </button>
-        <button type="button" class="la-preview__tab" data-tab="mobile" role="tab" aria-selected="false">
+        <button type="button" class="la-preview-tab" data-tab="mobile" role="tab" aria-selected="false">
             <i class="fa fa-mobile" aria-hidden="true"></i> {{#str}}editor:preview:tab:mobile, local_awareness{{/str}}
         </button>
     </div>
 
-    <div class="la-preview__stage" data-slot="stage">
+    <div class="la-preview-stage" data-slot="stage">
         <div class="la-mockmodal" data-slot="mockmodal" style="{{#preview.modal_width}}max-width:{{preview.modal_width}};{{/preview.modal_width}}">
-            <div class="la-mockmodal__hero" data-slot="hero" style="{{#preview.bgimageurl}}background-image:url('{{preview.bgimageurl}}');{{/preview.bgimageurl}}">
-                <span class="la-mockmodal__tag">{{#str}}notice:notice, local_awareness{{/str}}</span>
-                <span class="la-mockmodal__close" aria-hidden="true">×</span>
+            <div class="la-mockmodal-hero" data-slot="hero" style="{{#preview.bgimageurl}}background-image:url('{{preview.bgimageurl}}');{{/preview.bgimageurl}}">
+                <span class="la-mockmodal-tag">{{#str}}notice:notice, local_awareness{{/str}}</span>
+                <span class="la-mockmodal-close" aria-hidden="true">×</span>
             </div>
-            <div class="la-mockmodal__body">
+            <div class="la-mockmodal-body">
                 <h4 data-slot="title">{{preview.title}}</h4>
                 <p data-slot="content">{{preview.contentpreview}}</p>
             </div>
-            <div class="la-mockmodal__actions" data-slot="actions">
+            <div class="la-mockmodal-actions" data-slot="actions">
                 {{#preview.reqack}}
                     <button type="button" class="la-btn la-btn--brand">{{#str}}editor:preview:btn:iam_aware, local_awareness{{/str}}</button>
                 {{/preview.reqack}}
@@ -75,26 +75,26 @@
         </div>
     </div>
 
-    <dl class="la-preview__meta">
-        <div class="la-preview__meta-item">
+    <dl class="la-preview-meta">
+        <div class="la-preview-meta-item">
             <dt>{{#str}}editor:preview:meta:frequency, local_awareness{{/str}}</dt>
             <dd data-slot="meta-frequency">{{preview.frequency}}</dd>
         </div>
-        <div class="la-preview__meta-item">
+        <div class="la-preview-meta-item">
             <dt>{{#str}}editor:preview:meta:dismissable, local_awareness{{/str}}</dt>
             <dd data-slot="meta-outsideclick">
                 {{#preview.outsideclick}}{{#str}}editor:preview:meta:yes, local_awareness{{/str}}{{/preview.outsideclick}}
                 {{^preview.outsideclick}}{{#str}}editor:preview:meta:no, local_awareness{{/str}}{{/preview.outsideclick}}
             </dd>
         </div>
-        <div class="la-preview__meta-item">
+        <div class="la-preview-meta-item">
             <dt>{{#str}}editor:preview:meta:acknowledgement, local_awareness{{/str}}</dt>
             <dd data-slot="meta-reqack">
                 {{#preview.reqack}}{{#str}}editor:preview:meta:required, local_awareness{{/str}}{{/preview.reqack}}
                 {{^preview.reqack}}{{#str}}editor:preview:meta:optional, local_awareness{{/str}}{{/preview.reqack}}
             </dd>
         </div>
-        <div class="la-preview__meta-item">
+        <div class="la-preview-meta-item">
             <dt>{{#str}}editor:preview:meta:logout, local_awareness{{/str}}</dt>
             <dd data-slot="meta-forcelogout">
                 {{#preview.forcelogout}}{{#str}}editor:preview:meta:forced, local_awareness{{/str}}{{/preview.forcelogout}}

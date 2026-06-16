@@ -50,7 +50,7 @@ class all_notices extends table_sql implements renderable {
     public function __construct(string $uniqueid, \moodle_url $url, int $page = 0, int $perpage = 20) {
         parent::__construct($uniqueid);
 
-        $this->set_attribute('class', 'local_awareness awarenesss');
+        $this->set_attribute('class', 'local-awareness awarenesss');
 
         // Set protected properties.
         $this->pagesize = $perpage;

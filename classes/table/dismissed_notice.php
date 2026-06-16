@@ -79,7 +79,7 @@ class dismissed_notice extends table_sql implements renderable
     ) {
         parent::__construct($uniqueid);
 
-        $this->set_attribute('class', 'local_awareness dismissed_notices');
+        $this->set_attribute('class', 'local-awareness dismissed_notices');
 
         // Set protected properties.
         $this->pagesize = $perpage;

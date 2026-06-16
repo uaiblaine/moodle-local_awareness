@@ -86,7 +86,7 @@ class acknowledged_notice extends table_sql implements renderable {
     ) {
         parent::__construct($uniqueid);
 
-        $this->set_attribute('class', 'local_awareness acknowledged_notices');
+        $this->set_attribute('class', 'local-awareness acknowledged_notices');
 
         // Set protected properties.
         $this->pagesize = $perpage;

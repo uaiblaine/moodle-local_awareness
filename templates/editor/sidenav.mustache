@@ -23,14 +23,14 @@
 }}
 <nav class="la-sidenav" data-region="la-sidenav" aria-label="{{sidenav.helptitle}}">
     {{#sidenav.items}}
-        <a href="#{{id}}" data-target="{{id}}" class="la-sidenav__link" {{#active}}aria-current="step"{{/active}}>
-            <span class="la-sidenav__num" aria-hidden="true">{{num}}</span>
-            <i class="fa {{icon}} la-sidenav__icon" aria-hidden="true"></i>
-            <span class="la-sidenav__label">{{label}}</span>
+        <a href="#{{id}}" data-target="{{id}}" class="la-sidenav-link" {{#active}}aria-current="step"{{/active}}>
+            <span class="la-sidenav-num" aria-hidden="true">{{num}}</span>
+            <i class="fa {{icon}} la-sidenav-icon" aria-hidden="true"></i>
+            <span class="la-sidenav-label">{{label}}</span>
         </a>
     {{/sidenav.items}}
 </nav>
 <div class="la-navhelp" role="note">
-    <h3 class="la-navhelp__title"><i class="fa fa-info-circle" aria-hidden="true"></i> {{sidenav.helptitle}}</h3>
-    <div class="la-navhelp__body">{{{sidenav.helpbody}}}</div>
+    <h3 class="la-navhelp-title"><i class="fa fa-info-circle" aria-hidden="true"></i> {{sidenav.helptitle}}</h3>
+    <div class="la-navhelp-body">{{{sidenav.helpbody}}}</div>
 </div>

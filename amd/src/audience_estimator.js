@@ -49,8 +49,21 @@ define([
         slots: {}
     };
 
+    /**
+     * Scoped querySelector helper.
+     *
+     * @param {Element} root Root element to search within.
+     * @param {string} sel CSS selector to match.
+     * @returns {Element|null} The first matching element, or null.
+     */
     function $(root, sel) { return root.querySelector(sel); }
 
+    /**
+     * Resolve the panel slot elements once per init.
+     *
+     * @param {Element} root The audience panel root element.
+     * @returns {object} Map of slot name to element (or null when absent).
+     */
     function captureSlots(root) {
         return {
             summary:    $(root, '[data-slot="summary"]'),
@@ -66,6 +79,11 @@ define([
         };
     }
 
+    /**
+     * Load and map the audience-estimator language strings into state.
+     *
+     * @returns {Promise<object>} Promise resolving to the strings map.
+     */
     function loadStrings() {
         return str.get_strings([
             {key: 'audience:state:idle', component: 'local_awareness'},
@@ -117,7 +135,12 @@ define([
         });
     }
 
-    /** Format an integer with non-breaking thousands separators. */
+    /**
+     * Format an integer with locale thousands separators.
+     *
+     * @param {number} n The number to format.
+     * @returns {string} The formatted number string.
+     */
     function formatCount(n) {
         try {
             return new Intl.NumberFormat().format(n);
@@ -126,19 +149,33 @@ define([
         }
     }
 
+    /**
+     * Write the status line text.
+     *
+     * @param {string} text The status message to display.
+     */
     function setState(text) {
         if (state.slots.stateLine) {
             state.slots.stateLine.textContent = text || '';
         }
     }
 
+    /**
+     * Write the reach value text.
+     *
+     * @param {string} text The value to display.
+     */
     function setValue(text) {
         if (state.slots.value) {
             state.slots.value.textContent = text;
         }
     }
 
-    /** Update the small per-rule summary at the top of the panel. */
+    /**
+     * Update the small per-rule summary at the top of the panel.
+     *
+     * @param {object} criteria The current audience criteria object.
+     */
     function updateSummary(criteria) {
         if (!state.slots.summary) {
             return;
@@ -157,7 +194,11 @@ define([
         });
     }
 
-    /** Update the context-restrictions chips list. */
+    /**
+     * Update the context-restrictions chips list.
+     *
+     * @param {Array} contextRules List of context rule descriptors to render.
+     */
     function updateContextChips(contextRules) {
         if (!state.slots.context || !state.slots.contextChips) {
             return;
@@ -188,6 +229,12 @@ define([
         state.slots.contextChips.innerHTML = html;
     }
 
+    /**
+     * Escape a string for safe insertion into HTML.
+     *
+     * @param {string} s The raw string.
+     * @returns {string} The HTML-escaped string.
+     */
     function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, function (c) {
             return {
@@ -210,13 +257,20 @@ define([
         state.currentJobId = null;
     }
 
-    /** Begin polling for a queued job. */
+    /**
+     * Begin polling for a queued job.
+     *
+     * @param {number} jobid The queued job identifier to poll for.
+     */
     function startPolling(jobid) {
         state.currentJobId = jobid;
         state.pollAttempts = 0;
         scheduleNextPoll();
     }
 
+    /**
+     * Schedule the next poll attempt after the configured interval.
+     */
     function scheduleNextPoll() {
         if (state.pollTimer) {
             clearTimeout(state.pollTimer);
@@ -224,6 +278,9 @@ define([
         state.pollTimer = setTimeout(pollOnce, state.pollIntervalMs);
     }
 
+    /**
+     * Perform a single poll for the current job's result.
+     */
     function pollOnce() {
         if (!state.currentJobId) {
             return;
@@ -252,6 +309,11 @@ define([
         });
     }
 
+    /**
+     * Render a completed estimate result.
+     *
+     * @param {object} response The web service response payload.
+     */
     function handleReady(response) {
         stopPolling();
         var count = (response.count === null || response.count === undefined) ? 0 : parseInt(response.count, 10);
@@ -293,6 +355,11 @@ define([
         }
     }
 
+    /**
+     * Render an error state.
+     *
+     * @param {string} msg The error message to surface.
+     */
     function handleError(msg) {
         stopPolling();
         setValue('—');
@@ -301,6 +368,9 @@ define([
         showAction('retry', true);
     }
 
+    /**
+     * Render a timeout state after exhausting poll attempts.
+     */
     function handleTimeout() {
         stopPolling();
         setValue('—');
@@ -309,6 +379,12 @@ define([
         showAction('retry', true);
     }
 
+    /**
+     * Toggle visibility of an action button.
+     *
+     * @param {string} name Either "calculate" or "retry".
+     * @param {boolean} visible Whether the button should be shown.
+     */
     function showAction(name, visible) {
         var el = (name === 'calculate') ? state.slots.calcBtn : state.slots.retryBtn;
         if (!el) { return; }

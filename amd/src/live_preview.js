@@ -29,6 +29,10 @@ define(['core/str'], function (str) {
 
     /**
      * Truncate to N chars without breaking inside a word.
+     *
+     * @param {string} text Raw text to shorten.
+     * @param {number} max Maximum number of characters to keep.
+     * @returns {string} Truncated text, with an ellipsis when shortened.
      */
     function truncate(text, max) {
         if (!text) {
@@ -41,11 +45,23 @@ define(['core/str'], function (str) {
         return text.substring(0, max).replace(/\s\S*$/, '') + '…';
     }
 
+    /**
+     * Read the current value of a named form field.
+     *
+     * @param {string} name The field name attribute to look up.
+     * @returns {string} The field value, or an empty string when absent.
+     */
     function getValue(name) {
         var el = document.querySelector('[name="' + name + '"]');
         return el ? (el.value || '') : '';
     }
 
+    /**
+     * Resolve whether a named checkbox/select field is in the "on" state.
+     *
+     * @param {string} name The field name attribute to look up.
+     * @returns {boolean} True when checked, or when a select's value equals 1.
+     */
     function isChecked(name) {
         var el = document.querySelector('[name="' + name + '"]');
         if (!el) {
@@ -86,6 +102,8 @@ define(['core/str'], function (str) {
 
     /**
      * Mirror the current form state into the preview card.
+     *
+     * @param {object} strings Resolved language strings used in the preview.
      */
     function sync(strings) {
         if (!SLOTS.title) {
@@ -140,6 +158,13 @@ define(['core/str'], function (str) {
         }
     }
 
+    /**
+     * Build a preview action button element.
+     *
+     * @param {string} label Visible button text.
+     * @param {string} cls Extra CSS class controlling the button style.
+     * @returns {HTMLButtonElement} The constructed button element.
+     */
     function makeBtn(label, cls) {
         var b = document.createElement('button');
         b.type = 'button';
@@ -148,6 +173,11 @@ define(['core/str'], function (str) {
         return b;
     }
 
+    /**
+     * Debounce a preview sync call by 250ms to coalesce rapid edits.
+     *
+     * @param {object} strings Resolved language strings used in the preview.
+     */
     function debouncedSync(strings) {
         if (debounceTimer) {
             clearTimeout(debounceTimer);
@@ -158,6 +188,12 @@ define(['core/str'], function (str) {
         }, 250);
     }
 
+    /**
+     * Wire editor change listeners (Atto contenteditable and TinyMCE) to the
+     * debounced preview sync.
+     *
+     * @param {object} strings Resolved language strings used in the preview.
+     */
     function bindEditor(strings) {
         // Atto: contenteditable area.
         var editable = document.querySelector('#id_contenteditable');
@@ -178,6 +214,11 @@ define(['core/str'], function (str) {
         }
     }
 
+    /**
+     * Cache the preview card slot elements for later updates.
+     *
+     * @returns {boolean} True when the preview region exists and slots were cached.
+     */
     function captureSlots() {
         var preview = document.querySelector('[data-region="la-preview"]');
         if (!preview) {
@@ -194,6 +235,11 @@ define(['core/str'], function (str) {
         return true;
     }
 
+    /**
+     * Load and map the preview language strings.
+     *
+     * @returns {Promise<object>} Promise resolving to the named strings object.
+     */
     function loadStrings() {
         return str.get_strings([
             {key: 'editor:preview:placeholder:title', component: 'local_awareness'},
@@ -249,9 +295,9 @@ define(['core/str'], function (str) {
             });
 
             // Tab switching desktop/mobile.
-            document.querySelectorAll('.la-preview__tab').forEach(function (btn) {
+            document.querySelectorAll('.la-preview-tab').forEach(function (btn) {
                 btn.addEventListener('click', function () {
-                    document.querySelectorAll('.la-preview__tab').forEach(function (b) {
+                    document.querySelectorAll('.la-preview-tab').forEach(function (b) {
                         b.classList.remove('is-on');
                         b.setAttribute('aria-selected', 'false');
                     });

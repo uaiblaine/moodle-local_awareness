@@ -36,23 +36,23 @@
 
     <form {{{form_attributes}}} class="la-shell">
 
-        <aside class="la-shell__nav">
+        <aside class="la-shell-nav">
             {{> local_awareness/editor/sidenav }}
         </aside>
 
-        <main class="la-shell__main">
+        <main class="la-shell-main">
 
             <div class="la-pagehead">
-                <div class="la-pagehead__title">
+                <div class="la-pagehead-title">
                     <h1>{{pagetitle}}</h1>
-                    <p class="la-pagehead__sub">{{subtitle}}</p>
+                    <p class="la-pagehead-sub">{{subtitle}}</p>
                 </div>
-                <div class="la-pagehead__meta">
+                <div class="la-pagehead-meta">
                     <span class="la-status-badge {{#statusislive}}la-status-badge--live{{/statusislive}}">
-                        <span class="la-status-badge__ping" aria-hidden="true"></span>
+                        <span class="la-status-badge-ping" aria-hidden="true"></span>
                         {{statuslabel}}
                     </span>
-                    {{#autosaved}}<span class="la-pagehead__autosaved">{{autosaved}}</span>{{/autosaved}}
+                    {{#autosaved}}<span class="la-pagehead-autosaved">{{autosaved}}</span>{{/autosaved}}
                 </div>
             </div>
 
@@ -69,15 +69,15 @@
 
             {{#sections}}
                 <section class="la-card" id="{{id}}" role="region" aria-labelledby="{{id}}-title">
-                    <header class="la-card__head">
-                        <span class="la-card__icon" aria-hidden="true"><i class="fa {{icon}}"></i></span>
-                        <div class="la-card__meta">
-                            <h2 id="{{id}}-title" class="la-card__title">{{title}}</h2>
-                            <p class="la-card__desc">{{desc}}</p>
+                    <header class="la-card-head">
+                        <span class="la-card-icon" aria-hidden="true"><i class="fa {{icon}}"></i></span>
+                        <div class="la-card-meta">
+                            <h2 id="{{id}}-title" class="la-card-title">{{title}}</h2>
+                            <p class="la-card-desc">{{desc}}</p>
                         </div>
-                        <span class="la-card__num" aria-hidden="true">{{num}}</span>
+                        <span class="la-card-num" aria-hidden="true">{{num}}</span>
                     </header>
-                    <div class="la-card__body" data-region="la-card-body" data-section="{{id}}">
+                    <div class="la-card-body" data-region="la-card-body" data-section="{{id}}">
                         {{!-- moodleform fields are moved here by notice_editor JS at init --}}
                     </div>
                 </section>
@@ -87,7 +87,7 @@
 
         </main>
 
-        <aside class="la-shell__rail">
+        <aside class="la-shell-rail">
             {{> local_awareness/editor/preview_card }}
             {{> local_awareness/editor/audience_panel }}
         </aside>

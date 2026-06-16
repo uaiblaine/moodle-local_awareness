@@ -96,7 +96,7 @@ define([
 
     /** Smooth-scroll for side-nav clicks. */
     function bindSideNav() {
-        var links = document.querySelectorAll('.la-sidenav__link');
+        var links = document.querySelectorAll('.la-sidenav-link');
         if (!links.length) {
             return;
         }
@@ -115,8 +115,13 @@ define([
         });
     }
 
+    /**
+     * Flag the side-nav entry for the given section id as the current step.
+     *
+     * @param {string} id Section id whose nav link should be marked active.
+     */
     function setActive(id) {
-        document.querySelectorAll('.la-sidenav__link').forEach(function (a) {
+        document.querySelectorAll('.la-sidenav-link').forEach(function (a) {
             if (a.getAttribute('data-target') === id) {
                 a.setAttribute('aria-current', 'step');
             } else {
@@ -132,6 +137,9 @@ define([
             return;
         }
         var ticking = false;
+        /**
+         * Recompute the active section while scrolling (rAF-throttled).
+         */
         function onScroll() {
             if (ticking) {
                 return;
