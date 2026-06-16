@@ -23,7 +23,7 @@ Feature: The audience estimate panel calculates how many users a notice will rea
   @javascript
   Scenario: The estimator queues a job and renders the result after the queue runs
     When I navigate to "Awareness > Manage" in site administration
-    And I press "Create new notice"
+    And I click on "Create new notice" "link"
     And I wait until ".local-awareness-editor" "css_element" exists
     # Add the cohort. The autocomplete is the first audience field.
     And I set the field "Cohort" to "Audience pilot"

@@ -45,7 +45,7 @@
         <div class="modal-content shadow-lg border-0 rounded">
             <div class="modal-header bg-light border-bottom-0 {{$headerclasses}}{{headerclasses}}{{/headerclasses}}" data-region="header">
                 {{$header}}
-                    <h5 id="{{uniqid}}-modal-title" class="modal-title font-weight-bold" data-region="title">{{$title}}{{title}}{{/title}}</h5>
+                    <h5 id="{{uniqid}}-modal-title" class="modal-title fw-bold" data-region="title">{{$title}}{{title}}{{/title}}</h5>
                     <button id="awareness-closebtn" type="button" class="close" data-action="close" aria-label="{{#str}} close, core {{/str}}">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -60,11 +60,11 @@
                 {{$footer}}
                      <div class="form-check d-none" id="awareness-ack-container">
                         <input type="checkbox" class="form-check-input" id="awareness-modal-ackcheckbox">
-                        <label class="form-check-label ml-2" for="awareness-modal-ackcheckbox">
+                        <label class="form-check-label ms-2" for="awareness-modal-ackcheckbox">
                             {{#str}} modal:checkboxtext, local_awareness {{/str}}
                         </label>
                     </div>
-                    <div class="ml-auto">
+                    <div class="ms-auto">
                         <button id="awareness-acceptbtn" type="button" class="btn btn-primary px-4" data-action="accept">
                             {{#str}} button:accept, local_awareness {{/str}}
                         </button>
