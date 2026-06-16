@@ -27,7 +27,38 @@
 defined('MOODLE_INTERNAL') || die();
 
 $string['all'] = 'All';
+$string['audience:btn:calculate'] = 'Calculate reach';
+$string['audience:btn:retry'] = 'Try again';
+$string['audience:context_restrictions:hint'] = 'These rules narrow when and where the notice appears, but do not change the audience size.';
+$string['audience:context_restrictions:title'] = 'Display restrictions';
+$string['audience:job_not_found'] = 'Audience job not found.';
+$string['audience:reach:label'] = 'Estimated reach';
+$string['audience:reach:value'] = '~ {$a} users';
+$string['audience:rule:cohorts'] = 'Member of selected cohorts';
+$string['audience:rule:filter_category'] = 'Course category: {$a}';
+$string['audience:rule:filter_competency_rules'] = 'Competency requirement(s)';
+$string['audience:rule:filter_course'] = 'Course: {$a}';
+$string['audience:rule:filter_format'] = 'Course format: {$a}';
+$string['audience:rule:filter_role'] = 'Has selected roles';
+$string['audience:rule:filter_role_context'] = 'Selected role context';
+$string['audience:rule:filter_theme'] = 'Theme: {$a}';
+$string['audience:rule:pathmatch'] = 'On URL path: {$a}';
+$string['audience:rule:reqcourse'] = 'Has not completed required course';
+$string['audience:rules_too_many'] = 'Too many filter rules to estimate automatically — click "Calculate reach" to run on demand.';
+$string['audience:state:auto_pending'] = 'Computing — refreshing as you change the filters…';
+$string['audience:state:cached'] = 'Result computed at {$a}.';
+$string['audience:state:error'] = 'Estimate failed: {$a}';
+$string['audience:state:idle'] = 'Set at least one audience filter (cohorts, role or required course) to estimate reach.';
+$string['audience:state:manual_ready'] = 'Click "Calculate reach" when you are ready.';
+$string['audience:state:queued'] = 'Calculating in the background…';
+$string['audience:state:timeout'] = 'Calculation took longer than expected. Try again.';
+$string['audience:summary:cohorts'] = 'Cohorts';
+$string['audience:summary:competencies'] = 'Competencies';
+$string['audience:summary:courses'] = 'Courses';
+$string['audience:summary:role'] = 'Role';
+$string['audience:title'] = 'Audience estimate';
 $string['awareness:manage'] = 'Manage site notice';
+$string['awareness:viewreports'] = 'View awareness reports';
 $string['booleanformat:false'] = 'No';
 $string['booleanformat:true'] = 'Yes';
 $string['button:accept'] = 'Accept';
@@ -37,6 +68,56 @@ $string['cachedef_notice_view'] = 'A list of viewed notices';
 $string['cachedef_user_notices'] = 'Cached user-specific notices for the current session';
 $string['confirmation:deletenotice'] = 'Do you really want to delete the notice "{$a}"';
 $string['course_search_placeholder'] = 'Type to search courses...';
+$string['datasource:acknowledgednotices'] = 'Acknowledged notices';
+$string['datasource:allnotices'] = 'All notices';
+$string['datasource:dismissednotices'] = 'Dismissed notices';
+$string['datasource:linkhistory'] = 'Link click history';
+$string['datasource:noticeviews'] = 'Notice views';
+$string['editor:action:cancel'] = 'Cancel';
+$string['editor:action:preview'] = 'Preview';
+$string['editor:action:save_draft'] = 'Save draft';
+$string['editor:action:save_publish'] = 'Save & publish';
+$string['editor:action:saved_local'] = 'Changes saved locally';
+$string['editor:autosaved'] = 'auto-saved {$a} ago';
+$string['editor:nav:howitworks'] = 'How it works';
+$string['editor:nav:howitworks:body'] = 'Filters combine by <b>intersection</b> — all must match. Cohorts and individual courses combine by <b>union</b> within their own field.';
+$string['editor:preview:btn:gotit'] = 'Got it';
+$string['editor:preview:btn:iam_aware'] = 'I am aware';
+$string['editor:preview:btn:later'] = 'Later';
+$string['editor:preview:meta:acknowledgement'] = 'Acknowledgement';
+$string['editor:preview:meta:dismissable'] = 'Dismissable';
+$string['editor:preview:meta:forced'] = 'Forced';
+$string['editor:preview:meta:frequency'] = 'Frequency';
+$string['editor:preview:meta:logout'] = 'Logout';
+$string['editor:preview:meta:no'] = 'No';
+$string['editor:preview:meta:optional'] = 'Optional';
+$string['editor:preview:meta:required'] = 'Required';
+$string['editor:preview:meta:yes'] = 'Yes';
+$string['editor:preview:placeholder:content'] = 'Your notice content will appear here. Write a clear, direct message for the user.';
+$string['editor:preview:placeholder:title'] = 'Notice title';
+$string['editor:preview:tab:desktop'] = 'Desktop';
+$string['editor:preview:tab:mobile'] = 'Mobile';
+$string['editor:preview:title'] = 'Preview';
+$string['editor:requirements'] = 'Required fields are missing: {$a}. Complete them before enabling the notice.';
+$string['editor:section:appearance'] = 'Modal appearance';
+$string['editor:section:appearance:desc'] = 'Size and visual fit of the modal window.';
+$string['editor:section:audience'] = 'Audience';
+$string['editor:section:audience:desc'] = 'Who the notice will be shown to. Filters combine with AND (intersection).';
+$string['editor:section:behavior'] = 'Behaviour';
+$string['editor:section:behavior:desc'] = 'How the notice appears, repeats and is dismissed.';
+$string['editor:section:content'] = 'Notice content';
+$string['editor:section:content:desc'] = 'What will be shown in the modal to the user.';
+$string['editor:section:filters'] = 'Display restrictions';
+$string['editor:section:filters:desc'] = 'Refine where on the platform the notice fires.';
+$string['editor:status:draft'] = 'Draft · not published';
+$string['editor:status:live'] = 'Live · being shown';
+$string['editor:subtitle'] = 'Build a contextual modal that will be shown to users when the rules below match.';
+$string['editor:title:create'] = 'Create notice';
+$string['editor:title:edit'] = 'Edit notice';
+$string['entity_acknowledgement'] = 'Acknowledgement';
+$string['entity_linkhistory'] = 'Link click';
+$string['entity_notice'] = 'Notice';
+$string['entity_noticeview'] = 'Notice view';
 $string['event:acknowledge'] = 'acknowledge';
 $string['event:create'] = 'create';
 $string['event:delete'] = 'delete';
@@ -48,24 +129,28 @@ $string['event:timecreated'] = 'Time';
 $string['event:update'] = 'update';
 $string['filter_category'] = 'Category';
 $string['filter_competency'] = 'Competencies';
+$string['filter_competency_add'] = 'Add competencies';
 $string['filter_competency_help'] = 'Filters this notification based on the user’s competency proficiency. This filter only works on course pages (requires course context).
 
 When competencies are selected, each rule checks whether the user is proficient in a given competency within the current course. In the default mode, the user’s proficiency status must exactly match the configuration defined for each rule.
 
 When “Proficient in all” is enabled, the user must be proficient in all selected competencies, regardless of the individual rule settings.';
-$string['filter_competency_add'] = 'Add competencies';
+$string['filter_competency_picker_addselected'] = 'Add selected';
+$string['filter_competency_picker_framework'] = 'Competency framework';
+$string['filter_competency_picker_nocompetencies'] = 'No competencies found.';
+$string['filter_competency_picker_noframeworks'] = 'No competency frameworks available.';
+$string['filter_competency_picker_title'] = 'Select competencies';
 $string['filter_competency_proficient'] = 'Proficient';
 $string['filter_competency_remove'] = 'Remove';
 $string['filter_competency_requireall'] = 'Proficient in all selected competencies';
 $string['filter_competency_requireall_help'] = 'When enabled and more than one competency is selected, the notice is shown only if the user is proficient in all selected competencies.';
-$string['filter_competency_picker_title'] = 'Select competencies';
-$string['filter_competency_picker_framework'] = 'Competency framework';
-$string['filter_competency_picker_noframeworks'] = 'No competency frameworks available.';
-$string['filter_competency_picker_nocompetencies'] = 'No competencies found.';
-$string['filter_competency_picker_addselected'] = 'Add selected';
 $string['filter_course'] = 'Courses';
 $string['filter_courseformat'] = 'Course format';
 $string['filter_role'] = 'Role';
+$string['filter_role_context'] = 'Role context';
+$string['filter_role_context:category'] = 'Course category';
+$string['filter_role_context:course'] = 'Course';
+$string['filter_role_context:system'] = 'System';
 $string['filter_theme'] = 'Theme';
 $string['filters'] = 'Filters';
 $string['modal:acceptbtntooltip'] = 'Please tick the above check box.';
@@ -147,6 +232,34 @@ $string['report:dismissed_desc'] = 'List of users who dismissed the notice.';
 $string['report:timecreated_server'] = 'Server time';
 $string['report:timecreated_spreadsheet'] = 'Spreadsheet timestamp';
 $string['report:timeformat:sortable'] = '%Y-%m-%d %H:%M:%S';
+$string['report_ack:action'] = 'Action';
+$string['report_ack:action_acknowledged'] = 'Acknowledged';
+$string['report_ack:action_dismissed'] = 'Dismissed';
+$string['report_ack:firstname'] = 'First name';
+$string['report_ack:idnumber'] = 'ID number';
+$string['report_ack:lastname'] = 'Last name';
+$string['report_ack:noticetitle'] = 'Notice title (snapshot)';
+$string['report_ack:timecreated'] = 'Date';
+$string['report_ack:username'] = 'Username';
+$string['report_lh:linktext'] = 'Link text';
+$string['report_lh:linkurl'] = 'Link URL';
+$string['report_lh:timecreated'] = 'Click date';
+$string['report_notice:ack_count'] = 'Acknowledged count';
+$string['report_notice:content'] = 'Content';
+$string['report_notice:dismiss_count'] = 'Dismissed count';
+$string['report_notice:enabled'] = 'Enabled';
+$string['report_notice:forcelogout'] = 'Force logout';
+$string['report_notice:reqack'] = 'Requires acknowledgement';
+$string['report_notice:reqcourse'] = 'Requires course completion';
+$string['report_notice:resetinterval'] = 'Reset interval';
+$string['report_notice:timecreated'] = 'Date created';
+$string['report_notice:timeend'] = 'Expiry';
+$string['report_notice:timemodified'] = 'Date modified';
+$string['report_notice:timestart'] = 'Active from';
+$string['report_notice:title'] = 'Notice title';
+$string['report_nv:action'] = 'Last action';
+$string['report_nv:timecreated'] = 'First seen';
+$string['report_nv:timemodified'] = 'Last seen';
 $string['setting:allow_delete'] = 'Allow notice deletion';
 $string['setting:allow_deletedesc'] = 'Allow notice to be deleted';
 $string['setting:allow_update'] = 'Allow notice update';
@@ -160,141 +273,3 @@ $string['setting:enableddesc'] = 'Enable site notice';
 $string['setting:managenotice'] = 'Manage notice';
 $string['setting:settings'] = 'Settings';
 $string['timeformat:resetinterval'] = '%a day(s), %h hour(s), %i minute(s) and %s second(s)';
-
-// Report Builder — entity names.
-$string['entity_notice']          = 'Notice';
-$string['entity_acknowledgement'] = 'Acknowledgement';
-$string['entity_noticeview']      = 'Notice view';
-$string['entity_linkhistory']     = 'Link click';
-
-// Report Builder — datasource names.
-$string['datasource:allnotices']          = 'All notices';
-$string['datasource:acknowledgednotices'] = 'Acknowledged notices';
-$string['datasource:dismissednotices']    = 'Dismissed notices';
-$string['datasource:noticeviews']         = 'Notice views';
-$string['datasource:linkhistory']         = 'Link click history';
-
-// Report Builder — notice entity columns / filters.
-$string['report_notice:title']         = 'Notice title';
-$string['report_notice:enabled']       = 'Enabled';
-$string['report_notice:reqack']        = 'Requires acknowledgement';
-$string['report_notice:reqcourse']     = 'Requires course completion';
-$string['report_notice:forcelogout']   = 'Force logout';
-$string['report_notice:timestart']     = 'Active from';
-$string['report_notice:timeend']       = 'Expiry';
-$string['report_notice:timecreated']   = 'Date created';
-$string['report_notice:timemodified']  = 'Date modified';
-$string['report_notice:resetinterval'] = 'Reset interval';
-$string['report_notice:content']       = 'Content';
-$string['report_notice:ack_count']     = 'Acknowledged count';
-$string['report_notice:dismiss_count'] = 'Dismissed count';
-
-// Report Builder — acknowledgement entity columns / filters.
-$string['report_ack:username']             = 'Username';
-$string['report_ack:firstname']            = 'First name';
-$string['report_ack:lastname']             = 'Last name';
-$string['report_ack:idnumber']             = 'ID number';
-$string['report_ack:noticetitle']          = 'Notice title (snapshot)';
-$string['report_ack:action']               = 'Action';
-$string['report_ack:timecreated']          = 'Date';
-$string['report_ack:action_dismissed']     = 'Dismissed';
-$string['report_ack:action_acknowledged']  = 'Acknowledged';
-
-// Report Builder — noticeview entity columns / filters.
-$string['report_nv:action']       = 'Last action';
-$string['report_nv:timecreated']  = 'First seen';
-$string['report_nv:timemodified'] = 'Last seen';
-
-// Report Builder — linkhistory entity columns / filters.
-$string['report_lh:timecreated'] = 'Click date';
-$string['report_lh:linktext']    = 'Link text';
-$string['report_lh:linkurl']     = 'Link URL';
-
-// Report Builder — awareness:viewreports capability string.
-$string['awareness:viewreports'] = 'View awareness reports';
-
-// Notice editor — section titles & descriptions.
-$string['editor:section:content']         = 'Notice content';
-$string['editor:section:content:desc']    = 'What will be shown in the modal to the user.';
-$string['editor:section:behavior']        = 'Behaviour';
-$string['editor:section:behavior:desc']   = 'How the notice appears, repeats and is dismissed.';
-$string['editor:section:appearance']      = 'Modal appearance';
-$string['editor:section:appearance:desc'] = 'Size and visual fit of the modal window.';
-$string['editor:section:audience']        = 'Audience';
-$string['editor:section:audience:desc']   = 'Who the notice will be shown to. Filters combine with AND (intersection).';
-$string['editor:section:filters']         = 'Display restrictions';
-$string['editor:section:filters:desc']    = 'Refine where on the platform the notice fires.';
-
-// Notice editor — page chrome.
-$string['editor:title:create']     = 'Create notice';
-$string['editor:title:edit']       = 'Edit notice';
-$string['editor:subtitle']         = 'Build a contextual modal that will be shown to users when the rules below match.';
-$string['editor:status:draft']     = 'Draft · not published';
-$string['editor:status:live']      = 'Live · being shown';
-$string['editor:autosaved']        = 'auto-saved {$a} ago';
-$string['editor:nav:howitworks']   = 'How it works';
-$string['editor:nav:howitworks:body'] = 'Filters combine by <b>intersection</b> — all must match. Cohorts and individual courses combine by <b>union</b> within their own field.';
-$string['editor:requirements']     = 'Required fields are missing: {$a}. Complete them before enabling the notice.';
-
-// Notice editor — action bar.
-$string['editor:action:cancel']       = 'Cancel';
-$string['editor:action:preview']      = 'Preview';
-$string['editor:action:save_draft']   = 'Save draft';
-$string['editor:action:save_publish'] = 'Save & publish';
-$string['editor:action:saved_local']  = 'Changes saved locally';
-
-// Preview card.
-$string['editor:preview:title']           = 'Preview';
-$string['editor:preview:tab:desktop']     = 'Desktop';
-$string['editor:preview:tab:mobile']      = 'Mobile';
-$string['editor:preview:placeholder:title']   = 'Notice title';
-$string['editor:preview:placeholder:content'] = 'Your notice content will appear here. Write a clear, direct message for the user.';
-$string['editor:preview:btn:later']     = 'Later';
-$string['editor:preview:btn:gotit']     = 'Got it';
-$string['editor:preview:btn:iam_aware'] = 'I am aware';
-$string['editor:preview:meta:frequency']      = 'Frequency';
-$string['editor:preview:meta:dismissable']    = 'Dismissable';
-$string['editor:preview:meta:acknowledgement'] = 'Acknowledgement';
-$string['editor:preview:meta:logout']         = 'Logout';
-$string['editor:preview:meta:required']       = 'Required';
-$string['editor:preview:meta:optional']       = 'Optional';
-$string['editor:preview:meta:forced']         = 'Forced';
-$string['editor:preview:meta:no']             = 'No';
-$string['editor:preview:meta:yes']            = 'Yes';
-
-// Audience estimate panel.
-$string['audience:title']               = 'Audience estimate';
-$string['audience:summary:cohorts']     = 'Cohorts';
-$string['audience:summary:courses']     = 'Courses';
-$string['audience:summary:role']        = 'Role';
-$string['audience:summary:competencies'] = 'Competencies';
-$string['audience:reach:label']         = 'Estimated reach';
-$string['audience:reach:value']         = '~ {$a} users';
-$string['audience:state:idle']          = 'Set at least one audience filter (cohorts, role or required course) to estimate reach.';
-$string['audience:state:auto_pending']  = 'Computing — refreshing as you change the filters…';
-$string['audience:state:manual_ready']  = 'Click "Calculate reach" when you are ready.';
-$string['audience:state:queued']        = 'Calculating in the background…';
-$string['audience:state:cached']        = 'Result computed at {$a}.';
-$string['audience:state:timeout']       = 'Calculation took longer than expected. Try again.';
-$string['audience:state:error']         = 'Estimate failed: {$a}';
-$string['audience:btn:calculate']       = 'Calculate reach';
-$string['audience:btn:retry']           = 'Try again';
-$string['audience:context_restrictions:title'] = 'Display restrictions';
-$string['audience:context_restrictions:hint']  = 'These rules narrow when and where the notice appears, but do not change the audience size.';
-$string['audience:rule:cohorts']                  = 'Member of selected cohorts';
-$string['audience:rule:filter_role']              = 'Has selected roles';
-$string['audience:rule:reqcourse']                = 'Has not completed required course';
-$string['audience:rule:pathmatch']                = 'On URL path: {$a}';
-$string['audience:rule:filter_category']          = 'Course category: {$a}';
-$string['audience:rule:filter_course']            = 'Course: {$a}';
-$string['audience:rule:filter_format']            = 'Course format: {$a}';
-$string['audience:rule:filter_theme']             = 'Theme: {$a}';
-$string['audience:rule:filter_competency_rules']  = 'Competency requirement(s)';
-$string['audience:job_not_found']                 = 'Audience job not found.';
-$string['audience:rules_too_many']                = 'Too many filter rules to estimate automatically — click "Calculate reach" to run on demand.';
-$string['filter_role_context'] = 'Role context';
-$string['audience:rule:filter_role_context'] = 'Selected role context';
-$string['filter_role_context:system'] = 'System';
-$string['filter_role_context:category'] = 'Course category';
-$string['filter_role_context:course'] = 'Course';
-
