@@ -112,7 +112,7 @@ define(
                     nextNotice();
                 }
             }).fail(function (ex) {
-                // TODO: Log fail event.
+                // Surface the failure to the console for debugging.
                 this.console.log(ex);
             });
         };
@@ -133,7 +133,7 @@ define(
                     nextNotice();
                 }
             }).fail(function (ex) {
-                // TODO: Log fail event.
+                // Surface the failure to the console for debugging.
                 this.console.log(ex);
             });
         };
