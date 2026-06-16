@@ -80,6 +80,9 @@ define(
 
                         modal.show();
                         modal.getModal().focus();
+                        return null;
+                    }).catch(function(ex) {
+                        window.console.log(ex);
                     });
             } else {
                 // Update with new details.

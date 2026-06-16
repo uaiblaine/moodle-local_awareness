@@ -329,6 +329,7 @@ define([], function() {
                             })
                         };
 
+                        // eslint-disable-next-line promise/no-nesting
                         var bodyPromise = Templates.renderForPromise('local_awareness/competency_picker_body', pickerContext)
                             .then(function(result) {
                                 return result.html;
@@ -363,6 +364,7 @@ define([], function() {
                             '<div class="spinner-border spinner-border-sm" role="status"></div> ' +
                             labels.loading + '</div>';
 
+                            // eslint-disable-next-line promise/no-nesting
                             Ajax.call([{
                                 methodname: 'core_competency_search_competencies',
                                 args: {searchtext: searchText || '', competencyframeworkid: frameworkId}

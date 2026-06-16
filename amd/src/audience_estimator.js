@@ -359,7 +359,7 @@ define([
                 if (Array.isArray(ctx)) {
                     updateContextChips(ctx);
                 }
-            } catch (e) { /* noop */ }
+            } catch (e) { /* No-op. */ }
         }
     }
 
@@ -536,7 +536,7 @@ define([
                 // Initial sync of context chips & summary.
                 debouncedTrigger();
                 return null;
-            }).catch(function() { /* string loading failed — panel stays idle */ });
+            }).catch(function() { /* String loading failed — panel stays idle. */ });
 
             window.addEventListener('beforeunload', stopPolling);
         }

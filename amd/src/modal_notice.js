@@ -117,8 +117,9 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
             var stringKey = (parseInt(forcelogout, 10) === 1) ?
                 'modal:checkboxtext_logout' : 'modal:checkboxtext_nologout';
             var label = this.getFooter().find('label[for="awareness-modal-ackcheckbox"]');
-            str.get_string(stringKey, 'local_awareness').then(function(text) {
+            return str.get_string(stringKey, 'local_awareness').then(function(text) {
                 label.text(text);
+                return null;
             });
         };
 

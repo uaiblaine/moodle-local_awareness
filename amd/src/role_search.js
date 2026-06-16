@@ -28,6 +28,7 @@ define(['core/ajax', 'jquery'], function(Ajax, $) {
                         label: role.name,
                     };
                 });
+                // eslint-disable-next-line promise/no-callback-in-promise
                 callback(options);
                 return;
             })

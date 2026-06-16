@@ -72,9 +72,9 @@ define([
             FIELD_MAP[sectionId].forEach(function(name) {
                 // Try several lookup strategies — moodleform IDs vary by element type.
                 var node = source.querySelector('#fitem_id_' + name)
-                    || source.querySelector('#' + name) // raw HTML element id
+                    || source.querySelector('#' + name) // Raw HTML element id.
                     || source.querySelector('[id^="fgroup_id_' + name + '"]')
-                    || source.querySelector('#fitem_id_' + name + '_year'); // date_time_selector container fallback
+                    || source.querySelector('#fitem_id_' + name + '_year'); // Fallback for the date_time_selector container.
 
                 if (node) {
                     slot.appendChild(node);
@@ -180,7 +180,7 @@ define([
                 // dependency, plus the competency picker initialiser).
                 try {
                     NoticeForm.init();
-                } catch (e) { /* noop */ }
+                } catch (e) { /* No-op. */ }
                 LivePreview.init();
                 AudienceEstimator.init();
             };

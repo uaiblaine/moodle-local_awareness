@@ -33,6 +33,7 @@ define(['core/ajax'], function(Ajax) {
                         label: course.fullname,
                     };
                 });
+                // eslint-disable-next-line promise/no-callback-in-promise
                 callback(options);
                 return;
             })
