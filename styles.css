@@ -232,16 +232,8 @@
 
 .la-shell-main {
     min-width: 0;
-    /* Scroll clearance so the sticky action bar never overlaps the last fields. */
+    /* Clearance below the content so the sticky action bar has room. */
     padding-bottom: 160px;
-}
-
-/* When a relocated field is scrolled into view it must clear the sticky action
-   bar, otherwise automated clicks (Behat/Selenium) land on the footer instead. */
-.la-card-body input,
-.la-card-body select,
-.la-card-body textarea {
-    scroll-margin-bottom: 180px;
 }
 
 /* Page head */
@@ -550,10 +542,20 @@
     box-shadow: 0 0 0 4px rgba(44, 74, 138, .14);
 }
 
+/* Action bar buttons stay clickable even though the bar itself passes clicks through. */
+.la-actionbar button,
+.la-actionbar a {
+    pointer-events: auto;
+}
+
 /* Action bar (sticky) */
 .la-actionbar {
     position: sticky;
     bottom: 18px;
+    /* The empty footer area lets clicks fall through to the fields behind it
+       (buttons re-enable pointer events above). Fixes Behat clicking the
+       autocomplete that sits under the sticky footer in the headless viewport. */
+    pointer-events: none;
     margin-top: 24px;
     background: var(--la-paper);
     border: 1px solid var(--la-ink-200);
