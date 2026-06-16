@@ -47,13 +47,6 @@ class manage_page implements renderable, templatable {
             'subtitle' => get_string('editor:subtitle', 'local_awareness'),
             'createurl' => $this->createurl,
             'createlabel' => get_string('notice:create', 'local_awareness'),
-            'topbar' => [
-                'brand' => 'Local Awareness',
-                'breadcrumbs' => [
-                    ['label' => get_string('administrationsite')],
-                    ['label' => get_string('pluginname', 'local_awareness'), 'current' => true],
-                ],
-            ],
             'tablehtml' => $this->tablehtml,
         ];
     }

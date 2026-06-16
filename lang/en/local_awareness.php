@@ -292,3 +292,9 @@ $string['audience:rule:filter_theme']             = 'Theme: {$a}';
 $string['audience:rule:filter_competency_rules']  = 'Competency requirement(s)';
 $string['audience:job_not_found']                 = 'Audience job not found.';
 $string['audience:rules_too_many']                = 'Too many filter rules to estimate automatically — click "Calculate reach" to run on demand.';
+$string['filter_role_context'] = 'Role context';
+$string['audience:rule:filter_role_context'] = 'Selected role context';
+$string['filter_role_context:system'] = 'System';
+$string['filter_role_context:category'] = 'Course category';
+$string['filter_role_context:course'] = 'Course';
+

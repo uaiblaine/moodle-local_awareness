@@ -65,6 +65,7 @@ class estimator {
         $roles = self::sanitise_int_list($raw['filter_role'] ?? []);
         if (!empty($roles)) {
             $out['filter_role'] = $roles;
+            $out['filter_role_context'] = (int) ($raw['filter_role_context'] ?? 0);
         }
 
         $reqcourse = (int) ($raw['reqcourse'] ?? 0);
@@ -220,28 +221,66 @@ class estimator {
 
         if (!empty($criteria['filter_role'])) {
             $roleids = array_map('intval', $criteria['filter_role']);
+            $rolectx = (int) ($criteria['filter_role_context'] ?? 0);
             $clauses = [];
 
             // Real assignments.
             [$insql, $inparams] = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED, 'role');
-            $clauses[] = "EXISTS (SELECT 1 FROM {role_assignments} ra
-                                    WHERE ra.userid = u.id AND ra.roleid {$insql})";
+            
+            $ctxjoin = '';
+            $ctxwhere = '';
+
+            if ($rolectx == CONTEXT_SYSTEM) {
+                $syscontext = \context_system::instance();
+                $ctxwhere = " AND ra.contextid = " . $syscontext->id;
+            } else if ($rolectx == CONTEXT_COURSECAT) {
+                $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSECAT;
+                if (!empty($criteria['filter_category'])) {
+                    $catids = array_map('intval', $criteria['filter_category']);
+                    [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rcat');
+                    $ctxwhere = " AND ctx.instanceid {$catinsql}";
+                    $inparams += $catinparams;
+                }
+            } else if ($rolectx == CONTEXT_COURSE) {
+                $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSE;
+                
+                $coursewheres = [];
+                if (!empty($criteria['filter_course'])) {
+                    $courseids = array_map('intval', $criteria['filter_course']);
+                    [$cinsql, $cinparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED, 'rcrs');
+                    $coursewheres[] = "ctx.instanceid {$cinsql}";
+                    $inparams += $cinparams;
+                }
+                if (!empty($criteria['filter_category'])) {
+                    $catids = array_map('intval', $criteria['filter_category']);
+                    [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rccat');
+                    $ctxjoin .= " LEFT JOIN {course} crs ON crs.id = ctx.instanceid";
+                    $coursewheres[] = "crs.category {$catinsql}";
+                    $inparams += $catinparams;
+                }
+                if (!empty($coursewheres)) {
+                    $ctxwhere = " AND (" . implode(" OR ", $coursewheres) . ")";
+                }
+            }
+
+            $clauses[] = "EXISTS (SELECT 1 FROM {role_assignments} ra {$ctxjoin}
+                                    WHERE ra.userid = u.id AND ra.roleid {$insql} {$ctxwhere})";
             $params += $inparams;
 
             // Implicit default-user role: applies to every confirmed, non-guest user.
-            // Mirrors helper.php:1146-1148 (defaultuserroleid) and helper.php:1149-1151
-            // (defaultfrontpageroleid). Both behave like "everyone has this role".
-            $defaults = [];
-            if (!empty($CFG->defaultuserroleid)) {
-                $defaults[] = (int) $CFG->defaultuserroleid;
-            }
-            if (!empty($CFG->defaultfrontpageroleid)) {
-                $defaults[] = (int) $CFG->defaultfrontpageroleid;
-            }
-            $defaults = array_unique($defaults);
-            if (array_intersect($defaults, $roleids)) {
-                // Filter matches a default role → every user qualifies on the role test.
-                $clauses[] = "1 = 1";
+            if ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM) {
+                $defaults = [];
+                if (!empty($CFG->defaultuserroleid)) {
+                    $defaults[] = (int) $CFG->defaultuserroleid;
+                }
+                if (!empty($CFG->defaultfrontpageroleid)) {
+                    $defaults[] = (int) $CFG->defaultfrontpageroleid;
+                }
+                $defaults = array_unique($defaults);
+                if (array_intersect($defaults, $roleids)) {
+                    // Filter matches a default role → every user qualifies on the role test.
+                    $clauses[] = "1 = 1";
+                }
             }
 
             $where[] = '(' . implode(' OR ', $clauses) . ')';

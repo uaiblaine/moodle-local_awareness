@@ -10,27 +10,9 @@
     * subtitle (string)
     * createurl (string)
     * createlabel (string)
-    * topbar (object) — same shape as in editor/shell.mustache
     * tablehtml (raw HTML)
 }}
 <div class="local-awareness-editor local-awareness-editor--manage">
-
-    <header class="la-topbar">
-        <div class="la-topbar__inner">
-            <div class="la-topbar__left">
-                <div class="la-brand">
-                    <span class="la-brand__dot" aria-hidden="true"></span>
-                    <span class="la-brand__name">{{topbar.brand}}</span>
-                </div>
-                <nav class="la-crumbs" aria-label="breadcrumb">
-                    {{#topbar.breadcrumbs}}
-                        {{^current}}<span class="la-crumbs__item">{{label}}</span>{{/current}}
-                        {{#current}}<span class="la-crumbs__item la-crumbs__item--current">{{label}}</span>{{/current}}
-                    {{/topbar.breadcrumbs}}
-                </nav>
-            </div>
-        </div>
-    </header>
 
     <div class="la-shell la-shell--single">
         <main class="la-shell__main">

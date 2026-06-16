@@ -72,12 +72,12 @@ define([
             {key: 'audience:state:auto_pending', component: 'local_awareness'},
             {key: 'audience:state:manual_ready', component: 'local_awareness'},
             {key: 'audience:state:queued', component: 'local_awareness'},
-            {key: 'audience:state:cached', component: 'local_awareness', param: ''},
+            {key: 'audience:state:cached', component: 'local_awareness', param: '{$a}'},
             {key: 'audience:state:timeout', component: 'local_awareness'},
-            {key: 'audience:state:error', component: 'local_awareness', param: ''},
+            {key: 'audience:state:error', component: 'local_awareness', param: '{$a}'},
             {key: 'audience:btn:calculate', component: 'local_awareness'},
             {key: 'audience:btn:retry', component: 'local_awareness'},
-            {key: 'audience:reach:value', component: 'local_awareness', param: ''},
+            {key: 'audience:reach:value', component: 'local_awareness', param: '{$a}'},
             {key: 'audience:rules_too_many', component: 'local_awareness'},
             {key: 'audience:rule:cohorts', component: 'local_awareness'},
             {key: 'audience:rule:filter_role', component: 'local_awareness'},
@@ -405,7 +405,7 @@ define([
 
     /** Bind change/input listeners to ALL form fields that affect criteria. */
     function bindFormChanges() {
-        var form = document.querySelector('#la-moodleform-source form');
+        var form = document.querySelector('form.la-shell') || document.querySelector('#la-moodleform-source form');
         if (!form) {
             return;
         }

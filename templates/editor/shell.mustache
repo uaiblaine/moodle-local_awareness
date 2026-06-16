@@ -12,9 +12,7 @@
     * formhtml (raw) — rendered moodleform (kept hidden, fields relocated by JS)
     * sections (array of {id, num, icon, title, desc})
     * preview (object) — see preview_card.mustache
-    * audience (object) — see audience_panel.mustache
     * actionbar (object) — see action_bar.mustache
-    * topbar (object) — {brand, breadcrumbs:[{label, current}]}
     * sidenav (object) — see sidenav.mustache
 
     Example context (json):
@@ -29,30 +27,14 @@
         "preview": {},
         "audience": {},
         "actionbar": {},
-        "topbar": {"brand": "Local Awareness", "breadcrumbs": [{"label": "Administração"}, {"label": "Avisos"}, {"label": "Novo aviso", "current": true}]},
         "sidenav": {}
     }
 }}
 <div class="local-awareness-editor" data-region="la-editor">
 
-    <header class="la-topbar">
-        <div class="la-topbar__inner">
-            <div class="la-topbar__left">
-                <div class="la-brand">
-                    <span class="la-brand__dot" aria-hidden="true"></span>
-                    <span class="la-brand__name">{{topbar.brand}}</span>
-                </div>
-                <nav class="la-crumbs" aria-label="breadcrumb">
-                    {{#topbar.breadcrumbs}}
-                        {{^current}}<span class="la-crumbs__item">{{label}}</span>{{/current}}
-                        {{#current}}<span class="la-crumbs__item la-crumbs__item--current">{{label}}</span>{{/current}}
-                    {{/topbar.breadcrumbs}}
-                </nav>
-            </div>
-        </div>
-    </header>
 
-    <div class="la-shell">
+
+    <form {{{form_attributes}}} class="la-shell">
 
         <aside class="la-shell__nav">
             {{> local_awareness/editor/sidenav }}
@@ -109,5 +91,5 @@
             {{> local_awareness/editor/preview_card }}
             {{> local_awareness/editor/audience_panel }}
         </aside>
-    </div>
+    </form>
 </div>

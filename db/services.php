@@ -62,6 +62,15 @@ $functions = [
         'ajax' => true,
     ],
 
+    'local_awareness_search_roles' => [
+        'classname' => 'local_awareness\external',
+        'methodname' => 'search_roles',
+        'description' => 'Search roles dynamically based on context',
+        'type' => 'read',
+        'loginrequired' => true,
+        'ajax' => true,
+    ],
+
     'local_awareness_search_courses' => [
         'classname' => 'local_awareness\external',
         'methodname' => 'search_courses',

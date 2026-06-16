@@ -66,6 +66,15 @@ class editor_page implements renderable, templatable {
         $isedit = (bool) $this->awareness;
         $statusislive = $isedit && (int) $this->awareness->get('enabled') === 1;
 
+        $form_attributes = '';
+        $formhtml = $this->formhtml;
+        if (preg_match('/<form\b([^>]*\bid="([^"]+)"[^>]*)>/', $formhtml, $m)) {
+            $form_attributes = $m[1];
+            $form_attributes = preg_replace('/\s*class=[\'"][^\'"]*[\'"]/', '', $form_attributes);
+        }
+        $formhtml = preg_replace('/<form\b[^>]*>/', '<div class="la-mform-wrapper">', $formhtml);
+        $formhtml = preg_replace('/<\/form>/', '</div>', $formhtml);
+
         $sections = [
             ['id' => 'sec-content',    'num' => '01', 'icon' => 'fa-file-text-o',
              'title' => get_string('editor:section:content', 'local_awareness'),
@@ -148,7 +157,8 @@ class editor_page implements renderable, templatable {
             'statusislive' => $statusislive,
             'autosaved' => '',
             'requirements' => '',
-            'formhtml' => $this->formhtml,
+            'form_attributes' => $form_attributes,
+            'formhtml' => $formhtml,
             'sections' => $sections,
             'sidenav' => [
                 'items' => $sidenavitems,
@@ -158,16 +168,6 @@ class editor_page implements renderable, templatable {
             'preview' => $preview,
             'audience' => $audience,
             'actionbar' => $actionbar,
-            'topbar' => [
-                'brand' => 'Local Awareness',
-                'breadcrumbs' => [
-                    ['label' => get_string('administrationsite')],
-                    ['label' => get_string('pluginname', 'local_awareness')],
-                    ['label' => $isedit
-                        ? get_string('editor:title:edit', 'local_awareness')
-                        : get_string('editor:title:create', 'local_awareness'), 'current' => true],
-                ],
-            ],
         ];
     }
 

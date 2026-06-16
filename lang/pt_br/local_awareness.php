@@ -292,3 +292,9 @@ $string['audience:rule:filter_theme']             = 'Tema: {$a}';
 $string['audience:rule:filter_competency_rules']  = 'Requisito(s) de competência';
 $string['audience:job_not_found']                 = 'Trabalho de estimativa não encontrado.';
 $string['audience:rules_too_many']                = 'Há muitos filtros para estimar automaticamente — clique em "Calcular alcance" para rodar sob demanda.';
+$string['filter_role_context'] = 'Contexto do papel';
+$string['audience:rule:filter_role_context'] = 'Contexto do papel selecionado';
+$string['filter_role_context:system'] = 'Sistema';
+$string['filter_role_context:category'] = 'Categoria de curso';
+$string['filter_role_context:course'] = 'Curso';
+

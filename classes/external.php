@@ -244,6 +244,82 @@ class external extends external_api {
     }
 
     /**
+     * Parameters for search_roles.
+     *
+     * @return external_function_parameters
+     */
+    public static function search_roles_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'query' => new external_value(PARAM_RAW, 'search query', VALUE_DEFAULT, ''),
+            'contextlevel' => new external_value(PARAM_INT, 'context level', VALUE_DEFAULT, 0),
+        ]);
+    }
+
+    /**
+     * Search roles dynamically based on context level.
+     *
+     * @param string $query search string
+     * @param int $contextlevel context level (e.g. 10, 40, 50)
+     * @return array
+     */
+    public static function search_roles(string $query = '', int $contextlevel = 0): array {
+        global $DB;
+        self::validate_context(\context_system::instance());
+
+        $params = self::validate_parameters(self::search_roles_parameters(), [
+            'query' => $query,
+            'contextlevel' => $contextlevel,
+        ]);
+
+        $query = $params['query'];
+        $contextlevel = $params['contextlevel'];
+
+        $sql = "SELECT r.id, r.name, r.shortname
+                  FROM {role} r
+                 WHERE 1=1";
+        
+        $sqlparams = [];
+
+        if ($contextlevel > 0) {
+            $sql .= " AND EXISTS (SELECT 1 FROM {role_context_levels} rcl WHERE rcl.roleid = r.id AND rcl.contextlevel = :contextlevel)";
+            $sqlparams['contextlevel'] = $contextlevel;
+        }
+
+        if ($query !== '') {
+            $sql .= " AND (" . $DB->sql_like('r.name', ':q1', false, false) . " OR " . $DB->sql_like('r.shortname', ':q2', false, false) . ")";
+            $sqlparams['q1'] = '%' . $DB->sql_like_escape($query) . '%';
+            $sqlparams['q2'] = '%' . $DB->sql_like_escape($query) . '%';
+        }
+
+        $sql .= " ORDER BY r.sortorder ASC";
+
+        $records = $DB->get_records_sql($sql, $sqlparams, 0, 50);
+        $roles = [];
+        $allroles = role_get_names(null, ROLENAME_ORIGINAL);
+
+        foreach ($records as $record) {
+            $localname = isset($allroles[$record->id]) ? $allroles[$record->id]->localname : $record->name;
+            $roles[] = [
+                'id' => $record->id,
+                'name' => $localname,
+            ];
+        }
+
+        return ['roles' => json_encode($roles)];
+    }
+
+    /**
+     * Returns for search_roles.
+     *
+     * @return external_single_structure
+     */
+    public static function search_roles_returns(): external_single_structure {
+        return new external_single_structure([
+            'roles' => new external_value(PARAM_RAW, 'JSON encoded list of roles'),
+        ]);
+    }
+
+    /**
      * Parameters for search_courses.
      *
      * @return external_function_parameters

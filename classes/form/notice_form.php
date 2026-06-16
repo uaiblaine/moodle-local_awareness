@@ -37,7 +37,7 @@ class notice_form extends \core\form\persistent {
 
     /** @var array Fields to remove from the persistent validation. */
     protected static $foreignfields = [
-        'perpetual', 'cohorts', 'filter_role', 'filter_category',
+        'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
         'filter_course', 'filter_format', 'filter_theme', 'filter_competency_rules',
         'filter_competency_requireall', 'bgimage',
     ];
@@ -84,6 +84,53 @@ class notice_form extends \core\form\persistent {
         $mform->addHelpButton('outsideclick', 'notice:outsideclick', 'local_awareness');
         $mform->setDefault('outsideclick', 1);
 
+        // Get persistent early — needed for pre-loading defaults in audience and filter sections.
+        $persistent = $this->get_persistent();
+
+        $mform->addElement('header', 'header_audience', get_string('editor:section:audience', 'local_awareness'));
+
+        // Context / Filter fields.
+        $mform->addElement(
+            'select',
+            'filter_role_context',
+            get_string('filter_role_context', 'local_awareness'),
+            [
+                0 => get_string('all', 'local_awareness'),
+                CONTEXT_SYSTEM => get_string('filter_role_context:system', 'local_awareness'),
+                CONTEXT_COURSECAT => get_string('filter_role_context:category', 'local_awareness'),
+                CONTEXT_COURSE => get_string('filter_role_context:course', 'local_awareness')
+            ]
+        );
+        $mform->setDefault('filter_role_context', 0);
+
+        $filterroledefaults = [];
+        if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
+            $existingfilters = json_decode($persistent->get('filtervalues'), true);
+            if (!empty($existingfilters['filter_role'])) {
+                $roleids = array_map('intval', $existingfilters['filter_role']);
+                $allroles = helper::get_role_options();
+                foreach ($roleids as $rid) {
+                    if (isset($allroles[$rid])) {
+                        $filterroledefaults[$rid] = $allroles[$rid];
+                    }
+                }
+            }
+        }
+
+        // Role.
+        $mform->addElement(
+            'autocomplete',
+            'filter_role',
+            get_string('filter_role', 'local_awareness'),
+            $filterroledefaults,
+            [
+                'multiple' => true,
+                'noselectionstring' => get_string('all', 'local_awareness'),
+                'ajax' => 'local_awareness/role_search',
+                'showSuggestions' => true,
+            ]
+        );
+
         $mform->addElement(
             'autocomplete',
             'cohorts',
@@ -97,7 +144,6 @@ class notice_form extends \core\form\persistent {
         // AJAX autocomplete for course requirement.
         // Only pre-load the currently selected course (if editing), not all courses.
         $reqcourseoptions = [0 => get_string('booleanformat:false', 'local_awareness')];
-        $persistent = $this->get_persistent();
         if ($persistent && $persistent->get('id') > 0 && $persistent->get('reqcourse') > 0) {
             $selcourse = $DB->get_record('course', ['id' => $persistent->get('reqcourse')], 'id, fullname');
             if ($selcourse) {
@@ -180,18 +226,7 @@ class notice_form extends \core\form\persistent {
         $mform->setType('pathmatch', PARAM_RAW);
         $mform->addHelpButton('pathmatch', 'pathmatch', 'local_awareness');
 
-        // Context / Filter fields.
-        // Role.
-        $mform->addElement(
-            'autocomplete',
-            'filter_role',
-            get_string('filter_role', 'local_awareness'),
-            helper::get_role_options(),
-            [
-                'multiple' => true,
-                'noselectionstring' => get_string('all', 'local_awareness'),
-            ]
-        );
+        // Fields moved to header_audience.
 
         // Category.
         $mform->addElement(

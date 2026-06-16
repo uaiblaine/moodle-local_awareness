@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || in_array($action, $actionsrequiress
 }
 
 $managenoticepage = new moodle_url('/local/awareness/managenotice.php');
-$thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid]);
+$thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid, 'action' => $action]);
 $PAGE->set_url($thispage);
 // notice_editor handles field relocation, side-nav, live preview and audience estimator.
 // It internally calls notice_form/init() once the form fields have been moved into cards.
@@ -190,18 +190,6 @@ switch ($action) {
         break;
     case 'edit':
         if (get_config('local_awareness', 'allow_update')) {
-            $mform = new notice_form($thispage, $customdata);
-            // Re-prepare draft area for bgimage for the edit form.
-            $bgdraft = file_get_submitted_draft_itemid('bgimage');
-            file_prepare_draft_area(
-                $bgdraft,
-                context_system::instance()->id,
-                'local_awareness',
-                'bgimage',
-                $noticeid,
-                ['maxfiles' => 1, 'accepted_types' => ['image']]
-            );
-            $mform->set_data(['bgimage' => $bgdraft]);
             [$formhtml, $formid] = $render_moodleform_for_shell($mform);
             $output = $PAGE->get_renderer('local_awareness');
             echo $OUTPUT->header();
