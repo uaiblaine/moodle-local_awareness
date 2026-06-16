@@ -24,12 +24,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Updated Behat administration navigation path to `Awareness > Settings`.
 - Notice management report actions now route to the new system report pages.
 - Action links in manage-notice table improved for accessibility (`title`, `aria-label`) and clearer visual grouping.
-- Plugin metadata support range updated to Moodle 4.5-5.1 (`supported = [405, 501]`).
+- Plugin metadata support range updated to Moodle 4.5-5.2 (`supported = [405, 502]`).
+- CI migrated from the Catalyst reusable workflow to moodle-an-hochschulen/moodle-workflows (`moodle-plugin-ci.yml`), called once per supported Moodle branch (5.02 full PHP×DB matrix; 5.01/5.00/4.05 PostgreSQL-only).
 
 ### Fixed
 - PHPUnit data provider typo in awareness tests (`allowdeltion` -> `allowdeletion`).
 - CI reusable workflow input mismatch (`disable_phpcpd` removed).
 - AMD JSDoc compatibility issue in `amd/src/course_search.js`.
+- Frontend now passes core grunt without `disable_grunt`: BEM `__` CSS selectors renamed to hyphenated form (core `selector-class-pattern`), missing AMD JSDoc added across `audience_estimator`/`live_preview`/`notice_editor`/`role_search` (core `eslint`), and AMD bundles rebuilt with source maps.
 - Compatibility fixes for Report Builder API differences across Moodle versions:
 	- `system_report_factory::create()` used instead of non-existent `make()`
 	- system reports rendered via `$report->output()` instead of `$OUTPUT->render($report)`

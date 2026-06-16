@@ -45,7 +45,7 @@ This repository is maintained for modern Moodle branches through CI matrix testi
 
 Current declared support in plugin metadata:
 
-- Moodle 4.5 to 5.1
+- Moodle 4.5 to 5.2
 
 ## Administration paths
 
