@@ -32,6 +32,9 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - CI reusable workflow input mismatch (`disable_phpcpd` removed).
 - AMD JSDoc compatibility issue in `amd/src/course_search.js`.
 - Frontend now passes core grunt without `disable_grunt`: BEM `__` CSS selectors renamed to hyphenated form (core `selector-class-pattern`), missing AMD JSDoc added across `audience_estimator`/`live_preview`/`notice_editor`/`role_search` (core `eslint`), and AMD bundles rebuilt with source maps.
+- Brought the plugin to a fully green MAH CI across Moodle 4.5–5.2: `phpcs`/`phpdoc` compliance, alphabetical lang-string ordering (en + pt_br), the remaining core eslint rules (`promise/*`, `capitalized-comments`, `consistent-return`) and stylelint nits, plus removal of a stray `test_roles.php` debug script.
+- Behat: disabled collapsible short-forms so core `collapsesections` no longer hangs on the relocated editor form; let clicks fall through the sticky action bar to the fields behind it; and made the estimator's "Calculate reach" button always available as a manual recalculate.
+- Mustache lint set to non-blocking (`mustache-continue-on-error`) for the editor's intentional cross-form `form=` submit pattern that standalone HTML validation rejects.
 - Compatibility fixes for Report Builder API differences across Moodle versions:
 	- `system_report_factory::create()` used instead of non-existent `make()`
 	- system reports rendered via `$report->output()` instead of `$OUTPUT->render($report)`
