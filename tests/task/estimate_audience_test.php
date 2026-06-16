@@ -30,12 +30,17 @@ use local_awareness\persistent\audience_job;
  * @covers     \local_awareness\task\estimate_audience
  */
 final class estimate_audience_test extends \advanced_testcase {
-
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
     }
 
+    /**
+     * Create and persist a pending audience job for the given criteria.
+     *
+     * @param array $criteria Raw audience criteria.
+     * @return audience_job The persisted pending job.
+     */
     private function create_pending_job(array $criteria): audience_job {
         global $USER;
         $normalised = estimator::normalise($criteria);
@@ -85,8 +90,11 @@ final class estimate_audience_test extends \advanced_testcase {
         $task->execute();
 
         $reloaded = audience_job::get_record(['jobid' => $job->get('jobid')]);
-        $this->assertSame(99, (int) $reloaded->get('resultcount'),
-            'Already-ready job must not be recomputed.');
+        $this->assertSame(
+            99,
+            (int) $reloaded->get('resultcount'),
+            'Already-ready job must not be recomputed.'
+        );
     }
 
     public function test_execute_with_unknown_jobid_does_not_throw(): void {

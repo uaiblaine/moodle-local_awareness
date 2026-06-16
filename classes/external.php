@@ -277,16 +277,18 @@ class external extends external_api {
         $sql = "SELECT r.id, r.name, r.shortname
                   FROM {role} r
                  WHERE 1=1";
-        
+
         $sqlparams = [];
 
         if ($contextlevel > 0) {
-            $sql .= " AND EXISTS (SELECT 1 FROM {role_context_levels} rcl WHERE rcl.roleid = r.id AND rcl.contextlevel = :contextlevel)";
+            $sql .= " AND EXISTS (SELECT 1 FROM {role_context_levels} rcl
+                                   WHERE rcl.roleid = r.id AND rcl.contextlevel = :contextlevel)";
             $sqlparams['contextlevel'] = $contextlevel;
         }
 
         if ($query !== '') {
-            $sql .= " AND (" . $DB->sql_like('r.name', ':q1', false, false) . " OR " . $DB->sql_like('r.shortname', ':q2', false, false) . ")";
+            $sql .= " AND (" . $DB->sql_like('r.name', ':q1', false, false) .
+                    " OR " . $DB->sql_like('r.shortname', ':q2', false, false) . ")";
             $sqlparams['q1'] = '%' . $DB->sql_like_escape($query) . '%';
             $sqlparams['q2'] = '%' . $DB->sql_like_escape($query) . '%';
         }

@@ -98,7 +98,7 @@ class notice_form extends \core\form\persistent {
                 0 => get_string('all', 'local_awareness'),
                 CONTEXT_SYSTEM => get_string('filter_role_context:system', 'local_awareness'),
                 CONTEXT_COURSECAT => get_string('filter_role_context:category', 'local_awareness'),
-                CONTEXT_COURSE => get_string('filter_role_context:course', 'local_awareness')
+                CONTEXT_COURSE => get_string('filter_role_context:course', 'local_awareness'),
             ]
         );
         $mform->setDefault('filter_role_context', 0);
@@ -341,7 +341,11 @@ class notice_form extends \core\form\persistent {
             $mform->addElement('hidden', 'filter_competency_rules', json_encode($existingrules));
             $mform->setType('filter_competency_rules', PARAM_RAW);
 
-            $mform->addElement('selectyesno', 'filter_competency_requireall', get_string('filter_competency_requireall', 'local_awareness'));
+            $mform->addElement(
+                'selectyesno',
+                'filter_competency_requireall',
+                get_string('filter_competency_requireall', 'local_awareness')
+            );
             $mform->setDefault('filter_competency_requireall', 0);
             $mform->addHelpButton('filter_competency_requireall', 'filter_competency_requireall', 'local_awareness');
 

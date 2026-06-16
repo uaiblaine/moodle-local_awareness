@@ -31,7 +31,6 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
  * @covers     \local_awareness\external::get_estimate
  */
 final class audience_external_test extends \advanced_testcase {
-
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -59,8 +58,10 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertSame('pending', $job->get('status'));
 
         // Task is queued.
-        $tasks = $DB->get_records('task_adhoc',
-            ['classname' => '\\local_awareness\\task\\estimate_audience']);
+        $tasks = $DB->get_records(
+            'task_adhoc',
+            ['classname' => '\\local_awareness\\task\\estimate_audience']
+        );
         $this->assertCount(1, $tasks);
     }
 

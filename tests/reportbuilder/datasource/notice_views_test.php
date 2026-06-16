@@ -37,9 +37,12 @@ use local_awareness\reportbuilder\datasource\notice_views;
  * @copyright  Anderson Blaine <anderson@blaine.com.br>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class notice_views_test extends core_reportbuilder_testcase {
+final class notice_views_test extends core_reportbuilder_testcase {
     /**
      * Insert a notice and return its ID.
+     *
+     * @param string $title Notice title.
+     * @return int The inserted notice ID.
      */
     private function create_notice(string $title = 'View notice'): int {
         global $DB, $USER;
@@ -63,6 +66,11 @@ class notice_views_test extends core_reportbuilder_testcase {
 
     /**
      * Insert a row into local_awareness_lastview.
+     *
+     * @param int $noticeid Notice ID.
+     * @param int|string $userid User ID.
+     * @param int $action Action code.
+     * @return void
      */
     private function create_view(int $noticeid, int|string $userid, int $action = 0): void {
         global $DB;

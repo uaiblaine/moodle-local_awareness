@@ -36,10 +36,13 @@ use local_awareness\reportbuilder\datasource\link_history;
  * @copyright  Anderson Blaine <anderson@blaine.com.br>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class link_history_test extends core_reportbuilder_testcase {
+final class link_history_test extends core_reportbuilder_testcase {
     /**
      * Insert a notice, a hyperlink for it, and a click event.
      *
+     * @param int|string $userid User ID performing the click.
+     * @param string $text Hyperlink text.
+     * @param string $url Hyperlink URL.
      * @return array{noticeid: int, hlinkid: int, lhhid: int}
      */
     private function create_link_click(int|string $userid, string $text = 'Click me', string $url = 'https://example.com'): array {

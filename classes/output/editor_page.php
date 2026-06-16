@@ -31,7 +31,6 @@ use moodle_url;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class editor_page implements renderable, templatable {
-
     /** Threshold above which the audience estimator stops auto-running. */
     public const RULE_THRESHOLD = 3;
     /** Polling interval (ms). */
@@ -51,6 +50,14 @@ class editor_page implements renderable, templatable {
     /** @var moodle_url */
     protected $cancelurl;
 
+    /**
+     * Constructor.
+     *
+     * @param awareness|null $awareness The notice being edited, or null when creating.
+     * @param string $formhtml Rendered moodleform HTML to embed.
+     * @param string $formid The DOM id of the embedded form.
+     * @param moodle_url $cancelurl URL to return to on cancel.
+     */
     public function __construct(?awareness $awareness, string $formhtml, string $formid, moodle_url $cancelurl) {
         $this->awareness = $awareness;
         $this->formhtml = $formhtml;
@@ -59,38 +66,40 @@ class editor_page implements renderable, templatable {
     }
 
     /**
-     * @param renderer_base $output
-     * @return array
+     * Export the editor page data for the Mustache template.
+     *
+     * @param renderer_base $output The renderer.
+     * @return array Template context.
      */
     public function export_for_template(renderer_base $output) {
         $isedit = (bool) $this->awareness;
         $statusislive = $isedit && (int) $this->awareness->get('enabled') === 1;
 
-        $form_attributes = '';
+        $formattributes = '';
         $formhtml = $this->formhtml;
         if (preg_match('/<form\b([^>]*\bid="([^"]+)"[^>]*)>/', $formhtml, $m)) {
-            $form_attributes = $m[1];
-            $form_attributes = preg_replace('/\s*class=[\'"][^\'"]*[\'"]/', '', $form_attributes);
+            $formattributes = $m[1];
+            $formattributes = preg_replace('/\s*class=[\'"][^\'"]*[\'"]/', '', $formattributes);
         }
         $formhtml = preg_replace('/<form\b[^>]*>/', '<div class="la-mform-wrapper">', $formhtml);
         $formhtml = preg_replace('/<\/form>/', '</div>', $formhtml);
 
         $sections = [
-            ['id' => 'sec-content',    'num' => '01', 'icon' => 'fa-file-text-o',
+            ['id' => 'sec-content', 'num' => '01', 'icon' => 'fa-file-text-o',
              'title' => get_string('editor:section:content', 'local_awareness'),
-             'desc'  => get_string('editor:section:content:desc', 'local_awareness')],
-            ['id' => 'sec-behavior',   'num' => '02', 'icon' => 'fa-sliders',
+             'desc' => get_string('editor:section:content:desc', 'local_awareness')],
+            ['id' => 'sec-behavior', 'num' => '02', 'icon' => 'fa-sliders',
              'title' => get_string('editor:section:behavior', 'local_awareness'),
-             'desc'  => get_string('editor:section:behavior:desc', 'local_awareness')],
+             'desc' => get_string('editor:section:behavior:desc', 'local_awareness')],
             ['id' => 'sec-appearance', 'num' => '03', 'icon' => 'fa-arrows-alt',
              'title' => get_string('editor:section:appearance', 'local_awareness'),
-             'desc'  => get_string('editor:section:appearance:desc', 'local_awareness')],
-            ['id' => 'sec-audience',   'num' => '04', 'icon' => 'fa-users',
+             'desc' => get_string('editor:section:appearance:desc', 'local_awareness')],
+            ['id' => 'sec-audience', 'num' => '04', 'icon' => 'fa-users',
              'title' => get_string('editor:section:audience', 'local_awareness'),
-             'desc'  => get_string('editor:section:audience:desc', 'local_awareness')],
-            ['id' => 'sec-filters',    'num' => '05', 'icon' => 'fa-filter',
+             'desc' => get_string('editor:section:audience:desc', 'local_awareness')],
+            ['id' => 'sec-filters', 'num' => '05', 'icon' => 'fa-filter',
              'title' => get_string('editor:section:filters', 'local_awareness'),
-             'desc'  => get_string('editor:section:filters:desc', 'local_awareness')],
+             'desc' => get_string('editor:section:filters:desc', 'local_awareness')],
         ];
 
         $sidenavitems = [];
@@ -125,10 +134,10 @@ class editor_page implements renderable, templatable {
             'poll_interval_ms' => self::POLL_INTERVAL_MS,
             'poll_max' => self::POLL_MAX,
             'summary' => [
-                ['key' => 'cohorts',     'label' => get_string('audience:summary:cohorts',     'local_awareness'), 'value' => 0],
-                ['key' => 'courses',     'label' => get_string('audience:summary:courses',     'local_awareness'), 'value' => 0],
-                ['key' => 'role',        'label' => get_string('audience:summary:role',        'local_awareness'), 'value' => 0],
-                ['key' => 'competencies','label' => get_string('audience:summary:competencies','local_awareness'), 'value' => 0],
+                ['key' => 'cohorts', 'label' => get_string('audience:summary:cohorts', 'local_awareness'), 'value' => 0],
+                ['key' => 'courses', 'label' => get_string('audience:summary:courses', 'local_awareness'), 'value' => 0],
+                ['key' => 'role', 'label' => get_string('audience:summary:role', 'local_awareness'), 'value' => 0],
+                ['key' => 'competencies', 'label' => get_string('audience:summary:competencies', 'local_awareness'), 'value' => 0],
             ],
             'initialcount' => null,
             'initialcountformatted' => '—',
@@ -157,7 +166,7 @@ class editor_page implements renderable, templatable {
             'statusislive' => $statusislive,
             'autosaved' => '',
             'requirements' => '',
-            'form_attributes' => $form_attributes,
+            'form_attributes' => $formattributes,
             'formhtml' => $formhtml,
             'sections' => $sections,
             'sidenav' => [
@@ -173,6 +182,10 @@ class editor_page implements renderable, templatable {
 
     /**
      * Truncate to N chars on a word boundary, appending an ellipsis.
+     *
+     * @param string $text The text to truncate.
+     * @param int $max Maximum length in characters.
+     * @return string The truncated text.
      */
     private static function truncate(string $text, int $max): string {
         $text = trim(preg_replace('/\s+/', ' ', $text));
@@ -184,6 +197,9 @@ class editor_page implements renderable, templatable {
 
     /**
      * Format a reset-interval (seconds) into a human-readable string.
+     *
+     * @param int $seconds The interval in seconds.
+     * @return string Human-readable duration, or '0'.
      */
     private static function format_interval(int $seconds): string {
         if ($seconds <= 0) {

@@ -29,18 +29,29 @@ use renderer_base;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class manage_page implements renderable, templatable {
-
     /** @var string */
     protected $tablehtml;
 
     /** @var string */
     protected $createurl;
 
+    /**
+     * Constructor.
+     *
+     * @param string $tablehtml Rendered notices table HTML.
+     * @param string $createurl URL of the create-notice page.
+     */
     public function __construct(string $tablehtml, string $createurl) {
         $this->tablehtml = $tablehtml;
         $this->createurl = $createurl;
     }
 
+    /**
+     * Export the manage page data for the Mustache template.
+     *
+     * @param renderer_base $output The renderer.
+     * @return array Template context.
+     */
     public function export_for_template(renderer_base $output) {
         return [
             'pagetitle' => get_string('setting:managenotice', 'local_awareness'),

@@ -29,7 +29,6 @@ use local_awareness\audience\estimator;
  * @covers     \local_awareness\audience\estimator
  */
 final class audience_estimator_test extends \advanced_testcase {
-
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -105,7 +104,7 @@ final class audience_estimator_test extends \advanced_testcase {
         $u3 = $generator->create_user();
         cohort_add_member($cohort->id, $u1->id);
         cohort_add_member($cohort->id, $u2->id);
-        // u1 is in cohort AND has the teacher role; u2 in cohort only; u3 has role only.
+        // User u1 is in cohort AND has the teacher role; u2 in cohort only; u3 has role only.
         $generator->enrol_user($u1->id, $course->id, $teacherrole->id);
         $generator->enrol_user($u3->id, $course->id, $teacherrole->id);
 
@@ -159,7 +158,7 @@ final class audience_estimator_test extends \advanced_testcase {
         cohort_add_member($cohort->id, $u1->id);
         // Cannot add deleted user — skip; suspended user is added.
         cohort_add_member($cohort->id, $u2->id);
-        $u3->id; // appease phpcs.
+        $u3->id; // Appease phpcs.
 
         $result = (new estimator())->estimate(['cohorts' => [$cohort->id]]);
         $this->assertSame(1, $result['count']);

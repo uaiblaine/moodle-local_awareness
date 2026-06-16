@@ -32,7 +32,6 @@ namespace local_awareness\audience;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class estimator {
-
     /** Field names that contribute to the audience count. */
     public const AUDIENCE_FIELDS = ['cohorts', 'filter_role', 'reqcourse'];
 
@@ -226,7 +225,7 @@ class estimator {
 
             // Real assignments.
             [$insql, $inparams] = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED, 'role');
-            
+
             $ctxjoin = '';
             $ctxwhere = '';
 
@@ -243,7 +242,7 @@ class estimator {
                 }
             } else if ($rolectx == CONTEXT_COURSE) {
                 $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSE;
-                
+
                 $coursewheres = [];
                 if (!empty($criteria['filter_course'])) {
                     $courseids = array_map('intval', $criteria['filter_course']);
@@ -303,6 +302,8 @@ class estimator {
     }
 
     /**
+     * Sanitise a raw list into a sorted array of unique positive integers.
+     *
      * @param mixed $values
      * @return int[]
      */
@@ -323,6 +324,8 @@ class estimator {
     }
 
     /**
+     * Sanitise a raw list into a sorted array of unique non-empty strings.
+     *
      * @param mixed $values
      * @return string[]
      */

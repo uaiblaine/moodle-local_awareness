@@ -36,7 +36,7 @@ use local_awareness\reportbuilder\datasource\all_notices;
  * @copyright  Anderson Blaine <anderson@blaine.com.br>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class all_notices_test extends core_reportbuilder_testcase {
+final class all_notices_test extends core_reportbuilder_testcase {
     /**
      * Test default datasource.
      */

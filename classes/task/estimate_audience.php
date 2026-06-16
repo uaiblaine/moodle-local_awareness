@@ -30,7 +30,6 @@ use local_awareness\persistent\audience_job;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class estimate_audience extends \core\task\adhoc_task {
-
     /**
      * Run the task.
      */

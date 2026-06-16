@@ -37,9 +37,12 @@ use local_awareness\reportbuilder\datasource\acknowledged_notices;
  * @copyright  Anderson Blaine <anderson@blaine.com.br>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class acknowledged_notices_test extends core_reportbuilder_testcase {
+final class acknowledged_notices_test extends core_reportbuilder_testcase {
     /**
      * Insert a notice and return its ID.
+     *
+     * @param string $title Notice title.
+     * @return int The inserted notice ID.
      */
     private function create_notice(string $title = 'Test notice'): int {
         global $DB, $USER;
@@ -63,6 +66,11 @@ class acknowledged_notices_test extends core_reportbuilder_testcase {
 
     /**
      * Insert a row into local_awareness_ack.
+     *
+     * @param int $noticeid Notice ID.
+     * @param int|string $userid User ID.
+     * @param int $action Acknowledgement action code.
+     * @return void
      */
     private function create_ack(int $noticeid, int|string $userid, int $action): void {
         global $DB;
