@@ -236,6 +236,14 @@
     padding-bottom: 160px;
 }
 
+/* When a relocated field is scrolled into view it must clear the sticky action
+   bar, otherwise automated clicks (Behat/Selenium) land on the footer instead. */
+.la-card-body input,
+.la-card-body select,
+.la-card-body textarea {
+    scroll-margin-bottom: 180px;
+}
+
 /* Page head */
 .la-pagehead {
     display: flex;
