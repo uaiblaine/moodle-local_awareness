@@ -23,15 +23,15 @@ Feature: The audience estimate panel calculates how many users a notice will rea
   @javascript
   Scenario: The estimator queues a job and renders the result after the queue runs
     When I navigate to "Awareness > Manage" in site administration
-    And I press "Cadastrar aviso"
+    And I press "Create new notice"
     And I wait until ".local-awareness-editor" "css_element" exists
     # Add the cohort. The autocomplete is the first audience field.
     And I set the field "Cohort" to "Audience pilot"
     # Title is required; set it so the form would also be valid for save.
     And I set the field "Title" to "Estimator scenario"
     # Trigger the estimator manually to keep the test deterministic.
-    And I press "Calcular alcance"
+    And I press "Calculate reach"
     And I run all adhoc tasks
     # Re-trigger so the panel polls and renders the cached result.
-    And I press "Calcular alcance"
+    And I press "Calculate reach"
     Then I should see "2" in the ".la-audience-reach-value" "css_element"
