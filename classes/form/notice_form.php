@@ -49,6 +49,12 @@ class notice_form extends \core\form\persistent {
         global $CFG, $DB;
         $mform =& $this->_form;
 
+        // The editor relocates these fields into custom cards and hides the raw
+        // moodleform, so core's collapsesections JS never settles on the hidden
+        // form (it times out the Behat estimator scenario). Disabling collapsible
+        // short-forms turns that JS off; harmless since users only see the cards.
+        $mform->setDisableShortforms(true);
+
         $mform->addElement('hidden', 'id', 0);
         $mform->setType('id', PARAM_INT);
 
