@@ -398,7 +398,9 @@ define([
         if (!el) {
             return;
         }
-        el.hidden = !visible;
+        // The calculate button stays available as a manual recalculate control even
+        // in auto-mode; only the retry button follows the requested visible state.
+        el.hidden = (name === 'calculate') ? false : !visible;
     }
 
     /** Trigger a fresh estimate based on the current criteria. */
@@ -459,11 +461,13 @@ define([
         var totalRules = criteriaReader.countAudienceRules(criteria) + criteriaReader.countContextRules(criteria);
         var newAutoMode = totalRules <= state.threshold;
 
+        // Keep the manual calculate button available regardless of mode.
+        if (state.slots.calcBtn) {
+            state.slots.calcBtn.hidden = false;
+        }
+
         if (newAutoMode !== state.autoMode) {
             state.autoMode = newAutoMode;
-            if (state.slots.calcBtn) {
-                state.slots.calcBtn.hidden = newAutoMode;
-            }
             if (!newAutoMode) {
                 setState(state.strings.rulesTooMany);
                 stopPolling();
