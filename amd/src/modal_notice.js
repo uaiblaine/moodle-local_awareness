@@ -39,58 +39,58 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
         ModalNotice.TEMPLATE = 'local_awareness/modal_notice';
         ModalNotice.create = Modal.create;
 
-            /**
-             * Get ID of close button.
-             * @returns {string}
-             */
+        /**
+         * Get ID of close button.
+         * @returns {string}
+         */
         ModalNotice.prototype.getCloseButtonID = function() {
             return '#awareness-closebtn';
         };
 
-            /**
-             * Get ID of accept button.
-             * @returns {string}
-             */
+        /**
+         * Get ID of accept button.
+         * @returns {string}
+         */
         ModalNotice.prototype.getAcceptButtonID = function() {
             return '#' + this.getFooter().find(SELECTORS.ACCEPT_BUTTON).attr('id');
         };
 
-            /**
-             * Get ID of accept button.
-             * @returns {string}
-             */
+        /**
+         * Get ID of accept button.
+         * @returns {string}
+         */
         ModalNotice.prototype.getAckCheckboxID = function() {
             return SELECTORS.ACK_CHECKBOX;
         };
 
-            /**
-             * Set outside click dismissed.
-             * @param {boolean} allowOutsideClick
-             */
+        /**
+         * Set outside click dismissed.
+         * @param {boolean} allowOutsideClick
+         */
         ModalNotice.prototype.setOutsideClick = function(allowOutsideClick) {
             this.outsideclick = allowOutsideClick;
         };
 
-            /**
-             * Set Notice ID to the current modal.
-             * @param {Integer} noticeid
-             */
+        /**
+         * Set Notice ID to the current modal.
+         * @param {Integer} noticeid
+         */
         ModalNotice.prototype.setNoticeId = function(noticeid) {
             this.getModal().attr(ATTRIBUTE.NOTICE_ID, noticeid);
         };
 
-            /**
-             * Get the current notice id.
-             * @returns {*}
-             */
+        /**
+         * Get the current notice id.
+         * @returns {*}
+         */
         ModalNotice.prototype.getNoticeId = function() {
             return this.getModal().attr(ATTRIBUTE.NOTICE_ID);
         };
 
-            /**
-             * Add Checkbox if the notice requires acknowledgement.
-             * @param {Integer} reqack
-             */
+        /**
+         * Add Checkbox if the notice requires acknowledgement.
+         * @param {Integer} reqack
+         */
         ModalNotice.prototype.setRequiredAcknowledgement = function(reqack) {
             var ackContainer = this.getFooter().find(SELECTORS.ACK_CONTAINER);
             var acceptBtn = this.getFooter().find(SELECTORS.ACCEPT_BUTTON);
@@ -109,10 +109,10 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
             }
         };
 
-            /**
-             * Update checkbox label text based on forcelogout setting.
-             * @param {Integer} forcelogout 1 if force logout is enabled, 0 otherwise.
-             */
+        /**
+         * Update checkbox label text based on forcelogout setting.
+         * @param {Integer} forcelogout 1 if force logout is enabled, 0 otherwise.
+         */
         ModalNotice.prototype.setForceLogout = function(forcelogout) {
             var stringKey = (parseInt(forcelogout, 10) === 1) ?
                 'modal:checkboxtext_logout' : 'modal:checkboxtext_nologout';
@@ -122,24 +122,24 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
             });
         };
 
-            /**
-             * Turn off tool tip
-             */
+        /**
+         * Turn off tool tip
+         */
         ModalNotice.prototype.turnoffToolTip = function() {
             // Deprecated/Not used in new design.
         };
 
-            /**
-             * Turn on tool tip
-             */
+        /**
+         * Turn on tool tip
+         */
         ModalNotice.prototype.turnonToolTip = function() {
             // Deprecated/Not used in new design.
         };
 
-            /**
-             * Set background image on the modal content area.
-             * @param {string} url URL of the background image, or empty to clear.
-             */
+        /**
+         * Set background image on the modal content area.
+         * @param {string} url URL of the background image, or empty to clear.
+         */
         ModalNotice.prototype.setBackgroundImage = function(url) {
             var modalContent = this.getModal().find('.modal-content');
             if (url) {
@@ -156,11 +156,11 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
             }
         };
 
-            /**
-             * Set custom modal dimensions.
-             * @param {string} width Custom width (e.g. '600px', '80%', '50vw') or empty for default.
-             * @param {string} height Custom height (e.g. '400px', '70%', '50vh') or empty for default.
-             */
+        /**
+         * Set custom modal dimensions.
+         * @param {string} width Custom width (e.g. '600px', '80%', '50vw') or empty for default.
+         * @param {string} height Custom height (e.g. '400px', '70%', '50vh') or empty for default.
+         */
         ModalNotice.prototype.setModalSize = function(width, height) {
             var modalDialog = this.getModal().find('.modal-dialog');
             var modalContent = this.getModal().find('.modal-content');
@@ -179,15 +179,15 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
         };
 
 
-            /**
-             * Override registerEventListeners to custom handle backdrop clicks.
-             *
-             * IMPORTANT: This MUST be a proper prototype method (not a class field
-             * like `= function() {}`) so that it exists on the prototype chain BEFORE
-             * the parent Modal constructor calls `this.registerEventListeners()`.
-             * Class fields are only initialised after super() returns, which means
-             * the parent would use its own version instead of this override.
-             */
+        /**
+         * Override registerEventListeners to custom handle backdrop clicks.
+         *
+         * IMPORTANT: This MUST be a proper prototype method (not a class field
+         * like `= function() {}`) so that it exists on the prototype chain BEFORE
+         * the parent Modal constructor calls `this.registerEventListeners()`.
+         * Class fields are only initialised after super() returns, which means
+         * the parent would use its own version instead of this override.
+         */
         ModalNotice.prototype.registerEventListeners = function() {
             var modal = this;
 
@@ -226,10 +226,10 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
             }.bind(this));
         };
 
-            /**
-             * CAN_RECEIVE_FOCUS in modal.js does not check if the disabled or hidden button
-             * @param {Event} e
-             */
+        /**
+         * CAN_RECEIVE_FOCUS in modal.js does not check if the disabled or hidden button
+         * @param {Event} e
+         */
         ModalNotice.prototype.handleTabLock = function(e) {
             var target = $(document.activeElement);
 

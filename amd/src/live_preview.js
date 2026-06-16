@@ -21,7 +21,7 @@
  * @copyright  Anderson Blaine <anderson@blaine.com.br>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-define(['core/str'], function (str) {
+define(['core/str'], function(str) {
     'use strict';
 
     var SLOTS = {};
@@ -182,7 +182,7 @@ define(['core/str'], function (str) {
         if (debounceTimer) {
             clearTimeout(debounceTimer);
         }
-        debounceTimer = setTimeout(function () {
+        debounceTimer = setTimeout(function() {
             sync(strings);
             debounceTimer = null;
         }, 250);
@@ -198,14 +198,18 @@ define(['core/str'], function (str) {
         // Atto: contenteditable area.
         var editable = document.querySelector('#id_contenteditable');
         if (editable) {
-            editable.addEventListener('input', function () { debouncedSync(strings); });
+            editable.addEventListener('input', function() {
+                debouncedSync(strings);
+            });
         }
         // TinyMCE: editor 'input' event, set up after init.
         if (window.tinymce) {
             try {
-                window.tinymce.on('AddEditor', function (e) {
+                window.tinymce.on('AddEditor', function(e) {
                     if (e.editor && e.editor.id === 'id_content') {
-                        e.editor.on('input keyup change', function () { debouncedSync(strings); });
+                        e.editor.on('input keyup change', function() {
+                            debouncedSync(strings);
+                        });
                     }
                 });
             } catch (err) {
@@ -254,7 +258,7 @@ define(['core/str'], function (str) {
             {key: 'editor:preview:meta:no', component: 'local_awareness'},
             {key: 'editor:status:live', component: 'local_awareness'},
             {key: 'editor:status:draft', component: 'local_awareness'}
-        ]).then(function (s) {
+        ]).then(function(s) {
             return {
                 placeholderTitle: s[0],
                 placeholderContent: s[1],
@@ -273,31 +277,35 @@ define(['core/str'], function (str) {
     }
 
     return {
-        init: function () {
+        init: function() {
             if (!captureSlots()) {
                 return;
             }
-            loadStrings().then(function (strings) {
+            loadStrings().then(function(strings) {
                 sync(strings);
                 bindEditor(strings);
 
                 // Listen to plain inputs/selects in the source form.
                 ['title', 'modal_width', 'modal_height', 'reqack', 'outsideclick',
-                 'forcelogout', 'enabled'].forEach(function (name) {
-                    document.querySelectorAll('[name="' + name + '"]').forEach(function (el) {
-                        el.addEventListener('change', function () { debouncedSync(strings); });
-                        el.addEventListener('input', function () { debouncedSync(strings); });
+                    'forcelogout', 'enabled'].forEach(function(name) {
+                    document.querySelectorAll('[name="' + name + '"]').forEach(function(el) {
+                        el.addEventListener('change', function() {
+                            debouncedSync(strings);
+                        });
+                        el.addEventListener('input', function() {
+                            debouncedSync(strings);
+                        });
                     });
                 });
                 return null;
-            }).catch(function () {
+            }).catch(function() {
                 // String-loading failures are non-fatal — preview just won't update.
             });
 
             // Tab switching desktop/mobile.
-            document.querySelectorAll('.la-preview-tab').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    document.querySelectorAll('.la-preview-tab').forEach(function (b) {
+            document.querySelectorAll('.la-preview-tab').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.la-preview-tab').forEach(function(b) {
                         b.classList.remove('is-on');
                         b.setAttribute('aria-selected', 'false');
                     });

@@ -30,8 +30,12 @@ define([
     'core/ajax',
     'core/str',
     'local_awareness/audience_criteria'
-], function (Ajax, str, criteriaReader) {
+], function(Ajax, str, criteriaReader) {
     'use strict';
+
+    // The criteria object keys mirror the moodleform/server field names
+    // (filter_role, filter_category, …), which are snake_case by contract.
+    /* eslint-disable camelcase */
 
     var DEBOUNCE_MS = 800;
 
@@ -56,7 +60,9 @@ define([
      * @param {string} sel CSS selector to match.
      * @returns {Element|null} The first matching element, or null.
      */
-    function $(root, sel) { return root.querySelector(sel); }
+    function $(root, sel) {
+        return root.querySelector(sel);
+    }
 
     /**
      * Resolve the panel slot elements once per init.
@@ -106,7 +112,7 @@ define([
             {key: 'audience:rule:filter_format', component: 'local_awareness', param: ''},
             {key: 'audience:rule:filter_theme', component: 'local_awareness', param: ''},
             {key: 'audience:rule:filter_competency_rules', component: 'local_awareness'}
-        ]).then(function (s) {
+        ]).then(function(s) {
             state.strings = {
                 idle: s[0],
                 autoPending: s[1],
@@ -186,7 +192,7 @@ define([
             role: criteria.filter_role ? criteria.filter_role.length : 0,
             competencies: criteria.filter_competency_rules ? criteria.filter_competency_rules.length : 0
         };
-        Object.keys(counts).forEach(function (key) {
+        Object.keys(counts).forEach(function(key) {
             var dd = state.slots.summary.querySelector('[data-summary-key="' + key + '"]');
             if (dd) {
                 dd.textContent = String(counts[key]);
@@ -210,7 +216,7 @@ define([
         state.slots.context.hidden = false;
 
         var html = '';
-        contextRules.forEach(function (rule) {
+        contextRules.forEach(function(rule) {
             var label = state.strings.ruleLabels[rule.key] || rule.key;
             // Some labels carry a {$a} placeholder; substitute with a
             // human-readable summary of the values.
@@ -236,7 +242,7 @@ define([
      * @returns {string} The HTML-escaped string.
      */
     function escapeHtml(s) {
-        return String(s).replace(/[&<>"']/g, function (c) {
+        return String(s).replace(/[&<>"']/g, function(c) {
             return {
                 '&': '&amp;',
                 '<': '&lt;',
@@ -290,8 +296,10 @@ define([
         Ajax.call([{
             methodname: 'local_awareness_get_estimate',
             args: {jobid: state.currentJobId}
-        }])[0].then(function (response) {
-            if (!response) { return null; }
+        }])[0].then(function(response) {
+            if (!response) {
+                return null;
+            }
             if (response.status === 'ready') {
                 handleReady(response);
             } else if (response.status === 'error') {
@@ -304,7 +312,7 @@ define([
                 }
             }
             return null;
-        }).catch(function (err) {
+        }).catch(function(err) {
             handleError((err && err.message) ? err.message : 'AJAX error');
         });
     }
@@ -330,7 +338,7 @@ define([
                 var arr = JSON.parse(response.breakdown);
                 if (Array.isArray(arr) && arr.length) {
                     var html = '';
-                    arr.forEach(function (it) {
+                    arr.forEach(function(it) {
                         var label = state.strings.ruleLabels[it.key] || it.key;
                         html += '<span class="la-chip la-chip--brand">'
                             + escapeHtml(label) + ' · ' + formatCount(parseInt(it.count, 10) || 0)
@@ -387,7 +395,9 @@ define([
      */
     function showAction(name, visible) {
         var el = (name === 'calculate') ? state.slots.calcBtn : state.slots.retryBtn;
-        if (!el) { return; }
+        if (!el) {
+            return;
+        }
         el.hidden = !visible;
     }
 
@@ -407,7 +417,7 @@ define([
             showAction('retry', false);
             // Still show context restrictions if any.
             var ctxLocal = [];
-            criteriaReader.CONTEXT_KEYS.forEach(function (k) {
+            criteriaReader.CONTEXT_KEYS.forEach(function(k) {
                 if (criteria[k]) {
                     ctxLocal.push({key: k, values: criteria[k]});
                 }
@@ -424,7 +434,7 @@ define([
         Ajax.call([{
             methodname: 'local_awareness_estimate_audience',
             args: {criteria: json}
-        }])[0].then(function (response) {
+        }])[0].then(function(response) {
             if (!response || !response.jobid) {
                 handleError('No job id returned.');
                 return null;
@@ -437,7 +447,7 @@ define([
                 startPolling(response.jobid);
             }
             return null;
-        }).catch(function (err) {
+        }).catch(function(err) {
             handleError((err && err.message) ? err.message : 'AJAX error');
         });
     }
@@ -473,7 +483,7 @@ define([
             clearTimeout(state.debounceTimer);
         }
         setState(state.strings.autoPending);
-        state.debounceTimer = setTimeout(function () {
+        state.debounceTimer = setTimeout(function() {
             state.debounceTimer = null;
             trigger();
         }, DEBOUNCE_MS);
@@ -485,18 +495,18 @@ define([
         if (!form) {
             return;
         }
-        form.addEventListener('change', function () {
+        form.addEventListener('change', function() {
             recomputeMode();
             debouncedTrigger();
         });
-        form.addEventListener('input', function () {
+        form.addEventListener('input', function() {
             recomputeMode();
             debouncedTrigger();
         });
     }
 
     return {
-        init: function (config) {
+        init: function(config) {
             config = config || {};
             var root = document.querySelector('[data-region="la-audience"]');
             if (!root) {
@@ -510,19 +520,23 @@ define([
             state.pollMax = config.pollMax
                 || parseInt(root.getAttribute('data-poll-max'), 10) || 30;
 
-            loadStrings().then(function () {
+            loadStrings().then(function() {
                 state.autoMode = recomputeMode();
                 if (state.slots.calcBtn) {
-                    state.slots.calcBtn.addEventListener('click', function () { trigger(); });
+                    state.slots.calcBtn.addEventListener('click', function() {
+                        trigger();
+                    });
                 }
                 if (state.slots.retryBtn) {
-                    state.slots.retryBtn.addEventListener('click', function () { trigger(); });
+                    state.slots.retryBtn.addEventListener('click', function() {
+                        trigger();
+                    });
                 }
                 bindFormChanges();
                 // Initial sync of context chips & summary.
                 debouncedTrigger();
                 return null;
-            }).catch(function () { /* string loading failed — panel stays idle */ });
+            }).catch(function() { /* string loading failed — panel stays idle */ });
 
             window.addEventListener('beforeunload', stopPolling);
         }

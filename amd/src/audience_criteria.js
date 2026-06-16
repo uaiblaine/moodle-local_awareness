@@ -25,8 +25,12 @@
  * @copyright  Anderson Blaine <anderson@blaine.com.br>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-define([], function () {
+define([], function() {
     'use strict';
+
+    // The criteria object keys mirror the moodleform/server field names
+    // (filter_role, filter_category, …), which are snake_case by contract.
+    /* eslint-disable camelcase */
 
     var AUDIENCE_KEYS = ['cohorts', 'filter_role', 'reqcourse'];
     var CONTEXT_KEYS = [
@@ -64,12 +68,12 @@ define([], function () {
         var nodes = document.querySelectorAll(
             'input[name="' + name + '[]"], input[name="' + name + '"]'
         );
-        nodes.forEach(function (node) {
+        nodes.forEach(function(node) {
             if (node.type === 'hidden' || node.type === 'text') {
                 if (node.value !== '' && node.value !== '_qf__force_multiselect_submission') {
                     // Some autocomplete widgets store comma-separated values.
                     if (node.value.indexOf(',') !== -1) {
-                        node.value.split(',').forEach(function (v) {
+                        node.value.split(',').forEach(function(v) {
                             v = v.trim();
                             if (v !== '') {
                                 out.push(v);
@@ -137,14 +141,22 @@ define([], function () {
     function read() {
         var criteria = {};
 
-        var cohorts = readMultiValue('cohorts').map(function (v) { return parseInt(v, 10); })
-            .filter(function (v) { return v > 0; });
+        var cohorts = readMultiValue('cohorts').map(function(v) {
+            return parseInt(v, 10);
+        })
+            .filter(function(v) {
+                return v > 0;
+            });
         if (cohorts.length) {
             criteria.cohorts = cohorts;
         }
 
-        var roles = readMultiValue('filter_role').map(function (v) { return parseInt(v, 10); })
-            .filter(function (v) { return v > 0; });
+        var roles = readMultiValue('filter_role').map(function(v) {
+            return parseInt(v, 10);
+        })
+            .filter(function(v) {
+                return v > 0;
+            });
         if (roles.length) {
             criteria.filter_role = roles;
         }
@@ -154,24 +166,36 @@ define([], function () {
             criteria.reqcourse = reqcourse;
         }
 
-        var categories = readMultiValue('filter_category').map(function (v) { return parseInt(v, 10); })
-            .filter(function (v) { return v > 0; });
+        var categories = readMultiValue('filter_category').map(function(v) {
+            return parseInt(v, 10);
+        })
+            .filter(function(v) {
+                return v > 0;
+            });
         if (categories.length) {
             criteria.filter_category = categories;
         }
 
-        var courses = readMultiValue('filter_course').map(function (v) { return parseInt(v, 10); })
-            .filter(function (v) { return v > 0; });
+        var courses = readMultiValue('filter_course').map(function(v) {
+            return parseInt(v, 10);
+        })
+            .filter(function(v) {
+                return v > 0;
+            });
         if (courses.length) {
             criteria.filter_course = courses;
         }
 
-        var formats = readMultiValue('filter_format').filter(function (v) { return v !== ''; });
+        var formats = readMultiValue('filter_format').filter(function(v) {
+            return v !== '';
+        });
         if (formats.length) {
             criteria.filter_format = formats;
         }
 
-        var themes = readMultiValue('filter_theme').filter(function (v) { return v !== ''; });
+        var themes = readMultiValue('filter_theme').filter(function(v) {
+            return v !== '';
+        });
         if (themes.length) {
             criteria.filter_theme = themes;
         }
@@ -198,7 +222,7 @@ define([], function () {
      */
     function countAudienceRules(criteria) {
         var n = 0;
-        AUDIENCE_KEYS.forEach(function (k) {
+        AUDIENCE_KEYS.forEach(function(k) {
             if (criteria[k] && (typeof criteria[k] === 'number' ? criteria[k] > 0 : criteria[k].length > 0)) {
                 n += 1;
             }
@@ -214,7 +238,7 @@ define([], function () {
      */
     function countContextRules(criteria) {
         var n = 0;
-        CONTEXT_KEYS.forEach(function (k) {
+        CONTEXT_KEYS.forEach(function(k) {
             if (criteria[k] && (typeof criteria[k] === 'string' ? criteria[k] !== '' : criteria[k].length > 0)) {
                 n += 1;
             }

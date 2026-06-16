@@ -9,7 +9,7 @@
 
 define(
     ['jquery', 'core/ajax', 'local_awareness/modal_notice'],
-    function ($, ajax, ModalNotice) {
+    function($, ajax, ModalNotice) {
 
         var notices = {};
         var modal;
@@ -21,7 +21,7 @@ define(
          * Retrieved notice which has not been viewwed.
          * @returns {boolean|*}
          */
-        var getNotice = function () {
+        var getNotice = function() {
             for (var i in notices) {
                 // Check the notice has been viewed.
                 if (!viewednotices.includes(i)) {
@@ -35,7 +35,7 @@ define(
         /**
          * Show next notice in the modal.
          */
-        var nextNotice = function () {
+        var nextNotice = function() {
             var nextnotice = getNotice();
             if (nextnotice == false) {
                 return;
@@ -47,7 +47,7 @@ define(
                     body: nextnotice.content,
                     large: true,
                 })
-                    .then(function (newmodal) {
+                    .then(function(newmodal) {
                         modal = newmodal;
 
                         modal.setNoticeId(nextnotice.id);
@@ -58,22 +58,22 @@ define(
                         modal.setOutsideClick(parseInt(nextnotice.outsideclick, 10) !== 0);
 
                         // Event listener for close button.
-                        modal.getModal().on('click', modal.getCloseButtonID(), function () {
+                        modal.getModal().on('click', modal.getCloseButtonID(), function() {
                             dismissNotice();
                             modal.hide();
                         });
                         // Event listener for accept button.
-                        modal.getModal().on('click', modal.getAcceptButtonID(), function () {
+                        modal.getModal().on('click', modal.getAcceptButtonID(), function() {
                             acknowledgeNotice();
                             modal.hide();
                         });
                         // Event listener for link tracking.
-                        modal.getModal().on('click', 'a', function () {
+                        modal.getModal().on('click', 'a', function() {
                             var linkid = $(this).attr("data-linkid");
                             trackLink(linkid);
                         });
                         // Event listener for ack checkbox.
-                        modal.getModal().on('click', modal.getAckCheckboxID(), function () {
+                        modal.getModal().on('click', modal.getAckCheckboxID(), function() {
                             var ischecked = $(modal.getAckCheckboxID()).is(":checked");
                             $(modal.getAcceptButtonID()).attr('disabled', !ischecked);
                         });
@@ -99,19 +99,19 @@ define(
         /**
          * Dismiss Notice.
          */
-        var dismissNotice = function () {
+        var dismissNotice = function() {
             var noticeid = modal.getNoticeId();
             var promises = ajax.call([
-                { methodname: 'local_awareness_dismiss', args: { noticeid: noticeid } }
+                {methodname: 'local_awareness_dismiss', args: {noticeid: noticeid}}
             ]);
 
-            promises[0].done(function (response) {
+            promises[0].done(function(response) {
                 if (response.redirecturl) {
                     window.open(response.redirecturl, "_parent", "");
                 } else {
                     nextNotice();
                 }
-            }).fail(function (ex) {
+            }).fail(function(ex) {
                 // Surface the failure to the console for debugging.
                 this.console.log(ex);
             });
@@ -120,19 +120,19 @@ define(
         /**
          * Acknowledge notice.
          */
-        var acknowledgeNotice = function () {
+        var acknowledgeNotice = function() {
             var noticeid = modal.getNoticeId();
             var promises = ajax.call([
-                { methodname: 'local_awareness_acknowledge', args: { noticeid: noticeid } }
+                {methodname: 'local_awareness_acknowledge', args: {noticeid: noticeid}}
             ]);
 
-            promises[0].done(function (response) {
+            promises[0].done(function(response) {
                 if (response.redirecturl) {
                     window.open(response.redirecturl, "_parent", "");
                 } else {
                     nextNotice();
                 }
-            }).fail(function (ex) {
+            }).fail(function(ex) {
                 // Surface the failure to the console for debugging.
                 this.console.log(ex);
             });
@@ -142,16 +142,16 @@ define(
          * Link tracking.
          * @param {Integer} linkid
          */
-        var trackLink = function (linkid) {
+        var trackLink = function(linkid) {
             var promises = ajax.call([
-                { methodname: 'local_awareness_tracklink', args: { linkid: linkid } }
+                {methodname: 'local_awareness_tracklink', args: {linkid: linkid}}
             ]);
 
-            promises[0].done(function (response) {
+            promises[0].done(function(response) {
                 if (response.redirecturl) {
                     window.open(response.redirecturl, "_parent", "");
                 }
-            }).fail(function (ex) {
+            }).fail(function(ex) {
                 this.console.log(ex);
             });
         };
@@ -159,19 +159,19 @@ define(
         /**
          * Initial Modal with user notices.
          */
-        Awareness.init = function () {
+        Awareness.init = function() {
             var currenturl = window.location.pathname + window.location.search;
             var courseid = (M.cfg && M.cfg.courseId) ? M.cfg.courseId : 0;
             var promises = ajax.call([
-                { methodname: 'local_awareness_getnotices', args: { pageurl: currenturl, courseid: courseid } }
+                {methodname: 'local_awareness_getnotices', args: {pageurl: currenturl, courseid: courseid}}
             ]);
 
-            promises[0].done(function (response) {
+            promises[0].done(function(response) {
                 notices = JSON.parse(response.notices);
-                $(document).ready(function () {
+                $(document).ready(function() {
                     nextNotice();
                 });
-            }).fail(function (ex) {
+            }).fail(function(ex) {
                 this.console.log(ex);
             });
         };

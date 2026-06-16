@@ -30,19 +30,19 @@ define([
     'local_awareness/notice_form',
     'local_awareness/live_preview',
     'local_awareness/audience_estimator'
-], function (NoticeForm, LivePreview, AudienceEstimator) {
+], function(NoticeForm, LivePreview, AudienceEstimator) {
     'use strict';
 
     /** Mapping of section id → list of moodleform field names that belong in it. */
     var FIELD_MAP = {
         'sec-content': ['title', 'content', 'bgimage'],
         'sec-behavior': ['enabled', 'resetinterval', 'perpetual', 'timestart', 'timeend',
-                         'reqack', 'outsideclick', 'forcelogout'],
+            'reqack', 'outsideclick', 'forcelogout'],
         'sec-appearance': ['modal_width', 'modal_height'],
         'sec-audience': ['cohorts', 'reqcourse', 'awareness-competency-filter',
-                         'filter_competency_requireall'],
+            'filter_competency_requireall'],
         'sec-filters': ['pathmatch', 'filter_role', 'filter_category', 'filter_course',
-                        'filter_format', 'filter_theme']
+            'filter_format', 'filter_theme']
     };
 
     /** Reveal the source form (un-hide it visually) for unmapped fields debug. */
@@ -64,15 +64,15 @@ define([
         source.style.clipPath = 'inset(50%)';
         source.style.whiteSpace = 'nowrap';
 
-        Object.keys(FIELD_MAP).forEach(function (sectionId) {
+        Object.keys(FIELD_MAP).forEach(function(sectionId) {
             var slot = document.querySelector('[data-section="' + sectionId + '"]');
             if (!slot) {
                 return;
             }
-            FIELD_MAP[sectionId].forEach(function (name) {
+            FIELD_MAP[sectionId].forEach(function(name) {
                 // Try several lookup strategies — moodleform IDs vary by element type.
                 var node = source.querySelector('#fitem_id_' + name)
-                    || source.querySelector('#' + name)        // raw HTML element id
+                    || source.querySelector('#' + name) // raw HTML element id
                     || source.querySelector('[id^="fgroup_id_' + name + '"]')
                     || source.querySelector('#fitem_id_' + name + '_year'); // date_time_selector container fallback
 
@@ -100,8 +100,8 @@ define([
         if (!links.length) {
             return;
         }
-        links.forEach(function (link) {
-            link.addEventListener('click', function (ev) {
+        links.forEach(function(link) {
+            link.addEventListener('click', function(ev) {
                 var target = link.getAttribute('data-target');
                 var section = document.getElementById(target);
                 if (!section) {
@@ -121,7 +121,7 @@ define([
      * @param {string} id Section id whose nav link should be marked active.
      */
     function setActive(id) {
-        document.querySelectorAll('.la-sidenav-link').forEach(function (a) {
+        document.querySelectorAll('.la-sidenav-link').forEach(function(a) {
             if (a.getAttribute('data-target') === id) {
                 a.setAttribute('aria-current', 'step');
             } else {
@@ -145,7 +145,7 @@ define([
                 return;
             }
             ticking = true;
-            window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(function() {
                 ticking = false;
                 var topThreshold = 100;
                 var current = sections[0].id;
@@ -163,20 +163,24 @@ define([
     }
 
     return {
-        init: function () {
+        init: function() {
             // Wait for the source form's rendering to complete (Moodle injects
             // some elements late, e.g. autocomplete enhancements). A short
             // setTimeout + MutationObserver fallback covers both cases.
             var ready = false;
-            var bootstrap = function () {
-                if (ready) { return; }
+            var bootstrap = function() {
+                if (ready) {
+                    return;
+                }
                 ready = true;
                 relocateFields();
                 bindSideNav();
                 bindScrollSpy();
                 // Boot the legacy notice_form bindings (course → reset/reqack
                 // dependency, plus the competency picker initialiser).
-                try { NoticeForm.init(); } catch (e) { /* noop */ }
+                try {
+                    NoticeForm.init();
+                } catch (e) { /* noop */ }
                 LivePreview.init();
                 AudienceEstimator.init();
             };
@@ -184,7 +188,7 @@ define([
             if (document.readyState === 'complete' || document.readyState === 'interactive') {
                 setTimeout(bootstrap, 50);
             } else {
-                document.addEventListener('DOMContentLoaded', function () {
+                document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(bootstrap, 50);
                 });
             }

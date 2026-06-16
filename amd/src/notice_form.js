@@ -7,7 +7,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define([], function () {
+define([], function() {
 
     var SELECTORS = {
         RESET_NUMBER: 'id_resetinterval_number',
@@ -32,16 +32,16 @@ define([], function () {
     // Course-completion field logic
     // ───────────────────────────────────────────
 
-    var hasCourseSelected = function (select) {
+    var hasCourseSelected = function(select) {
         var val = select.value;
         return val !== '' && val !== '0' && parseInt(val, 10) > 0;
     };
 
-    var setDependentFields = function (disable) {
+    var setDependentFields = function(disable) {
         [{id: SELECTORS.RESET_NUMBER, def: DEFAULT_VALUES.RESET_NUMBER},
-         {id: SELECTORS.RESET_UNIT, def: DEFAULT_VALUES.RESET_UNIT},
-         {id: SELECTORS.REQACK, def: DEFAULT_VALUES.REQACK}
-        ].forEach(function (pair) {
+            {id: SELECTORS.RESET_UNIT, def: DEFAULT_VALUES.RESET_UNIT},
+            {id: SELECTORS.REQACK, def: DEFAULT_VALUES.REQACK}
+        ].forEach(function(pair) {
             var el = document.getElementById(pair.id);
             if (!el) {
                 return;
@@ -53,7 +53,7 @@ define([], function () {
         });
     };
 
-    var bind = function () {
+    var bind = function() {
         var select = document.getElementById(SELECTORS.REQCOURSE);
         if (!select) {
             return false;
@@ -63,7 +63,7 @@ define([], function () {
         }
         select.setAttribute('data-awareness-bound', '1');
         setDependentFields(hasCourseSelected(select));
-        select.addEventListener('change', function () {
+        select.addEventListener('change', function() {
             setDependentFields(hasCourseSelected(select));
         });
         return true;
@@ -73,7 +73,7 @@ define([], function () {
     // Helpers
     // ───────────────────────────────────────────
 
-    var parseRules = function (raw) {
+    var parseRules = function(raw) {
         if (!raw) {
             return [];
         }
@@ -94,10 +94,10 @@ define([], function () {
      * @param {number} depth  Current nesting depth
      * @returns {Array}
      */
-    var flattenTree = function (tree, existingIds, depth) {
+    var flattenTree = function(tree, existingIds, depth) {
         depth = depth || 0;
         var items = [];
-        tree.forEach(function (node) {
+        tree.forEach(function(node) {
             var comp = node.data;
             items.push({
                 id: comp.id,
@@ -114,13 +114,13 @@ define([], function () {
         return items;
     };
 
-    var buildCompetencyTree = function (flatList) {
+    var buildCompetencyTree = function(flatList) {
         var tree = [];
         var map = {};
-        flatList.forEach(function (item) {
+        flatList.forEach(function(item) {
             map[item.id] = {data: item, children: []};
         });
-        flatList.forEach(function (item) {
+        flatList.forEach(function(item) {
             var node = map[item.id];
             if (item.parentid == 0 || !map[item.parentid]) {
                 tree.push(node);
@@ -135,7 +135,7 @@ define([], function () {
     // Competency filter
     // ───────────────────────────────────────────
 
-    var initCompetencyFilter = function () {
+    var initCompetencyFilter = function() {
         var container = document.getElementById(SELECTORS.COMPETENCY_FILTER_CONTAINER);
         var addButton = document.getElementById(SELECTORS.COMPETENCY_ADD_BUTTON);
         var rulesContainer = document.getElementById(SELECTORS.COMPETENCY_RULES_CONTAINER);
@@ -157,24 +157,24 @@ define([], function () {
         var noLabel = container.getAttribute('data-no-label') || 'No';
         var removeLabel = container.getAttribute('data-remove-label') || 'Remove';
 
-        var rules = parseRules(rulesInput.value).map(function (rule) {
+        var rules = parseRules(rulesInput.value).map(function(rule) {
             var id = parseInt(rule.id || rule.competencyid || 0, 10);
             return {
                 id: id,
                 name: rule.name || ('#' + id),
                 proficient: parseInt(rule.proficient || 0, 10) === 1 ? 1 : 0
             };
-        }).filter(function (rule) {
+        }).filter(function(rule) {
             return rule.id > 0;
         });
 
-        var syncRulesInput = function () {
-            rulesInput.value = JSON.stringify(rules.map(function (r) {
+        var syncRulesInput = function() {
+            rulesInput.value = JSON.stringify(rules.map(function(r) {
                 return {id: r.id, name: r.name, proficient: r.proficient};
             }));
         };
 
-        var toggleRequireAllVisibility = function () {
+        var toggleRequireAllVisibility = function() {
             if (!requireAllWrapper) {
                 return;
             }
@@ -186,9 +186,9 @@ define([], function () {
             }
         };
 
-        var applyRequireAllMode = function () {
+        var applyRequireAllMode = function() {
             var requireAll = parseInt(requireAllInput.value, 10) === 1;
-            rulesContainer.querySelectorAll('.awareness-competency-proficient').forEach(function (sel, i) {
+            rulesContainer.querySelectorAll('.awareness-competency-proficient').forEach(function(sel, i) {
                 if (requireAll) {
                     rules[i].proficient = 1;
                     sel.value = '1';
@@ -201,7 +201,7 @@ define([], function () {
         };
 
         // ─── Rules rendering (Mustache template) ───
-        var renderRules = function () {
+        var renderRules = function() {
             if (!rules.length) {
                 rulesContainer.innerHTML = '';
                 toggleRequireAllVisibility();
@@ -215,7 +215,7 @@ define([], function () {
                 yesLabel: yesLabel,
                 noLabel: noLabel,
                 removeLabel: removeLabel,
-                rules: rules.map(function (rule, index) {
+                rules: rules.map(function(rule, index) {
                     return {
                         index: index,
                         name: rule.name,
@@ -224,9 +224,9 @@ define([], function () {
                 })
             };
 
-            require(['core/templates'], function (Templates) {
+            require(['core/templates'], function(Templates) {
                 Templates.renderForPromise('local_awareness/competency_rules', context)
-                    .then(function (result) {
+                    .then(function(result) {
                         rulesContainer.innerHTML = result.html;
                         if (result.js) {
                             Templates.runTemplateJS(result.js);
@@ -236,7 +236,7 @@ define([], function () {
                         syncRulesInput();
                         return null;
                     })
-                    .catch(function () {
+                    .catch(function() {
                         // Fallback: basic rendering if template fails.
                         rulesContainer.innerHTML = '<div class="alert alert-warning">Error rendering rules.</div>';
                     });
@@ -244,7 +244,7 @@ define([], function () {
         };
 
         // ─── Event delegation on rulesContainer (attach once) ───
-        rulesContainer.addEventListener('change', function (event) {
+        rulesContainer.addEventListener('change', function(event) {
             if (!event.target.matches('.awareness-competency-proficient')) {
                 return;
             }
@@ -256,7 +256,7 @@ define([], function () {
             }
         });
 
-        rulesContainer.addEventListener('click', function (event) {
+        rulesContainer.addEventListener('click', function(event) {
             var btn = event.target.closest('.awareness-competency-remove');
             if (btn) {
                 var idx = parseInt(btn.getAttribute('data-index'), 10);
@@ -265,14 +265,16 @@ define([], function () {
             }
         });
 
-        requireAllInput.addEventListener('change', function () {
+        requireAllInput.addEventListener('change', function() {
             applyRequireAllMode();
         });
 
         // ─── Add-from-picker helper ───
-        var addRulesFromPicker = function (selectedRules) {
-            selectedRules.forEach(function (sr) {
-                if (!rules.some(function (r) { return r.id === sr.id; })) {
+        var addRulesFromPicker = function(selectedRules) {
+            selectedRules.forEach(function(sr) {
+                if (!rules.some(function(r) {
+                    return r.id === sr.id;
+                })) {
                     rules.push(sr);
                 }
             });
@@ -280,7 +282,7 @@ define([], function () {
         };
 
         // ─── Competency picker modal (ModalSaveCancel + Mustache templates) ───
-        addButton.addEventListener('click', function () {
+        addButton.addEventListener('click', function() {
             var contextid = parseInt(container.getAttribute('data-contextid'), 10);
             if (!contextid) {
                 return;
@@ -296,184 +298,188 @@ define([], function () {
                 addSelected: container.getAttribute('data-picker-addselected') || 'Add selected'
             };
 
-            var existingIds = rules.map(function (r) { return r.id; });
+            var existingIds = rules.map(function(r) {
+                return r.id;
+            });
 
             require(
                 ['core/modal_save_cancel', 'core/modal_events', 'core/ajax', 'core/notification', 'core/templates'],
-                function (ModalSaveCancel, ModalEvents, Ajax, Notification, Templates) {
+                function(ModalSaveCancel, ModalEvents, Ajax, Notification, Templates) {
 
-                // Fetch frameworks, then open the modal.
-                Ajax.call([{
-                    methodname: 'core_competency_list_competency_frameworks',
-                    args: {
-                        sort: 'shortname', order: 'ASC', skip: 0, limit: 0,
-                        context: {contextid: contextid},
-                        includes: 'children', onlyvisible: true
-                    }
-                }])[0].then(function (frameworks) {
-                    if (!frameworks || !frameworks.length) {
-                        Notification.addNotification({message: labels.noFrameworks, type: 'warning'});
-                        return null;
-                    }
-
-                    var pickerContext = {
-                        frameworkLabel: labels.framework,
-                        searchLabel: labels.search,
-                        loadingLabel: labels.loading,
-                        frameworks: frameworks.map(function (fw) {
-                            return {id: fw.id, displayname: fw.shortname || fw.idnumber || ('#' + fw.id)};
-                        })
-                    };
-
-                    var bodyPromise = Templates.renderForPromise('local_awareness/competency_picker_body', pickerContext)
-                        .then(function (result) { return result.html; });
-
-                    return ModalSaveCancel.create({
-                        title: labels.title,
-                        body: bodyPromise,
-                        large: true,
-                        show: true,
-                        removeOnClose: true,
-                        buttons: {save: labels.addSelected}
-                    });
-                }).then(function (modal) {
-                    if (!modal) {
-                        return null;
-                    }
-
-                    // Disable save button initially.
-                    modal.setButtonDisabled('save', true);
-
-                    var root = modal.getRoot()[0];
-
-                    // ── Load competencies into the list ──
-                    var loadCompetencies = function (frameworkId, searchText) {
-                        var listEl = root.querySelector('[data-region="competency-list"]');
-                        if (!listEl) {
-                            return;
+                    // Fetch frameworks, then open the modal.
+                    Ajax.call([{
+                        methodname: 'core_competency_list_competency_frameworks',
+                        args: {
+                            sort: 'shortname', order: 'ASC', skip: 0, limit: 0,
+                            context: {contextid: contextid},
+                            includes: 'children', onlyvisible: true
                         }
-                        listEl.innerHTML =
+                    }])[0].then(function(frameworks) {
+                        if (!frameworks || !frameworks.length) {
+                            Notification.addNotification({message: labels.noFrameworks, type: 'warning'});
+                            return null;
+                        }
+
+                        var pickerContext = {
+                            frameworkLabel: labels.framework,
+                            searchLabel: labels.search,
+                            loadingLabel: labels.loading,
+                            frameworks: frameworks.map(function(fw) {
+                                return {id: fw.id, displayname: fw.shortname || fw.idnumber || ('#' + fw.id)};
+                            })
+                        };
+
+                        var bodyPromise = Templates.renderForPromise('local_awareness/competency_picker_body', pickerContext)
+                            .then(function(result) {
+                                return result.html;
+                            });
+
+                        return ModalSaveCancel.create({
+                            title: labels.title,
+                            body: bodyPromise,
+                            large: true,
+                            show: true,
+                            removeOnClose: true,
+                            buttons: {save: labels.addSelected}
+                        });
+                    }).then(function(modal) {
+                        if (!modal) {
+                            return null;
+                        }
+
+                        // Disable save button initially.
+                        modal.setButtonDisabled('save', true);
+
+                        var root = modal.getRoot()[0];
+
+                        // ── Load competencies into the list ──
+                        var loadCompetencies = function(frameworkId, searchText) {
+                            var listEl = root.querySelector('[data-region="competency-list"]');
+                            if (!listEl) {
+                                return;
+                            }
+                            listEl.innerHTML =
                             '<div class="p-3 text-center text-muted">' +
                             '<div class="spinner-border spinner-border-sm" role="status"></div> ' +
                             labels.loading + '</div>';
 
-                        Ajax.call([{
-                            methodname: 'core_competency_search_competencies',
-                            args: {searchtext: searchText || '', competencyframeworkid: frameworkId}
-                        }])[0].then(function (competencies) {
-                            if (!competencies || !competencies.length) {
+                            Ajax.call([{
+                                methodname: 'core_competency_search_competencies',
+                                args: {searchtext: searchText || '', competencyframeworkid: frameworkId}
+                            }])[0].then(function(competencies) {
+                                if (!competencies || !competencies.length) {
+                                    var el = root.querySelector('[data-region="competency-list"]');
+                                    if (el) {
+                                        el.innerHTML =
+                                        '<div class="p-3 text-center text-muted">' +
+                                        labels.noCompetencies + '</div>';
+                                    }
+                                    return null;
+                                }
+                                var tree = buildCompetencyTree(competencies);
+                                var itemsContext = {
+                                    items: flattenTree(tree, existingIds),
+                                    emptyMessage: labels.noCompetencies
+                                };
+                                return Templates.renderForPromise('local_awareness/competency_picker_items', itemsContext);
+                            }).then(function(result) {
+                                if (result) {
+                                    var el = root.querySelector('[data-region="competency-list"]');
+                                    if (el) {
+                                        el.innerHTML = result.html;
+                                        if (result.js) {
+                                            Templates.runTemplateJS(result.js);
+                                        }
+                                    }
+                                }
+                                return null;
+                            }).catch(function() {
                                 var el = root.querySelector('[data-region="competency-list"]');
                                 if (el) {
                                     el.innerHTML =
-                                        '<div class="p-3 text-center text-muted">' +
-                                        labels.noCompetencies + '</div>';
-                                }
-                                return null;
-                            }
-                            var tree = buildCompetencyTree(competencies);
-                            var itemsContext = {
-                                items: flattenTree(tree, existingIds),
-                                emptyMessage: labels.noCompetencies
-                            };
-                            return Templates.renderForPromise('local_awareness/competency_picker_items', itemsContext);
-                        }).then(function (result) {
-                            if (result) {
-                                var el = root.querySelector('[data-region="competency-list"]');
-                                if (el) {
-                                    el.innerHTML = result.html;
-                                    if (result.js) {
-                                        Templates.runTemplateJS(result.js);
-                                    }
-                                }
-                            }
-                            return null;
-                        }).catch(function () {
-                            var el = root.querySelector('[data-region="competency-list"]');
-                            if (el) {
-                                el.innerHTML =
                                     '<div class="p-3 text-center text-danger">Error loading competencies.</div>';
-                            }
-                        });
-                    };
-
-                    // ── Attach body event listeners after body is rendered ──
-                    var setupBodyListeners = function () {
-                        var fwSelect = root.querySelector('[data-action="choose-framework"]');
-                        if (!fwSelect) {
-                            return; // Body not yet in DOM.
-                        }
-
-                        // Framework selector.
-                        fwSelect.addEventListener('change', function () {
-                            loadCompetencies(parseInt(fwSelect.value, 10), '');
-                            var si = root.querySelector('[data-action="search-input"]');
-                            if (si) {
-                                si.value = '';
-                            }
-                        });
-
-                        // Auto-load first framework.
-                        if (fwSelect.value) {
-                            loadCompetencies(parseInt(fwSelect.value, 10), '');
-                        }
-                    };
-
-                    // Wait for the body to be rendered before binding to body elements.
-                    modal.getRoot().on(ModalEvents.bodyRendered, function () {
-                        setupBodyListeners();
-                    });
-                    // Also try immediately in case body was already rendered synchronously.
-                    setupBodyListeners();
-
-                    // ── Search (delegated on root — safe before body renders) ──
-                    root.addEventListener('click', function (e) {
-                        if (e.target.closest('[data-action="search-btn"]')) {
-                            var fwSel = root.querySelector('[data-action="choose-framework"]');
-                            var text = root.querySelector('[data-action="search-input"]');
-                            if (fwSel && text) {
-                                loadCompetencies(parseInt(fwSel.value, 10), text.value || '');
-                            }
-                        }
-                    });
-                    root.addEventListener('keydown', function (e) {
-                        if (e.target.matches && e.target.matches('[data-action="search-input"]') && e.key === 'Enter') {
-                            e.preventDefault();
-                            var fwSel = root.querySelector('[data-action="choose-framework"]');
-                            if (fwSel) {
-                                loadCompetencies(parseInt(fwSel.value, 10), e.target.value || '');
-                            }
-                        }
-                    });
-
-                    // ── Checkbox toggle → enable/disable Save (delegated) ──
-                    root.addEventListener('change', function (e) {
-                        if (e.target.matches && e.target.matches('[data-competency-id]')) {
-                            var any = root.querySelectorAll('[data-competency-id]:checked:not(:disabled)').length > 0;
-                            modal.setButtonDisabled('save', !any);
-                        }
-                    });
-
-                    // ── Save event (ModalSaveCancel fires this) ──
-                    modal.getRoot().on(ModalEvents.save, function (evt) {
-                        evt.preventDefault();
-                        var checked = root.querySelectorAll('[data-competency-id]:checked:not(:disabled)');
-                        var selected = [];
-                        checked.forEach(function (cb) {
-                            selected.push({
-                                id: parseInt(cb.getAttribute('data-competency-id'), 10),
-                                name: cb.getAttribute('data-competency-name') || ('#' + cb.getAttribute('data-competency-id')),
-                                proficient: 1
+                                }
                             });
-                        });
-                        if (selected.length) {
-                            addRulesFromPicker(selected);
-                        }
-                        modal.destroy();
-                    });
+                        };
 
-                    return null;
-                }).catch(Notification.exception);
-            });
+                        // ── Attach body event listeners after body is rendered ──
+                        var setupBodyListeners = function() {
+                            var fwSelect = root.querySelector('[data-action="choose-framework"]');
+                            if (!fwSelect) {
+                                return; // Body not yet in DOM.
+                            }
+
+                            // Framework selector.
+                            fwSelect.addEventListener('change', function() {
+                                loadCompetencies(parseInt(fwSelect.value, 10), '');
+                                var si = root.querySelector('[data-action="search-input"]');
+                                if (si) {
+                                    si.value = '';
+                                }
+                            });
+
+                            // Auto-load first framework.
+                            if (fwSelect.value) {
+                                loadCompetencies(parseInt(fwSelect.value, 10), '');
+                            }
+                        };
+
+                        // Wait for the body to be rendered before binding to body elements.
+                        modal.getRoot().on(ModalEvents.bodyRendered, function() {
+                            setupBodyListeners();
+                        });
+                        // Also try immediately in case body was already rendered synchronously.
+                        setupBodyListeners();
+
+                        // ── Search (delegated on root — safe before body renders) ──
+                        root.addEventListener('click', function(e) {
+                            if (e.target.closest('[data-action="search-btn"]')) {
+                                var fwSel = root.querySelector('[data-action="choose-framework"]');
+                                var text = root.querySelector('[data-action="search-input"]');
+                                if (fwSel && text) {
+                                    loadCompetencies(parseInt(fwSel.value, 10), text.value || '');
+                                }
+                            }
+                        });
+                        root.addEventListener('keydown', function(e) {
+                            if (e.target.matches && e.target.matches('[data-action="search-input"]') && e.key === 'Enter') {
+                                e.preventDefault();
+                                var fwSel = root.querySelector('[data-action="choose-framework"]');
+                                if (fwSel) {
+                                    loadCompetencies(parseInt(fwSel.value, 10), e.target.value || '');
+                                }
+                            }
+                        });
+
+                        // ── Checkbox toggle → enable/disable Save (delegated) ──
+                        root.addEventListener('change', function(e) {
+                            if (e.target.matches && e.target.matches('[data-competency-id]')) {
+                                var any = root.querySelectorAll('[data-competency-id]:checked:not(:disabled)').length > 0;
+                                modal.setButtonDisabled('save', !any);
+                            }
+                        });
+
+                        // ── Save event (ModalSaveCancel fires this) ──
+                        modal.getRoot().on(ModalEvents.save, function(evt) {
+                            evt.preventDefault();
+                            var checked = root.querySelectorAll('[data-competency-id]:checked:not(:disabled)');
+                            var selected = [];
+                            checked.forEach(function(cb) {
+                                selected.push({
+                                    id: parseInt(cb.getAttribute('data-competency-id'), 10),
+                                    name: cb.getAttribute('data-competency-name') || ('#' + cb.getAttribute('data-competency-id')),
+                                    proficient: 1
+                                });
+                            });
+                            if (selected.length) {
+                                addRulesFromPicker(selected);
+                            }
+                            modal.destroy();
+                        });
+
+                        return null;
+                    }).catch(Notification.exception);
+                });
         });
 
         renderRules();
@@ -485,14 +491,14 @@ define([], function () {
     // ───────────────────────────────────────────
 
     return {
-        init: function () {
+        init: function() {
             var competencyBound = initCompetencyFilter();
 
             if (bind() && competencyBound) {
                 return;
             }
 
-            setTimeout(function () {
+            setTimeout(function() {
                 if (bind()) {
                     competencyBound = initCompetencyFilter() || competencyBound;
                 } else {
@@ -502,7 +508,7 @@ define([], function () {
                     return;
                 }
 
-                var observer = new MutationObserver(function () {
+                var observer = new MutationObserver(function() {
                     var courseBound = bind();
                     competencyBound = initCompetencyFilter() || competencyBound;
                     if (courseBound && competencyBound) {
@@ -511,7 +517,7 @@ define([], function () {
                 });
                 observer.observe(document.body, {childList: true, subtree: true});
 
-                setTimeout(function () {
+                setTimeout(function() {
                     observer.disconnect();
                 }, 10000);
             }, 200);

@@ -729,8 +729,7 @@
 
 .la-mockmodal-hero {
     height: 100px;
-    background:
-        linear-gradient(135deg, #4a5fa0, #7148a3);
+    background: linear-gradient(135deg, #4a5fa0, #7148a3);
     background-size: cover;
     background-position: center;
     position: relative;
@@ -1014,5 +1013,7 @@
 }
 
 @keyframes la-spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }

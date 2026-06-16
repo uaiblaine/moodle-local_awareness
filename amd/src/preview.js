@@ -20,9 +20,9 @@ define(['jquery', 'core/modal_cancel', 'core/str'],
                     body: content,
                     large: true
                 })
-                .then(function(modal) {
-                    return modal.show();
-                });
+                    .then(function(modal) {
+                        return modal.show();
+                    });
             });
         };
 
