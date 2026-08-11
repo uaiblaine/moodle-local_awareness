@@ -36,6 +36,7 @@ admin_externalpage_setup('local_awareness_managenotice');
 helper::check_manage_capability();
 
 $PAGE->set_context(context_system::instance());
+\local_awareness\local\bootstrap::mark_page();
 $PAGE->navbar->add(get_string('notice:notice', 'local_awareness'));
 
 $noticeid = optional_param('noticeid', 0, PARAM_INT);

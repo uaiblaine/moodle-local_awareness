@@ -1029,3 +1029,87 @@
         transform: rotate(360deg);
     }
 }
+/* The notice modal's title carried fw-bold, a Bootstrap 5 utility that resolves to nothing
+   on Moodle 4.5. notice.js shows this modal on arbitrary pages, where the plugin has no body
+   class to gate a polyfill on, so the weight is owned here under the modal's own .awareness
+   scope instead - correct on both branches, no version test involved. */
+.awareness .modal-title {
+    font-weight: 700;
+}
+
+/* ============================================
+      BOOTSTRAP 4 UTILITY POLYFILL (Moodle 4.5 only)
+      ============================================
+
+      Moodle 4.5's forward bridge (theme/boost/scss/moodle/bs5-bridge.scss) is 116 lines and
+      covers only g-0, btn-close, the ms/me/ps/pe spacers and float/text/border/rounded-start
+      and -end. Moodle 5.x's backward bridge runs past a thousand lines. So BS4 names resolve
+      on both branches and BS5 names do not, and the families below resolve to NOTHING on 4.5.
+
+      Writing BS4 names in the markup instead was rejected: 5.x wraps every back-ported BS4
+      name in @include deprecated-styles() and Moodle 6.0 removes that sheet (MDL-84465).
+
+      GATED on body.local-awareness-bs4, added by local_awareness\local\bootstrap when
+      $CFG->branch < 500. The gate is not optional: plugin CSS loads after core's, so an
+      ungated rule would outrank core's own definition on 5.x and freeze 4.5's metrics there.
+
+      Only the competency picker and rules markup needs this, and it renders on the plugin's
+      own admin pages. Deletable in one edit when 405 leaves $plugin->supported. */
+
+body.local-awareness-bs4 .form-select {
+    display: inline-block;
+    width: 100%;
+    max-width: 100%;
+    height: 36.5px;
+    padding: 6px 28px 6px 12px;
+    font-size: 15px;
+    line-height: 22.5px;
+    color: #495057;
+    vertical-align: middle;
+    background-color: #fff;
+    background-image:
+        linear-gradient(45deg, transparent 50%, #343a40 50%),
+        linear-gradient(135deg, #343a40 50%, transparent 50%);
+    background-position:
+        calc(100% - 16px) calc(50% - 1px),
+        calc(100% - 11px) calc(50% - 1px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    border: 1px solid #8f959e;
+    border-radius: 8px;
+    appearance: none;
+}
+
+body.local-awareness-bs4 .form-select:focus {
+    border-color: #0f6cbf;
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(15, 108, 191, 0.25);
+}
+
+body.local-awareness-bs4 .form-select-sm {
+    height: 29.7px;
+    padding: 4px 28px 4px 8px;
+    font-size: 13.125px;
+    line-height: 19.7px;
+}
+
+body.local-awareness-bs4 .form-label {
+    display: inline-block;
+    margin-bottom: 8px;
+}
+
+body.local-awareness-bs4 .fw-bold {
+    font-weight: 700;
+}
+
+body.local-awareness-bs4 .fw-semibold {
+    font-weight: 600;
+}
+
+body.local-awareness-bs4 .gap-2 {
+    gap: 8px;
+}
+
+body.local-awareness-bs4 .lh-1 {
+    line-height: 1;
+}
