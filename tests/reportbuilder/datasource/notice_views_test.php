@@ -171,12 +171,13 @@ final class notice_views_test extends core_reportbuilder_testcase {
     }
 
     /**
-     * Stress test datasource — requires PHPUNIT_LONGTEST.
+     * Exercise every column and aggregation the datasource offers.
+     *
+     * Not gated behind PHPUNIT_LONGTEST: moodle-plugin-ci never defines it, so gating this
+     * test removed the only coverage of the column/aggregation matrix from every CI run —
+     * which is where two aggregation defects lived while the suite reported green.
      */
     public function test_stress_datasource(): void {
-        if (!PHPUNIT_LONGTEST) {
-            $this->markTestSkipped('PHPUNIT_LONGTEST is not defined');
-        }
         $this->resetAfterTest();
         $this->setAdminUser();
 

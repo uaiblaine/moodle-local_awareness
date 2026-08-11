@@ -50,6 +50,29 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
+     * A notice outliving its cohort must not make the manage page fatal.
+     *
+     * cohort_get_all_cohorts() returns only the cohorts visible to the caller, and a cohort can
+     * simply be deleted, so the id stored on the notice may be absent from the options. An
+     * unguarded array lookup raised a TypeError and took the whole notice list down with it.
+     *
+     * @covers \local_awareness\helper::get_cohort_name
+     */
+    public function test_get_cohort_name_survives_a_missing_cohort(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $cohort = $this->getDataGenerator()->create_cohort();
+
+        // Control: while the cohort exists its name is returned.
+        $this->assertSame($cohort->name, helper::get_cohort_name((int) $cohort->id));
+
+        cohort_delete_cohort($cohort);
+
+        $this->assertSame('-', helper::get_cohort_name((int) $cohort->id));
+    }
+
+    /**
      * Test that we can have full HTML in a notice content.
      */
     public function test_can_have_html_in_notice_content(): void {

@@ -72,6 +72,19 @@ class noticeview extends persistent {
     }
 
     /**
+     * Forget a user's cached view records.
+     *
+     * The cache is MODE_APPLICATION and keyed by user id, so rows deleted outside the persistent
+     * — the privacy erasure path does bulk deletes — leave the cached copy behind and the user's
+     * viewing history survives their own erasure request.
+     *
+     * @param int $userid User id.
+     */
+    public static function purge_user_cache(int $userid): void {
+        self::get_cache()->delete((string) $userid);
+    }
+
+    /**
      * Run after update.
      *
      * @param bool $result Result of update.

@@ -698,7 +698,11 @@ class helper {
         }
 
         $cohorts = self::built_cohorts_options();
-        return $cohorts[$cohortid];
+
+        // A notice outlives the cohort it targets, and cohort_get_all_cohorts() only returns the
+        // cohorts visible to the caller. Either way the id can be absent, and an unguarded lookup
+        // makes the whole manage-notices page fatal. Match get_course_name()'s treatment.
+        return $cohorts[$cohortid] ?? '-';
     }
 
     /**

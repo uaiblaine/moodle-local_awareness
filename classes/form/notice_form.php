@@ -383,6 +383,34 @@ class notice_form extends \core\form\persistent {
         $data = parent::get_default_data();
         $data->perpetual = $data->timestart == 0 && $data->timeend == 0;
 
+        /*
+         * Hand the notice's own file area to the content editor.
+         *
+         * core\form\persistent::get_default_data() turns content + contentformat into a
+         * text/format pair but never supplies an itemid. MoodleQuickForm_editor::toHtml() then
+         * mints an empty draft area of its own, and the save path syncs that empty area over
+         * local_awareness/content/<noticeid>, deleting every file embedded in the notice.
+         *
+         * file_prepare_draft_area() only copies when the draft id is empty, so on submit the
+         * user's in-progress draft is left alone and deletions made in the editor still stick.
+         */
+        $noticeid = (int) $this->get_persistent()->get('id');
+        $draftitemid = file_get_submitted_draft_itemid('content');
+        $content = is_array($data->content)
+            ? $data->content
+            : ['text' => (string) $data->content, 'format' => FORMAT_HTML];
+        $content['text'] = file_prepare_draft_area(
+            $draftitemid,
+            \context_system::instance()->id,
+            'local_awareness',
+            'content',
+            $noticeid > 0 ? $noticeid : null,
+            helper::get_file_editor_options(),
+            $content['text']
+        );
+        $content['itemid'] = $draftitemid;
+        $data->content = $content;
+
         // Ensure reqcourse is always an integer (0 = no course).
         if (empty($data->reqcourse)) {
             $data->reqcourse = 0;

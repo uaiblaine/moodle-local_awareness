@@ -225,14 +225,31 @@ class awareness extends persistent {
      * @throws \core\invalid_persistent_exception
      */
     public static function create_new_notice(\stdClass $data) {
-        if (isset($data->cohorts) && is_array($data->cohorts)) {
-            $data->cohorts = implode(',', $data->cohorts);
-        } else {
-            $data->cohorts = '';
-        }
+        self::normalise_cohorts($data);
 
         $persistent = new self(0, $data);
         return $persistent->create();
+    }
+
+    /**
+     * Reduce the submitted cohort selection to a comma-separated list of cohort ids.
+     *
+     * The autocomplete element posts a hidden '_qf__force_multiselect_submission' marker so that
+     * an empty multi-select still submits a value. Core drops it in
+     * HTML_QuickForm_select::exportValue(), but only inside the `!empty($this->_options)` branch —
+     * on a site with no cohorts the option list is empty, the value is returned unfiltered and the
+     * marker reaches us as a literal. Stored as a cohort it matches no user, which hides the notice
+     * from everyone. Casting to int discards it and any other non-id value.
+     *
+     * @param \stdClass $data Form data, modified in place.
+     */
+    private static function normalise_cohorts(\stdClass $data): void {
+        $ids = $data->cohorts ?? [];
+        if (is_string($ids)) {
+            // Already stored form: a comma-separated list, as get_cohorts() returns it.
+            $ids = explode(',', $ids);
+        }
+        $data->cohorts = implode(',', array_filter(array_map('intval', (array) $ids)));
     }
 
     /**
@@ -257,11 +274,7 @@ class awareness extends persistent {
      * @throws \core\invalid_persistent_exception
      */
     public static function update_notice_data(awareness $persistent, \stdClass $data) {
-        if (isset($data->cohorts) && is_array($data->cohorts)) {
-            $data->cohorts = implode(',', $data->cohorts);
-        } else {
-            $data->cohorts = '';
-        }
+        self::normalise_cohorts($data);
 
         $persistent->from_record($data);
         return $persistent->update();

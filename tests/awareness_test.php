@@ -85,6 +85,71 @@ final class awareness_test extends \advanced_testcase {
     }
 
     /**
+     * A site with no cohorts must not end up storing the multi-select marker as an audience.
+     *
+     * The cohorts autocomplete posts a hidden '_qf__force_multiselect_submission' value so an
+     * empty selection still submits. Core strips it in HTML_QuickForm_select::exportValue(), but
+     * only inside its `!empty($this->_options)` branch — with no cohorts on the site the option
+     * list is empty and the marker survives. Stored as a cohort it matches nobody, so every
+     * notice created through the form became invisible to every user.
+     *
+     * @covers \local_awareness\helper::create_new_notice
+     */
+    public function test_the_multiselect_marker_is_never_stored_as_a_cohort(): void {
+        global $USER;
+
+        $this->setAdminUser();
+        $user = $this->getDataGenerator()->create_user();
+
+        $data = new \stdClass();
+        $data->title = 'Notice with no audience';
+        $data->content = '<p>Everyone should see this.</p>';
+        $data->cohorts = ['_qf__force_multiselect_submission'];
+        helper::create_new_notice($data);
+
+        $notices = array_values(awareness::get_enabled_notices());
+        $this->assertCount(1, $notices);
+        $this->assertSame([], $notices[0]->get('cohorts'));
+
+        // The notice must actually reach a user with no cohort membership at all.
+        $this->setUser($user);
+        unset($USER->viewednotices);
+        $this->assertCount(1, helper::retrieve_user_notices());
+    }
+
+    /**
+     * Control for the test above: a real cohort selection still restricts the audience.
+     *
+     * Without this, the assertion that the notice reaches a cohort-less user would also pass if
+     * cohort filtering had been removed altogether.
+     *
+     * @covers \local_awareness\helper::create_new_notice
+     */
+    public function test_a_real_cohort_selection_still_restricts_the_audience(): void {
+        global $USER;
+
+        $this->setAdminUser();
+        $cohort = $this->getDataGenerator()->create_cohort();
+        $member = $this->getDataGenerator()->create_user();
+        $outsider = $this->getDataGenerator()->create_user();
+        cohort_add_member($cohort->id, $member->id);
+
+        $data = new \stdClass();
+        $data->title = 'Cohort only';
+        $data->content = '<p>Members only.</p>';
+        $data->cohorts = [$cohort->id];
+        helper::create_new_notice($data);
+
+        $this->setUser($member);
+        unset($USER->viewednotices);
+        $this->assertCount(1, helper::retrieve_user_notices());
+
+        $this->setUser($outsider);
+        unset($USER->viewednotices);
+        $this->assertCount(0, helper::retrieve_user_notices());
+    }
+
+    /**
      * Test set reset notice.
      *
      * @covers \local_awareness\helper::reset_notice

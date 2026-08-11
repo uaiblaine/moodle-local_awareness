@@ -87,13 +87,26 @@ class noticeview extends base {
         ))
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.action")
-            ->set_type(column::TYPE_INTEGER)
+            /*
+             * TYPE_TEXT, not TYPE_INTEGER: local_awareness_lastview.action is a char column
+             * (db/install.xml) holding '0'/'1', and noticeview declares it PARAM_RAW_TRIMMED.
+             * Claiming TYPE_INTEGER let Report Builder offer Sum/Average, whose generated
+             * `AVG(1.0 * action)` is a hard PostgreSQL error on a varchar.
+             */
+            ->set_type(column::TYPE_TEXT)
             ->set_is_sortable(true)
-            ->add_callback(static function (?int $value): string {
-                if ($value === acknowledgement_persistent::ACTION_ACKNOWLEDGED) {
+            ->add_callback(static function ($value): string {
+                // Untyped for the same reason as the acknowledgement entity's action column.
+                if ($value === null || $value === '') {
+                    return '';
+                }
+                if ((string) $value === (string) acknowledgement_persistent::ACTION_ACKNOWLEDGED) {
                     return get_string('report_ack:action_acknowledged', 'local_awareness');
                 }
-                return get_string('report_ack:action_dismissed', 'local_awareness');
+                if ((string) $value === (string) acknowledgement_persistent::ACTION_DISMISSED) {
+                    return get_string('report_ack:action_dismissed', 'local_awareness');
+                }
+                return s((string) $value);
             });
 
         $columns[] = (new column(
