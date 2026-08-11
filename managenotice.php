@@ -37,6 +37,7 @@ $page = optional_param('page', 0, PARAM_INT);
 $thispage = '/local/awareness/managenotice.php';
 $editnotice = '/local/awareness/editnotice.php';
 
+\local_awareness\local\bootstrap::mark_page();
 $PAGE->set_url(new moodle_url($thispage));
 $PAGE->requires->js_call_amd('local_awareness/preview', 'init');
 
