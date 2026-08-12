@@ -22,6 +22,7 @@ use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\contextlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
+use local_awareness\persistent\noticeview;
 
 /**
  * Privacy Subsystem implementation.
@@ -45,10 +46,30 @@ class provider implements
      */
     public static function get_contexts_for_userid(int $userid): contextlist {
         $contextlist = new contextlist();
-        $sql = "SELECT DISTINCT c.id
-                  FROM {local_awareness_lastview} lw
-                  JOIN {context} c ON c.instanceid = lw.userid AND c.contextlevel = :contextuser
-                 WHERE lw.userid = :userid";
+
+        /*
+         * Every user-linked table has to be considered, not just lastview. A link click writes
+         * local_awareness_hlinks_his on its own (the modal stays open, so no view record exists
+         * yet), and an audience-estimate job writes local_awareness_audience_jobs with no view
+         * record at all. Driving the contextlist off lastview alone left those rows outside both
+         * the export and the erasure, while the site reported success.
+         */
+        $sql = "SELECT c.id
+                  FROM {context} c
+                 WHERE c.contextlevel = :contextuser
+                   AND c.instanceid = :userid
+                   AND (EXISTS (SELECT 1
+                                  FROM {local_awareness_lastview} lv
+                                 WHERE lv.userid = c.instanceid)
+                     OR EXISTS (SELECT 1
+                                  FROM {local_awareness_ack} ack
+                                 WHERE ack.userid = c.instanceid)
+                     OR EXISTS (SELECT 1
+                                  FROM {local_awareness_hlinks_his} his
+                                 WHERE his.userid = c.instanceid)
+                     OR EXISTS (SELECT 1
+                                  FROM {local_awareness_audience_jobs} job
+                                 WHERE job.userid = c.instanceid))";
 
         $params = [
             'contextuser'   => CONTEXT_USER,
@@ -83,6 +104,10 @@ class provider implements
                        FROM {local_awareness_hlinks_his} his
                       WHERE his.userid = :userid";
 
+            $sql4 = "SELECT job.*
+                       FROM {local_awareness_audience_jobs} job
+                      WHERE job.userid = :userid";
+
             $params = [
                 'userid' => $user->id,
             ];
@@ -90,11 +115,13 @@ class provider implements
             $lastview = $DB->get_records_sql($sql1, $params);
             $acknowlegement = $DB->get_records_sql($sql2, $params);
             $linktracking = $DB->get_records_sql($sql3, $params);
+            $audiencejobs = $DB->get_records_sql($sql4, $params);
 
             $data = (object)[
                 'lastview' => $lastview,
                 'acknowledgement' => $acknowlegement,
                 'linktracking' => $linktracking,
+                'audiencejobs' => $audiencejobs,
             ];
 
             $subcontext = [
@@ -111,15 +138,12 @@ class provider implements
      * @param \context $context Context.
      */
     public static function delete_data_for_all_users_in_context(\context $context) {
-        global $DB;
         if ($context->contextlevel !== CONTEXT_USER) {
             return;
         }
         $userid = $context->instanceid;
 
-        $DB->delete_records('local_awareness_lastview', ['userid' => $userid]);
-        $DB->delete_records('local_awareness_hlinks_his', ['userid' => $userid]);
-        $DB->delete_records('local_awareness_ack', ['userid' => $userid]);
+        self::delete_all_data_for_userid($userid);
     }
 
     /**
@@ -128,8 +152,6 @@ class provider implements
      * @param \core_privacy\local\request\approved_contextlist $contextlist Context list.
      */
     public static function delete_data_for_user(approved_contextlist $contextlist) {
-        global $DB;
-
         $contexts = $contextlist->get_contexts();
         if (count($contexts) == 0) {
             return;
@@ -141,9 +163,7 @@ class provider implements
         }
         $userid = $context->instanceid;
 
-        $DB->delete_records('local_awareness_lastview', ['userid' => $userid]);
-        $DB->delete_records('local_awareness_hlinks_his', ['userid' => $userid]);
-        $DB->delete_records('local_awareness_ack', ['userid' => $userid]);
+        self::delete_all_data_for_userid($userid);
     }
 
     /**
@@ -160,11 +180,25 @@ class provider implements
 
         $params = ['contextid' => $context->id, 'contextlevel' => CONTEXT_USER];
 
-        $sql = "SELECT lv.userid
-                  FROM {local_awareness_lastview} lv
-                  JOIN {context} c ON c.contextlevel = :contextlevel
-                   AND c.instanceid = lv.userid
-                 WHERE c.id = :contextid";
+        // Same reasoning as get_contexts_for_userid(): a user can hold link-click or
+        // audience-job rows without ever having a view record, and driving this off lastview
+        // alone meant delete_data_for_users() was never called for them.
+        $sql = "SELECT c.instanceid AS userid
+                  FROM {context} c
+                 WHERE c.id = :contextid
+                   AND c.contextlevel = :contextlevel
+                   AND (EXISTS (SELECT 1
+                                  FROM {local_awareness_lastview} lv
+                                 WHERE lv.userid = c.instanceid)
+                     OR EXISTS (SELECT 1
+                                  FROM {local_awareness_ack} ack
+                                 WHERE ack.userid = c.instanceid)
+                     OR EXISTS (SELECT 1
+                                  FROM {local_awareness_hlinks_his} his
+                                 WHERE his.userid = c.instanceid)
+                     OR EXISTS (SELECT 1
+                                  FROM {local_awareness_audience_jobs} job
+                                 WHERE job.userid = c.instanceid))";
 
         $userlist->add_from_sql('userid', $sql, $params);
     }
@@ -175,16 +209,33 @@ class provider implements
      * @param \core_privacy\local\request\approved_userlist $userlist User list.
      */
     public static function delete_data_for_users(approved_userlist $userlist) {
-        global $DB;
-
         $context = $userlist->get_context();
 
         if ($context instanceof \context_user) {
             $userid = $context->instanceid;
-            $DB->delete_records('local_awareness_lastview', ['userid' => $userid]);
-            $DB->delete_records('local_awareness_hlinks_his', ['userid' => $userid]);
-            $DB->delete_records('local_awareness_ack', ['userid' => $userid]);
+            self::delete_all_data_for_userid($userid);
         }
+    }
+
+    /**
+     * Remove every row this plugin holds for one user, across all four user-linked tables.
+     *
+     * Shared by the three deletion entry points so a table added later cannot be wired into one
+     * path and forgotten in the others.
+     *
+     * @param int $userid User id.
+     */
+    private static function delete_all_data_for_userid(int $userid): void {
+        global $DB;
+
+        $DB->delete_records('local_awareness_lastview', ['userid' => $userid]);
+        $DB->delete_records('local_awareness_hlinks_his', ['userid' => $userid]);
+        $DB->delete_records('local_awareness_ack', ['userid' => $userid]);
+        $DB->delete_records('local_awareness_audience_jobs', ['userid' => $userid]);
+
+        // The view records are also held in a MODE_APPLICATION cache keyed by user id, which a
+        // bulk delete does not touch.
+        noticeview::purge_user_cache($userid);
     }
 
     /**
@@ -220,6 +271,16 @@ class provider implements
                 'userid' => 'privacy:metadata:userid',
             ],
             'privacy:metadata:local_awareness_lastview'
+        );
+
+        $collection->add_database_table(
+            'local_awareness_audience_jobs',
+            [
+                'userid' => 'privacy:metadata:userid',
+                'criteria' => 'privacy:metadata:criteria',
+                'timecreated' => 'privacy:metadata:timecreated',
+            ],
+            'privacy:metadata:local_awareness_audience_jobs'
         );
 
         return $collection;

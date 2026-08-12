@@ -87,7 +87,13 @@ final class estimate_audience_test extends \advanced_testcase {
 
         $task = new estimate_audience();
         $task->set_custom_data(['jobid' => $job->get('jobid')]);
+        // The task reports through mtrace(); capturing it keeps the test from being marked
+        // risky and lets the skip be asserted rather than inferred from the count alone.
+        ob_start();
         $task->execute();
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('already in status ready', $output);
 
         $reloaded = audience_job::get_record(['jobid' => $job->get('jobid')]);
         $this->assertSame(
@@ -98,9 +104,17 @@ final class estimate_audience_test extends \advanced_testcase {
     }
 
     public function test_execute_with_unknown_jobid_does_not_throw(): void {
+        $jobid = 'does-not-exist-' . time();
+
+        // Precondition: without this the test would pass even if the lookup were removed.
+        $this->assertFalse(audience_job::get_record(['jobid' => $jobid]));
+
         $task = new estimate_audience();
-        $task->set_custom_data(['jobid' => 'does-not-exist-' . time()]);
+        $task->set_custom_data(['jobid' => $jobid]);
+        ob_start();
         $task->execute();
-        $this->assertTrue(true, 'execute() must swallow unknown jobid silently.');
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('not found', $output);
     }
 }

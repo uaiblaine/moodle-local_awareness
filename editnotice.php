@@ -67,9 +67,8 @@ $customdata = [
 ];
 $mform = new notice_form($thispage, $customdata);
 
-$options = helper::get_file_editor_options();
-$draftitemid = file_get_submitted_draft_itemid('content');
-file_prepare_draft_area($draftitemid, context_system::instance()->id, 'local_awareness', 'content', 0, $options);
+// The content editor's draft area is prepared inside notice_form::get_default_data(), which is
+// where the notice id is known; preparing it here against item 0 handed the editor an empty area.
 
 // Prepare draft area for background image.
 $bgdraftitemid = file_get_submitted_draft_itemid('bgimage');

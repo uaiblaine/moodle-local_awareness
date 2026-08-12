@@ -274,7 +274,14 @@ class acknowledged_notice extends table_sql implements renderable {
         $hlinkcount = '';
         $linkcounts = linkhistory::count_clicked_links($row->userid, $row->noticeid);
         foreach ($linkcounts as $count) {
-            $hlinkcount .= "<a href=\"{$count->link}\">{$count->text}</a>: " . $count->count . " <br/>";
+            // Both values come straight from the notice author's HTML, so they are escaped here:
+            // the href through PARAM_URL, the label through s().
+            $href = clean_param($count->link, PARAM_URL);
+            $label = s($count->text);
+            $hlinkcount .= $href === ''
+                ? $label
+                : '<a href="' . s($href) . '">' . $label . '</a>';
+            $hlinkcount .= ': ' . (int) $count->clickcount . ' <br/>';
         }
         return $hlinkcount;
     }
@@ -296,7 +303,7 @@ class acknowledged_notice extends table_sql implements renderable {
             }
             $linkcounts = linkhistory::count_clicked_links($row->userid, $row->noticeid, $column);
             if (isset($linkcounts[$column])) {
-                return $linkcounts[$column]->count;
+                return (string) (int) $linkcounts[$column]->clickcount;
             } else {
                 return '0';
             }

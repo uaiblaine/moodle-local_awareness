@@ -215,12 +215,15 @@ Some example values include:
 
 If you wish to display a notice on the site home, you can use the value: "FRONTPAGE".';
 $string['pluginname'] = 'Awareness';
+$string['privacy:metadata:criteria'] = 'Audience criteria submitted for the estimate';
 $string['privacy:metadata:firstname'] = 'First name';
 $string['privacy:metadata:idnumber'] = 'ID number';
 $string['privacy:metadata:lastname'] = 'Last name';
 $string['privacy:metadata:local_awareness_ack'] = 'Notice acknowledgement';
+$string['privacy:metadata:local_awareness_audience_jobs'] = 'Audience estimate jobs';
 $string['privacy:metadata:local_awareness_hlinks_his'] = 'Hyperlink tracking';
 $string['privacy:metadata:local_awareness_lastview'] = 'Notice last view';
+$string['privacy:metadata:timecreated'] = 'Time the record was created';
 $string['privacy:metadata:userid'] = 'User ID';
 $string['privacy:metadata:username'] = 'Username';
 $string['report:acknowledge_desc'] = 'List of users who acknowledged the notice.';

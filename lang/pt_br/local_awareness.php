@@ -215,12 +215,15 @@ Alguns exemplos de valores incluem:
 
 Se você deseja exibir um alerta na página inicial do site, você pode usar o valor: "FRONTPAGE".';
 $string['pluginname'] = 'Alertas';
+$string['privacy:metadata:criteria'] = 'Critérios de público enviados para a estimativa';
 $string['privacy:metadata:firstname'] = 'Primeiro nome';
 $string['privacy:metadata:idnumber'] = 'Número de ID';
 $string['privacy:metadata:lastname'] = 'Sobrenome';
 $string['privacy:metadata:local_awareness_ack'] = 'Reconhecimento de alerta';
+$string['privacy:metadata:local_awareness_audience_jobs'] = 'Trabalhos de estimativa de público';
 $string['privacy:metadata:local_awareness_hlinks_his'] = 'Rastreamento de links';
 $string['privacy:metadata:local_awareness_lastview'] = 'Última visualização do alerta';
+$string['privacy:metadata:timecreated'] = 'Momento em que o registro foi criado';
 $string['privacy:metadata:userid'] = 'ID do usuário';
 $string['privacy:metadata:username'] = 'Nome de usuário';
 $string['report:acknowledge_desc'] = 'Lista de usuários que reconheceram o alerta.';

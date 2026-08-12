@@ -80,7 +80,9 @@ class linkhistory extends persistent {
         } else {
             $wheresql = "WHERE h.userid = :userid AND l.noticeid = :noticeid";
         }
-        $sql = "SELECT h.hlinkid, l.text, l.link, COUNT(h.hlinkid)
+        // The aggregate must be aliased: PostgreSQL names an unaliased COUNT() 'count' while
+        // MySQL/MariaDB names it 'COUNT(h.hlinkid)', so the consumer's property only exists on one.
+        $sql = "SELECT h.hlinkid, l.text, l.link, COUNT(h.hlinkid) AS clickcount
                   FROM {local_awareness_hlinks_his} h
                   JOIN {local_awareness_hlinks} l on h.hlinkid = l.id
                   $wheresql

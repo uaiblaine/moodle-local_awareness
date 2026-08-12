@@ -116,7 +116,8 @@ class linkhistory extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$hlalias}.text")
             ->set_type(column::TYPE_TEXT)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            ->add_callback(static fn($value): string => s((string) ($value ?? '')));
 
         $columns[] = (new column(
             'linkurl',
@@ -126,7 +127,8 @@ class linkhistory extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$hlalias}.link")
             ->set_type(column::TYPE_TEXT)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            ->add_callback(static fn($value): string => s((string) ($value ?? '')));
 
         return $columns;
     }

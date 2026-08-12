@@ -85,7 +85,12 @@ class notice extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.title")
             ->set_type(column::TYPE_TEXT)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            ->add_callback(static fn($value): string => format_string(
+                (string) ($value ?? ''),
+                true,
+                ['context' => \context_system::instance()]
+            ));
 
         $columns[] = (new column(
             'enabled',

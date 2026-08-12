@@ -12,7 +12,6 @@ jobs:
     uses: moodle-an-hochschulen/moodle-workflows/.github/workflows/moodle-plugin-ci.yml@main
     with:
       moodle-core-branch: MOODLE_502_STABLE
-      mustache-continue-on-error: true
 
   ci-501:
     name: Moodle 5.01
@@ -20,7 +19,6 @@ jobs:
     with:
       moodle-core-branch: MOODLE_501_STABLE
       one-db-only: true
-      mustache-continue-on-error: true
 
   ci-500:
     name: Moodle 5.00
@@ -28,7 +26,6 @@ jobs:
     with:
       moodle-core-branch: MOODLE_500_STABLE
       one-db-only: true
-      mustache-continue-on-error: true
 
   ci-405:
     name: Moodle 4.05
@@ -36,4 +33,3 @@ jobs:
     with:
       moodle-core-branch: MOODLE_405_STABLE
       one-db-only: true
-      mustache-continue-on-error: true

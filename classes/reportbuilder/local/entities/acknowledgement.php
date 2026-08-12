@@ -89,7 +89,8 @@ class acknowledgement extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.username")
             ->set_type(column::TYPE_TEXT)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            ->add_callback(static fn($value): string => s((string) ($value ?? '')));
 
         $columns[] = (new column(
             'firstname',
@@ -99,7 +100,8 @@ class acknowledgement extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.firstname")
             ->set_type(column::TYPE_TEXT)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            ->add_callback(static fn($value): string => s((string) ($value ?? '')));
 
         $columns[] = (new column(
             'lastname',
@@ -109,7 +111,8 @@ class acknowledgement extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.lastname")
             ->set_type(column::TYPE_TEXT)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            ->add_callback(static fn($value): string => s((string) ($value ?? '')));
 
         $columns[] = (new column(
             'idnumber',
@@ -119,7 +122,8 @@ class acknowledgement extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.idnumber")
             ->set_type(column::TYPE_TEXT)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            ->add_callback(static fn($value): string => s((string) ($value ?? '')));
 
         $columns[] = (new column(
             'noticetitle',
@@ -129,7 +133,12 @@ class acknowledgement extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.noticetitle")
             ->set_type(column::TYPE_TEXT)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            ->add_callback(static fn($value): string => format_string(
+                (string) ($value ?? ''),
+                true,
+                ['context' => \context_system::instance()]
+            ));
 
         $columns[] = (new column(
             'action',
@@ -140,11 +149,25 @@ class acknowledgement extends base {
             ->add_fields("{$alias}.action")
             ->set_type(column::TYPE_INTEGER)
             ->set_is_sortable(true)
-            ->add_callback(static function (?int $value): string {
-                if ($value === acknowledgement_persistent::ACTION_ACKNOWLEDGED) {
+            ->add_callback(static function ($value): string {
+                /*
+                 * Deliberately untyped. Report Builder calls display callbacks from
+                 * reportbuilder/classes/local/aggregation/base.php, which declares
+                 * strict_types=1 — strictness follows the caller, so an aggregation such as
+                 * Average hands a float to a ?int signature and raises a TypeError instead of
+                 * rendering. An aggregate is not one of the two actions, so it is shown as a
+                 * number.
+                 */
+                if ($value === null || $value === '') {
+                    return '';
+                }
+                if ((float) $value === (float) acknowledgement_persistent::ACTION_ACKNOWLEDGED) {
                     return get_string('report_ack:action_acknowledged', 'local_awareness');
                 }
-                return get_string('report_ack:action_dismissed', 'local_awareness');
+                if ((float) $value === (float) acknowledgement_persistent::ACTION_DISMISSED) {
+                    return get_string('report_ack:action_dismissed', 'local_awareness');
+                }
+                return format_float((float) $value, 2);
             });
 
         $columns[] = (new column(

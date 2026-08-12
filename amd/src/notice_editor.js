@@ -83,7 +83,7 @@ define([
         });
 
         // The form's submit/cancel button group is hidden — the action bar
-        // submits the form via the `form="<formid>"` attribute. Hide the
+        // submits the form as its ancestor (see editor/shell.mustache). Hide the
         // moodleform-rendered button group to avoid double controls.
         var btnRow = source.querySelector('#fgroup_id_buttonar')
             || source.querySelector('[id^="fgroup_id_button"]')
