@@ -6,6 +6,22 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — click-history indexes and CI trigger (version 2026081103)
+
+- **`local_awareness_hlinks_his` is indexed on the two columns it is queried by.** The table grows
+  one row per link click and had only its primary key, while every read filters on `hlinkid` (the
+  join in `linkhistory::count_clicked_links()`) or `userid` (its WHERE clause, and the privacy
+  erasure path) — both full scans on a table with no upper bound. Declared as foreign keys, which
+  in Moodle create the indexes without emitting a real constraint (`sql_generator::$foreign_keys`
+  is false on every driver), so sites carrying click rows whose link no longer exists upgrade
+  cleanly.
+- **`db/install.xml` carries a current `VERSION`.** It still said `20220321`, against the fleet
+  rule that the savepoint version, `version.php` and the install.xml `VERSION` move together.
+- **CI no longer runs twice per pull request.** `on: [push, pull_request]` fired both triggers on
+  every branch push that had a PR open, running 42 jobs where 21 cover the same commit. `push` is
+  now limited to `main` and release tags, with `workflow_dispatch` as the manual escape hatch for a
+  branch that has no PR yet.
+
 ### Fixed — course access is now judged on active enrolment (version 2026081102)
 
 - **A suspended participant no longer receives the course's notices.** `can_access_course()`

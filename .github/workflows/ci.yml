@@ -1,6 +1,16 @@
 name: ci
 
-on: [push, pull_request]
+# Pushes to a feature branch are covered by the pull_request trigger, so limiting push to
+# main and release tags halves the Actions minutes a PR costs without losing any coverage.
+# workflow_dispatch is the manual escape hatch for a branch that has no PR yet.
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   # One reusable-workflow call per supported Moodle branch (version.php
