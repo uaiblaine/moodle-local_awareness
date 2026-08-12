@@ -176,12 +176,15 @@ class notice_form extends \core\form\persistent {
         $mform->addElement('selectyesno', 'perpetual', get_string('notice:perpetual', 'local_awareness'));
         $mform->setDefault('perpetual', 1);
 
-        $activeoptions = ['startyear' => date("Y"), 'stopyear' => 2030];
+        // Computed, not a literal: a hardcoded stopyear silently stops accepting dates once it
+        // arrives, and the whole non-perpetual scheduling path goes with it.
+        $stopyear = (int) date('Y') + 10;
+        $activeoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear];
         $mform->addElement('date_time_selector', 'timestart', get_string('notice:activefrom', 'local_awareness'), $activeoptions);
         $mform->addHelpButton('timestart', 'notice:activefrom', 'local_awareness');
         $mform->hideIf('timestart', 'perpetual', 'eq', 1);
 
-        $expiryoptions = ['startyear' => date("Y"), 'stopyear' => 2030, 'defaulttime' => time() + HOURSECS];
+        $expiryoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear, 'defaulttime' => time() + HOURSECS];
         $mform->addElement('date_time_selector', 'timeend', get_string('notice:expiry', 'local_awareness'), $expiryoptions);
         $mform->addHelpButton('timeend', 'notice:expiry', 'local_awareness');
         $mform->hideIf('timeend', 'perpetual', 'eq', 1);

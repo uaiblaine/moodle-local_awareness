@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added — audience-estimate jobs are now purged (version 2026081201)
+
+- **New scheduled task `local_awareness\task\purge_audience_jobs`.** Every click of "Calculate
+  reach" wrote a row to `local_awareness_audience_jobs` and nothing ever removed one, so the table
+  grew without bound — carrying a user id, the criteria JSON and timestamps for the life of the
+  site. Jobs older than a day are discarded nightly; a completed job stops being reusable after
+  `audience_job::DEDUP_WINDOW` (5 minutes), so the window is generous by two orders of magnitude.
+  Deletion keys on `timecreated`, not `timecompleted`: a job that errored, or whose ad-hoc task
+  never ran, has no completion time and would otherwise be kept for ever.
+
+### Fixed — two long-standing metadata defects (version 2026081201)
+
+- **`$plugin->release` was `'2026061600'`** — a version number in the release field, and one dated
+  before the version it shipped with. It now reads `v1.0`, matching the convention used across the
+  fleet.
+- **The date selectors were hard-capped at the year 2030.** `stopyear` was a literal, so from 2030
+  the "Active from" and "Expiry" pickers would offer no selectable year and scheduled notices could
+  no longer be created or edited. It is now computed as ten years ahead.
+
 ### Changed — file headers follow the house standard, and restore upstream attribution
 
 - **`@copyright  Catalyst IT` is restored on the 39 files derived from

@@ -273,4 +273,5 @@ $string['setting:enabled'] = 'Habilitado';
 $string['setting:enableddesc'] = 'Habilitar alertas do site';
 $string['setting:managenotice'] = 'Gerenciar alerta';
 $string['setting:settings'] = 'Configurações';
+$string['task_purge_audience_jobs'] = 'Expurgar trabalhos de estimativa de público já consumidos';
 $string['timeformat:resetinterval'] = '%a dia(s), %h hora(s), %i minuto(s) e %s segundo(s)';

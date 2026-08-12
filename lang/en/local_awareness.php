@@ -274,4 +274,5 @@ $string['setting:enabled'] = 'Enabled';
 $string['setting:enableddesc'] = 'Enable site notice';
 $string['setting:managenotice'] = 'Manage notice';
 $string['setting:settings'] = 'Settings';
+$string['task_purge_audience_jobs'] = 'Purge spent audience estimate jobs';
 $string['timeformat:resetinterval'] = '%a day(s), %h hour(s), %i minute(s) and %s second(s)';
