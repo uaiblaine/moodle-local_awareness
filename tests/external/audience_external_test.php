@@ -23,12 +23,11 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
  * Tests for the audience-estimate external functions.
  *
  * @package    local_awareness
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers     \local_awareness\external::estimate_audience
- * @covers     \local_awareness\external::get_estimate
+ * @covers \local_awareness\external::estimate_audience
+ * @covers \local_awareness\external::get_estimate
  */
 final class audience_external_test extends \advanced_testcase {
     protected function setUp(): void {

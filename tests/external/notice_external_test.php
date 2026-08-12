@@ -29,11 +29,11 @@ use local_awareness\persistent\noticelink;
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers     \local_awareness\external::dismiss_notice
- * @covers     \local_awareness\external::acknowledge_notice
- * @covers     \local_awareness\external::track_link
- * @covers     \local_awareness\external::search_roles
- * @covers     \local_awareness\helper::is_notice_available_to_user
+ * @covers \local_awareness\external::dismiss_notice
+ * @covers \local_awareness\external::acknowledge_notice
+ * @covers \local_awareness\external::track_link
+ * @covers \local_awareness\external::search_roles
+ * @covers \local_awareness\helper::is_notice_available_to_user
  */
 final class notice_external_test extends \advanced_testcase {
     /**

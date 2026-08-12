@@ -31,10 +31,10 @@ use local_awareness\reportbuilder\datasource\all_notices;
  * Unit tests for the all_notices datasource.
  *
  * @package    local_awareness
- * @covers     \local_awareness\reportbuilder\datasource\all_notices
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ *
+ * @covers \local_awareness\reportbuilder\datasource\all_notices
  */
 final class all_notices_test extends core_reportbuilder_testcase {
     /**

@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — file headers follow the house standard, and restore upstream attribution
+
+- **`@copyright  Catalyst IT` is restored on the 39 files derived from
+  `catalyst/moodle-local_sitenotice`,** alongside the current maintainer's notice. Those headers had
+  been replaced outright. This plugin is a declared GPL-3.0 derivative, and removing the original
+  copyright notice from a derivative is a licence-compliance problem, not a formatting preference.
+
+  The derived set was determined by comparing this tree against the upstream `MOODLE_403_STABLE`
+  tree — 27 files match by path, and 12 more by the `sitenotice` → `awareness` rename (the eight
+  event classes, `classes/persistent/awareness.php`, `lang/en/local_awareness.php`,
+  `tests/awareness_test.php` and the Behat context). Every upstream PHP file has a counterpart here.
+- **`@author` removed everywhere**, per Moodle convention and the house standard. Authorship stays
+  in the git history and in the README credits; `@copyright` is what the licence requires.
+- The stray "Forked and adapted by ..." prose line wedged between tags is gone, and every header now
+  emits `@package` / `@copyright` / `@license` in that order with the house spacing. Other tags such
+  as `@covers` are preserved.
+
+No version bump: this commit changes comments only, so there is nothing for a site to upgrade.
+
 ### Fixed — notice content is stored as authored (version 2026081200)
 
 - **Filters and file URLs are applied when a notice is rendered, not when it is saved.**

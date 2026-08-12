@@ -23,11 +23,10 @@ use local_awareness\persistent\audience_job;
  * Tests for the estimate_audience ad-hoc task.
  *
  * @package    local_awareness
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers     \local_awareness\task\estimate_audience
+ * @covers \local_awareness\task\estimate_audience
  */
 final class estimate_audience_test extends \advanced_testcase {
     protected function setUp(): void {
