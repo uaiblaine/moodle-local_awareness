@@ -440,10 +440,7 @@ class helper {
         $notices = array_filter(
             array_diff_key($notices, $USER->viewednotices),
             function (awareness $notice): bool {
-                $now = time();
-                $isperpetual = $notice->get('timestart') == 0 && $notice->get('timeend') == 0;
-                $isinactivewindow = $now >= $notice->get('timestart') && $now < $notice->get('timeend');
-                return $isperpetual || (!$isperpetual && $isinactivewindow);
+                return self::is_within_active_window($notice);
             }
         );
 
@@ -508,6 +505,87 @@ class helper {
     }
 
     /**
+     * Whether the notice's scheduling window has opened.
+     *
+     * A zero timestart means "no start date", so the notice has always been live.
+     *
+     * @param awareness $notice Notice.
+     * @return bool
+     */
+    private static function has_started(awareness $notice): bool {
+        return $notice->get('timestart') == 0 || time() >= $notice->get('timestart');
+    }
+
+    /**
+     * Whether the notice's scheduling window is open right now.
+     *
+     * A notice is perpetual when both timestart and timeend are zero; otherwise it must fall
+     * inside the window. This is the DISPLAY test; writes use has_started() instead, which drops
+     * the upper bound — see is_notice_available_to_user() for why.
+     *
+     * @param awareness $notice Notice.
+     * @return bool
+     * @throws \coding_exception
+     */
+    private static function is_within_active_window(awareness $notice): bool {
+        $now = time();
+        $isperpetual = $notice->get('timestart') == 0 && $notice->get('timeend') == 0;
+        $isinactivewindow = $now >= $notice->get('timestart') && $now < $notice->get('timeend');
+
+        return $isperpetual || $isinactivewindow;
+    }
+
+    /**
+     * Whether a notice may currently be acted on by the logged-in user.
+     *
+     * The web services need this because they take a notice id straight from the client: without
+     * it any authenticated user can acknowledge, dismiss or record a click for a notice that was
+     * never shown to them, and the acknowledgement reports — the reason this plugin exists —
+     * cannot be trusted.
+     *
+     * It is deliberately looser than the display test in two places:
+     *
+     * - Only the START of the scheduling window is enforced, not the end. Blocking an unpublished
+     *   notice is the point; discarding a genuine Accept because the notice expired while the
+     *   modal was open would silently lose the very record this plugin exists to keep.
+     * - The path and filter checks in check_filters() are not repeated, because they need the page
+     *   URL and a write request has no trustworthy source for it. That leaves the page-independent
+     *   role rule inside filtervalues unenforced here, so a role-targeted notice is still writable
+     *   by anyone in the cohort — a pre-existing gap this gate narrows but does not close.
+     *
+     * @param awareness $notice Notice.
+     * @return bool
+     * @throws \dml_exception
+     * @throws \coding_exception
+     */
+    public static function is_notice_available_to_user(awareness $notice): bool {
+        global $DB, $USER;
+
+        if (!$notice->get('enabled') || !self::has_started($notice)) {
+            return false;
+        }
+
+        $cohorts = $notice->get('cohorts');
+        if (!empty($cohorts)) {
+            $usercohorts = cohort_get_user_cohorts($USER->id);
+            if (!array_intersect($cohorts, array_keys($usercohorts))) {
+                return false;
+            }
+        }
+
+        if ($notice->get('reqcourse') > 0) {
+            if ($course = $DB->get_record('course', ['id' => $notice->get('reqcourse')])) {
+                $completion = new \completion_info($course);
+                if ($completion->is_course_complete($USER->id)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Load viewed notices of current user.
      * @throws \dml_exception
      */
@@ -525,9 +603,23 @@ class helper {
      *
      * @param \local_awareness\persistent\awareness $notice Notice instance.
      * @param string $action Action.
+     * @param bool $sessiononly Record in the session only, without writing the shared row.
      */
-    private static function add_to_viewed_notices(awareness $notice, string $action) {
+    private static function add_to_viewed_notices(awareness $notice, string $action, bool $sessiononly = false) {
         global $USER;
+
+        /*
+         * Guests get the session marker only. Every guest session shares the single guest user id,
+         * so a persisted row would hide the notice from every guest who came after — but the marker
+         * is still required: retrieve_user_notices() suppresses a notice solely by finding it in
+         * $USER->viewednotices, so skipping it altogether reopens the modal on every page load with
+         * no way for the guest to stop it.
+         */
+        if ($sessiononly) {
+            $USER->viewednotices[$notice->get('id')] = ['timeviewed' => time(), 'action' => $action];
+            return;
+        }
+
         // Add to viewed notices.
         $noticeview = noticeview::add_notice_view($notice->get('id'), $USER->id, $action);
         $USER->viewednotices[$notice->get('id')] = ['timeviewed' => $noticeview->get('timemodified'), 'action' => $action];
@@ -568,10 +660,11 @@ class helper {
         global $USER;
 
         $userid = $USER->id;
+        $isguest = isguestuser();
 
         $result = [];
-        // Check if require acknowledgement.
-        if ($notice->get('reqack')) {
+        // Check if require acknowledgement. Guests share one user id, so the row would be nobody's.
+        if ($notice->get('reqack') && !$isguest) {
             // Record dismiss action.
             self::create_new_acknowledge_record($notice, acknowledgement::ACTION_DISMISSED);
 
@@ -585,8 +678,9 @@ class helper {
             $event->trigger();
         }
 
-        // Mark notice as viewed.
-        self::add_to_viewed_notices($notice, acknowledgement::ACTION_DISMISSED);
+        // Mark notice as viewed — session-only for a guest, so it stops reappearing for them
+        // without hiding it from the next guest.
+        self::add_to_viewed_notices($notice, acknowledgement::ACTION_DISMISSED, $isguest);
 
         if ((!is_siteadmin() && $notice->get('forcelogout'))) {
             require_logout();
@@ -608,14 +702,18 @@ class helper {
         global $USER;
 
         $result = ['status' => true];
-        // Check if the notice has been acknowledged by the user in another browser.
-        if (self::check_if_already_acknowledged_by_user($notice, $USER->id)) {
-            return $result;
-        }
+        $isguest = isguestuser();
 
-        // Record Acknowledge action.
-        $persistent = self::create_new_acknowledge_record($notice, acknowledgement::ACTION_ACKNOWLEDGED);
-        if ($persistent) {
+        if ($isguest) {
+            /*
+             * No shared row for a guest, but the session marker still has to be set or the modal
+             * reopens on every page load. Fall through to the forcelogout handling below.
+             */
+            self::add_to_viewed_notices($notice, acknowledgement::ACTION_ACKNOWLEDGED, true);
+        } else if (self::check_if_already_acknowledged_by_user($notice, $USER->id)) {
+            // Already acknowledged in another browser.
+            return $result;
+        } else if ($persistent = self::create_new_acknowledge_record($notice, acknowledgement::ACTION_ACKNOWLEDGED)) {
             // Mark notice as viewed.
             self::add_to_viewed_notices($notice, acknowledgement::ACTION_ACKNOWLEDGED);
             // Log acknowledged event.
@@ -646,6 +744,28 @@ class helper {
      */
     public static function track_link(int $linkid) {
         global $USER;
+
+        // Every guest session shares the single guest user id, so the row would be nobody's.
+        // Nothing suppresses a future click, so there is no session state to keep here.
+        if (isguestuser()) {
+            return ['status' => true];
+        }
+
+        /*
+         * The link id arrives from the client. Without these checks any authenticated user could
+         * post arbitrary ids and fabricate click history — or simply create unbounded rows in a
+         * table that has no index on either column it is queried by.
+         */
+        $link = noticelink::get_record(['id' => $linkid]);
+        if (!$link) {
+            return ['status' => false];
+        }
+
+        $notice = awareness::get_record(['id' => $link->get('noticeid')]);
+        if (!$notice || !self::is_notice_available_to_user($notice)) {
+            return ['status' => false];
+        }
+
         $data = new \stdClass();
         $data->hlinkid = $linkid;
         $data->userid = $USER->id;
@@ -1132,6 +1252,14 @@ class helper {
         $coursecontext = null;
         if ($courseid > 1) { // 1 is the site/frontpage course, not a real course.
             $course = $DB->get_record('course', ['id' => $courseid]);
+            /*
+             * The course id is supplied by the browser, and the filters below use it to decide
+             * that a course- or category-targeted notice applies. Without an access check any
+             * user could name a course they cannot enter and pull that notice's content.
+             */
+            if ($course && !can_access_course($course)) {
+                $course = null;
+            }
             if ($course) {
                 $coursecontext = \context_course::instance($course->id, IGNORE_MISSING);
             }

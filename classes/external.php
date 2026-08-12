@@ -69,7 +69,12 @@ class external extends external_api {
             'redirecturl' => '',
         ];
 
-        if ($notice = awareness::get_record(['id' => $params['noticeid']])) {
+        $notice = awareness::get_record(['id' => $params['noticeid']]);
+
+        // The notice id comes from the client, so the audience test has to be repeated here —
+        // otherwise a user can record an interaction with a notice never shown to them, and the
+        // acknowledgement reports stop meaning anything.
+        if ($notice && helper::is_notice_available_to_user($notice)) {
             $result = helper::dismiss_notice($notice);
         }
 
@@ -122,7 +127,12 @@ class external extends external_api {
             'redirecturl' => '',
         ];
 
-        if ($notice = awareness::get_record(['id' => $params['noticeid']])) {
+        $notice = awareness::get_record(['id' => $params['noticeid']]);
+
+        // The notice id comes from the client, so the audience test has to be repeated here —
+        // otherwise a user can record an interaction with a notice never shown to them, and the
+        // acknowledgement reports stop meaning anything.
+        if ($notice && helper::is_notice_available_to_user($notice)) {
             $result = helper::acknowledge_notice($notice);
         }
 
@@ -264,7 +274,12 @@ class external extends external_api {
      */
     public static function search_roles(string $query = '', int $contextlevel = 0): array {
         global $DB;
-        self::validate_context(\context_system::instance());
+
+        // Only reached from the notice editor. Without this any authenticated user could
+        // enumerate every role defined on the site.
+        $syscontext = \context_system::instance();
+        self::validate_context($syscontext);
+        require_capability('local/awareness:manage', $syscontext);
 
         $params = self::validate_parameters(self::search_roles_parameters(), [
             'query' => $query,

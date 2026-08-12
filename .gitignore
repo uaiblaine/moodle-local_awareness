@@ -11,3 +11,8 @@ package-lock.json
 
 # Linter config
 .stylelintrc.json
+
+# Claude Code scratch worktrees. One of these was once committed as a bare gitlink
+# (mode 160000) with no .gitmodules entry, which made every CI checkout emit
+# "fatal: No url found for submodule path".
+.claude/worktrees/

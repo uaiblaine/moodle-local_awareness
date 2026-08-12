@@ -6,6 +6,46 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — audit remediation, second block (version 2026081101)
+
+Repository hygiene and the web-service audience checks.
+
+- **The release zip no longer ships development files to production sites.** The repo had no
+  `.gitattributes`, and the install package is built with `git archive`, so `.github/`,
+  `.gitignore` and `.claude/` were published with every release. The fleet template is now in
+  place; `tests/` still ships, per Moodle convention.
+- **The orphan gitlink is gone.** `.claude/worktrees/intelligent-lederberg-6f6840` was committed
+  as a bare submodule entry (mode 160000) with no `.gitmodules`, so every CI checkout emitted
+  `fatal: No url found for submodule path`. Untracked and added to `.gitignore`.
+- **The interaction web services check the audience.** `dismiss_notice()`, `acknowledge_notice()`
+  and `track_link()` took a notice or link id straight from the client and wrote a row for it. Any
+  authenticated user could acknowledge a notice never shown to them, pre-dismiss one before it was
+  published, or fabricate click history for arbitrary ids — which made the acknowledgement reports,
+  the reason this plugin exists, untrustworthy. They now go through
+  `helper::is_notice_available_to_user()`, and `track_link()` additionally requires the link to
+  exist and to belong to a notice the caller can see.
+- **Guest interactions are no longer persisted, but are remembered for the session.** Every guest
+  session shares the single guest user id, so the first guest to close a notice hid it from every
+  guest who came after. Guests now get the in-session marker only. Both halves are required:
+  `retrieve_user_notices()` suppresses a notice solely by finding it in `$USER->viewednotices`, so
+  skipping the marker as well would reopen the modal on every page load — and with `reqack` the JS
+  blocks the backdrop and Escape, leaving the guest no way out.
+- **A late acknowledgement is no longer discarded.** The write path checks only that the notice has
+  STARTED, not that its window is still open. Blocking an unpublished notice is the point of the
+  gate; throwing away a genuine Accept because the notice expired while the modal was open would
+  lose the record this plugin exists to keep.
+- **`get_notices()` no longer trusts the client's course id.** `check_filters()` used it to decide
+  that a course- or category-targeted notice applies, so naming a course you cannot enter pulled
+  that notice's content. The course is now dropped unless `can_access_course()` allows it.
+- **`search_roles()` requires `local/awareness:manage`.** It was the one external function with no
+  capability check, letting any authenticated user enumerate every role on the site.
+
+The scheduling-window predicate was extracted into `helper::is_within_active_window()` so
+`retrieve_user_notices()` and the new audience check cannot drift apart.
+
+Nine external-function tests were added, each paired with a control that must record, and all
+verified to fail without their fix.
+
 ### Fixed — audit remediation (version 2026081100)
 
 Ten defects found by a full audit of the plugin, in the order they affect a running site.
