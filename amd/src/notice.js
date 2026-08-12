@@ -8,8 +8,8 @@
  */
 
 define(
-    ['jquery', 'core/ajax', 'local_awareness/modal_notice'],
-    function($, ajax, ModalNotice) {
+    ['jquery', 'core/ajax', 'core/notification', 'local_awareness/modal_notice'],
+    function($, ajax, Notification, ModalNotice) {
 
         var notices = {};
         var modal;
@@ -81,9 +81,7 @@ define(
                         modal.show();
                         modal.getModal().focus();
                         return null;
-                    }).catch(function(ex) {
-                        window.console.log(ex);
-                    });
+                    }).catch(Notification.exception);
             } else {
                 // Update with new details.
                 modal.setTitle(nextnotice.title);
@@ -114,10 +112,7 @@ define(
                 } else {
                     nextNotice();
                 }
-            }).fail(function(ex) {
-                // Surface the failure to the console for debugging.
-                this.console.log(ex);
-            });
+            }).fail(Notification.exception);
         };
 
         /**
@@ -135,10 +130,7 @@ define(
                 } else {
                     nextNotice();
                 }
-            }).fail(function(ex) {
-                // Surface the failure to the console for debugging.
-                this.console.log(ex);
-            });
+            }).fail(Notification.exception);
         };
 
         /**
@@ -154,9 +146,7 @@ define(
                 if (response.redirecturl) {
                     window.open(response.redirecturl, "_parent", "");
                 }
-            }).fail(function(ex) {
-                this.console.log(ex);
-            });
+            }).fail(Notification.exception);
         };
 
         /**
@@ -170,13 +160,18 @@ define(
             ]);
 
             promises[0].done(function(response) {
-                notices = JSON.parse(response.notices);
+                try {
+                    notices = JSON.parse(response.notices);
+                } catch (ex) {
+                    // JSON.parse runs inside done(), where fail() cannot see it: a malformed
+                    // payload used to kill the modal with nothing reported anywhere.
+                    Notification.exception(ex);
+                    return;
+                }
                 $(document).ready(function() {
                     nextNotice();
                 });
-            }).fail(function(ex) {
-                this.console.log(ex);
-            });
+            }).fail(Notification.exception);
         };
 
         return Awareness;

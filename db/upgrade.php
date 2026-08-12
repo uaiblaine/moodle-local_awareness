@@ -153,5 +153,59 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026081103, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026081200) {
+        /*
+         * Notice content used to be stored as the output of saveHTML() on a full document, so
+         * every row carries a <!DOCTYPE html><html><body> wrapper that then rendered nested
+         * inside the page. Unwrap it in place.
+         *
+         * Only the wrapper is touched. The rows also hold absolute pluginfile URLs and already
+         * filter-expanded markup from the same code path; neither can be reversed reliably from
+         * the stored text, and both keep rendering correctly — file_rewrite_pluginfile_urls()
+         * leaves absolute URLs alone. Content saved from now on is stored as authored.
+         *
+         * The logic is inlined rather than calling the plugin's classes, which upgrade steps
+         * must keep working against however those classes evolve.
+         */
+        $rs = $DB->get_recordset_select(
+            'local_awareness',
+            $DB->sql_like('content', ':needle', false),
+            ['needle' => '%<html%'],
+            '',
+            'id, content'
+        );
+
+        foreach ($rs as $record) {
+            $dom = new DOMDocument();
+            libxml_use_internal_errors(true);
+            $loaded = $dom->loadHTML(
+                mb_encode_numericentity($record->content, [0x80, 0x10FFFF, 0, ~0], 'UTF-8')
+            );
+            libxml_clear_errors();
+
+            if (!$loaded) {
+                continue;
+            }
+
+            $body = $dom->getElementsByTagName('body')->item(0);
+            if ($body === null) {
+                continue;
+            }
+
+            $unwrapped = '';
+            foreach ($body->childNodes as $child) {
+                $unwrapped .= $dom->saveHTML($child);
+            }
+
+            // Never blank a notice: if unwrapping produced nothing, keep what was there.
+            if (trim($unwrapped) !== '') {
+                $DB->set_field('local_awareness', 'content', $unwrapped, ['id' => $record->id]);
+            }
+        }
+        $rs->close();
+
+        upgrade_plugin_savepoint(true, 2026081200, 'local', 'awareness');
+    }
+
     return true;
 }
