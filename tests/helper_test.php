@@ -73,6 +73,65 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
+     * Saving a notice must not wrap its content in a whole HTML document.
+     *
+     * update_hyperlinks() parses the content with DOMDocument to stamp each anchor with its link
+     * id. Without LIBXML_HTML_NOIMPLIED|NODEFDTD, saveHTML() returns a complete document, so the
+     * stored row carried a doctype and <html>/<body> that then rendered nested inside the page.
+     *
+     * @covers \local_awareness\helper::create_new_notice
+     */
+    public function test_saved_content_is_a_fragment_not_a_document(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $formdata = new \stdClass();
+        $formdata->title = 'Policy update';
+        $formdata->content = '<p>Read <a href="https://example.com/policy">the policy</a>.</p>';
+        helper::create_new_notice($formdata);
+
+        $notices = awareness::get_all_notices();
+        $stored = reset($notices)->get('content');
+
+        $this->assertStringNotContainsStringIgnoringCase('<!DOCTYPE', $stored);
+        $this->assertStringNotContainsStringIgnoringCase('<html', $stored);
+        $this->assertStringNotContainsStringIgnoringCase('<body', $stored);
+
+        // Control: the anchor was still processed, so the parse really ran.
+        $this->assertStringContainsString('data-linkid=', $stored);
+    }
+
+    /**
+     * Filters and file URLs are resolved when the notice is rendered, not when it is saved.
+     *
+     * Baking them into storage froze a multilang notice into the author's language for every
+     * reader, and wrote absolute /pluginfile.php URLs that break when wwwroot changes.
+     *
+     * @covers \local_awareness\helper::render_content
+     */
+    public function test_file_urls_are_resolved_at_render_time_not_at_save_time(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $formdata = new \stdClass();
+        $formdata->title = 'Policy update';
+        $formdata->content = '<p><img src="@@PLUGINFILE@@/diagram.png" alt="Diagram"></p>';
+        helper::create_new_notice($formdata);
+
+        $notices = awareness::get_all_notices();
+        $notice = reset($notices);
+
+        // Storage keeps the placeholder.
+        $this->assertStringContainsString('@@PLUGINFILE@@', $notice->get('content'));
+        $this->assertStringNotContainsString('/pluginfile.php/', $notice->get('content'));
+
+        // Rendering resolves it.
+        $rendered = helper::render_content($notice);
+        $this->assertStringNotContainsString('@@PLUGINFILE@@', $rendered);
+        $this->assertStringContainsString('/pluginfile.php/', $rendered);
+    }
+
+    /**
      * Test that we can have full HTML in a notice content.
      */
     public function test_can_have_html_in_notice_content(): void {

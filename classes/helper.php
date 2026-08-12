@@ -26,6 +26,13 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/cohort/lib.php');
 require_once($CFG->dirroot . '/lib/completionlib.php');
+/*
+ * render_content() needs file_rewrite_pluginfile_urls(). That call used to be reached only from the
+ * save path, where adminlib/formslib had already pulled filelib in; the read path runs inside the
+ * AJAX web service, where nothing loads it and the call is a fatal "undefined function". PHPUnit
+ * cannot catch that — its bootstrap loads filelib for every test — so Behat is the only guard.
+ */
+require_once($CFG->libdir . '/filelib.php');
 
 /**
  * Helper class to create, retrieve, manage notices
@@ -208,22 +215,25 @@ class helper {
      * @return string
      */
     private static function update_hyperlinks(awareness $notice, string $content): string {
-        // Replace file URLs before processing.
-        $content = file_rewrite_pluginfile_urls(
-            $content,
-            'pluginfile.php',
-            \context_system::instance()->id,
-            'local_awareness',
-            'content',
-            $notice->get('id')
-        );
+        if (trim($content) === '') {
+            return $content;
+        }
 
-        // Extract hyperlinks from the content of the notice, which is then used for link clicked tracking.
+        /*
+         * The content is stored as authored. It used to be run through
+         * file_rewrite_pluginfile_urls() and format_text() first, which baked three things into
+         * the stored row: absolute /pluginfile.php URLs that break when wwwroot changes, the
+         * output of every text filter — freezing a multilang notice into whichever language the
+         * author happened to be using, for every reader, forever — and a full
+         * <!DOCTYPE html><html><body> wrapper from saveHTML(). All three belong to render time;
+         * see render_content().
+         */
         $dom = new \DOMDocument();
-        $content = format_text($content, FORMAT_HTML, ['noclean' => true]);
-        $content = mb_encode_numericentity($content, [0x80, 0x10FFFF, 0, ~0], 'UTF-8');
+        $encoded = mb_encode_numericentity($content, [0x80, 0x10FFFF, 0, ~0], 'UTF-8');
         libxml_use_internal_errors(true);
-        $dom->loadHTML($content);
+        // NOIMPLIED + NODEFDTD keep this a fragment: without them saveHTML() returns a whole
+        // document, and the notice body ends up nested inside another <html> when it renders.
+        $dom->loadHTML($encoded, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         // Current links in the notice.
         $currentlinks = noticelink::get_notice_link_records($notice->get('id'));
@@ -960,6 +970,36 @@ class helper {
                 $awareness->update();
             }
         }
+    }
+
+    /**
+     * Render a notice's stored content for display.
+     *
+     * Storage keeps what the author wrote — @@PLUGINFILE@@ placeholders and unfiltered markup.
+     * This is where the file URLs are resolved and the text filters run, so a multilang notice
+     * resolves per reader and the stored row survives a wwwroot change.
+     *
+     * file_rewrite_pluginfile_urls() leaves absolute URLs alone, so notices written before the
+     * storage format was corrected render unchanged.
+     *
+     * @param awareness $notice Notice.
+     * @return string HTML ready to place in the modal.
+     * @throws \coding_exception
+     */
+    public static function render_content(awareness $notice): string {
+        $content = file_rewrite_pluginfile_urls(
+            (string) $notice->get('content'),
+            'pluginfile.php',
+            \context_system::instance()->id,
+            'local_awareness',
+            'content',
+            $notice->get('id')
+        );
+
+        return format_text($content, (int) $notice->get('contentformat'), [
+            'noclean' => true,
+            'context' => \context_system::instance(),
+        ]);
     }
 
     /**

@@ -224,6 +224,9 @@ class external extends external_api {
             array_map(
                 function (awareness $notice): \stdClass {
                     $record = $notice->to_record();
+                    // Storage holds the content as authored; filters and pluginfile URLs are
+                    // resolved here so a multilang notice reads in each user's own language.
+                    $record->content = helper::render_content($notice);
                     // Attach background image URL if one exists.
                     if (!empty($record->bgimage)) {
                         $record->bgimageurl = helper::get_bgimage_url($record->id);

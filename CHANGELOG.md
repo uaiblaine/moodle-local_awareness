@@ -6,6 +6,32 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — notice content is stored as authored (version 2026081200)
+
+- **Filters and file URLs are applied when a notice is rendered, not when it is saved.**
+  `update_hyperlinks()` ran the content through `file_rewrite_pluginfile_urls()` and `format_text()`
+  before storing it, which baked three things into the row: absolute `/pluginfile.php` URLs that
+  break when `wwwroot` changes, the output of every text filter — freezing a multilang notice into
+  whichever language the author happened to be using, for every reader — and a full
+  `<!DOCTYPE html><html><body>` wrapper from `saveHTML()`. The parse now uses
+  `LIBXML_HTML_NOIMPLIED|NODEFDTD` so it stays a fragment, and the new `helper::render_content()`
+  resolves URLs and runs filters at display time. It leaves absolute URLs alone, so notices written
+  under the old format render unchanged.
+- **The upgrade unwraps existing rows.** Only the document wrapper is removed; the absolute URLs and
+  already-expanded filter output cannot be reversed reliably from the stored text and keep rendering
+  correctly. A notice is never blanked: if unwrapping yields nothing, the original is kept.
+- **AJAX failures are no longer invisible.** Every rejection handler in `amd/src/notice.js` was
+  `this.console.log(ex)` — inside a jQuery `fail()` callback `this` is the deferred, not `window`,
+  so the handler itself threw and the failure disappeared. They now go through `core/notification`.
+  `JSON.parse()` of the payload is also guarded: it runs inside `done()`, where `fail()` cannot see
+  it, so a malformed response used to kill the modal silently.
+
+The last item is not theoretical. The first draft of this change moved
+`file_rewrite_pluginfile_urls()` onto the read path, which runs inside the web service, where
+`lib/filelib.php` had never been loaded — a fatal that surfaced only as "the modal does not appear".
+`helper.php` now requires `filelib.php` explicitly. PHPUnit could not catch it (its bootstrap loads
+`filelib` for every test); Behat did.
+
 ### Fixed — click-history indexes and CI trigger (version 2026081103)
 
 - **`local_awareness_hlinks_his` is indexed on the two columns it is queried by.** The table grows
