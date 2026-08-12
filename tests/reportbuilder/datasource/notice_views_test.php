@@ -32,10 +32,10 @@ use local_awareness\reportbuilder\datasource\notice_views;
  * Unit tests for the notice_views datasource.
  *
  * @package    local_awareness
- * @covers     \local_awareness\reportbuilder\datasource\notice_views
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ *
+ * @covers \local_awareness\reportbuilder\datasource\notice_views
  */
 final class notice_views_test extends core_reportbuilder_testcase {
     /**

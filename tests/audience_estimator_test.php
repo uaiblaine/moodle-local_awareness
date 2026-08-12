@@ -22,11 +22,10 @@ use local_awareness\audience\estimator;
  * Tests for the audience estimator.
  *
  * @package    local_awareness
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers     \local_awareness\audience\estimator
+ * @covers \local_awareness\audience\estimator
  */
 final class audience_estimator_test extends \advanced_testcase {
     protected function setUp(): void {

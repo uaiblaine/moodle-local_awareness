@@ -36,7 +36,8 @@ namespace local_awareness\local;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\local\bootstrap
+ *
+ * @covers \local_awareness\local\bootstrap
  */
 final class bootstrap_compat_test extends \basic_testcase {
     /**

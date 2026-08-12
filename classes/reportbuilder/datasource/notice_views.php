@@ -30,8 +30,7 @@ use local_awareness\reportbuilder\local\entities\noticeview;
  * capturing when a user last interacted with a notice.
  *
  * @package    local_awareness
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class notice_views extends datasource {

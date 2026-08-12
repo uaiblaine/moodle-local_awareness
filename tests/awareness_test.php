@@ -24,10 +24,8 @@ use local_awareness\persistent\linkhistory;
  * Test cases
  *
  * @package    local_awareness
- * Forked and adapted by Anderson Blaine <anderson@blaine.com.br>.
- *
- * @author    Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  Catalyst IT
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class awareness_test extends \advanced_testcase {

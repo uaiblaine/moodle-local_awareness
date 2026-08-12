@@ -37,8 +37,7 @@ use core_reportbuilder\local\report\action;
  * acknowledged a specific notice. The notice ID is passed as a parameter.
  *
  * @package    local_awareness
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class acknowledged_notice extends system_report {

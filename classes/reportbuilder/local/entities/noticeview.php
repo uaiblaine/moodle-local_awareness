@@ -34,8 +34,7 @@ use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
  * recording when a user last viewed a notice and the action taken.
  *
  * @package    local_awareness
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class noticeview extends base {

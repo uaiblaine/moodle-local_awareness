@@ -32,8 +32,7 @@ use local_awareness\reportbuilder\local\entities\notice;
  * The base condition is permanent and invisible to end users.
  *
  * @package    local_awareness
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class acknowledged_notices extends datasource {

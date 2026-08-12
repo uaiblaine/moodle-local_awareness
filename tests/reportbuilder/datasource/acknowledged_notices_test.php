@@ -32,10 +32,10 @@ use local_awareness\reportbuilder\datasource\acknowledged_notices;
  * Unit tests for the acknowledged_notices datasource.
  *
  * @package    local_awareness
- * @covers     \local_awareness\reportbuilder\datasource\acknowledged_notices
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ *
+ * @covers \local_awareness\reportbuilder\datasource\acknowledged_notices
  */
 final class acknowledged_notices_test extends core_reportbuilder_testcase {
     /**

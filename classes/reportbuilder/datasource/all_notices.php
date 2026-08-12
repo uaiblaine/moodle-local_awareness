@@ -29,8 +29,7 @@ use local_awareness\reportbuilder\local\entities\notice;
  * the user who last modified each record.
  *
  * @package    local_awareness
- * @author     Anderson Blaine <anderson@blaine.com.br>
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class all_notices extends datasource {
