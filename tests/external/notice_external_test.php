@@ -307,6 +307,44 @@ final class notice_external_test extends \advanced_testcase {
     }
 
     /**
+     * A suspended participant is no longer in the course, so its notices stop reaching them.
+     *
+     * can_access_course() defaults $onlyactive to false, which accepts any enrolment row at all;
+     * the plugin passes true. Without it a suspended user keeps receiving the course's notices.
+     */
+    public function test_get_notices_ignores_a_course_the_user_is_only_suspended_in(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $active = $this->getDataGenerator()->create_user();
+        $suspended = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($active->id, $course->id);
+        $this->getDataGenerator()->enrol_user(
+            $suspended->id,
+            $course->id,
+            null,
+            'manual',
+            0,
+            0,
+            ENROL_USER_SUSPENDED
+        );
+
+        $this->setAdminUser();
+        $data = new \stdClass();
+        $data->title = 'Course only';
+        $data->content = '<p>Only inside this course.</p>';
+        $data->filter_course = [$course->id];
+        helper::create_new_notice($data);
+
+        $url = '/course/view.php?id=' . $course->id;
+
+        $this->setUser($suspended);
+        $this->assertSame([], json_decode(external::get_notices($url, (int) $course->id)['notices'], true));
+
+        // Control: the actively enrolled user still receives it.
+        $this->setUser($active);
+        $this->assertCount(1, json_decode(external::get_notices($url, (int) $course->id)['notices'], true));
+    }
+
+    /**
      * Role enumeration is limited to users who can manage notices.
      */
     public function test_search_roles_requires_the_manage_capability(): void {

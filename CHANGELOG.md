@@ -6,6 +6,19 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — course access is now judged on active enrolment (version 2026081102)
+
+- **A suspended participant no longer receives the course's notices.** `can_access_course()`
+  defaults its `$onlyactive` argument to `false`, which accepts any `{user_enrolments}` row at all
+  — including suspended enrolments and ones whose time window has closed. `check_filters()` now
+  passes `true`, restricting it to active enrolments in enabled plugins within their time
+  restrictions, which is what "is currently in this course" has to mean for a targeted notice.
+
+Recorded alongside it, because it reads like a bug and is not: a course-targeted notice does **not**
+appear on that course's own enrolment page, since a user who has not enrolled yet fails the access
+check. That is intended — the alternative leaks targeted content to anyone who guesses a course id.
+Use a cohort or category filter for notices meant to reach people before they enrol.
+
 ### Fixed — audit remediation, second block (version 2026081101)
 
 Repository hygiene and the web-service audience checks.

@@ -1256,8 +1256,21 @@ class helper {
              * The course id is supplied by the browser, and the filters below use it to decide
              * that a course- or category-targeted notice applies. Without an access check any
              * user could name a course they cannot enter and pull that notice's content.
+             *
+             * $onlyactive = true is deliberate. can_access_course() defaults it to false, which
+             * accepts any {user_enrolments} row — including suspended ones and ones whose window
+             * has closed — so a suspended participant would keep receiving the course's notices.
+             * Passing true restricts it to active enrolments in enabled plugins, within their
+             * time restrictions, which is what "is currently in this course" has to mean for a
+             * targeted notice.
+             *
+             * Also deliberate, and easy to mistake for a bug: a user who is not yet enrolled
+             * fails this check on the course's own enrolment page, so a course-targeted notice
+             * does NOT appear at /enrol/index.php. That is the intended behaviour — the
+             * alternative leaks targeted content to anyone who guesses a course id. Use a cohort
+             * or category filter for notices meant to reach people before they enrol.
              */
-            if ($course && !can_access_course($course)) {
+            if ($course && !can_access_course($course, null, '', true)) {
                 $course = null;
             }
             if ($course) {
