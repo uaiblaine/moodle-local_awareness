@@ -133,5 +133,25 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026051401, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026081103) {
+        /*
+         * local_awareness_hlinks_his grows one row per link click and is queried only by hlinkid
+         * (the join in linkhistory::count_clicked_links) and by userid (its WHERE, and the privacy
+         * erasure path), yet it had no index on either. Moodle never emits a real FOREIGN KEY
+         * constraint — sql_generator::$foreign_keys is false on every driver — so these declare
+         * the relationships and create the two indexes, without failing on rows whose hlinkid no
+         * longer resolves.
+         */
+        $table = new xmldb_table('local_awareness_hlinks_his');
+
+        $key = new xmldb_key('hlinkid', XMLDB_KEY_FOREIGN, ['hlinkid'], 'local_awareness_hlinks', ['id']);
+        $dbman->add_key($table, $key);
+
+        $key = new xmldb_key('userid', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+        $dbman->add_key($table, $key);
+
+        upgrade_plugin_savepoint(true, 2026081103, 'local', 'awareness');
+    }
+
     return true;
 }
