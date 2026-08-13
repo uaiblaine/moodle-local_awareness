@@ -401,13 +401,56 @@ class helper {
     }
 
     /**
-     * Retrieve notices applied to user.
-     * @param string $pageurl The current page URL path (from JS). Empty means skip path/filter checks.
+     * Retrieve the notices to show the current user on the page they are currently on.
+     *
+     * The page URL is mandatory. Everything this returns is about to be rendered, and the
+     * pathmatch and check_filters() rules that decide the audience can only be evaluated against
+     * a page — so a caller with no page to offer has no business reaching this method. Use
+     * has_candidate_notices() for the page-independent question instead.
+     *
+     * @param string $pageurl The current page URL path (from JS). Must not be empty.
      * @param int $courseid The current course ID (from JS). 0 means not on a course page.
+     * @return awareness[] Array of awareness instances
+     * @throws \coding_exception
+     * @throws \dml_exception
+     */
+    public static function retrieve_user_notices(string $pageurl, int $courseid = 0): array {
+        if (trim($pageurl) === '') {
+            throw new \coding_exception(
+                'retrieve_user_notices() needs the page URL to apply the path and filter rules; '
+                    . 'call has_candidate_notices() for the page-independent check'
+            );
+        }
+
+        return self::collect_user_notices($pageurl, $courseid, true);
+    }
+
+    /**
+     * Whether any notice could reach this user once they are on a page.
+     *
+     * local_awareness_extend_navigation() only has to decide whether to load the JS, and it has no
+     * trustworthy page URL to filter with. This therefore skips the page-dependent rules and is a
+     * SUPERSET of what the user will actually be shown: it answers "is it worth asking?", never
+     * "what may this user read". Nothing rendered may be derived from it — the AJAX call, which
+     * does carry a page URL, performs the real filtering.
+     *
+     * @return bool
+     * @throws \dml_exception
+     */
+    public static function has_candidate_notices(): bool {
+        return !empty(self::collect_user_notices('', 0, false));
+    }
+
+    /**
+     * Shared body of the two retrieval entry points above.
+     *
+     * @param string $pageurl The current page URL path; empty when the page rules are not applied.
+     * @param int $courseid The current course ID. 0 means not on a course page.
+     * @param bool $checkpagerules Whether to apply the pathmatch and check_filters() rules.
      * @return awareness[] Array of awareness instances
      * @throws \dml_exception
      */
-    public static function retrieve_user_notices(string $pageurl = '', int $courseid = 0): array {
+    private static function collect_user_notices(string $pageurl, int $courseid, bool $checkpagerules): array {
         global $DB, $USER;
 
         $notices = awareness::get_enabled_notices();
@@ -458,10 +501,14 @@ class helper {
             $checkcompletion = false;
 
             foreach ($notices as $id => $notice) {
-                // Only run path/filter checks when called from AJAX with actual page URL.
-                // When called from extend_navigation (no pageurl), skip these checks
-                // to ensure JS is loaded — AJAX will do the definitive filtering.
-                if (!empty($pageurl)) {
+                /*
+                 * The page-dependent rules run only for a caller that supplied a page. This is an
+                 * explicit argument rather than "is $pageurl empty" on purpose: while it was
+                 * inferred from the string, the get_notices() web service could be called with the
+                 * parameter simply left out, and every rule below was skipped for a request that
+                 * went on to return the rendered notice bodies.
+                 */
+                if ($checkpagerules) {
                     // Check Path Match (using the URL passed from JavaScript).
                     if (!self::check_path_match($notice->get('pathmatch') ?? '', $pageurl)) {
                         unset($usernotices[$id]);

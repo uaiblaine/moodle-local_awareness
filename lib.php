@@ -38,11 +38,13 @@ function local_awareness_extend_navigation(global_navigation $navigation) {
     }
 
     try {
-        // Note: retrieve_user_notices() without a pageurl uses $PAGE->url fallback.
-        // The definitive path/filter check happens in the AJAX call (get_notices)
-        // where the real page URL is passed from JavaScript.
-        $usernotices = helper::retrieve_user_notices();
-        if (!empty($usernotices)) {
+        /*
+         * This decides one thing only: whether to load the JS. It has no page URL to filter with,
+         * so it deliberately answers the page-independent question and over-reports. The definitive
+         * path and filter check happens in the AJAX call (get_notices), which is the only caller
+         * that carries the real page URL — and the only one that returns any notice content.
+         */
+        if (helper::has_candidate_notices()) {
             $PAGE->requires->js_call_amd('local_awareness/notice', 'init', []);
         }
     } catch (Exception $exception) {

@@ -247,4 +247,48 @@ final class helper_test extends \advanced_testcase {
 
         $this->assertTrue(helper::check_filters($filtervalues));
     }
+
+    /**
+     * The display path refuses to answer without a page to judge against.
+     *
+     * The page rules used to be skipped whenever the URL was empty, which made the definitive
+     * filtering optional at the caller's discretion. Refusing is what keeps it mandatory.
+     */
+    public function test_retrieve_user_notices_requires_a_page_url(): void {
+        $this->resetAfterTest();
+        $this->setUser($this->getDataGenerator()->create_user());
+
+        $this->expectException(\coding_exception::class);
+        helper::retrieve_user_notices('   ');
+    }
+
+    /**
+     * The navigation probe deliberately ignores the page rules, and the display path applies them.
+     *
+     * Both halves are load-bearing and pull in opposite directions. If the probe ever narrowed to
+     * what the user can actually see right now, a notice restricted to one path would stop loading
+     * the JS module anywhere — including on the very path it targets — and could never be shown.
+     * If the display path ever widened to match the probe, the notice would appear everywhere.
+     */
+    public function test_has_candidate_notices_ignores_the_page_rules_that_display_applies(): void {
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+
+        $this->setAdminUser();
+        $data = new \stdClass();
+        $data->title = 'Dashboard only';
+        $data->content = '<p>Only on the dashboard.</p>';
+        $data->pathmatch = '/my/%';
+        helper::create_new_notice($data);
+
+        $this->setUser($user);
+
+        // The probe says yes from anywhere: that is what keeps the module loading.
+        $this->assertTrue(helper::has_candidate_notices());
+
+        // The display path judges the page, and does so in both directions.
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
+        $this->assertSame([], helper::retrieve_user_notices('/'));
+    }
 }
