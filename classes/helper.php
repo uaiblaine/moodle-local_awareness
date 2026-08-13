@@ -443,6 +443,111 @@ class helper {
     }
 
     /**
+     * Choose which of the applicable notices to actually put in front of the user now.
+     *
+     * Arriving at a site and finding three modals stacked in front of the thing you came to do is
+     * the behaviour this replaces. One notice at a time; the next one waits until the user reaches
+     * its situation again, which in practice means the next page load where it still applies.
+     *
+     * One at a time on its own would starve the queue, because a notice that keeps coming back
+     * would hold the only slot for ever. So the queue has two tiers, and what separates them is
+     * whether the user has met the notice before:
+     *
+     * - FIRST OCCURRENCE goes to the front. A repeating notice gets seen promptly the first time,
+     *   which is the whole point of setting one up, and then stops being special.
+     * - ANYTHING SEEN BEFORE goes to the back — a repeat of a repeating notice, an acknowledgement
+     *   the user closed without accepting, or one they simply ignored. All three would otherwise
+     *   occupy the slot indefinitely, which is the same starvation by three different routes.
+     *
+     * The single exception to one-at-a-time: repeating notices in their first occurrence are shown
+     * as a group. Deferring one of those behind the other only delays a notice that is going to
+     * interrupt again anyway, so nothing is gained by spacing them out.
+     *
+     * Within a tier the order is by notice id, oldest first, which is the order this plugin has
+     * always used. Repeats of repeating notices sort behind everything else in the back tier, so
+     * they really do wait until the rest of the queue is clear.
+     *
+     * @param awareness[] $applicable Notices that pass the audience and page rules, keyed by id.
+     * @return awareness[] The notices to display now, keyed by id.
+     * @throws \coding_exception
+     * @throws \dml_exception
+     */
+    public static function select_for_display(array $applicable): array {
+        global $USER;
+
+        if (empty($applicable)) {
+            return [];
+        }
+
+        $met = self::notices_already_met($applicable);
+
+        $firstrepeating = [];
+        $firstonce = [];
+        $againonce = [];
+        $againrepeating = [];
+
+        foreach ($applicable as $id => $notice) {
+            $repeating = $notice->get('resetinterval') > 0;
+            if (!isset($met[$id])) {
+                $repeating ? $firstrepeating[$id] = $notice : $firstonce[$id] = $notice;
+            } else {
+                $repeating ? $againrepeating[$id] = $notice : $againonce[$id] = $notice;
+            }
+        }
+
+        if (!empty($firstrepeating)) {
+            // The one case where more than one notice is handed over at a time.
+            $selected = $firstrepeating;
+        } else {
+            $queue = $firstonce + $againonce + $againrepeating;
+            $head = array_key_first($queue);
+            $selected = [$head => $queue[$head]];
+        }
+
+        /*
+         * Remember what was handed over, so an ignored notice stops counting as a first occurrence
+         * and yields the slot on the next page. This is session state on purpose: recording a
+         * display in the database would put a write on the read path, which is exactly the cost
+         * this plugin cannot afford on every page view.
+         */
+        foreach (array_keys($selected) as $id) {
+            $USER->awarenessshown[$id] = true;
+        }
+
+        return $selected;
+    }
+
+    /**
+     * Which of these notices the user has already met, either in this session or in an earlier one.
+     *
+     * $USER->viewednotices cannot answer this: retrieve_user_notices() drops entries from it as
+     * notices fall due again, so by the time the queue is built it means "seen and still settled"
+     * rather than "seen at all".
+     *
+     * @param awareness[] $applicable Notices under consideration, keyed by id.
+     * @return array Set of notice ids the user has met, as keys.
+     * @throws \dml_exception
+     */
+    private static function notices_already_met(array $applicable): array {
+        global $DB, $USER;
+
+        if (!isset($USER->awarenessinteracted)) {
+            // One statement per session, not per page: the set only grows when the user acts, and
+            // the write paths add to it themselves.
+            $USER->awarenessinteracted = $DB->get_records_menu(
+                'local_awareness_lastview',
+                ['userid' => $USER->id],
+                '',
+                'noticeid, noticeid AS seen'
+            );
+        }
+
+        $met = $USER->awarenessinteracted + ($USER->awarenessshown ?? []);
+
+        return array_intersect_key($met, $applicable);
+    }
+
+    /**
      * Shared body of the two retrieval entry points above.
      *
      * @param string $pageurl The current page URL path; empty when the page rules are not applied.
@@ -681,6 +786,13 @@ class helper {
          * $USER->viewednotices, so skipping it altogether reopens the modal on every page load with
          * no way for the guest to stop it.
          */
+        /*
+         * Either way the user has now met this notice, so it stops counting as a first occurrence
+         * and gives up its place at the front of the queue. Kept in step here rather than re-read,
+         * so acting on a notice costs no extra statement.
+         */
+        $USER->awarenessinteracted[$notice->get('id')] = $notice->get('id');
+
         if ($sessiononly) {
             $USER->viewednotices[$notice->get('id')] = ['timeviewed' => time(), 'action' => $action];
             return;

@@ -6,6 +6,33 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — one notice at a time (version 2026081303)
+
+- **Arriving at the site no longer stacks modals.** Every applicable notice used to be sent in one
+  response; the module rendered them in sequence, so closing one immediately produced the next and
+  a user with three pending notices had to clear all three before reaching what they came for.
+  `helper::select_for_display()` now hands over the head of the queue only, and the next notice
+  waits until the user reaches its situation again — in practice, the next page load where it still
+  applies.
+
+- **The queue has two tiers, separated by whether the user has met the notice before.** One at a
+  time on its own would starve the queue, because anything that keeps coming back would hold the
+  only slot for ever. So a **first occurrence** goes to the front — a repeating notice is seen
+  promptly the first time, which is the point of setting one up — and **anything seen before** goes
+  to the back. That last group covers three routes to the same problem: a repeat of a repeating
+  notice, an acknowledgement closed without accepting, and a notice simply ignored. Repeats of
+  repeating notices sort behind everything else, so they really do wait for the queue to clear.
+
+- **One exception to one-at-a-time:** repeating notices in their first occurrence are delivered as a
+  group. Deferring one behind another only delays a notice that is going to interrupt again anyway.
+
+- Notices handed over are remembered in the session rather than the database. Recording a display
+  would put a write on the read path, which is the one cost this plugin cannot afford on every page
+  view.
+
+- No JavaScript change and no AMD rebuild: the module already stopped when it ran out of notices, so
+  the queue is expressed entirely by what the web service sends.
+
 ### Changed — the role rule's context scoping is now written once
 
 - **`classes/local/role_scope.php` replaces two copies of the same thirty lines.**

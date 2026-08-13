@@ -248,7 +248,14 @@ class external extends external_api {
                     }
                     return $record;
                 },
-                helper::retrieve_user_notices($params['pageurl'], (int) $params['courseid'])
+                /*
+                 * select_for_display() is what makes this one notice at a time. Everything the
+                 * user is eligible for is computed first; only the head of the queue is sent, so
+                 * arriving at a page never stacks modals. See its docblock for the two tiers.
+                 */
+                helper::select_for_display(
+                    helper::retrieve_user_notices($params['pageurl'], (int) $params['courseid'])
+                )
             )
         );
 
