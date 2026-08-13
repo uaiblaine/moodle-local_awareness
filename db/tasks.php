@@ -15,19 +15,23 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details.
+ * Scheduled task definitions.
  *
  * @package    local_awareness
- * @copyright  Catalyst IT
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_awareness'; // Full name of the plugin (used for diagnostics).
-$plugin->version   = 2026081201;         // The current module version (Date: YYYYMMDDXX).
-$plugin->release = 'v1.0';
-$plugin->requires = 2024100700;          // Requires Moodle 4.5 or later.
-$plugin->supported = [405, 502];  // Supported from Moodle 4.5 to 5.2.
-$plugin->maturity = MATURITY_STABLE;
+$tasks = [
+    [
+        'classname' => 'local_awareness\task\purge_audience_jobs',
+        'blocking' => 0,
+        'minute' => '20',
+        'hour' => '3',
+        'day' => '*',
+        'dayofweek' => '*',
+        'month' => '*',
+    ],
+];
