@@ -18,13 +18,19 @@ namespace local_awareness\audience;
 
 /**
  * Pure module that estimates the audience size for a notice given a normalised
- * criteria array. Mirrors {@see \local_awareness\helper::check_filters()} as
- * closely as possible, but in bulk SQL instead of per-user.
+ * criteria array, in bulk SQL instead of per-user.
  *
  * Audience-shaping criteria (participate in the count): cohorts, filter_role,
  * reqcourse (completion). Everything else (pathmatch, category, course list,
  * format, theme, competencies) is page-context dependent and surfaced as a
  * context restriction.
+ *
+ * The role half mirrors {@see \local_awareness\helper::user_matches_role_filter()},
+ * which is the single per-user definition of that rule and is what both the
+ * display and the write paths call. This is the third implementation of it and
+ * the only one allowed to diverge: a default role standing in for "every user"
+ * collapses to 1 = 1 here, because counting cannot enumerate an implicit
+ * assignment that has no rows in {role_assignments}.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -287,8 +293,9 @@ class estimator {
         if (!empty($criteria['reqcourse'])) {
             $params['reqcourseid'] = (int) $criteria['reqcourse'];
             // Notice fires for users who have NOT completed the required course.
-            // Mirrors helper.php:491-502 — present in {course_completions} only counts
-            // when timecompleted is set.
+            // Mirrors the course-completion block in helper::retrieve_user_notices() — being
+            // present in {course_completions} only counts when timecompleted is set. Named rather
+            // than cited by line, which the previous reference had already drifted past.
             $where[] = "NOT EXISTS (SELECT 1 FROM {course_completions} cc
                                       WHERE cc.userid = u.id
                                         AND cc.course = :reqcourseid

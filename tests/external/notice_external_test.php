@@ -345,6 +345,90 @@ final class notice_external_test extends \advanced_testcase {
     }
 
     /**
+     * A notice targeted at a role must not be acknowledgeable by someone who does not hold it.
+     *
+     * The role rule lives in filtervalues alongside the page-context rules, so the write gate used
+     * to skip all of them together and anyone in the right cohort could confirm a notice meant for
+     * teachers. Acknowledgement reporting is the reason this plugin exists, so a row from someone
+     * the notice never targeted is not a cosmetic problem.
+     */
+    public function test_acknowledging_a_role_targeted_notice_records_nothing_without_the_role(): void {
+        global $DB;
+
+        $teacherroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'editingteacher']);
+        $course = $this->getDataGenerator()->create_course();
+        $outsider = $this->getDataGenerator()->create_user();
+        $teacher = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($teacher->id, $course->id, 'editingteacher');
+
+        $this->setAdminUser();
+        $data = new \stdClass();
+        $data->title = 'Teachers only';
+        $data->content = '<p>Teachers must confirm this.</p>';
+        $data->filter_role = [$teacherroleid];
+        helper::create_new_notice($data);
+
+        $notice = awareness::get_record(['title' => 'Teachers only']);
+
+        $this->setUser($outsider);
+        $result = external::acknowledge_notice((int) $notice->get('id'));
+        $this->assertFalse((bool) $result['status']);
+        $this->assertSame(0, $this->count_acks($notice));
+
+        // Control: the role holder is recorded, so the role rule is what rejected the outsider and
+        // the write path has not simply been switched off.
+        $this->setUser($teacher);
+        $result = external::acknowledge_notice((int) $notice->get('id'));
+        $this->assertTrue((bool) $result['status']);
+        $this->assertSame(1, $this->count_acks($notice));
+    }
+
+    /**
+     * A course-scoped role rule keeps its scope on the write path.
+     *
+     * filter_course has two jobs. As a page-context filter it says which course the reader must be
+     * in, and that cannot be enforced on a write. But it ALSO narrows which contexts the role
+     * assignment is looked for in, and that part is page-independent and must survive. Passing
+     * only filter_role to the check would widen "teacher in this one course" into "teacher
+     * anywhere on the site", which is why the whole filters array is handed over.
+     */
+    public function test_a_course_scoped_role_rule_keeps_its_scope_on_the_write_path(): void {
+        global $DB;
+
+        $teacherroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'editingteacher']);
+        $listed = $this->getDataGenerator()->create_course();
+        $unlisted = $this->getDataGenerator()->create_course();
+
+        $inlisted = $this->getDataGenerator()->create_user();
+        $elsewhere = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($inlisted->id, $listed->id, 'editingteacher');
+        $this->getDataGenerator()->enrol_user($elsewhere->id, $unlisted->id, 'editingteacher');
+
+        $this->setAdminUser();
+        $data = new \stdClass();
+        $data->title = 'Teachers of one course';
+        $data->content = '<p>Scoped to a single course.</p>';
+        $data->filter_role = [$teacherroleid];
+        $data->filter_role_context = CONTEXT_COURSE;
+        $data->filter_course = [$listed->id];
+        helper::create_new_notice($data);
+
+        $notice = awareness::get_record(['title' => 'Teachers of one course']);
+
+        // Holds the role, but in a course the rule does not name.
+        $this->setUser($elsewhere);
+        $result = external::dismiss_notice((int) $notice->get('id'));
+        $this->assertFalse((bool) $result['status']);
+        $this->assertSame(0, $DB->count_records('local_awareness_lastview'));
+
+        // Control: the same role in the named course is accepted.
+        $this->setUser($inlisted);
+        $result = external::dismiss_notice((int) $notice->get('id'));
+        $this->assertTrue((bool) $result['status']);
+        $this->assertSame(1, $DB->count_records('local_awareness_lastview'));
+    }
+
+    /**
      * Role enumeration is limited to users who can manage notices.
      */
     public function test_search_roles_requires_the_manage_capability(): void {

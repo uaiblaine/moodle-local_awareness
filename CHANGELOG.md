@@ -6,6 +6,42 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the role rule is now enforced when a notice is written to (version 2026081301)
+
+- **A notice targeted at a role could be acknowledged, dismissed or click-tracked by anyone in the
+  right cohort.** `helper::is_notice_available_to_user()` is the gate the write web services use.
+  It checked `enabled`, the start of the scheduling window, cohort membership and the required
+  course, but nothing inside `filtervalues` — because those rules lived in `check_filters()`, which
+  needs the page URL a write request has no trustworthy source for.
+
+  That reasoning holds for five of the six rules. It does not hold for the role rule, which asks
+  what the user *holds*, not where they *are*, and so can be answered without a page. Until now it
+  was not, and the acknowledgement report — the reason this plugin exists — could not be trusted
+  for any notice targeted by role.
+
+- **The rule now has one definition.** The role block moved out of `check_filters()` into
+  `helper::user_matches_role_filter()`, called from the same position on the display path and from
+  the write gate. The moved code is byte-identical to its previous form apart from indentation; the
+  only deliberate change of shape is that the "no role filter set" guard now lives inside the
+  method, where no caller can forget it.
+
+  The **whole** filters array is passed, not just `filter_role`. `filter_category` and
+  `filter_course` carry a second meaning inside that block — they scope which contexts the role
+  assignment is searched for in — so dropping them would silently widen "teacher in this one
+  course" into "teacher anywhere on the site" on the write path.
+
+- **Two behaviours nobody had written down are now pinned by tests** (`tests/role_filter_test.php`),
+  written against the previous implementation and kept unchanged across the move: a course-scoped
+  rule takes the **union** of the course list and the category list, not their intersection; and a
+  category-scoped rule reads the category list only, never the course list, unlike the
+  course-scoped one which consults both.
+
+- The docblock of `classes/audience/estimator.php` — a third implementation of the same rule, in
+  bulk SQL — now points at `user_matches_role_filter()`, and records that its collapse of a default
+  role to `1 = 1` is a deliberate divergence rather than drift. A second reference in that file
+  cited `helper.php:491-502`, which had already drifted onto the wrong block; it now names the code
+  instead of the lines.
+
 ### Added — audience-estimate jobs are now purged (version 2026081201)
 
 - **New scheduled task `local_awareness\task\purge_audience_jobs`.** Every click of "Calculate
