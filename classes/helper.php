@@ -516,7 +516,7 @@ class helper {
                     }
 
                     // Check Filters (using courseid for course context detection).
-                    if (!self::check_filters($notice->get('filtervalues'), $pageurl, $courseid)) {
+                    if (!self::check_filters($notice->get('filtervalues'), $courseid)) {
                         unset($usernotices[$id]);
                         continue;
                     }
@@ -1310,12 +1310,16 @@ class helper {
     /**
      * Check if the filters match the current context.
      *
+     * Takes no page URL, and never did: path matching belongs to check_path_match(), and the
+     * course context here is decided by $courseid alone. The parameter used to sit between the two
+     * arguments below without a single read, which invited the reader to assume the URL was
+     * consulted and made every call pass an empty string past it to reach $courseid.
+     *
      * @param string|null $filtervalues JSON encoded filter values.
-     * @param string $pageurl The current page URL path (from JS via AJAX).
      * @param int $courseid The current course ID (from JS via M.cfg.courseId).
      * @return bool
      */
-    public static function check_filters(?string $filtervalues, string $pageurl = '', int $courseid = 0): bool {
+    public static function check_filters(?string $filtervalues, int $courseid = 0): bool {
         global $PAGE, $USER, $DB;
 
         if (empty($filtervalues)) {

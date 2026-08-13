@@ -6,6 +6,17 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — `check_filters()` no longer takes a page URL it never read
+
+- **The `$pageurl` parameter was dead.** It sat between `$filtervalues` and `$courseid` and was not
+  read once in the body: path matching belongs to `check_path_match()`, and the course context is
+  decided by `$courseid` alone. Its presence invited the reader to assume the URL was consulted —
+  the exact assumption that has to be right when judging who may see a notice — and forced every
+  caller that wanted a course id to pass an empty string past it positionally, which is a mistake
+  waiting to be made rather than one already made.
+
+No version bump: nothing about this reaches a running site, so there is nothing to upgrade.
+
 ### Fixed — the role rule is now enforced when a notice is written to (version 2026081301)
 
 - **A notice targeted at a role could be acknowledged, dismissed or click-tracked by anyone in the
