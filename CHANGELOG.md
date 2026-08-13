@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the audience breakdown ignored the scope of the role rule (version 2026081302)
+
+- **A role rule scoped to a course or category was counted across the whole site in the editor's
+  breakdown.** "Calculate reach" renders one chip per audience rule beside the combined total.
+  Isolating a rule for its own chip built `[$rule => $criteria[$rule]]`, which for `filter_role`
+  dropped `filter_role_context` and the course and category lists that scope it — so a notice
+  meaning "teachers of this one course" produced a chip counting *every teacher on the site*, next
+  to a total that had it right. The larger the site, the wider the disagreement.
+
+  "The rule alone" means without the *other* rules, not without its own settings. The isolation now
+  carries the keys that modify a rule rather than being one. Only `filter_role` has any, and
+  `filter_category` / `filter_course` are read nowhere else in the count, so no other rule widens.
+
+- **The bulk count is now pinned against the per-user rule it mirrors.** `estimator` is a second
+  implementation of the role rule, `helper::check_filters()` the first, and until now they were kept
+  in step by care alone. A test asks both about every user the count claims to cover and requires
+  the same answer, for an unscoped rule and a course-scoped one. Verified by mutation in both
+  directions: breaking the scoping on either side alone fails it.
+
 ### Changed — `check_filters()` no longer takes a page URL it never read
 
 - **The `$pageurl` parameter was dead.** It sat between `$filtervalues` and `$courseid` and was not
