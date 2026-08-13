@@ -16,6 +16,8 @@
 
 namespace local_awareness\audience;
 
+use local_awareness\local\role_scope;
+
 /**
  * Pure module that estimates the audience size for a notice given a normalised
  * criteria array, in bulk SQL instead of per-user.
@@ -25,12 +27,15 @@ namespace local_awareness\audience;
  * format, theme, competencies) is page-context dependent and surfaced as a
  * context restriction.
  *
- * The role half mirrors {@see \local_awareness\helper::user_matches_role_filter()},
- * which is the single per-user definition of that rule and is what both the
- * display and the write paths call. This is the third implementation of it and
- * the only one allowed to diverge: a default role standing in for "every user"
- * collapses to 1 = 1 here, because counting cannot enumerate an implicit
- * assignment that has no rows in {role_assignments}.
+ * The role half shares its context scoping with the per-user rule: both call
+ * {@see \local_awareness\local\role_scope::sql()}, so which contexts count is
+ * one definition rather than two that have to be kept in step. What remains
+ * separate is how the answer is consumed — here membership is tested inside an
+ * EXISTS over every user, there the roles are read back for one — and one
+ * deliberate divergence: a default role standing in for "every user" collapses
+ * to 1 = 1 here, because counting cannot enumerate an implicit assignment that
+ * has no rows in {role_assignments}. That the two agree in practice is pinned
+ * by test_the_bulk_count_agrees_with_the_per_user_rule().
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -263,41 +268,8 @@ class estimator {
             // Real assignments.
             [$insql, $inparams] = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED, 'role');
 
-            $ctxjoin = '';
-            $ctxwhere = '';
-
-            if ($rolectx == CONTEXT_SYSTEM) {
-                $syscontext = \context_system::instance();
-                $ctxwhere = " AND ra.contextid = " . $syscontext->id;
-            } else if ($rolectx == CONTEXT_COURSECAT) {
-                $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSECAT;
-                if (!empty($criteria['filter_category'])) {
-                    $catids = array_map('intval', $criteria['filter_category']);
-                    [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rcat');
-                    $ctxwhere = " AND ctx.instanceid {$catinsql}";
-                    $inparams += $catinparams;
-                }
-            } else if ($rolectx == CONTEXT_COURSE) {
-                $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSE;
-
-                $coursewheres = [];
-                if (!empty($criteria['filter_course'])) {
-                    $courseids = array_map('intval', $criteria['filter_course']);
-                    [$cinsql, $cinparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED, 'rcrs');
-                    $coursewheres[] = "ctx.instanceid {$cinsql}";
-                    $inparams += $cinparams;
-                }
-                if (!empty($criteria['filter_category'])) {
-                    $catids = array_map('intval', $criteria['filter_category']);
-                    [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rccat');
-                    $ctxjoin .= " LEFT JOIN {course} crs ON crs.id = ctx.instanceid";
-                    $coursewheres[] = "crs.category {$catinsql}";
-                    $inparams += $catinparams;
-                }
-                if (!empty($coursewheres)) {
-                    $ctxwhere = " AND (" . implode(" OR ", $coursewheres) . ")";
-                }
-            }
+            [$ctxjoin, $ctxwhere, $ctxparams] = role_scope::sql($criteria, $rolectx);
+            $inparams += $ctxparams;
 
             $clauses[] = "EXISTS (SELECT 1 FROM {role_assignments} ra {$ctxjoin}
                                     WHERE ra.userid = u.id AND ra.roleid {$insql} {$ctxwhere})";

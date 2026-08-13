@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\local\role_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
 use local_awareness\persistent\linkhistory;
@@ -1495,41 +1496,8 @@ class helper {
         $filterroleids = array_map('intval', $filters['filter_role']);
         $rolectx = (int) ($filters['filter_role_context'] ?? 0);
 
-        $ctxjoin = '';
-        $ctxwhere = '';
-        $params = ['userid' => $USER->id];
-
-        if ($rolectx == CONTEXT_SYSTEM) {
-            $syscontext = \context_system::instance();
-            $ctxwhere = " AND ra.contextid = " . $syscontext->id;
-        } else if ($rolectx == CONTEXT_COURSECAT) {
-            $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSECAT;
-            if (!empty($filters['filter_category'])) {
-                $catids = array_map('intval', $filters['filter_category']);
-                [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rcat');
-                $ctxwhere = " AND ctx.instanceid {$catinsql}";
-                $params += $catinparams;
-            }
-        } else if ($rolectx == CONTEXT_COURSE) {
-            $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSE;
-            $coursewheres = [];
-            if (!empty($filters['filter_course'])) {
-                $courseids = array_map('intval', $filters['filter_course']);
-                [$cinsql, $cinparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED, 'rcrs');
-                $coursewheres[] = "ctx.instanceid {$cinsql}";
-                $params += $cinparams;
-            }
-            if (!empty($filters['filter_category'])) {
-                $catids = array_map('intval', $filters['filter_category']);
-                [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rccat');
-                $ctxjoin .= " LEFT JOIN {course} crs ON crs.id = ctx.instanceid";
-                $coursewheres[] = "crs.category {$catinsql}";
-                $params += $catinparams;
-            }
-            if (!empty($coursewheres)) {
-                $ctxwhere = " AND (" . implode(" OR ", $coursewheres) . ")";
-            }
-        }
+        [$ctxjoin, $ctxwhere, $ctxparams] = role_scope::sql($filters, $rolectx);
+        $params = ['userid' => $USER->id] + $ctxparams;
 
         // Single query: get ALL distinct role IDs assigned to this user across the matched contexts.
         $sql = "SELECT DISTINCT ra.roleid
