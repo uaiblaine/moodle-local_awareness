@@ -61,6 +61,15 @@ $functions = [
         'ajax' => true,
     ],
 
+    'local_awareness_check_collision' => [
+        'classname' => 'local_awareness\external',
+        'methodname' => 'check_collision',
+        'description' => 'Repeating notices that would compete with this one for the same pages',
+        'type' => 'read',
+        'loginrequired' => true,
+        'ajax' => true,
+    ],
+
     'local_awareness_search_roles' => [
         'classname' => 'local_awareness\external',
         'methodname' => 'search_roles',

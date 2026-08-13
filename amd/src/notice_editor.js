@@ -29,8 +29,9 @@
 define([
     'local_awareness/notice_form',
     'local_awareness/live_preview',
-    'local_awareness/audience_estimator'
-], function(NoticeForm, LivePreview, AudienceEstimator) {
+    'local_awareness/audience_estimator',
+    'local_awareness/collision_warning'
+], function(NoticeForm, LivePreview, AudienceEstimator, CollisionWarning) {
     'use strict';
 
     /** Mapping of section id → list of moodleform field names that belong in it. */
@@ -183,6 +184,7 @@ define([
                 } catch (e) { /* No-op. */ }
                 LivePreview.init();
                 AudienceEstimator.init();
+                CollisionWarning.init();
             };
 
             if (document.readyState === 'complete' || document.readyState === 'interactive') {

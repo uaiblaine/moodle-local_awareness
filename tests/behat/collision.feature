@@ -30,6 +30,23 @@ Feature: Repeating notices competing for the same pages are flagged to the autho
     When I navigate to "Awareness > Manage" in site administration
     Then I should see "Create new notice"
 
+  # End to end through the web service: the author is told while still choosing, not after saving.
+  # The interval is set first and the path second, so the warning can only appear once both halves
+  # of the question are answered — which is also what proves the check is reading both fields.
+  @javascript
+  Scenario: The editor warns about a competing notice while the author is still choosing
+    Given the following site notices exist
+      | title      | content         | pathmatch | resetinterval |
+      | Old rival  | body of rival   | /my/%     | 86400         |
+    When I navigate to "Awareness > Manage" in site administration
+    And I click on "Create new notice" "link"
+    And I wait until ".local-awareness-editor" "css_element" exists
+    # Targeted by id: "Reset every" is a duration element, so its label belongs to the group rather
+    # than to the number input the check actually reads.
+    And I set the field "id_resetinterval_number" to "1"
+    And I set the field "id_pathmatch" to "/my/%"
+    Then I should see "Old rival"
+
   # A notice shown once takes its turn and leaves, so it competes with nobody however it is aimed.
   Scenario: A notice that does not repeat is never flagged
     Given the following site notices exist

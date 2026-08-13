@@ -67,6 +67,7 @@ $string['cachedef_notice_view'] = 'A list of viewed notices';
 $string['cachedef_user_notices'] = 'Cached user-specific notices for the current session';
 $string['collision:badge'] = 'Competing';
 $string['collision:badgetooltip'] = 'This repeating notice reaches the same pages as: {$a}. Only one notice is shown at a time, so they will take turns interrupting the same people.';
+$string['collision:live'] = 'Heads up: this repeating notice reaches the same pages as: {$a}. Only one notice is shown at a time, so they will take turns interrupting the same people.';
 $string['collision:saved'] = 'Saved. This repeating notice reaches the same pages as: {$a}. Only one notice is shown at a time, so they will take turns interrupting the same people.';
 $string['confirmation:deletenotice'] = 'Do you really want to delete the notice "{$a}"';
 $string['course_search_placeholder'] = 'Type to search courses...';

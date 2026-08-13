@@ -6,6 +6,23 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added — the editor warns about a competing notice while you are still choosing (version 2026081305)
+
+- **The collision warning is now live in the notice editor**, not only after saving. A new
+  `local_awareness_check_collision` web service answers "who would this compete with", and
+  `amd/src/collision_warning.js` asks it as the page-reach and repeat-interval fields change,
+  writing the answer next to the page-reach field.
+
+- **Gated on `local/awareness:manage`.** The reply names notices the caller may have no other way of
+  seeing, so the capability check is the point rather than a formality. Only titles cross the
+  boundary — a notice's page reach and audience are not the editor's to hand out.
+
+- Requests are debounced so typing a path does not fire one per keystroke, and replies carry a
+  sequence number so a slow answer cannot overwrite a newer question.
+
+- The warning reads the notice id from the form's hidden field rather than taking it as an init
+  argument, which keeps the PHP side of the editor's AMD call unchanged.
+
 ### Added — repeating notices that compete for the same pages are flagged (version 2026081304)
 
 - **Two repeating notices aimed at the same pages take turns interrupting the same people.** Now
