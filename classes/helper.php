@@ -603,10 +603,13 @@ class helper {
      * - Only the START of the scheduling window is enforced, not the end. Blocking an unpublished
      *   notice is the point; discarding a genuine Accept because the notice expired while the
      *   modal was open would silently lose the very record this plugin exists to keep.
-     * - The path and filter checks in check_filters() are not repeated, because they need the page
-     *   URL and a write request has no trustworthy source for it. That leaves the page-independent
-     *   role rule inside filtervalues unenforced here, so a role-targeted notice is still writable
-     *   by anyone in the cohort — a pre-existing gap this gate narrows but does not close.
+     * - The PAGE-DEPENDENT checks in check_filters() are not repeated, because they need the page
+     *   URL and a write request has no trustworthy source for it. Category, course, format, theme
+     *   and competency rules are therefore not enforced here, and cannot be: a notice restricted
+     *   to one course stays writable from anywhere. The role rule is the exception — it asks what
+     *   the user holds, not where they are, so it is applied below through
+     *   user_matches_role_filter(), with the whole filters array so a course- or category-scoped
+     *   rule keeps its scope.
      *
      * @param awareness $notice Notice.
      * @return bool
@@ -626,6 +629,13 @@ class helper {
             if (!array_intersect($cohorts, array_keys($usercohorts))) {
                 return false;
             }
+        }
+
+        // Decoded here rather than through check_filters(), which needs a page this request has not
+        // got. A malformed or scalar payload leaves the rule unapplied, exactly as it does there.
+        $filters = json_decode((string) $notice->get('filtervalues'), true);
+        if (is_array($filters) && !self::user_matches_role_filter($filters)) {
+            return false;
         }
 
         if ($notice->get('reqcourse') > 0) {
@@ -1306,7 +1316,7 @@ class helper {
      * @return bool
      */
     public static function check_filters(?string $filtervalues, string $pageurl = '', int $courseid = 0): bool {
-        global $PAGE, $USER, $DB, $CFG;
+        global $PAGE, $USER, $DB;
 
         if (empty($filtervalues)) {
             return true;
@@ -1364,68 +1374,8 @@ class helper {
         }
 
         // 1. Role Filter — check globally or by context.
-        if (!empty($filters['filter_role'])) {
-            $filterroleids = array_map('intval', $filters['filter_role']);
-            $rolectx = (int) ($filters['filter_role_context'] ?? 0);
-
-            $ctxjoin = '';
-            $ctxwhere = '';
-            $params = ['userid' => $USER->id];
-
-            if ($rolectx == CONTEXT_SYSTEM) {
-                $syscontext = \context_system::instance();
-                $ctxwhere = " AND ra.contextid = " . $syscontext->id;
-            } else if ($rolectx == CONTEXT_COURSECAT) {
-                $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSECAT;
-                if (!empty($filters['filter_category'])) {
-                    $catids = array_map('intval', $filters['filter_category']);
-                    [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rcat');
-                    $ctxwhere = " AND ctx.instanceid {$catinsql}";
-                    $params += $catinparams;
-                }
-            } else if ($rolectx == CONTEXT_COURSE) {
-                $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSE;
-                $coursewheres = [];
-                if (!empty($filters['filter_course'])) {
-                    $courseids = array_map('intval', $filters['filter_course']);
-                    [$cinsql, $cinparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED, 'rcrs');
-                    $coursewheres[] = "ctx.instanceid {$cinsql}";
-                    $params += $cinparams;
-                }
-                if (!empty($filters['filter_category'])) {
-                    $catids = array_map('intval', $filters['filter_category']);
-                    [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rccat');
-                    $ctxjoin .= " LEFT JOIN {course} crs ON crs.id = ctx.instanceid";
-                    $coursewheres[] = "crs.category {$catinsql}";
-                    $params += $catinparams;
-                }
-                if (!empty($coursewheres)) {
-                    $ctxwhere = " AND (" . implode(" OR ", $coursewheres) . ")";
-                }
-            }
-
-            // Single query: get ALL distinct role IDs assigned to this user across the matched contexts.
-            $sql = "SELECT DISTINCT ra.roleid
-                      FROM {role_assignments} ra
-                      {$ctxjoin}
-                     WHERE ra.userid = :userid {$ctxwhere}";
-            $records = $DB->get_records_sql($sql, $params);
-            $userroleids = array_map('intval', array_keys($records));
-
-            // Include Moodle's implicit default roles (not stored in role_assignments).
-            if ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM) {
-                if (!empty($CFG->defaultuserroleid) && isloggedin() && !isguestuser()) {
-                    $userroleids[] = (int) $CFG->defaultuserroleid;
-                }
-                if (!empty($CFG->defaultfrontpageroleid) && isloggedin()) {
-                    $userroleids[] = (int) $CFG->defaultfrontpageroleid;
-                }
-            }
-
-            $userroleids = array_unique($userroleids);
-            if (!array_intersect($filterroleids, $userroleids)) {
-                return false;
-            }
+        if (!self::user_matches_role_filter($filters)) {
+            return false;
         }
 
         // 2. Course Category Filter — only show when user is on a course in the matching category.
@@ -1506,6 +1456,98 @@ class helper {
                     }
                 }
             }
+        }
+
+        return true;
+    }
+
+    /**
+     * Whether the role rule inside a notice's filters admits the current user.
+     *
+     * Lifted out of check_filters() unchanged. It is the one rule in filtervalues that asks a
+     * question about the USER rather than about the page — "do they hold role X?" — so unlike the
+     * category, course, format, theme and competency rules beside it, it can be answered without a
+     * page URL. That is what lets is_notice_available_to_user() apply it to writes, where the
+     * client supplies a notice id and nothing trustworthy about where it came from.
+     *
+     * The whole $filters array is passed, not just filter_role, because filter_category and
+     * filter_course carry a SECOND meaning in here: they scope which contexts the role assignment
+     * is looked for in. (Their first meaning, as page-context filters in their own right, belongs
+     * to the blocks in check_filters() and stays there.) Splitting them out would silently widen a
+     * course-scoped rule into a site-wide one on the write path.
+     *
+     * @param array $filters Decoded filtervalues.
+     * @return bool
+     * @throws \dml_exception
+     */
+    private static function user_matches_role_filter(array $filters): bool {
+        global $USER, $DB, $CFG;
+
+        // The guard lives here rather than at each call site so that no caller can forget it.
+        if (empty($filters['filter_role'])) {
+            return true;
+        }
+
+        $filterroleids = array_map('intval', $filters['filter_role']);
+        $rolectx = (int) ($filters['filter_role_context'] ?? 0);
+
+        $ctxjoin = '';
+        $ctxwhere = '';
+        $params = ['userid' => $USER->id];
+
+        if ($rolectx == CONTEXT_SYSTEM) {
+            $syscontext = \context_system::instance();
+            $ctxwhere = " AND ra.contextid = " . $syscontext->id;
+        } else if ($rolectx == CONTEXT_COURSECAT) {
+            $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSECAT;
+            if (!empty($filters['filter_category'])) {
+                $catids = array_map('intval', $filters['filter_category']);
+                [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rcat');
+                $ctxwhere = " AND ctx.instanceid {$catinsql}";
+                $params += $catinparams;
+            }
+        } else if ($rolectx == CONTEXT_COURSE) {
+            $ctxjoin = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSE;
+            $coursewheres = [];
+            if (!empty($filters['filter_course'])) {
+                $courseids = array_map('intval', $filters['filter_course']);
+                [$cinsql, $cinparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED, 'rcrs');
+                $coursewheres[] = "ctx.instanceid {$cinsql}";
+                $params += $cinparams;
+            }
+            if (!empty($filters['filter_category'])) {
+                $catids = array_map('intval', $filters['filter_category']);
+                [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rccat');
+                $ctxjoin .= " LEFT JOIN {course} crs ON crs.id = ctx.instanceid";
+                $coursewheres[] = "crs.category {$catinsql}";
+                $params += $catinparams;
+            }
+            if (!empty($coursewheres)) {
+                $ctxwhere = " AND (" . implode(" OR ", $coursewheres) . ")";
+            }
+        }
+
+        // Single query: get ALL distinct role IDs assigned to this user across the matched contexts.
+        $sql = "SELECT DISTINCT ra.roleid
+                  FROM {role_assignments} ra
+                  {$ctxjoin}
+                 WHERE ra.userid = :userid {$ctxwhere}";
+        $records = $DB->get_records_sql($sql, $params);
+        $userroleids = array_map('intval', array_keys($records));
+
+        // Include Moodle's implicit default roles (not stored in role_assignments).
+        if ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM) {
+            if (!empty($CFG->defaultuserroleid) && isloggedin() && !isguestuser()) {
+                $userroleids[] = (int) $CFG->defaultuserroleid;
+            }
+            if (!empty($CFG->defaultfrontpageroleid) && isloggedin()) {
+                $userroleids[] = (int) $CFG->defaultfrontpageroleid;
+            }
+        }
+
+        $userroleids = array_unique($userroleids);
+        if (!array_intersect($filterroleids, $userroleids)) {
+            return false;
         }
 
         return true;
