@@ -6,6 +6,33 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added — repeating notices that compete for the same pages are flagged (version 2026081304)
+
+- **Two repeating notices aimed at the same pages take turns interrupting the same people.** Now
+  that notices are shown one at a time that is a real consequence, and it is invisible while editing
+  either notice on its own. `local\collision` finds them, and the author is told in two places: a
+  **Competing** badge on the notice list, with a tooltip naming the rivals, and a warning after
+  saving a notice that lands in one.
+
+- **Told, never blocked.** Two repeating notices on the same pages is a legitimate thing to want, so
+  this is a warning on the way out of the editor and never a validation error refusing the save.
+
+- **Page reach is compared, not audience.** Two notices on the same pages but aimed at disjoint
+  cohorts never actually meet, so this over-reports on purpose: computing audience overlap while
+  someone types costs more than an occasional unnecessary warning, and a warning that is sometimes
+  absent is worse than one that is sometimes redundant. Overlap is judged by asking
+  `check_path_match()` — the display path's own matcher — about landmark pages, so the answer cannot
+  drift from what actually happens; the `FRONTPAGE` / `MY` / `MYCOURSES` tokens overlap in ways the
+  strings do not show.
+
+- Notices that do not repeat are never flagged: one takes its turn and leaves, so it competes with
+  nobody. Notices scheduled to start later are flagged, so the author hears about it before it
+  starts rather than after.
+
+- The badge is a plain `title` attribute rather than a Bootstrap tooltip, which would need the JS
+  data-API and its differing attribute names on 4.5 and 5.x. It carries `text-dark` with
+  `bg-warning`, as `tests/local/bootstrap_compat_test.php` requires.
+
 ### Changed — one notice at a time (version 2026081303)
 
 - **Arriving at the site no longer stacks modals.** Every applicable notice used to be sent in one

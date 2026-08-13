@@ -21,6 +21,7 @@ use table_sql;
 use renderable;
 use local_awareness\helper;
 use moodle_url;
+use local_awareness\local\collision;
 use html_writer;
 
 defined('MOODLE_INTERNAL') || die();
@@ -37,6 +38,9 @@ require_once($CFG->libdir . '/tablelib.php');
 class all_notices extends table_sql implements renderable {
     /** @var int */
     protected $page;
+
+    /** @var array Notice id to the titles of the repeating notices it competes with, for this page of rows. */
+    protected $clashtitles = [];
 
     /**
      * all_notices constructor.
@@ -113,6 +117,16 @@ class all_notices extends table_sql implements renderable {
         foreach ($records as $record) {
             $this->rawdata[] = $record;
         }
+
+        /*
+         * Resolved once for the whole page of rows rather than per row, which would re-read every
+         * repeating notice for each line of the table.
+         *
+         * rawdata is null, not [], until the loop above puts something in it, so a site with no
+         * notices at all reaches this with nothing. The manage page is exactly where a site with no
+         * notices starts.
+         */
+        $this->clashtitles = collision::clash_titles_for($this->rawdata ?? []);
 
         // Set initial bars.
         if ($useinitialsbar) {
@@ -211,7 +225,31 @@ class all_notices extends table_sql implements renderable {
      * @return string
      */
     protected function col_title(awareness $awareness): string {
-        return $awareness->get('title');
+        $title = $awareness->get('title');
+        $clashes = $this->clashtitles[(int) $awareness->get('id')] ?? [];
+        if (empty($clashes)) {
+            return $title;
+        }
+
+        /*
+         * bg-warning carries text-dark on purpose. Bootstrap 4 gives .badge no colour at all and
+         * Bootstrap 5 defaults it to white, so a light fill left to its own devices renders white
+         * on near-white on 5.x. The pairing is enforced by tests/local/bootstrap_compat_test.php.
+         *
+         * The tooltip is a plain title attribute rather than a Bootstrap one: those need the JS
+         * data-API, which takes different attribute names on 4.5 and 5.x, and this needs no script
+         * at all to work.
+         */
+        $label = get_string('collision:badge', 'local_awareness');
+        $explanation = get_string('collision:badgetooltip', 'local_awareness', implode(', ', $clashes));
+
+        $badge = html_writer::tag('span', $label, [
+            'class' => 'badge bg-warning text-dark ml-1 ms-1',
+            'title' => $explanation,
+            'aria-label' => $explanation,
+        ]);
+
+        return $title . ' ' . $badge;
     }
 
     /**

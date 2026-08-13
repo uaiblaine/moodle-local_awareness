@@ -89,12 +89,41 @@ if ($formdata = $mform->get_data()) {
         $formdata->timeend = 0;
     }
 
+    /*
+     * Told, not blocked. Two repeating notices aimed at the same pages take turns interrupting the
+     * same people, which is rarely intended and is invisible while editing either one alone — but
+     * it is a legitimate thing to want, so this is a warning on the way out and never a validation
+     * error that refuses the save.
+     *
+     * Resolved BEFORE the save. A new notice has no id yet, so once it is in the table it matches
+     * the "every enabled repeating notice" query and, having no id to exclude itself by, reports a
+     * collision with itself.
+     */
+    $clashes = \local_awareness\local\collision::clashes_for(
+        (int) ($awareness ? $awareness->get('id') : 0),
+        $formdata->pathmatch ?? '',
+        (int) ($formdata->resetinterval ?? 0)
+    );
+
     if (!$awareness) {
         // Create new notice.
         helper::create_new_notice($formdata);
     } else {
         // Update notice.
         helper::update_notice($awareness, $formdata);
+    }
+
+    if (!empty($clashes)) {
+        $titles = array_map(function ($notice): string {
+            return $notice->get('title');
+        }, $clashes);
+
+        redirect(
+            $managenoticepage,
+            get_string('collision:saved', 'local_awareness', implode(', ', $titles)),
+            null,
+            \core\output\notification::NOTIFY_WARNING
+        );
     }
 
     redirect($managenoticepage);
