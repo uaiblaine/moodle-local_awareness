@@ -32,6 +32,7 @@ use local_awareness\persistent\noticelink;
  * @covers \local_awareness\external::dismiss_notice
  * @covers \local_awareness\external::acknowledge_notice
  * @covers \local_awareness\external::track_link
+ * @covers \local_awareness\external::get_notices
  * @covers \local_awareness\external::search_roles
  * @covers \local_awareness\helper::is_notice_available_to_user
  */
@@ -150,7 +151,7 @@ final class notice_external_test extends \advanced_testcase {
         $this->assertSame(0, $DB->count_records('local_awareness_lastview'));
 
         // But the guest stops being shown it.
-        $this->assertSame([], helper::retrieve_user_notices());
+        $this->assertSame([], helper::retrieve_user_notices('/my/'));
     }
 
     /**
@@ -165,11 +166,11 @@ final class notice_external_test extends \advanced_testcase {
 
         $this->setGuestUser();
         external::dismiss_notice((int) $notice->get('id'));
-        $this->assertSame([], helper::retrieve_user_notices());
+        $this->assertSame([], helper::retrieve_user_notices('/my/'));
 
         // A new guest arrives: same user id, new session.
         unset($USER->viewednotices);
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
     }
 
     /**
@@ -189,7 +190,7 @@ final class notice_external_test extends \advanced_testcase {
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(0, $this->count_acks($notice));
         $this->assertSame(0, $DB->count_records('local_awareness_lastview'));
-        $this->assertSame([], helper::retrieve_user_notices());
+        $this->assertSame([], helper::retrieve_user_notices('/my/'));
     }
 
     /**
@@ -342,6 +343,101 @@ final class notice_external_test extends \advanced_testcase {
         // Control: the actively enrolled user still receives it.
         $this->setUser($active);
         $this->assertCount(1, json_decode(external::get_notices($url, (int) $course->id)['notices'], true));
+    }
+
+    /**
+     * A notice targeted at a role must never reach a user who does not hold it.
+     *
+     * This is the disclosure the empty-pageurl bypass produced, and the one worth pinning: the
+     * same user and the same notice returned zero results with a page URL and the full rendered
+     * body without one. get_notices() returns content, not metadata, so the bypass published the
+     * text of every role-, category-, course-, format-, theme- and competency-targeted notice on
+     * the site to any authenticated caller.
+     */
+    public function test_a_role_targeted_notice_is_not_disclosed_to_a_user_without_the_role(): void {
+        global $DB;
+
+        $teacherroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'editingteacher']);
+        $course = $this->getDataGenerator()->create_course();
+        $outsider = $this->getDataGenerator()->create_user();
+        $teacher = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($teacher->id, $course->id, 'editingteacher');
+
+        $this->setAdminUser();
+        $data = new \stdClass();
+        $data->title = 'Teachers only';
+        $data->content = '<p>Only teachers may read this.</p>';
+        $data->filter_role = [$teacherroleid];
+        helper::create_new_notice($data);
+
+        // Control: the role holder does receive it, so the role rule is what rejects the outsider
+        // below rather than the notice being invisible to everyone.
+        $this->setUser($teacher);
+        $this->assertCount(1, json_decode(external::get_notices('/my/')['notices'], true));
+
+        $this->setUser($outsider);
+        $this->assertSame([], json_decode(external::get_notices('/my/')['notices'], true));
+
+        // And the outsider cannot get a different answer by declining to say where they are.
+        $this->expectException(\invalid_parameter_exception::class);
+        external::get_notices('');
+    }
+
+    /**
+     * Leaving pageurl out altogether is rejected by the parameter structure.
+     *
+     * This is the shape the defect actually took. pageurl was VALUE_DEFAULT '', so a web service
+     * client could simply omit the key; retrieve_user_notices() read the empty string as "apply no
+     * page rules" and answered with content. Only a call through call_external_function()
+     * exercises that layer — invoking the method directly cannot, because PHP fills the default in
+     * before the web service layer is ever consulted.
+     *
+     * The narrow half of this lives in the test below: this one cannot tell which layer refused,
+     * because the parameter structure and the empty-string guard raise the same exception.
+     */
+    public function test_get_notices_rejects_an_omitted_pageurl(): void {
+        $this->setUser($this->getDataGenerator()->create_user());
+        $_POST['sesskey'] = sesskey();
+
+        $this->create_notice();
+
+        $omitted = \core_external\external_api::call_external_function(
+            'local_awareness_getnotices',
+            ['courseid' => 0],
+            false
+        );
+
+        $this->assertTrue($omitted['error']);
+        $this->assertSame('invalidparameter', $omitted['exception']->errorcode);
+
+        // Control: the same call with a page URL — what the plugin's own JS always sends — is
+        // answered, so the rejection above is the missing key and not a broken registration.
+        $supplied = \core_external\external_api::call_external_function(
+            'local_awareness_getnotices',
+            ['pageurl' => '/my/', 'courseid' => 0],
+            false
+        );
+
+        $this->assertFalse($supplied['error']);
+        $this->assertCount(1, json_decode($supplied['data']['notices'], true));
+    }
+
+    /**
+     * The page URL is declared VALUE_REQUIRED, so the key cannot simply be left out.
+     *
+     * Asserted against the parameter structure directly and on purpose. Every route through
+     * get_notices() also meets the empty-string guard inside the method, which raises the very
+     * same invalid_parameter_exception — so an end-to-end test passes just as happily with the
+     * parameter back to VALUE_DEFAULT, and proves nothing about this declaration. Verified by
+     * mutation: reverting it to VALUE_DEFAULT leaves every other test in this file green.
+     */
+    public function test_get_notices_parameters_declares_the_page_url_required(): void {
+        $this->expectException(\invalid_parameter_exception::class);
+
+        \core_external\external_api::validate_parameters(
+            external::get_notices_parameters(),
+            ['courseid' => 0]
+        );
     }
 
     /**

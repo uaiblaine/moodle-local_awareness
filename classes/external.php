@@ -198,7 +198,7 @@ class external extends external_api {
      */
     public static function get_notices_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'pageurl' => new external_value(PARAM_RAW, 'current page url', VALUE_DEFAULT, ''),
+            'pageurl' => new external_value(PARAM_RAW, 'current page url', VALUE_REQUIRED),
             'courseid' => new external_value(PARAM_INT, 'current course id', VALUE_DEFAULT, 0),
         ]);
     }
@@ -206,17 +206,31 @@ class external extends external_api {
     /**
      * Gets a list of notices.
      *
-     * @param string $pageurl Current page URL.
+     * @param string $pageurl Current page URL. Must not be empty.
      * @param int $courseid Current course ID.
      * @return array
+     * @throws \invalid_parameter_exception
      */
-    public static function get_notices(string $pageurl = '', int $courseid = 0): array {
+    public static function get_notices(string $pageurl, int $courseid = 0): array {
         self::validate_context(\context_system::instance());
 
         $params = self::validate_parameters(
             self::get_notices_parameters(),
             ['pageurl' => $pageurl, 'courseid' => $courseid]
         );
+
+        /*
+         * This function returns rendered notice bodies, and the page URL is what drives the
+         * pathmatch and check_filters() rules that decide who may read them. An empty value used
+         * to mean "apply no page rules at all", so any authenticated caller could read every
+         * role-, category-, course-, format-, theme- and competency-targeted notice on the site
+         * just by leaving the parameter out. VALUE_REQUIRED rejects the omission; this rejects the
+         * empty string that would still satisfy it.
+         */
+        if (trim($params['pageurl']) === '') {
+            throw new \invalid_parameter_exception('pageurl must not be empty');
+        }
+
         $result = [];
         $result['status'] = true;
         $result['notices'] = json_encode(
