@@ -194,11 +194,11 @@ final class role_filter_test extends \advanced_testcase {
 
         // Matched through the category arm, despite holding no role in the course named.
         $this->setUser($reachable);
-        $this->assertTrue(helper::check_filters($filters, '', (int) $currentcourse->id));
+        $this->assertTrue(helper::check_filters($filters, (int) $currentcourse->id));
 
         // Control: the same role in a course outside the listed category reaches neither arm.
         $this->setUser($unreachable);
-        $this->assertFalse(helper::check_filters($filters, '', (int) $currentcourse->id));
+        $this->assertFalse(helper::check_filters($filters, (int) $currentcourse->id));
     }
 
     /**
@@ -234,7 +234,6 @@ final class role_filter_test extends \advanced_testcase {
         // The assignment lives at the category, so a category-scoped rule finds it.
         $this->assertTrue(helper::check_filters(
             $this->filters($base + ['filter_role_context' => CONTEXT_COURSECAT]),
-            '',
             (int) $currentcourse->id
         ));
 
@@ -242,7 +241,6 @@ final class role_filter_test extends \advanced_testcase {
         // course list names a course inside that very category.
         $this->assertFalse(helper::check_filters(
             $this->filters($base + ['filter_role_context' => CONTEXT_COURSE]),
-            '',
             (int) $currentcourse->id
         ));
 
@@ -256,7 +254,6 @@ final class role_filter_test extends \advanced_testcase {
         $this->setUser($elsewhere);
         $this->assertFalse(helper::check_filters(
             $this->filters($base + ['filter_role_context' => CONTEXT_COURSECAT]),
-            '',
             (int) $currentcourse->id
         ));
     }
