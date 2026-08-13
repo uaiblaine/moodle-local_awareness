@@ -6,6 +6,27 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the role rule's context scoping is now written once
+
+- **`classes/local/role_scope.php` replaces two copies of the same thirty lines.**
+  `helper::user_matches_role_filter()` and `audience\estimator` each built the join and where
+  fragments that narrow a `{role_assignments}` lookup to the contexts a role rule names. Diffed with
+  whitespace stripped, the two blocks differed only in what the local variables were called
+  (`$filters` / `$criteria`, `$params` / `$inparams`) — the same question, asked twice, kept in step
+  by nothing.
+
+  They now call one builder. What stays separate is how each consumes the answer: the estimator
+  tests membership inside an `EXISTS` over every user, the helper reads the roles back for one. The
+  deliberate divergence survives untouched — a default role collapses to `1 = 1` in the estimator,
+  because counting cannot enumerate an implicit assignment with no rows in `{role_assignments}`.
+
+  A side effect worth having: the characterisation tests in `tests/role_filter_test.php` cover
+  context levels the estimator has no tests of its own for, and now pin its scoping too, because it
+  is the same code.
+
+No version bump: this moves code without changing behaviour, so there is nothing for a site to
+upgrade.
+
 ### Fixed — the audience breakdown ignored the scope of the role rule (version 2026081302)
 
 - **A role rule scoped to a course or category was counted across the whole site in the editor's
