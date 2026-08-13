@@ -6,6 +6,33 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — an omitted page URL disabled every audience filter (version 2026081300)
+
+- **`local_awareness_getnotices` declared `pageurl` optional, and an empty value meant "apply no
+  page rules at all".** `retrieve_user_notices()` guarded both `check_path_match()` and
+  `check_filters()` behind `if (!empty($pageurl))`, so any authenticated caller that left the
+  parameter out received every enabled notice that passed the cohort and required-course checks —
+  including those targeted at other roles, categories, courses, course formats, themes and
+  competencies. The response carries the body rendered by `helper::render_content()`, so this
+  disclosed notice **content**, not merely the existence of a notice.
+
+  Demonstrated before the fix, with the same user and the same notice: a notice targeted at editing
+  teachers returned zero results for a user without the role when a page URL was supplied, and
+  returned that notice's title and rendered body when the parameter was omitted.
+
+  `pageurl` is now `VALUE_REQUIRED`, and `get_notices()` rejects the empty string that a required
+  parameter still admits. The plugin's own AMD module has always sent
+  `window.location.pathname + window.location.search`, so no supported client is affected.
+
+- **The permissive mode is now something a caller asks for by name, not something it falls into.**
+  The skip was inferred from an empty string, and one function served both the display path and the
+  navigation probe — which is what let the web service opt out of filtering by omission.
+  `retrieve_user_notices()` now takes the page URL as a mandatory argument and refuses an empty one;
+  `local_awareness_extend_navigation()` calls the new `helper::has_candidate_notices()`, which
+  answers the page-independent question it actually has (should the JS load at all?), returns a
+  bool, and renders nothing. Both routes share one private implementation whose page rules are
+  driven by an explicit argument.
+
 ### Added — audience-estimate jobs are now purged (version 2026081201)
 
 - **New scheduled task `local_awareness\task\purge_audience_jobs`.** Every click of "Calculate

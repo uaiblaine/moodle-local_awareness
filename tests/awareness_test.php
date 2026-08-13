@@ -112,7 +112,7 @@ final class awareness_test extends \advanced_testcase {
         // The notice must actually reach a user with no cohort membership at all.
         $this->setUser($user);
         unset($USER->viewednotices);
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
     }
 
     /**
@@ -140,11 +140,11 @@ final class awareness_test extends \advanced_testcase {
 
         $this->setUser($member);
         unset($USER->viewednotices);
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
 
         $this->setUser($outsider);
         unset($USER->viewednotices);
-        $this->assertCount(0, helper::retrieve_user_notices());
+        $this->assertCount(0, helper::retrieve_user_notices('/my/'));
     }
 
     /**
@@ -252,7 +252,7 @@ final class awareness_test extends \advanced_testcase {
 
         // Only notice 1 and notice 2 are applied to user 1.
         $this->setUser($user1);
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         $this->assertEquals(2, count($usernotices));
 
         $this->setAdminUser();
@@ -260,7 +260,7 @@ final class awareness_test extends \advanced_testcase {
 
         // Only Notice 1 applied to user 1.
         $this->setUser($user1);
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         $this->assertEquals(1, count($usernotices));
         $notice = reset($usernotices);
         $this->assertEquals('Notice 1', $notice->get('title'));
@@ -271,18 +271,18 @@ final class awareness_test extends \advanced_testcase {
         // Add user 1 to cohorts of cohort notice 1 and cohort notice 2, there will be 3 notices for the user.
         cohort_add_member(reset($cohorts1), $user1->id);
         cohort_add_member(reset($cohorts2), $user1->id);
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         $this->assertEquals(3, count($usernotices));
 
         // User 1 dismissed notice 1, there will be 2 notices for the user.
         helper::dismiss_notice($notice1);
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         $this->assertEquals(2, count($usernotices));
         $this->assertEquals(1, count($USER->viewednotices));
 
         // User 1 acknowledged notice 1, there will be 1 notice for the user.
         helper::acknowledge_notice($cohortnotice1);
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         $this->assertEquals(1, count($usernotices));
         $this->assertEquals(2, count($USER->viewednotices));
 
@@ -293,7 +293,7 @@ final class awareness_test extends \advanced_testcase {
 
         // There will be 2 notices for user 1.
         $this->setUser($user1);
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         $this->assertEquals(2, count($usernotices));
         $this->assertEquals(1, count($USER->viewednotices));
     }
@@ -374,7 +374,7 @@ final class awareness_test extends \advanced_testcase {
 
         // Now retrieve all the user notices.
         $this->setUser($user);
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         // There is only one notice.
         $this->assertEquals(1, count($usernotices));
         $this->assertEquals("Course Notice 1", reset($usernotices)->get('title'));
@@ -385,7 +385,7 @@ final class awareness_test extends \advanced_testcase {
         $completion->update_state($cmassign, COMPLETION_COMPLETE, $user->id);
 
         // Now retrieve all the user notices.
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         // There should still be one notice.
         $this->assertEquals(1, count($usernotices));
 
@@ -394,7 +394,7 @@ final class awareness_test extends \advanced_testcase {
         $ccompletion->mark_complete();
 
         // Now retrieve all the user notices.
-        $usernotices = helper::retrieve_user_notices();
+        $usernotices = helper::retrieve_user_notices('/my/');
         // There should not be any user notices.
         $this->assertEquals(0, count($usernotices));
     }
@@ -420,12 +420,12 @@ final class awareness_test extends \advanced_testcase {
         $notice = array_shift($allnotices);
 
         // Must see 1 notice.
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
 
         // After notice is dismissed, should still see 1 as it's required.
         $this->setAdminUser();
         helper::dismiss_notice($notice);
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
     }
 
     /**
@@ -449,22 +449,22 @@ final class awareness_test extends \advanced_testcase {
         $notice = array_shift($allnotices);
 
         // Must see 1 notice.
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
 
         // After notice is dismissed, should still see 1 as it's required.
         helper::dismiss_notice($notice);
         // User should be logged out after dismissing.
         $this->setAdminUser();
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
 
         // After notice is acknowledged, should still see 0.
         helper::acknowledge_notice($notice);
-        $this->assertCount(0, helper::retrieve_user_notices());
+        $this->assertCount(0, helper::retrieve_user_notices('/my/'));
 
         // Logout user and log in again. Still shouldn't require to see the notice.
         $this->setUser();
         $this->setAdminUser();
-        $this->assertCount(0, helper::retrieve_user_notices());
+        $this->assertCount(0, helper::retrieve_user_notices('/my/'));
     }
 
     /**
@@ -491,12 +491,12 @@ final class awareness_test extends \advanced_testcase {
         $notice = array_shift($allnotices);
 
         // Admin must see 1 notice.
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
         helper::dismiss_notice($notice);
         // Admin shouldn't be logged out.
         $this->assertNotEmpty($USER->username);
         // After notice is dismissed, admin shouldb't see it anymore.
-        $this->assertCount(0, helper::retrieve_user_notices());
+        $this->assertCount(0, helper::retrieve_user_notices('/my/'));
 
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
@@ -508,7 +508,7 @@ final class awareness_test extends \advanced_testcase {
 
         // Login again and check we still see the notice.
         $this->setUser($user);
-        $this->assertCount(1, helper::retrieve_user_notices());
+        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
     }
 
     /**
