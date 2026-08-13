@@ -197,7 +197,13 @@ class awareness extends persistent {
      * @return self[]
      */
     public static function get_enabled_notices(): array {
-        if (!$result = self::get_enabled_notices_cache()->get('records')) {
+        /*
+         * Compared against false, which is the only value the cache uses to say "I do not have
+         * this". A falsy test treats a cached empty array as a miss, and a site with no notice
+         * currently live then re-runs this query on every page load, for ever — which is the state
+         * nearly every site is in nearly all of the time.
+         */
+        if (($result = self::get_enabled_notices_cache()->get('records')) === false) {
             $select = "enabled = ? AND ((timeend = 0 AND timestart = 0) OR (timeend <> 0 AND timestart <> 0 AND ? < timeend))";
             $result = self::get_records_select($select, [1, time()], 'id');
             self::get_enabled_notices_cache()->set('records', $result);
