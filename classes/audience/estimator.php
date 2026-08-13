@@ -150,14 +150,46 @@ class estimator {
 
         $result['count'] = self::count_combined($criteria);
         foreach ($audiencerules as $rule) {
-            $single = [$rule => $criteria[$rule]];
             $result['breakdown'][] = [
                 'key' => $rule,
-                'count' => self::count_combined($single),
+                'count' => self::count_combined(self::isolate_rule($criteria, $rule)),
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * Reduce the criteria to a single audience rule, keeping the keys that modify that rule.
+     *
+     * "The rule alone" means without the OTHER rules, not without its own settings. filter_role is
+     * the only one with any: filter_role_context decides which context level is searched, and
+     * filter_category / filter_course narrow it further inside that level. Dropping them made the
+     * breakdown answer a different question from the one the notice asks — a rule scoped to one
+     * course was counted across the whole site, so the editor offered "Teachers: every teacher
+     * here" beside a total of the handful who would actually see it.
+     *
+     * filter_category and filter_course are context rules elsewhere and are ignored by the count
+     * on their own; they are read only inside the role block, which is why carrying them here
+     * cannot widen any other rule.
+     *
+     * @param array $criteria Normalised criteria.
+     * @param string $rule The audience-shaping rule to isolate.
+     * @return array
+     */
+    private static function isolate_rule(array $criteria, string $rule): array {
+        $modifiers = [
+            'filter_role' => ['filter_role_context', 'filter_category', 'filter_course'],
+        ];
+
+        $single = [$rule => $criteria[$rule]];
+        foreach ($modifiers[$rule] ?? [] as $key) {
+            if (isset($criteria[$key])) {
+                $single[$key] = $criteria[$key];
+            }
+        }
+
+        return $single;
     }
 
     /**

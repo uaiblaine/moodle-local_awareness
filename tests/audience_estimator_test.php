@@ -162,4 +162,119 @@ final class audience_estimator_test extends \advanced_testcase {
         $result = (new estimator())->estimate(['cohorts' => [$cohort->id]]);
         $this->assertSame(1, $result['count']);
     }
+
+    /**
+     * Count the users the per-user rule admits, over exactly the population the estimator counts.
+     *
+     * @param array $filters Filter values, in the shape stored in filtervalues.
+     * @param int $courseid Course to judge the page context from; 0 for none.
+     * @return int
+     */
+    private function users_admitted_by_the_rule(array $filters, int $courseid = 0): int {
+        global $DB;
+
+        $users = $DB->get_records_select(
+            'user',
+            'deleted = 0 AND suspended = 0 AND confirmed = 1 AND username <> :guestname',
+            ['guestname' => 'guest']
+        );
+
+        $filtervalues = json_encode($filters);
+        $admitted = 0;
+        foreach ($users as $user) {
+            $this->setUser($user);
+            if (helper::check_filters($filtervalues, $courseid)) {
+                $admitted++;
+            }
+        }
+
+        return $admitted;
+    }
+
+    /**
+     * The breakdown chip for a role rule keeps the scope that rule was given.
+     *
+     * The editor renders one chip per audience rule beside the total. Isolating filter_role used to
+     * drop filter_role_context and the course and category lists with it, so a rule meaning
+     * "teachers of this one course" was counted as "teachers anywhere", and the chip disagreed with
+     * the total sitting next to it — upward, and by the whole size of the site.
+     */
+    public function test_the_role_breakdown_keeps_the_scope_the_rule_was_given(): void {
+        global $DB;
+
+        $teacherroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'editingteacher']);
+        $listed = $this->getDataGenerator()->create_course();
+        $unlisted = $this->getDataGenerator()->create_course();
+
+        $inlisted = $this->getDataGenerator()->create_user();
+        $elsewhere = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($inlisted->id, $listed->id, 'editingteacher');
+        $this->getDataGenerator()->enrol_user($elsewhere->id, $unlisted->id, 'editingteacher');
+
+        $criteria = estimator::normalise([
+            'filter_role' => [$teacherroleid],
+            'filter_role_context' => CONTEXT_COURSE,
+            'filter_course' => [$listed->id],
+        ]);
+
+        $result = (new estimator())->estimate($criteria);
+
+        $chips = [];
+        foreach ($result['breakdown'] as $row) {
+            $chips[$row['key']] = (int) $row['count'];
+        }
+
+        // Control: the combined count has always respected the scope. The chip is what drifted, so
+        // asserting they agree is only meaningful while this stays at 1.
+        $this->assertSame(1, (int) $result['count']);
+        $this->assertSame(1, $chips['filter_role']);
+    }
+
+    /**
+     * The bulk count agrees, user for user, with the per-user rule it mirrors.
+     *
+     * This class is a second implementation of the role rule — helper::check_filters() is the
+     * first, and the two are kept in step by nothing but care. Rather than compare the two bodies,
+     * this asks each of them about every user the count claims to cover and requires the same
+     * answer, for an unscoped rule and for a course-scoped one.
+     */
+    public function test_the_bulk_count_agrees_with_the_per_user_rule(): void {
+        global $DB;
+
+        $teacherroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'editingteacher']);
+        $course = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+
+        $teacherhere = $this->getDataGenerator()->create_user();
+        $teacherthere = $this->getDataGenerator()->create_user();
+        $student = $this->getDataGenerator()->create_user();
+
+        $this->getDataGenerator()->enrol_user($teacherhere->id, $course->id, 'editingteacher');
+        $this->getDataGenerator()->enrol_user($teacherthere->id, $other->id, 'editingteacher');
+        $this->getDataGenerator()->enrol_user($student->id, $course->id);
+
+        // Unscoped: holding the role anywhere counts, so both teachers do.
+        $unscoped = ['filter_role' => [$teacherroleid]];
+        $this->setAdminUser();
+        $count = (int) (new estimator())->estimate(estimator::normalise($unscoped))['count'];
+        $this->assertSame(2, $count, 'both teachers, whichever course they teach');
+        $this->assertSame($this->users_admitted_by_the_rule($unscoped), $count);
+
+        /*
+         * Course-scoped. Everyone judged here is enrolled in $course, so the page-context block
+         * accepts them all and the role rule is what separates them — without that the block would
+         * reject first and both sides would agree on zero, which proves nothing.
+         */
+        $scoped = [
+            'filter_role' => [$teacherroleid],
+            'filter_role_context' => CONTEXT_COURSE,
+            'filter_course' => [$course->id],
+        ];
+        $this->getDataGenerator()->enrol_user($teacherthere->id, $course->id);
+
+        $this->setAdminUser();
+        $count = (int) (new estimator())->estimate(estimator::normalise($scoped))['count'];
+        $this->assertSame(1, $count, 'only the teacher of the listed course');
+        $this->assertSame($this->users_admitted_by_the_rule($scoped, (int) $course->id), $count);
+    }
 }
