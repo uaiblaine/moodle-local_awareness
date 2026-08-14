@@ -17,16 +17,23 @@
 namespace local_awareness;
 
 use local_awareness\audience\estimator;
-use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the audience estimator.
  *
+ * Coverage is declared in this docblock rather than with #[CoversClass]. The attribute is the
+ * form Moodle's own standards prefer, and PHPUnit 12 drops doc-comment metadata entirely — but
+ * moodle-cs on the 4.05 leg cannot see attributes, and reports every method here as missing
+ * coverage information, which fails phpcs under --max-warnings 0. While this plugin still
+ * supports 4.5, the docblock is the only form both ends of the range accept. Switch when the
+ * supported range drops 405.
+ *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ *
+ * @covers \local_awareness\audience\estimator
  */
-#[CoversClass(estimator::class)]
 final class audience_estimator_test extends \advanced_testcase {
     protected function setUp(): void {
         parent::setUp();
