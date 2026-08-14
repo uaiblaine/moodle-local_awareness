@@ -6,6 +6,30 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the course-completion rule cost a query per notice, before the first byte (version 2026081307)
+
+- **Every notice with a required course fetched that course again, inside page generation.** The
+  rule loops the notices and, for each one with `reqcourse`, read the course row and asked
+  `completion_info` about it. Two notices requiring the *same* course fetched it twice. Courses and
+  completion answers are now resolved once for the whole set, in the shape the cohort rule ten lines
+  above already uses.
+
+- **Position is what made this the urgent one.** The rule runs with the page rules switched off,
+  which means it also runs in `has_candidate_notices()` — the probe every page load calls before any
+  HTML is sent. It was the only per-notice cost in the plugin sitting inside the TTFB, and therefore
+  the only one delaying first paint; the rest of the per-notice work happens in the asynchronous
+  call, after the page is already on screen.
+
+- Reads per page-generation probe, by number of notices requiring a course:
+
+  | notices | 1 | 3 | 6 |
+  |---|---|---|---|
+  | before | 1 | 3 | 6 |
+  | after | 1 | **1** | **1** |
+
+- Behaviour is unchanged, including the edge the guarded fetch produced: a notice whose required
+  course no longer exists is still shown rather than withheld.
+
 ### Fixed — a cached empty result was treated as a cache miss (version 2026081306)
 
 - **Both caches re-ran their query on every call whenever the answer was empty.** The lookups were
