@@ -6,6 +6,64 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the audience estimate answers on the click, deduplicates, and names what it counts (version 2026081402)
+
+- **The estimate no longer needs cron on an ordinary site.** It is a handful of `COUNT` queries, and
+  handing every one of them to an adhoc task cost the author minutes of "Calculating in the
+  background…" for work measured in milliseconds — and on a site whose cron is not running it never
+  resolved at all, ending in a timeout after five minutes. Sites at or below the new
+  **Audience estimate inline limit** setting (default 25000 users) compute it during the request;
+  larger ones keep the queued path, where the cost is real. Setting it to 0 always queues. An unset
+  setting means the default rather than 0, so a site that has not yet stored it does not silently
+  fall back to the old behaviour.
+
+- The task's body moved to `estimate_audience::resolve()` so the inline and queued paths cannot
+  drift apart, and it keeps the try/catch — an inline caller cannot turn a failed estimate into a
+  failed request. The client now polls immediately for any non-pending status instead of testing for
+  `ready`, so an error surfaces as fast as a result.
+
+- **Identical estimates no longer pile up as duplicate adhoc tasks.** Only completed jobs were
+  deduplicated, so the editor re-estimating on every form change queued a burst of identical tasks —
+  each a full estimate the site ran and discarded, because the client was already polling a later
+  one. A request now joins a job already queued for the same criteria, within the same window the
+  client is still willing to wait (`audience_job::PENDING_WINDOW`). Past that window it starts a
+  fresh job, so a stuck queue cannot trap every later caller behind one dead entry.
+
+- **Chips name their values instead of showing raw ids.** "Course category: 4" is the one thing an
+  author cannot check against the form they just filled in; it now reads "Course category:
+  Engineering school", with courses, formats and themes resolved the same way and long lists
+  collapsed to the first few plus a count. Resolution happens in `audience\rule_describer` at READ
+  time, never stored on the job: jobs are shared between callers by criteria hash, so a name baked
+  into the stored result would serve the next reader the first reader's language. A test asserts the
+  stored breakdown carries no names, which is the mechanism rather than the symptom.
+
+### Fixed — Calculate reach answers for every filter, and for no filter at all (version 2026081402)
+
+- **The button did nothing on a notice with no audience filter.** `trigger()` returned early
+  whenever the criteria named none of cohorts, role or required course, reprinting the sentence
+  already on screen — so pressing Calculate reach on a fresh notice was indistinguishable from a
+  dead control. An empty criteria set is now a question with an answer: every real, active user on
+  the site, reported with its own status line rather than the filtered one.
+
+- **Four of the seven filters were left out of the number they belong to.** Course category,
+  course, course format and competency were classified as page-context restrictions and only ever
+  rendered as chips. They are page rules and user rules at once: `check_filters()` admits them only
+  on a course page the user can enter, so they bound who can ever see the notice. Each now
+  contributes to the count and gets its own breakdown chip. `pathmatch` and the theme filter stay
+  context-only — neither says anything about a user.
+
+- The new predicate inlines core's `get_enrolled_join($onlyactive = true)` because it asks about a
+  set of courses in one statement. It deliberately does **not** carry over that helper's SITEID
+  exemption, under which every user counts as enrolled on the front page: `check_filters()` resolves
+  a course only above id 1, so importing it would report the whole site for a rule that reaches
+  nobody. It models the enrolment branch of `can_access_course()` and not the viewer branch, making
+  the estimate a lower bound; a test pins the size of that gap so it cannot drift.
+
+- **Context chips rendered their values as empty.** The rule labels were fetched with `param: ''`,
+  which makes `get_string()` substitute `{$a}` server-side, so every chip read "Course category: "
+  with nothing after it. The strings are fetched without a param and substituted client-side, and
+  the breakdown chips now share that one code path instead of formatting labels separately.
+
 ### Fixed — the notices payload no longer ships targeting metadata to the browser
 
 - **`get_notices` serialised each displayed notice's whole record into the response.** Verified on

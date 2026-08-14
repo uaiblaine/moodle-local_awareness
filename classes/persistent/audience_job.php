@@ -40,6 +40,15 @@ class audience_job extends persistent {
     const DEDUP_WINDOW = 300;
 
     /**
+     * Window (seconds) in which a job still waiting for its worker may be reused.
+     *
+     * Matches the client's own patience — poll interval times poll count — so a request joins an
+     * in-flight job only while it could still see the answer, and starts a fresh one once the
+     * browser that queued it has given up.
+     */
+    const PENDING_WINDOW = 300;
+
+    /**
      * Returns a list of properties.
      *
      * @return array[]
@@ -103,6 +112,34 @@ class audience_job extends persistent {
             'criteriahash = :hash AND status = :status AND timecompleted IS NOT NULL AND timecompleted >= :mints',
             ['hash' => $criteriahash, 'status' => self::STATUS_READY, 'mints' => $mints],
             'timecompleted DESC',
+            '*',
+            0,
+            1
+        );
+        return reset($records) ?: false;
+    }
+
+    /**
+     * Find a job for the same criteria that is already queued and still worth waiting for.
+     *
+     * The editor re-estimates on every form change, and only completed jobs were deduplicated, so
+     * a burst of edits queued a burst of identical adhoc tasks — each a full estimate the site then
+     * ran and threw away, because by the time they completed the client was polling a later one.
+     * Joining the job already in flight costs the caller nothing: it is the same criteria, so it
+     * will produce the same answer.
+     *
+     * Deliberately not merged into find_reusable(): a ready job answers immediately and a pending
+     * one is a promise, and the caller decides differently about the two.
+     *
+     * @param string $criteriahash
+     * @return self|false
+     */
+    public static function find_in_flight(string $criteriahash) {
+        $mints = time() - self::PENDING_WINDOW;
+        $records = self::get_records_select(
+            'criteriahash = :hash AND status = :status AND timecreated >= :mints',
+            ['hash' => $criteriahash, 'status' => self::STATUS_PENDING, 'mints' => $mints],
+            'timecreated DESC',
             '*',
             0,
             1

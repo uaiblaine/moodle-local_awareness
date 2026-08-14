@@ -52,6 +52,21 @@ class estimate_audience extends \core\task\adhoc_task {
             return;
         }
 
+        self::resolve($job);
+    }
+
+    /**
+     * Run a pending job's estimate and record the outcome on it.
+     *
+     * Public and static because the web service resolves small sites inline rather than waiting for
+     * cron. Both callers must produce the same stored job, so there is one body rather than two;
+     * this one owns the try/catch, so an inline caller cannot turn a failed estimate into a failed
+     * request.
+     *
+     * @param audience_job $job A job in pending status.
+     * @return void
+     */
+    public static function resolve(audience_job $job): void {
         try {
             $criteria = json_decode($job->get('criteria'), true);
             if (!is_array($criteria)) {

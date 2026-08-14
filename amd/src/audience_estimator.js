@@ -91,27 +91,34 @@ define([
      * @returns {Promise<object>} Promise resolving to the strings map.
      */
     function loadStrings() {
+        /*
+         * No `param` on the templated strings. Supplying one — even the placeholder's own text —
+         * makes get_string() perform the substitution server-side, and an empty param silently
+         * erased the value from every context chip ("Course category: " with nothing after it).
+         * Omitted, the raw {$a} survives the trip and the replace() calls below can find it.
+         */
         return str.get_strings([
             {key: 'audience:state:idle', component: 'local_awareness'},
             {key: 'audience:state:auto_pending', component: 'local_awareness'},
             {key: 'audience:state:manual_ready', component: 'local_awareness'},
             {key: 'audience:state:queued', component: 'local_awareness'},
-            {key: 'audience:state:cached', component: 'local_awareness', param: '{$a}'},
+            {key: 'audience:state:cached', component: 'local_awareness'},
             {key: 'audience:state:timeout', component: 'local_awareness'},
-            {key: 'audience:state:error', component: 'local_awareness', param: '{$a}'},
+            {key: 'audience:state:error', component: 'local_awareness'},
             {key: 'audience:btn:calculate', component: 'local_awareness'},
             {key: 'audience:btn:retry', component: 'local_awareness'},
-            {key: 'audience:reach:value', component: 'local_awareness', param: '{$a}'},
+            {key: 'audience:reach:value', component: 'local_awareness'},
             {key: 'audience:rules_too_many', component: 'local_awareness'},
             {key: 'audience:rule:cohorts', component: 'local_awareness'},
             {key: 'audience:rule:filter_role', component: 'local_awareness'},
             {key: 'audience:rule:reqcourse', component: 'local_awareness'},
-            {key: 'audience:rule:pathmatch', component: 'local_awareness', param: ''},
-            {key: 'audience:rule:filter_category', component: 'local_awareness', param: ''},
-            {key: 'audience:rule:filter_course', component: 'local_awareness', param: ''},
-            {key: 'audience:rule:filter_format', component: 'local_awareness', param: ''},
-            {key: 'audience:rule:filter_theme', component: 'local_awareness', param: ''},
-            {key: 'audience:rule:filter_competency_rules', component: 'local_awareness'}
+            {key: 'audience:rule:pathmatch', component: 'local_awareness'},
+            {key: 'audience:rule:filter_category', component: 'local_awareness'},
+            {key: 'audience:rule:filter_course', component: 'local_awareness'},
+            {key: 'audience:rule:filter_format', component: 'local_awareness'},
+            {key: 'audience:rule:filter_theme', component: 'local_awareness'},
+            {key: 'audience:rule:filter_competency_rules', component: 'local_awareness'},
+            {key: 'audience:state:wholesite', component: 'local_awareness'}
         ]).then(function(s) {
             state.strings = {
                 idle: s[0],
@@ -135,7 +142,8 @@ define([
                     filter_format: s[17],
                     filter_theme: s[18],
                     filter_competency_rules: s[19]
-                }
+                },
+                wholeSiteTpl: s[20]
             };
             return state.strings;
         });
@@ -217,22 +225,34 @@ define([
 
         var html = '';
         contextRules.forEach(function(rule) {
-            var label = state.strings.ruleLabels[rule.key] || rule.key;
-            // Some labels carry a {$a} placeholder; substitute with a
-            // human-readable summary of the values.
-            if (label.indexOf('{$a}') !== -1) {
-                var summary;
-                if (Array.isArray(rule.values)) {
-                    summary = rule.values.length === 1 ? String(rule.values[0])
-                        : (rule.values.length + '×');
-                } else {
-                    summary = String(rule.values);
-                }
-                label = label.replace('{$a}', summary);
-            }
-            html += '<li class="la-chip" data-key="' + rule.key + '">' + escapeHtml(label) + '</li>';
+            html += '<li class="la-chip" data-key="' + rule.key + '">'
+                + escapeHtml(ruleLabel(rule.key, rule.display)) + '</li>';
         });
         state.slots.contextChips.innerHTML = html;
+    }
+
+    /**
+     * Resolve a rule's display label, filling its {$a} placeholder when it has one.
+     *
+     * Shared by the context chips and the per-rule breakdown chips, which render the same labels:
+     * the breakdown gained the category, course and format rules when those started counting
+     * towards the audience, and rendering them through a second path is how one of them ends up
+     * showing the placeholder verbatim.
+     *
+     * The substituted text comes from the server, which is the only side that can turn a category
+     * id into a category name — and it resolves them per request, so the names arrive in the
+     * reader's language rather than in whichever one first computed the job.
+     *
+     * @param {string} key The criteria key the rule was read from.
+     * @param {string} display Server-resolved names for the rule's values; may be empty.
+     * @returns {string} The label, ready to escape and insert.
+     */
+    function ruleLabel(key, display) {
+        var label = state.strings.ruleLabels[key] || key;
+        if (label.indexOf('{$a}') === -1) {
+            return label;
+        }
+        return label.replace('{$a}', display || '');
     }
 
     /**
@@ -329,7 +349,10 @@ define([
         var when = response.timecompleted
             ? new Date(response.timecompleted * 1000).toLocaleTimeString()
             : '';
-        setState(state.strings.cachedTpl.replace('{$a}', when));
+        // No audience rule means nothing has been narrowed and the count is the whole site — a
+        // fact about the notice worth stating, not the same message as a filtered result.
+        var template = response.has_audience_rules ? state.strings.cachedTpl : state.strings.wholeSiteTpl;
+        setState(template.replace('{$a}', when));
         showAction('calculate', !!state.slots.calcBtn && !state.autoMode);
         showAction('retry', false);
         // Render breakdown chips.
@@ -339,7 +362,7 @@ define([
                 if (Array.isArray(arr) && arr.length) {
                     var html = '';
                     arr.forEach(function(it) {
-                        var label = state.strings.ruleLabels[it.key] || it.key;
+                        var label = ruleLabel(it.key, it.display);
                         html += '<span class="la-chip la-chip--brand">'
                             + escapeHtml(label) + ' · ' + formatCount(parseInt(it.count, 10) || 0)
                             + '</span>';
@@ -410,24 +433,12 @@ define([
         state.lastCriteriaJson = json;
         updateSummary(criteria);
 
-        var audienceCount = criteriaReader.countAudienceRules(criteria);
-        if (audienceCount === 0) {
-            stopPolling();
-            setValue('—');
-            setState(state.strings.idle);
-            showAction('calculate', !state.autoMode);
-            showAction('retry', false);
-            // Still show context restrictions if any.
-            var ctxLocal = [];
-            criteriaReader.CONTEXT_KEYS.forEach(function(k) {
-                if (criteria[k]) {
-                    ctxLocal.push({key: k, values: criteria[k]});
-                }
-            });
-            updateContextChips(ctxLocal);
-            return;
-        }
-
+        /*
+         * No early return on an empty criteria set. It used to stop here and reprint the idle
+         * sentence, so pressing "Calculate reach" on an unfiltered notice looked like a dead
+         * button — the one thing the author had asked it to answer. An empty set is a valid
+         * question with a real answer: everyone on the site.
+         */
         setValue('—');
         setState(state.strings.queued);
         showAction('calculate', false);
@@ -441,12 +452,16 @@ define([
                 handleError('No job id returned.');
                 return null;
             }
-            if (response.status === 'ready') {
-                // Cached result — fetch it directly.
+            if (response.status === 'pending') {
+                startPolling(response.jobid);
+            } else {
+                /*
+                 * Already settled — a cached result, or one the server computed during this very
+                 * request. Read it now instead of sitting through a poll interval first; testing
+                 * for "pending" rather than for "ready" means an error comes back just as fast.
+                 */
                 state.currentJobId = response.jobid;
                 pollOnce();
-            } else {
-                startPolling(response.jobid);
             }
             return null;
         }).catch(function(err) {

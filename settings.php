@@ -69,6 +69,16 @@ if ($hassiteconfig) {
         )
     );
 
+    $temp->add(
+        new admin_setting_configtext(
+            'local_awareness/audience_sync_limit',
+            new lang_string('setting:audience_sync_limit', 'local_awareness'),
+            new lang_string('setting:audience_sync_limitdesc', 'local_awareness'),
+            \local_awareness\external::INLINE_LIMIT_DEFAULT,
+            PARAM_INT
+        )
+    );
+
     $ADMIN->add('awareness', $temp);
     $settings = null;
 }
