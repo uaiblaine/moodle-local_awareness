@@ -154,7 +154,9 @@ class noticeview extends persistent {
     public static function get_user_viewed_notice_records(): array {
         global $USER, $DB;
 
-        if (!$result = self::get_cache()->get($USER->id)) {
+        // Compared against false for the same reason as awareness::get_enabled_notices(): a user who
+        // has never acted on a notice has an empty history, and a falsy test re-reads it every time.
+        if (($result = self::get_cache()->get($USER->id)) === false) {
             $result = [];
             $sql = "SELECT sn.id, lv.timecreated, lv.action, lv.timemodified
                       FROM {local_awareness} sn

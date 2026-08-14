@@ -62,5 +62,13 @@ class behat_local_awareness extends behat_base {
             $noticeinfo['forcelogout'] = $noticeinfo['forcelogout'] ?? 0;
             $DB->insert_record('local_awareness', $noticeinfo);
         }
+
+        /*
+         * Inserted straight into the table, so the persistent's after_create() never runs and the
+         * enabled-notices cache is never invalidated. That was harmless while an empty cached result
+         * was re-read on every call — the cache healed itself by being broken. Now that an empty
+         * result is honoured, a notice created this way stays invisible until something purges.
+         */
+        \cache::make('local_awareness', 'enabled_notices')->purge();
     }
 }

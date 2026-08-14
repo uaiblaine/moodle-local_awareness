@@ -6,6 +6,23 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — a cached empty result was treated as a cache miss (version 2026081306)
+
+- **Both caches re-ran their query on every call whenever the answer was empty.** The lookups were
+  guarded with `if (!$result = $cache->get(…))`, and an empty array is falsy — so the value was
+  stored, found, judged a miss, and fetched again. Comparing against `false`, the only value the
+  cache uses to say it does not hold something, is the whole fix.
+
+- **It broke in the state nearly every site is in nearly all of the time:** the plugin installed
+  with no notice currently live. That site paid a database read on every page load, for ever, to be
+  told there was nothing to show. Measured on a running site with no live notice, reads per call to
+  `helper::has_candidate_notices()` across six page loads: **1, 1, 1, 1, 1, 1** before, **1, 0, 0,
+  0, 0, 0** after. The same fault hit `noticeview` for every user who had never acted on a notice.
+
+- Covered by tests that count statements rather than inspect the cache, since the cost is the point,
+  and paired with tests that a notice created after an empty answer is still found — so the cheap
+  result cannot be reached by simply serving nothing.
+
 ### Added — the editor warns about a competing notice while you are still choosing (version 2026081305)
 
 - **The collision warning is now live in the notice editor**, not only after saving. A new
