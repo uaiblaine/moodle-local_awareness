@@ -237,17 +237,30 @@ class external extends external_api {
         $result['notices'] = json_encode(
             array_map(
                 function (awareness $notice): \stdClass {
+                    /*
+                     * Only what the modal reads crosses the boundary. The record used to be
+                     * serialised whole, which shipped the notice's segmentation metadata —
+                     * pathmatch, filtervalues, cohorts, the scheduling window, resetinterval —
+                     * and the author's user id to every user the notice was displayed to. The
+                     * returns declaration is PARAM_RAW JSON, so nothing downstream strips a key;
+                     * this allowlist is the only gate. Values are picked from to_record() rather
+                     * than re-cast, so the client keeps receiving the exact types it always has.
+                     */
                     $record = $notice->to_record();
+                    $payload = new \stdClass();
+                    foreach (['id', 'title', 'reqack', 'forcelogout', 'modal_width', 'modal_height', 'outsideclick'] as $field) {
+                        $payload->$field = $record->$field;
+                    }
                     // Storage holds the content as authored; filters and pluginfile URLs are
                     // resolved here so a multilang notice reads in each user's own language.
-                    $record->content = helper::render_content($notice);
+                    $payload->content = helper::render_content($notice);
                     // Attach background image URL if one exists.
                     if (!empty($record->bgimage)) {
-                        $record->bgimageurl = helper::get_bgimage_url($record->id);
+                        $payload->bgimageurl = helper::get_bgimage_url($record->id);
                     } else {
-                        $record->bgimageurl = '';
+                        $payload->bgimageurl = '';
                     }
-                    return $record;
+                    return $payload;
                 },
                 /*
                  * select_for_display() is what makes this one notice at a time. Everything the
