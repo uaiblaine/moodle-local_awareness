@@ -71,4 +71,40 @@ class behat_local_awareness extends behat_base {
          */
         \cache::make('local_awareness', 'enabled_notices')->purge();
     }
+
+    /**
+     * Checks the notice module was queued into the current page.
+     *
+     * "I should see" on the modal text proves display; this proves delivery. Its negative twin
+     * below is what pins the footer-hook redesign: a page where no notice could appear must not
+     * merely show nothing, it must not have loaded the module — or fired its AJAX call — at all.
+     *
+     * @Then the awareness notice module should be loaded
+     * @throws \Behat\Mink\Exception\ExpectationException When the module is absent.
+     */
+    public function the_awareness_notice_module_should_be_loaded() {
+        // The trailing quote keeps 'local_awareness/notice_editor' and friends from matching.
+        if (strpos($this->getSession()->getPage()->getContent(), "local_awareness/notice'") === false) {
+            throw new \Behat\Mink\Exception\ExpectationException(
+                'The local_awareness/notice module was expected on this page but was not loaded.',
+                $this->getSession()
+            );
+        }
+    }
+
+    /**
+     * Checks the notice module was not even queued into the current page.
+     *
+     * @Then the awareness notice module should not be loaded
+     * @throws \Behat\Mink\Exception\ExpectationException When the module is present.
+     */
+    public function the_awareness_notice_module_should_not_be_loaded() {
+        // The trailing quote keeps 'local_awareness/notice_editor' and friends from matching.
+        if (strpos($this->getSession()->getPage()->getContent(), "local_awareness/notice'") !== false) {
+            throw new \Behat\Mink\Exception\ExpectationException(
+                'The local_awareness/notice module was loaded on a page where nothing could appear.',
+                $this->getSession()
+            );
+        }
+    }
 }

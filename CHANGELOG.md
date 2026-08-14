@@ -6,6 +6,41 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the notice module loads only where a notice could appear (version 2026081400)
+
+- **Every page view used to cost one authenticated AJAX request even where nothing could be
+  shown.** The probe that decides whether to load `local_awareness/notice` deliberately ignored the
+  page rules, so a site whose only notice was restricted to the Dashboard still fired
+  `local_awareness_getnotices` — a full authenticated Moodle bootstrap, serialised on the user's
+  session lock — on every page, for every logged-in user, to receive an empty list. The cost grew
+  with users × page views, independent of the number of notices.
+
+- **The decision moved from the navigation callback to the `before_footer_html_generation` hook**
+  (the architecture `tool_usertours` uses for the same problem). The navigation callback fired
+  mid-header, where `$PAGE->url` is not always set yet — measured across both supported branches:
+  ~94% of page renders had the URL at navigation time (`/contentbank/index.php` initialises
+  navigation before `set_url()` on both), 100% had it at footer time. The callback also ran on the
+  navigation-expansion AJAX endpoint, where the queued module can never execute — a pure-waste
+  probe that disappears with the move. The module itself, and the web service contract, are
+  untouched: the AJAX call remains the definitive filter and the only source of notice content.
+
+- **The probe now judges the page, using only rules that are zero-query and safe.** `pathmatch` is
+  evaluated with the display path's own matcher against both URL representations (the path the
+  browser will report, and the wwwroot-relative one — so patterns keep working on subdirectory
+  installs); the course, category and format filters are judged against `$PAGE->course`, the same
+  object the client's `courseid` is derived from; the theme filter only while course and category
+  theme overrides are off, because with either on this render can resolve a different theme than
+  the web service request will. Role, competency and course-access rules cost queries and always
+  count as a match. Every uncertainty — no trustworthy URL, an exception, a missing course
+  property, an unknown page layout — loads the module: the acceptable failure is one wasted
+  request, never a notice that fails to appear.
+
+- **Page layouts `maintenance`, `print`, `redirect`, `embedded` and `popup` never load the module**
+  (the first three follow `tool_usertours`; the last two had no module before either). `secure` is
+  a deliberate change, not preservation: with a sticky Navigation block the old callback could
+  deliver a notice — including one with a forced logout — inside a securewindow quiz attempt; it
+  no longer does.
+
 ### Fixed — the course-completion rule cost a query per notice, before the first byte (version 2026081307)
 
 - **Every notice with a required course fetched that course again, inside page generation.** The
