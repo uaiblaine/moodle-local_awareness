@@ -6,6 +6,20 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the notices payload no longer ships targeting metadata to the browser
+
+- **`get_notices` serialised each displayed notice's whole record into the response.** Verified on
+  a live 5.2 site: the JSON carried `pathmatch`, `filtervalues`, `cohorts`, `timestart`/`timeend`,
+  `resetinterval`, the timestamps and `usermodified` — a user id — to any user the notice was
+  displayed to, while the modal reads nine fields (`id`, `title`, `content`, `reqack`,
+  `forcelogout`, `bgimageurl`, `modal_width`, `modal_height`, `outsideclick`). The returns
+  declaration is PARAM_RAW JSON, so `clean_returnvalue()` strips nothing; the payload is now built
+  from an allowlist of exactly those nine fields, with values picked from the record unchanged so
+  the client keeps receiving the types it always has. No JavaScript change and no AMD rebuild.
+
+- Pinned by an exact-set test on the payload keys, which fails in both directions — a leaked extra
+  field and a dropped needed one.
+
 ### Changed — the notice module loads only where a notice could appear (version 2026081400)
 
 - **Every page view used to cost one authenticated AJAX request even where nothing could be

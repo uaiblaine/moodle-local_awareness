@@ -547,4 +547,45 @@ final class notice_external_test extends \advanced_testcase {
         $this->assertArrayHasKey('id', $roles[0]);
         $this->assertArrayHasKey('name', $roles[0]);
     }
+
+    /**
+     * The notices payload carries exactly what the modal reads, and nothing else.
+     *
+     * The record used to be serialised whole, shipping pathmatch, filtervalues, cohorts, the
+     * scheduling window, resetinterval, the timestamps and the author's user id to every user the
+     * notice was displayed to. The returns declaration is PARAM_RAW JSON, so clean_returnvalue()
+     * strips nothing — this exact-set assertion is the only gate between to_record() and the
+     * browser, and it fails in both directions: a leaked extra field and a dropped needed one.
+     */
+    public function test_get_notices_payload_is_limited_to_what_the_modal_reads(): void {
+        $this->setUser($this->getDataGenerator()->create_user());
+        // Targeting metadata deliberately present, so its absence below is an exclusion, not a null.
+        $this->create_notice([
+            'pathmatch' => '/my/%',
+            'resetinterval' => 3600,
+        ]);
+
+        $notices = json_decode(external::get_notices('/my/')['notices'], true);
+        $this->assertCount(1, $notices);
+        $payload = reset($notices);
+
+        $expected = [
+            'bgimageurl',
+            'content',
+            'forcelogout',
+            'id',
+            'modal_height',
+            'modal_width',
+            'outsideclick',
+            'reqack',
+            'title',
+        ];
+        $actual = array_keys($payload);
+        sort($actual);
+        $this->assertSame($expected, $actual);
+
+        // What the modal reads is really there, so the trim cannot pass by shipping nothing.
+        $this->assertSame('Policy update', $payload['title']);
+        $this->assertStringContainsString('Read the policy.', $payload['content']);
+    }
 }
