@@ -149,9 +149,10 @@ class estimator {
      *  - has_audience_rules: bool — false means the count is the whole site, nothing was narrowed
      *
      * @param array $criteria normalised criteria
+     * @param bool $withbreakdown Whether to compute the per-rule counts as well.
      * @return array
      */
-    public function estimate(array $criteria): array {
+    public function estimate(array $criteria, bool $withbreakdown = true): array {
         $audiencerules = self::audience_rules_in($criteria);
         $contextrules = self::context_rules_in($criteria);
 
@@ -161,6 +162,15 @@ class estimator {
             'context_only_filters' => $contextrules,
             'has_audience_rules' => !empty($audiencerules),
         ];
+
+        /*
+         * The breakdown costs one more full pass over {user} per rule — with every rule set, eight
+         * scans instead of one for a row of chips only the editor's panel draws. Callers that are
+         * refreshing a saved notice's stored total ask for the total alone.
+         */
+        if (!$withbreakdown) {
+            return $result;
+        }
 
         foreach ($audiencerules as $rule) {
             /*
@@ -341,7 +351,17 @@ class estimator {
             $params += $courseparams;
         }
 
-        $sql = "SELECT COUNT(DISTINCT u.id) FROM {user} u WHERE " . implode(' AND ', $where);
+        /*
+         * COUNT(*), not COUNT(DISTINCT u.id). The FROM clause is {user} alone and every rule is an
+         * EXISTS or a comparison on u, so a user can be matched at most once and DISTINCT only buys
+         * the database a sort or hash over the whole table — measurable on a site with hundreds of
+         * thousands of users, and buying nothing.
+         *
+         * THIS DEPENDS ON THE FROM CLAUSE STAYING JOIN-FREE. Anything that joins a one-to-many
+         * table in here multiplies the rows and silently overcounts; restore DISTINCT in the same
+         * edit, or keep the new predicate inside an EXISTS as the others are.
+         */
+        $sql = "SELECT COUNT(*) FROM {user} u WHERE " . implode(' AND ', $where);
         return (int) $DB->count_records_sql($sql, $params);
     }
 

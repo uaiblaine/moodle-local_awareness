@@ -114,6 +114,21 @@ class awareness extends persistent {
                 'null' => NULL_ALLOWED,
                 'default' => null,
             ],
+            'audiencecount' => [
+                'type' => PARAM_INT,
+                'null' => NULL_ALLOWED,
+                'default' => null,
+            ],
+            'audiencecomputed' => [
+                'type' => PARAM_INT,
+                'null' => NULL_ALLOWED,
+                'default' => null,
+            ],
+            'audiencehash' => [
+                'type' => PARAM_ALPHANUMEXT,
+                'null' => NULL_ALLOWED,
+                'default' => null,
+            ],
             'outsideclick' => [
                 'type' => PARAM_INT,
                 'null' => NULL_NOT_ALLOWED,

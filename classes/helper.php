@@ -68,13 +68,17 @@ class helper {
 
     /**
      * Create new notice
+     *
      * @param \stdClass $data form data
+     * @return string The audience-estimate state the new notice was left in — see
+     *                {@see \local_awareness\audience\notice_audience}. Returned rather than
+     *                signalled, because only the caller knows whether there is a user to tell.
      * @throws \coding_exception
      * @throws \dml_exception
      * @throws \core\invalid_persistent_exception
      * @throws \required_capability_exception
      */
-    public static function create_new_notice(\stdClass $data) {
+    public static function create_new_notice(\stdClass $data): string {
         self::check_manage_capability();
 
         // Pack filter values.
@@ -128,18 +132,24 @@ class helper {
         ];
         $event = \local_awareness\event\awareness_created::create($params);
         $event->trigger();
+
+        return \local_awareness\audience\notice_audience::refresh($awareness);
     }
 
     /**
      * Update existing notice.
+     *
      * @param awareness $awareness site notice persistent
      * @param \stdClass $data form data
+     * @return string The audience-estimate state the notice was left in — see
+     *                {@see \local_awareness\audience\notice_audience}. Unchanged filters leave it
+     *                current without computing anything.
      * @throws \coding_exception
      * @throws \core\invalid_persistent_exception
      * @throws \dml_exception
      * @throws \required_capability_exception
      */
-    public static function update_notice(awareness $awareness, \stdClass $data) {
+    public static function update_notice(awareness $awareness, \stdClass $data): string {
         self::check_manage_capability();
 
         // Pack filter values.
@@ -192,6 +202,8 @@ class helper {
         ];
         $event = \local_awareness\event\awareness_updated::create($params);
         $event->trigger();
+
+        return \local_awareness\audience\notice_audience::refresh($awareness);
     }
 
     /**

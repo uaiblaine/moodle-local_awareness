@@ -6,6 +6,50 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the audience estimate belongs to the saved notice, not to the form (version 2026081501)
+
+Sized for the sites this plugin actually runs on, which carry more than 200,000 active users. At
+that size the estimate is not an interactive operation, and the previous design — a live widget
+re-estimating as the author typed — was wrong in kind, not merely in tuning.
+
+- **The editor no longer estimates on its own above the interactive limit.** The auto-trigger had no
+  user-count gate at all: it fired 800ms after each form change, so an author on a large site
+  queued a scan of every user row by typing a title. Sites at or below the new limit (default
+  **1000** users, down from a 25000 that was reasoned rather than measured) keep the live behaviour
+  and answer during the request; above it the panel waits to be asked. One limit governs both, in
+  `audience\live_mode` — separable settings would allow the worst combination, an editor that
+  auto-fires a job it then waits on cron for.
+
+- **The site's user count is cached** (MUC, one hour) and is not counted at all when the limit is 0.
+  It is a full scan of `{user}`, and it was previously paid on every estimate on exactly the sites
+  where it is expensive, only to reach the same "too large" answer.
+
+- **A saved notice now carries its audience size**, with the criteria hash it was computed from and
+  the time it was computed. The manage list gained a **Target audience** column reading those
+  columns directly, and a per-notice **Recalculate audience** action. Saving recomputes only when
+  the hash changed, so editing a title costs nothing; on a large site the work is queued and the
+  author is notified when it lands, as asynchronous course backup does.
+
+- **The stored number is labelled with what it is a statement about.** A count describes a
+  particular set of filters, so once they change it is not merely old — it is about something else.
+  Comparing hashes separates "old but true" from "about filters that no longer exist", which a
+  timestamp cannot, and the column says "Filters changed since …" rather than presenting a wrong
+  number as current.
+
+- **`COUNT(DISTINCT u.id)` became `COUNT(*)`.** The FROM clause is `{user}` alone and every rule is
+  an EXISTS, so a user matches at most once and DISTINCT only bought a sort over the whole table.
+  The per-rule breakdown is now skipped when refreshing a notice's stored total: it costs one extra
+  full pass per rule — eight scans instead of one with every rule set — for chips only the editor's
+  panel draws.
+
+- A real audience of zero rendered as "not calculated", because the panel tested the count itself as
+  a Mustache section. It tests a separate flag now.
+
+**Still open, deliberately:** the per-rule breakdown could be one pass instead of N with conditional
+aggregation (`SUM(CASE WHEN … END)` per rule). It is a real win but a self-contained rewrite of the
+query builder, and it now runs in a worker rather than in a request, so it is left to be reviewed on
+its own rather than bundled with a schema and UX change.
+
 ### Changed — the audience estimate answers on the click, deduplicates, and names what it counts (version 2026081402)
 
 - **The estimate no longer needs cron on an ordinary site.** It is a handful of `COUNT` queries, and

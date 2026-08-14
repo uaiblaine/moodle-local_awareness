@@ -74,7 +74,7 @@ if ($hassiteconfig) {
             'local_awareness/audience_sync_limit',
             new lang_string('setting:audience_sync_limit', 'local_awareness'),
             new lang_string('setting:audience_sync_limitdesc', 'local_awareness'),
-            \local_awareness\external::INLINE_LIMIT_DEFAULT,
+            \local_awareness\audience\live_mode::LIMIT_DEFAULT,
             PARAM_INT
         )
     );

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/awareness/db" VERSION="20260811" COMMENT="XMLDB file for Moodle local/awareness"
+<XMLDB PATH="local/awareness/db" VERSION="20260815" COMMENT="XMLDB file for Moodle local/awareness"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -27,6 +27,9 @@
         <FIELD NAME="modal_width" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="Custom modal width (e.g. 600px, 80%, 50vw)"/>
         <FIELD NAME="modal_height" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="Custom modal height (e.g. 400px, 70%, 50vh)"/>
         <FIELD NAME="outsideclick" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Allow dismissing notice by clicking outside the modal: 1 - YES, 0 - NO"/>
+        <FIELD NAME="audiencecount" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Last computed audience size, denormalised from the jobs table so the manage list reads a column."/>
+        <FIELD NAME="audiencecomputed" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Unix timestamp the audience size was computed at."/>
+        <FIELD NAME="audiencehash" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false" COMMENT="Criteria hash the audience size was computed from; differs from the notice's current hash when the stored size is stale."/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
@@ -100,6 +103,7 @@
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="jobid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="Public UUID-style token used by the AJAX poller."/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="User who requested the estimate."/>
+        <FIELD NAME="noticeid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Notice this estimate belongs to; null for a speculative estimate run from the editor before saving."/>
         <FIELD NAME="criteriahash" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="SHA-256 of the normalised criteria, for dedup."/>
         <FIELD NAME="criteria" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="JSON of the normalised criteria sent to the estimator."/>
         <FIELD NAME="status" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="pending" SEQUENCE="false" COMMENT="pending|ready|error"/>
@@ -115,6 +119,7 @@
       <INDEXES>
         <INDEX NAME="jobid_uq" UNIQUE="true" FIELDS="jobid"/>
         <INDEX NAME="criteriahash_ix" UNIQUE="false" FIELDS="criteriahash"/>
+        <INDEX NAME="noticeid_ix" UNIQUE="false" FIELDS="noticeid"/>
       </INDEXES>
     </TABLE>
   </TABLES>

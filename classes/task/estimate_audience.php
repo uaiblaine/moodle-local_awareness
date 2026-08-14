@@ -53,6 +53,63 @@ class estimate_audience extends \core\task\adhoc_task {
         }
 
         self::resolve($job);
+
+        /*
+         * Notified from here and not from resolve(), because this method IS the asynchronous path.
+         * A small site resolves the same job inline during the request that asked for it, and
+         * messaging someone about work they watched finish in milliseconds is noise.
+         */
+        if ($job->get('status') === audience_job::STATUS_READY && (int) $job->get('noticeid') > 0) {
+            self::notify($job);
+        }
+    }
+
+    /**
+     * Tell the person who asked that their estimate is ready.
+     *
+     * Modelled on asynchronous course backup: the work outlives the request that started it, so the
+     * result has to find its way back to a user who has long since navigated away.
+     *
+     * A failure to message must not fail the task. An adhoc task that throws is retried forever,
+     * and the estimate itself — the thing worth keeping — has already been stored by this point.
+     *
+     * @param audience_job $job A completed job carrying a notice id.
+     * @return void
+     */
+    private static function notify(audience_job $job): void {
+        global $DB;
+
+        $notice = \local_awareness\persistent\awareness::get_record(['id' => (int) $job->get('noticeid')]);
+        $user = $DB->get_record('user', ['id' => (int) $job->get('userid'), 'deleted' => 0]);
+        if (!$notice || !$user) {
+            return;
+        }
+
+        $data = (object) [
+            'title' => $notice->get('title'),
+            'count' => (int) $job->get('resultcount'),
+        ];
+
+        $message = new \core\message\message();
+        $message->component = 'local_awareness';
+        $message->name = 'audience_estimate_ready';
+        $message->userfrom = \core_user::get_noreply_user();
+        $message->userto = $user;
+        $message->subject = get_string('message:audience_ready:subject', 'local_awareness', $data);
+        $message->fullmessage = get_string('message:audience_ready:body', 'local_awareness', $data);
+        $message->fullmessageformat = FORMAT_PLAIN;
+        $message->fullmessagehtml = '';
+        $message->smallmessage = $message->subject;
+        $message->notification = 1;
+        $message->contexturl = (new \moodle_url('/local/awareness/managenotice.php'))->out(false);
+        $message->contexturlname = get_string('setting:managenotice', 'local_awareness');
+
+        try {
+            message_send($message);
+        } catch (\Throwable $e) {
+            mtrace("local_awareness: could not notify user {$user->id} about audience job "
+                . $job->get('jobid') . ': ' . $e->getMessage());
+        }
     }
 
     /**
@@ -72,7 +129,13 @@ class estimate_audience extends \core\task\adhoc_task {
             if (!is_array($criteria)) {
                 $criteria = [];
             }
-            $result = (new estimator())->estimate($criteria);
+            /*
+             * The per-rule breakdown is drawn only by the editor's panel, which raises jobs with no
+             * notice attached. A job refreshing a saved notice's stored total feeds a list column
+             * that shows one number, so it skips the extra pass per rule.
+             */
+            $withbreakdown = (int) $job->get('noticeid') <= 0;
+            $result = (new estimator())->estimate($criteria, $withbreakdown);
             $job->set('resultcount', (int) $result['count']);
             $job->set('breakdown', json_encode($result['breakdown']));
             $job->set('status', audience_job::STATUS_READY);
@@ -83,5 +146,9 @@ class estimate_audience extends \core\task\adhoc_task {
 
         $job->set('timecompleted', time());
         $job->update();
+
+        // A job raised about a saved notice carries its answer back to that notice; one raised from
+        // the editor about an unsaved form has no notice to carry it to, and record() says so.
+        \local_awareness\audience\notice_audience::record($job);
     }
 }

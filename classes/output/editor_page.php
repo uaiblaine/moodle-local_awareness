@@ -127,8 +127,16 @@ class editor_page implements renderable, templatable {
             'statusislive' => $statusislive,
         ];
 
+        /*
+         * On a site above the interactive limit the editor must not estimate on its own: each
+         * auto-fire is a scan of every user row, and the author triggers one by typing. The panel
+         * still offers the button; it just waits to be asked.
+         */
+        $islive = \local_awareness\audience\live_mode::is_live();
+
         $audience = [
-            'autotrigger' => true,
+            'autotrigger' => $islive,
+            'auto' => $islive ? 1 : 0,
             'threshold' => self::RULE_THRESHOLD,
             'poll_interval_ms' => self::POLL_INTERVAL_MS,
             'poll_max' => self::POLL_MAX,
@@ -138,13 +146,43 @@ class editor_page implements renderable, templatable {
                 ['key' => 'role', 'label' => get_string('audience:summary:role', 'local_awareness'), 'value' => 0],
                 ['key' => 'competencies', 'label' => get_string('audience:summary:competencies', 'local_awareness'), 'value' => 0],
             ],
-            'initialcount' => null,
+            'hascount' => false,
             'initialcountformatted' => '—',
             'initialstate_idle' => true,
             'initialstate_cached' => false,
             'cachedlabel' => '',
             'contextrules' => [],
         ];
+
+        /*
+         * A saved notice already carries a count, and on a site that does not estimate
+         * interactively it is the only one the author will see without asking. Render it server
+         * side so the panel is populated before any JavaScript runs, and say plainly when it
+         * describes filters the notice no longer has.
+         */
+        if ($isedit && $this->awareness->get('audiencecount') !== null) {
+            $state = \local_awareness\audience\notice_audience::state_of($this->awareness);
+            $when = userdate(
+                (int) $this->awareness->get('audiencecomputed'),
+                get_string('strftimedatetimeshort')
+            );
+
+            $audience['hascount'] = true;
+            $audience['initialcountformatted'] = get_string(
+                'audience:reach:value',
+                'local_awareness',
+                number_format((int) $this->awareness->get('audiencecount'))
+            );
+            $audience['initialstate_idle'] = false;
+            $audience['initialstate_cached'] = true;
+            $audience['cachedlabel'] = get_string(
+                $state === \local_awareness\audience\notice_audience::STATE_STALE
+                    ? 'notice:audience:stale'
+                    : 'notice:audience:computed',
+                'local_awareness',
+                $when
+            );
+        }
 
         $actionbar = [
             'formid' => $this->formid,
