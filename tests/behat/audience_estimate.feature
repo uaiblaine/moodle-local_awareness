@@ -35,3 +35,16 @@ Feature: The audience estimate panel calculates how many users a notice will rea
     # Re-trigger so the panel polls and renders the cached result.
     And I press "Calculate reach"
     Then I should see "2" in the ".la-audience-reach-value" "css_element"
+
+  @javascript
+  Scenario: With no audience filter the estimate is the whole site rather than a dead button
+    When I navigate to "Awareness > Manage" in site administration
+    And I click on "Create new notice" "link"
+    And I wait until ".local-awareness-editor" "css_element" exists
+    And I set the field "Title" to "Unfiltered scenario"
+    And I press "Calculate reach"
+    And I run all adhoc tasks
+    And I press "Calculate reach"
+    # The three fixture users plus admin; guest is not a real user and is excluded.
+    Then I should see "4" in the ".la-audience-reach-value" "css_element"
+    And I should see "No audience filter set"

@@ -20,6 +20,7 @@ use local_awareness\helper;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\audience_job;
 use local_awareness\audience\estimator;
+use local_awareness\audience\rule_describer;
 use local_awareness\local\collision;
 use local_awareness\task\estimate_audience as estimate_audience_task;
 use core_external\external_api;
@@ -37,6 +38,9 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class external extends external_api {
+    /** Default user count up to which an audience estimate is computed during the request. */
+    public const INLINE_LIMIT_DEFAULT = 25000;
+
     /**
      * Parameters.
      *
@@ -521,8 +525,13 @@ class external extends external_api {
     }
 
     /**
-     * Enqueue (or reuse) an audience-estimate job. Returns the job id the
-     * client should poll.
+     * Resolve, enqueue or reuse an audience-estimate job. Returns the job id the client should poll.
+     *
+     * The estimate is a handful of COUNT queries, so on most sites it is finished before the
+     * response is written and there is nothing to wait for. Handing every one of them to cron cost
+     * the author minutes of "Calculating in the background…" for work that took milliseconds, and
+     * on a site with no cron it never resolved at all. Above the configured user count the async
+     * path remains, because there the cost is real.
      *
      * @param string $criteria JSON-encoded criteria object
      * @return array
@@ -556,6 +565,15 @@ class external extends external_api {
             ];
         }
 
+        // Otherwise join one already queued for the same criteria rather than queueing a duplicate.
+        if ($inflight = audience_job::find_in_flight($hash)) {
+            return [
+                'jobid' => $inflight->get('jobid'),
+                'status' => $inflight->get('status'),
+                'reused' => true,
+            ];
+        }
+
         $job = new audience_job(0, (object) [
             'jobid' => audience_job::new_jobid(),
             'userid' => (int) $USER->id,
@@ -564,6 +582,16 @@ class external extends external_api {
             'status' => audience_job::STATUS_PENDING,
         ]);
         $job->create();
+
+        if (self::can_estimate_inline()) {
+            estimate_audience_task::resolve($job);
+
+            return [
+                'jobid' => $job->get('jobid'),
+                'status' => $job->get('status'),
+                'reused' => false,
+            ];
+        }
 
         $task = new estimate_audience_task();
         $task->set_custom_data(['jobid' => $job->get('jobid')]);
@@ -575,6 +603,32 @@ class external extends external_api {
             'status' => audience_job::STATUS_PENDING,
             'reused' => false,
         ];
+    }
+
+    /**
+     * Whether this site is small enough to answer an estimate during the request.
+     *
+     * Decided on the user count because that is what the estimate scans: every rule is an EXISTS
+     * against one row per user. Zero disables the inline path entirely, which is the escape hatch
+     * for a site whose database makes even a small count expensive.
+     *
+     * @return bool
+     */
+    private static function can_estimate_inline(): bool {
+        global $DB;
+
+        /*
+         * An unset setting means "not configured", not "disabled". Reading it as 0 would silently
+         * turn the inline path off on any site whose upgrade had not yet stored the default, which
+         * is exactly the cron-dependent behaviour this replaced. Only an explicit 0 disables it.
+         */
+        $stored = get_config('local_awareness', 'audience_sync_limit');
+        $limit = ($stored === false || $stored === '') ? self::INLINE_LIMIT_DEFAULT : (int) $stored;
+        if ($limit <= 0) {
+            return false;
+        }
+
+        return $DB->count_records_select('user', 'deleted = 0') <= $limit;
     }
 
     /**
@@ -633,13 +687,31 @@ class external extends external_api {
 
         $criteria = json_decode($job->get('criteria'), true) ?: [];
         $hasaudience = !empty(estimator::audience_rules_in($criteria));
-        $contextrules = estimator::context_rules_in($criteria);
+
+        /*
+         * Names are resolved here and not stored on the job. Jobs are shared between callers by
+         * criteria hash, so a label written at compute time would be served to the next reader in
+         * the language of the first — the same reason a web service emitting localised strings
+         * cannot cache them without the language in the key.
+         */
+        $contextrules = [];
+        foreach (estimator::context_rules_in($criteria) as $rule) {
+            $rule['display'] = rule_describer::describe($rule['key'], $rule['values']);
+            $contextrules[] = $rule;
+        }
+
+        $breakdown = json_decode($job->get('breakdown') ?: '[]', true);
+        $breakdown = is_array($breakdown) ? $breakdown : [];
+        foreach ($breakdown as $i => $row) {
+            $key = (string) ($row['key'] ?? '');
+            $breakdown[$i]['display'] = rule_describer::describe($key, $criteria[$key] ?? null);
+        }
 
         return [
             'jobid' => $job->get('jobid'),
             'status' => $job->get('status'),
             'count' => $job->get('resultcount'),
-            'breakdown' => $job->get('breakdown') ?: '[]',
+            'breakdown' => json_encode($breakdown),
             'context_only_filters' => json_encode($contextrules),
             'has_audience_rules' => $hasaudience,
             'errormsg' => $job->get('errormsg'),

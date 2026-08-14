@@ -32,14 +32,21 @@ define([], function() {
     // (filter_role, filter_category, …), which are snake_case by contract.
     /* eslint-disable camelcase */
 
-    var AUDIENCE_KEYS = ['cohorts', 'filter_role', 'reqcourse'];
-    var CONTEXT_KEYS = [
-        'pathmatch',
+    // Must stay in step with estimator::AUDIENCE_FIELDS / CONTEXT_FIELDS — the server decides the
+    // number, these decide what the panel says about it. A rule is audience-shaping when it can be
+    // answered about a user; pathmatch and the theme are properties of the page alone.
+    var AUDIENCE_KEYS = [
+        'cohorts',
+        'filter_role',
+        'reqcourse',
         'filter_category',
         'filter_course',
         'filter_format',
-        'filter_theme',
         'filter_competency_rules'
+    ];
+    var CONTEXT_KEYS = [
+        'pathmatch',
+        'filter_theme'
     ];
 
     /**

@@ -42,9 +42,15 @@ final class audience_external_test extends \advanced_testcase {
         external::estimate_audience(json_encode(['cohorts' => [1]]));
     }
 
+    /**
+     * Above the inline limit the estimate still goes to cron.
+     *
+     * The limit is set to 0 rather than relying on the site being large, which no test site is.
+     */
     public function test_estimate_audience_enqueues_job_and_returns_pending_status(): void {
         global $DB;
         $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
         $cohort = $this->getDataGenerator()->create_cohort();
 
         $response = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
@@ -64,8 +70,13 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertCount(1, $tasks);
     }
 
+    /**
+     * A completed job is reused. Pinned to the queued path, which is the lifecycle it describes —
+     * inline resolution would complete the job before the task ever ran.
+     */
     public function test_estimate_audience_reuses_recent_completed_job(): void {
         $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
         $cohort = $this->getDataGenerator()->create_cohort();
         cohort_add_member($cohort->id, $this->getDataGenerator()->create_user()->id);
 
@@ -86,6 +97,7 @@ final class audience_external_test extends \advanced_testcase {
 
     public function test_get_estimate_returns_pending_then_ready(): void {
         $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
         $cohort = $this->getDataGenerator()->create_cohort();
         cohort_add_member($cohort->id, $this->getDataGenerator()->create_user()->id);
 
@@ -105,28 +117,168 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertTrue($ready['has_audience_rules']);
     }
 
+    /**
+     * On a site under the limit the answer is ready before the response is written.
+     *
+     * The empty adhoc queue is the half that matters: a job that came back ready because cron
+     * happened to run would satisfy the status assertion alone.
+     */
+    public function test_estimate_audience_answers_inline_on_a_small_site(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $cohort = $this->getDataGenerator()->create_cohort();
+        cohort_add_member($cohort->id, $this->getDataGenerator()->create_user()->id);
+
+        $response = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+
+        $this->assertSame('ready', $response['status']);
+        $this->assertFalse($response['reused']);
+        $this->assertSame(0, $DB->count_records(
+            'task_adhoc',
+            ['classname' => '\\local_awareness\\task\\estimate_audience']
+        ));
+
+        $ready = external::get_estimate($response['jobid']);
+        $this->assertSame(1, (int) $ready['count']);
+    }
+
+    /**
+     * A second request for criteria already queued joins that job instead of queueing another.
+     *
+     * The editor re-estimates on every form change, so without this a burst of edits left a burst
+     * of identical adhoc tasks behind. Only the queued path can produce the collision, so the
+     * inline path is switched off here.
+     */
+    public function test_estimate_audience_joins_a_job_already_in_flight(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
+        $cohort = $this->getDataGenerator()->create_cohort();
+
+        $first = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $second = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+
+        $this->assertSame($first['jobid'], $second['jobid']);
+        $this->assertTrue($second['reused']);
+        $this->assertSame('pending', $second['status']);
+        $this->assertSame(1, $DB->count_records('local_awareness_audience_jobs'));
+        $this->assertSame(1, $DB->count_records(
+            'task_adhoc',
+            ['classname' => '\\local_awareness\\task\\estimate_audience']
+        ));
+
+        // Control: different criteria are not merged into it, so the dedup is by criteria and not
+        // simply "one job at a time".
+        $other = external::estimate_audience(json_encode(['cohorts' => [$cohort->id], 'pathmatch' => '/my/']));
+        $this->assertNotSame($first['jobid'], $other['jobid']);
+        $this->assertSame(2, $DB->count_records('local_awareness_audience_jobs'));
+    }
+
+    /**
+     * A stale queued job is not joined — a new one is started instead.
+     */
+    public function test_estimate_audience_does_not_join_a_job_past_its_window(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
+        $cohort = $this->getDataGenerator()->create_cohort();
+
+        $first = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+
+        // Age it past the window the client would still be polling within.
+        $DB->set_field(
+            'local_awareness_audience_jobs',
+            'timecreated',
+            time() - audience_job::PENDING_WINDOW - 60,
+            ['jobid' => $first['jobid']]
+        );
+
+        $second = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+
+        $this->assertNotSame($first['jobid'], $second['jobid']);
+        $this->assertFalse($second['reused']);
+    }
+
+    /**
+     * The chips name the categories and courses a rule points at, rather than their ids.
+     */
+    public function test_get_estimate_describes_rule_values_by_name(): void {
+        $this->setAdminUser();
+        $category = $this->getDataGenerator()->create_category(['name' => 'Engineering school']);
+        $course = $this->getDataGenerator()->create_course([
+            'category' => $category->id,
+            'fullname' => 'Thermodynamics 101',
+        ]);
+
+        $response = external::estimate_audience(json_encode([
+            'filter_category' => [$category->id],
+            'filter_course' => [$course->id],
+            'pathmatch' => '/my/',
+        ]));
+        $ready = external::get_estimate($response['jobid']);
+
+        $breakdown = json_decode($ready['breakdown'], true);
+        $display = array_column($breakdown, 'display', 'key');
+        $this->assertSame('Engineering school', $display['filter_category']);
+        $this->assertSame('Thermodynamics 101', $display['filter_course']);
+
+        $context = json_decode($ready['context_only_filters'], true);
+        $this->assertSame('/my/', array_column($context, 'display', 'key')['pathmatch']);
+    }
+
+    /**
+     * The names are resolved when the job is read, never stored on it.
+     *
+     * Jobs are shared between callers by criteria hash, so a name written into the stored result
+     * would be served to the next reader in the language of the first. This asserts the mechanism
+     * rather than the symptom, which would need a second language pack installed to observe.
+     */
+    public function test_the_stored_job_carries_no_resolved_names(): void {
+        $this->setAdminUser();
+        $category = $this->getDataGenerator()->create_category(['name' => 'Engineering school']);
+
+        $response = external::estimate_audience(json_encode(['filter_category' => [$category->id]]));
+
+        $stored = audience_job::get_record(['jobid' => $response['jobid']])->get('breakdown');
+        $this->assertStringNotContainsString('Engineering school', (string) $stored);
+        $this->assertStringNotContainsString('display', (string) $stored);
+
+        // Control: the name does reach the caller, so its absence above is about storage and not
+        // about the rule having been dropped.
+        $ready = external::get_estimate($response['jobid']);
+        $this->assertStringContainsString('Engineering school', $ready['breakdown']);
+    }
+
     public function test_get_estimate_with_unknown_jobid_returns_error(): void {
         $this->setAdminUser();
         $response = external::get_estimate('00000000-0000-4000-8000-000000000000');
         $this->assertSame('error', $response['status']);
     }
 
+    /**
+     * The page-only rules travel back as restrictions, and leave the count at the whole site.
+     *
+     * pathmatch and the theme are the only two rules that say nothing about a user. The category
+     * rule used to sit here too, and moved to the count when it turned out to bound reach through
+     * enrolment; a notice carrying nothing but these two still reaches everybody.
+     */
     public function test_get_estimate_returns_context_only_filters(): void {
         $this->setAdminUser();
-        $req = external::estimate_audience(json_encode(['pathmatch' => 'my/?', 'filter_category' => [3]]));
+        $this->getDataGenerator()->create_user();
 
-        $task = new estimate_audience_task();
-        $task->set_custom_data(['jobid' => $req['jobid']]);
-        $task->execute();
+        $req = external::estimate_audience(json_encode(['pathmatch' => 'my/?', 'filter_theme' => ['boost']]));
 
         $ready = external::get_estimate($req['jobid']);
         $this->assertSame('ready', $ready['status']);
         $this->assertFalse($ready['has_audience_rules']);
-        $this->assertSame(0, (int) $ready['count']);
+        $this->assertGreaterThan(0, (int) $ready['count']);
         $context = json_decode($ready['context_only_filters'], true);
         $this->assertCount(2, $context);
         $keys = array_column($context, 'key');
         $this->assertContains('pathmatch', $keys);
-        $this->assertContains('filter_category', $keys);
+        $this->assertContains('filter_theme', $keys);
     }
 }
