@@ -15,7 +15,12 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Inject to every page.
+ * Plugin file serving.
+ *
+ * The decision to load the notice module lives in
+ * \local_awareness\local\hook_callbacks::before_footer_html_generation(), registered in
+ * db/hooks.php — not here. It used to be a navigation callback in this file; the hook fires
+ * later in the render, when $PAGE->url is settled enough to judge the page rules.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -23,35 +28,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use local_awareness\helper;
-
-/**
- * A callback to extend navigation.
- *
- * @param \global_navigation $navigation Navigation instance.
- */
-function local_awareness_extend_navigation(global_navigation $navigation) {
-    global $PAGE;
-
-    if (!isloggedin() || !get_config('local_awareness', 'enabled')) {
-        return;
-    }
-
-    try {
-        /*
-         * This decides one thing only: whether to load the JS. It has no page URL to filter with,
-         * so it deliberately answers the page-independent question and over-reports. The definitive
-         * path and filter check happens in the AJAX call (get_notices), which is the only caller
-         * that carries the real page URL — and the only one that returns any notice content.
-         */
-        if (helper::has_candidate_notices()) {
-            $PAGE->requires->js_call_amd('local_awareness/notice', 'init', []);
-        }
-    } catch (Exception $exception) {
-        debugging($exception->getMessage());
-        return;
-    }
-}
 /**
  * Serve the files from the MYPLUGIN file areas
  *

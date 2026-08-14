@@ -24,6 +24,11 @@ Feature: Notices are filtered by the page the user is actually on
   # changes is the URL the browser reports. The closing "should see" is the control for the opening
   # "should not see": it proves the module loaded, the AJAX call ran and the notice really was live
   # for this user, so the Dashboard result was a filtering decision and not a dead pipeline.
+  #
+  # The module steps pin the footer-hook probe: on the Dashboard the module must not merely show
+  # nothing, it must not have been delivered at all — that absent module IS the saved request this
+  # change exists for. On the profile page the module must be delivered, or a path-restricted
+  # notice could never appear anywhere.
   @javascript
   Scenario: A notice restricted to a path is shown there and nowhere else
     Given the following site notices exist
@@ -32,8 +37,10 @@ Feature: Notices are filtered by the page the user is actually on
     When I log in as "bilbo"
     And I visit "/my/"
     Then I should not see "this notice belongs to the profile"
+    And the awareness notice module should not be loaded
     And I visit "/user/profile.php"
     Then I should see "this notice belongs to the profile"
+    And the awareness notice module should be loaded
 
   @javascript
   Scenario: A notice with no path rule is still shown everywhere
