@@ -469,12 +469,17 @@ define([
         });
     }
 
-    /** Recompute mode (auto vs manual) based on current rule counts. */
+    /** Recompute mode (auto vs manual) based on site size and current rule counts. */
     function recomputeMode() {
         var criteria = criteriaReader.read();
         updateSummary(criteria);
         var totalRules = criteriaReader.countAudienceRules(criteria) + criteriaReader.countContextRules(criteria);
-        var newAutoMode = totalRules <= state.threshold;
+        /*
+         * Site size first, and it is not overridable by the rule count: on a large site every
+         * estimate scans every user row, so the editor must never start one on its own — the
+         * author would trigger a full scan by typing a title.
+         */
+        var newAutoMode = state.autoEnabled && totalRules <= state.threshold;
 
         // Keep the manual calculate button available regardless of mode.
         if (state.slots.calcBtn) {
@@ -484,7 +489,9 @@ define([
         if (newAutoMode !== state.autoMode) {
             state.autoMode = newAutoMode;
             if (!newAutoMode) {
-                setState(state.strings.rulesTooMany);
+                // Two reasons to be manual, and they need different sentences: a large site is a
+                // standing fact the author cannot change from this form, too many rules is not.
+                setState(state.autoEnabled ? state.strings.rulesTooMany : state.strings.manualReady);
                 stopPolling();
             }
         }
@@ -538,6 +545,13 @@ define([
                 || parseInt(root.getAttribute('data-poll-interval-ms'), 10) || 10000;
             state.pollMax = config.pollMax
                 || parseInt(root.getAttribute('data-poll-max'), 10) || 30;
+            /*
+             * Defaults to on when the attribute is absent, so a stale cached template degrades to
+             * the old behaviour rather than to a panel that silently never estimates. Only an
+             * explicit "0" — which the server writes whenever the site is over the limit — turns
+             * the automatic path off.
+             */
+            state.autoEnabled = root.getAttribute('data-auto') !== '0';
 
             loadStrings().then(function() {
                 state.autoMode = recomputeMode();
@@ -552,8 +566,17 @@ define([
                     });
                 }
                 bindFormChanges();
-                // Initial sync of context chips & summary.
-                debouncedTrigger();
+                if (state.autoEnabled) {
+                    // Initial sync of context chips & summary.
+                    debouncedTrigger();
+                } else if (!state.slots.value || state.slots.value.textContent.trim() === '—') {
+                    /*
+                     * Only when the server rendered no stored count. On a large site that count and
+                     * its date are the whole point of the panel, and overwriting the status line
+                     * with "click when you are ready" would throw away the answer beside it.
+                     */
+                    setState(state.strings.manualReady);
+                }
                 return null;
             }).catch(function() { /* String loading failed — panel stays idle. */ });
 

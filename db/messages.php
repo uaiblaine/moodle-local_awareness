@@ -15,32 +15,19 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Cache details.
+ * Message providers.
  *
  * @package    local_awareness
- * @copyright  Catalyst IT
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$definitions = [
-    'enabled_notices' => [
-        'mode' => cache_store::MODE_APPLICATION,
-    ],
-    'notice_view' => [
-        'mode' => cache_store::MODE_APPLICATION,
-    ],
-    'user_notices' => [
-        'mode' => cache_store::MODE_SESSION,
-    ],
-    // The site's user count, which decides whether an audience estimate may run interactively.
-    // Short-lived rather than invalidated: no event marks "the site got big", and being an hour
-    // stale only shifts the estimate between two paths that both produce the same number.
-    'site_user_count' => [
-        'mode' => cache_store::MODE_APPLICATION,
-        'simplekeys' => true,
-        'ttl' => 3600,
+$messageproviders = [
+    // On a site large enough for the audience estimate to run in the background, the answer arrives
+    // long after the author has navigated away from the editor.
+    'audience_estimate_ready' => [
+        'capability' => 'local/awareness:manage',
     ],
 ];

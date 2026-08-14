@@ -22,6 +22,7 @@ use renderable;
 use local_awareness\helper;
 use moodle_url;
 use local_awareness\local\collision;
+use local_awareness\audience\notice_audience;
 use html_writer;
 
 defined('MOODLE_INTERNAL') || die();
@@ -79,6 +80,7 @@ class all_notices extends table_sql implements renderable {
             'timestart' => get_string('notice:activefrom', 'local_awareness'),
             'timeend' => get_string('notice:expiry', 'local_awareness'),
             'cohort' => get_string('notice:cohort', 'local_awareness'),
+            'audience' => get_string('notice:audience', 'local_awareness'),
             'content' => get_string('notice:content', 'local_awareness'),
             'actions' => get_string('actions'),
             'timemodified' => get_string('notice:timemodified', 'local_awareness'),
@@ -179,6 +181,14 @@ class all_notices extends table_sql implements renderable {
         }
         $links .= ' ' . $editlink;
 
+        // Recalculate the audience.
+        $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'recalculate', 'sesskey' => sesskey()];
+        $editurl = new moodle_url($editnotice, $editparams);
+        $label = get_string('notice:audience:recalculate', 'local_awareness');
+        $icon = $OUTPUT->pix_icon('i/calc', $label);
+        $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--recalculate');
+        $links .= ' ' . $editlink;
+
         // Reset.
         $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'reset', 'sesskey' => sesskey()];
         $editurl = new moodle_url($editnotice, $editparams);
@@ -216,6 +226,67 @@ class all_notices extends table_sql implements renderable {
         }
 
         return $links;
+    }
+
+    /**
+     * Custom target-audience column.
+     *
+     * Reads the count denormalised onto the notice rather than resolving the latest job per row,
+     * which on a page of twenty notices would be twenty extra queries for a column.
+     *
+     * The number is always shown with what it is a statement about. A count computed before the
+     * filters changed is not merely old — it describes a different notice — so it is labelled
+     * "filters changed since" rather than being silently presented as current.
+     *
+     * @param awareness $awareness a notice record.
+     * @return string
+     */
+    protected function col_audience(awareness $awareness): string {
+        $count = $awareness->get('audiencecount');
+        $computed = (int) $awareness->get('audiencecomputed');
+        $state = notice_audience::state_of($awareness);
+
+        if ($state === notice_audience::STATE_PENDING) {
+            return html_writer::tag(
+                'span',
+                get_string('notice:audience:pending', 'local_awareness'),
+                ['class' => 'badge bg-info text-white']
+            );
+        }
+
+        if ($count === null) {
+            return html_writer::tag(
+                'span',
+                get_string('notice:audience:never', 'local_awareness'),
+                ['class' => 'text-muted']
+            );
+        }
+
+        $value = html_writer::tag(
+            'span',
+            get_string('notice:audience:value', 'local_awareness', number_format((int) $count)),
+            ['class' => 'd-block']
+        );
+
+        $whenkey = ($state === notice_audience::STATE_STALE)
+            ? 'notice:audience:stale'
+            : 'notice:audience:computed';
+        /*
+         * bg-warning takes text-dark explicitly: Bootstrap 4 gives .badge no colour and Bootstrap 5
+         * defaults it to white, so a light fill renders white on near-white on 5.x. Enforced by
+         * tests/local/bootstrap_compat_test.php.
+         */
+        $whenclass = ($state === notice_audience::STATE_STALE)
+            ? 'badge bg-warning text-dark'
+            : 'text-muted small';
+
+        $when = html_writer::tag(
+            'span',
+            get_string($whenkey, 'local_awareness', userdate($computed, get_string('strftimedatetimeshort'))),
+            ['class' => $whenclass]
+        );
+
+        return $value . $when;
     }
 
     /**

@@ -63,6 +63,11 @@ class audience_job extends persistent {
                 'type' => PARAM_INT,
                 'null' => NULL_NOT_ALLOWED,
             ],
+            'noticeid' => [
+                'type' => PARAM_INT,
+                'null' => NULL_ALLOWED,
+                'default' => null,
+            ],
             'criteriahash' => [
                 'type' => PARAM_ALPHANUMEXT,
                 'null' => NULL_NOT_ALLOWED,

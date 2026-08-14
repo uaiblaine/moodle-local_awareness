@@ -205,5 +205,42 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026081200, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026081501) {
+        $table = new xmldb_table('local_awareness');
+
+        /*
+         * The last computed audience size, kept on the notice so the manage list reads a column
+         * instead of resolving "the latest job for this notice" once per row. The jobs table stays
+         * the record of computations; this is the pointer at the newest one.
+         *
+         * audiencehash is what makes the number honest. A stored count describes the criteria it
+         * was computed from, so comparing it against the notice's current hash separates "old but
+         * still true" from "about filters that no longer exist" — which a timestamp alone cannot.
+         */
+        $fields = [
+            new xmldb_field('audiencecount', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'outsideclick'),
+            new xmldb_field('audiencecomputed', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'audiencecount'),
+            new xmldb_field('audiencehash', XMLDB_TYPE_CHAR, '64', null, null, null, null, 'audiencecomputed'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+
+        $jobs = new xmldb_table('local_awareness_audience_jobs');
+        $noticeid = new xmldb_field('noticeid', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'userid');
+        if (!$dbman->field_exists($jobs, $noticeid)) {
+            $dbman->add_field($jobs, $noticeid);
+        }
+
+        $index = new xmldb_index('noticeid_ix', XMLDB_INDEX_NOTUNIQUE, ['noticeid']);
+        if (!$dbman->index_exists($jobs, $index)) {
+            $dbman->add_index($jobs, $index);
+        }
+
+        upgrade_plugin_savepoint(true, 2026081501, 'local', 'awareness');
+    }
+
     return true;
 }

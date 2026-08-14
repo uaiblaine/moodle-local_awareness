@@ -6,9 +6,11 @@
     idle / queued / cached / error / timeout states.
 
     Context variables required:
-    * audience.autotrigger (bool) — true when ≤3 audience-shaping rules
+    * audience.autotrigger (bool) — true when the site is small enough to estimate as you edit
+    * audience.auto (int) — the same decision as 1 or 0, read by the JS from data-auto
     * audience.summary (array of {labelkey, value})
-    * audience.initialcount (int|null)
+    * audience.hascount (bool) — whether a stored count exists to render
+    * audience.initialcountformatted (string) — that count, formatted
     * audience.initialstate (string) — idle|cached|...
     * audience.contextrules (array of {key, label})
     * audience.threshold (int) — used by JS via data attribute
@@ -19,8 +21,10 @@
     {
         "audience": {
             "autotrigger": true,
+            "auto": 1,
             "summary": [{"labelkey": "audience:summary:cohorts", "value": 0}],
-            "initialcount": null,
+            "hascount": false,
+            "initialcountformatted": "—",
             "initialstate": "idle",
             "contextrules": [],
             "threshold": 3,
@@ -32,6 +36,7 @@
 <section class="la-audience"
          data-region="la-audience"
          data-threshold="{{audience.threshold}}"
+         data-auto="{{audience.auto}}"
          data-poll-interval-ms="{{audience.poll_interval_ms}}"
          data-poll-max="{{audience.poll_max}}"
          aria-labelledby="la-audience-title">
@@ -61,8 +66,10 @@
             </span>
         </div>
         <div class="la-audience-reach-value" data-slot="value">
-            {{#audience.initialcount}}{{audience.initialcountformatted}}{{/audience.initialcount}}
-            {{^audience.initialcount}}—{{/audience.initialcount}}
+            {{! hascount, not initialcount: a real audience of zero is a number worth showing, and
+                a section on the value itself would render it as "not calculated". }}
+            {{#audience.hascount}}{{audience.initialcountformatted}}{{/audience.hascount}}
+            {{^audience.hascount}}—{{/audience.hascount}}
         </div>
     </div>
 

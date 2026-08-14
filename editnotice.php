@@ -42,7 +42,7 @@ $noticeid = optional_param('noticeid', 0, PARAM_INT);
 $action = optional_param('action', 'create', PARAM_TEXT);
 
 // Enforce sesskey on any state-changing action to prevent CSRF.
-$actionsrequiressesskey = ['disable', 'enable', 'reset', 'unconfirmeddelete', 'confirmeddelete'];
+$actionsrequiressesskey = ['disable', 'enable', 'reset', 'unconfirmeddelete', 'confirmeddelete', 'recalculate'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' || in_array($action, $actionsrequiressesskey, true)) {
     require_sesskey();
 }
@@ -107,11 +107,12 @@ if ($formdata = $mform->get_data()) {
 
     if (!$awareness) {
         // Create new notice.
-        helper::create_new_notice($formdata);
+        $audiencestate = helper::create_new_notice($formdata);
     } else {
         // Update notice.
-        helper::update_notice($awareness, $formdata);
+        $audiencestate = helper::update_notice($awareness, $formdata);
     }
+
 
     if (!empty($clashes)) {
         $titles = array_map(function ($notice): string {
@@ -123,6 +124,22 @@ if ($formdata = $mform->get_data()) {
             get_string('collision:saved', 'local_awareness', implode(', ', $titles)),
             null,
             \core\output\notification::NOTIFY_WARNING
+        );
+    }
+
+    /*
+     * Ranked below the collision warning on purpose: a competing notice is something the author may
+     * want to go back and change, a queued estimate is only news. It still has to be said, though —
+     * on a site too large to estimate during a request the author is about to land on a list whose
+     * audience column shows the previous number, or none, and an empty column reads as "reaches
+     * nobody" rather than "not counted yet".
+     */
+    if ($audiencestate === \local_awareness\audience\notice_audience::STATE_PENDING) {
+        redirect(
+            $managenoticepage,
+            get_string('notice:audience:queued', 'local_awareness', $formdata->title),
+            null,
+            \core\output\notification::NOTIFY_INFO
         );
     }
 
@@ -176,6 +193,22 @@ switch ($action) {
     case 'reset':
         helper::reset_notice($awareness);
         redirect($managenoticepage);
+        break;
+    case 'recalculate':
+        // Forced: the author asked for this number specifically, so an up-to-date hash is not a
+        // reason to refuse — the site's population moves under a notice whose filters never change.
+        $state = \local_awareness\audience\notice_audience::refresh($awareness, true);
+        $pending = $state === \local_awareness\audience\notice_audience::STATE_PENDING;
+        redirect(
+            $managenoticepage,
+            get_string(
+                $pending ? 'notice:audience:queued' : 'notice:audience:recalculated',
+                'local_awareness',
+                $awareness->get('title')
+            ),
+            null,
+            $pending ? \core\output\notification::NOTIFY_INFO : \core\output\notification::NOTIFY_SUCCESS
+        );
         break;
     case 'disable':
         helper::disable_notice($awareness);

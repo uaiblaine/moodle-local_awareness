@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\audience\live_mode;
 use local_awareness\persistent\audience_job;
 use local_awareness\task\estimate_audience as estimate_audience_task;
 
@@ -141,6 +142,40 @@ final class audience_external_test extends \advanced_testcase {
 
         $ready = external::get_estimate($response['jobid']);
         $this->assertSame(1, (int) $ready['count']);
+    }
+
+    /**
+     * A site over the limit queues the estimate rather than answering during the request.
+     *
+     * The limit is crossed with a real user count rather than by setting it to 0, so this exercises
+     * the comparison and not the disabled short-circuit beside it.
+     */
+    public function test_estimate_audience_queues_when_the_site_is_over_the_limit(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $cohort = $this->getDataGenerator()->create_cohort();
+        $this->getDataGenerator()->create_user();
+
+        // Admin plus the new user already exceed a limit of one.
+        set_config('audience_sync_limit', 1, 'local_awareness');
+        live_mode::reset_cache();
+        $this->assertGreaterThan(1, $DB->count_records_select('user', 'deleted = 0'));
+
+        $response = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+
+        $this->assertSame('pending', $response['status']);
+        $this->assertSame(1, $DB->count_records(
+            'task_adhoc',
+            ['classname' => '\\local_awareness\\task\\estimate_audience']
+        ));
+
+        // Control: the same site under a limit it does meet answers inline, so the difference is
+        // the limit and not something else about this fixture.
+        set_config('audience_sync_limit', 100000, 'local_awareness');
+        live_mode::reset_cache();
+        $other = external::estimate_audience(json_encode(['cohorts' => [$cohort->id], 'pathmatch' => '/my/']));
+        $this->assertSame('ready', $other['status']);
     }
 
     /**
