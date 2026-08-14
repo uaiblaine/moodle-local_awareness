@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\local\page_probe;
 use local_awareness\local\role_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
@@ -429,17 +430,35 @@ class helper {
     /**
      * Whether any notice could reach this user once they are on a page.
      *
-     * local_awareness_extend_navigation() only has to decide whether to load the JS, and it has no
-     * trustworthy page URL to filter with. This therefore skips the page-dependent rules and is a
-     * SUPERSET of what the user will actually be shown: it answers "is it worth asking?", never
-     * "what may this user read". Nothing rendered may be derived from it — the AJAX call, which
-     * does carry a page URL, performs the real filtering.
+     * The footer hook only has to decide whether to load the JS, so this stays a SUPERSET of what
+     * the user will actually be shown: it answers "is it worth asking?", never "what may this user
+     * read". Nothing rendered may be derived from it — the AJAX call, which carries the browser's
+     * page URL, performs the real filtering.
      *
+     * Given a page probe, the superset narrows to the page: candidates that cannot match this
+     * page's cheap, safe rules (pathmatch and the course/category/format/theme filters — see
+     * page_probe) stop counting, so pages where nothing could appear stop loading the module and
+     * stop paying the XHR. Every uncertainty inside the probe admits, so narrowing never crosses
+     * into "the notice was due and the JS did not load". Without a probe the old page-independent
+     * answer is preserved.
+     *
+     * @param \local_awareness\local\page_probe|null $page What the current render can tell us, if anything.
      * @return bool
      * @throws \dml_exception
      */
-    public static function has_candidate_notices(): bool {
-        return !empty(self::collect_user_notices('', 0, false));
+    public static function has_candidate_notices(?page_probe $page = null): bool {
+        $candidates = self::collect_user_notices('', 0, false);
+
+        if ($page === null) {
+            return !empty($candidates);
+        }
+
+        foreach ($candidates as $notice) {
+            if ($page->admits($notice)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1401,7 +1420,7 @@ class helper {
             return true;
         }
 
-        // Use passed URL from JS, or try $PAGE->url as fallback (e.g. when called from extend_navigation).
+        // Use the passed URL, or try $PAGE->url as a fallback for a caller that has none.
         if (!empty($pageurl)) {
             $target = $pageurl;
         } else {

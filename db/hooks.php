@@ -15,19 +15,19 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details.
+ * Hook callbacks for local_awareness.
  *
  * @package    local_awareness
- * @copyright  Catalyst IT
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_awareness'; // Full name of the plugin (used for diagnostics).
-$plugin->version   = 2026081400;         // The current module version (Date: YYYYMMDDXX).
-$plugin->release = 'v1.0';
-$plugin->requires = 2024100700;          // Requires Moodle 4.5 or later.
-$plugin->supported = [405, 502];  // Supported from Moodle 4.5 to 5.2.
-$plugin->maturity = MATURITY_STABLE;
+$callbacks = [
+    [
+        'hook' => \core\hook\output\before_footer_html_generation::class,
+        'callback' => \local_awareness\local\hook_callbacks::class . '::before_footer_html_generation',
+        'priority' => 0,
+    ],
+];

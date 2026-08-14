@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\local\page_probe;
 use local_awareness\persistent\awareness;
 
 /**
@@ -263,14 +264,15 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
-     * The navigation probe deliberately ignores the page rules, and the display path applies them.
+     * The probe is a page-aware superset of the display path.
      *
-     * Both halves are load-bearing and pull in opposite directions. If the probe ever narrowed to
-     * what the user can actually see right now, a notice restricted to one path would stop loading
-     * the JS module anywhere — including on the very path it targets — and could never be shown.
-     * If the display path ever widened to match the probe, the notice would appear everywhere.
+     * This deliberately replaces the previous contract, which pinned the probe as page-INDEPENDENT.
+     * The probe may now say "no" for a page — that is the whole point of the footer-hook redesign —
+     * but only from the cheap page rules, and only when given a page: without one it must keep the
+     * old page-independent answer, and with one it must still admit every notice the display path
+     * would show on that page. The display path itself is pinned unchanged in both directions.
      */
-    public function test_has_candidate_notices_ignores_the_page_rules_that_display_applies(): void {
+    public function test_has_candidate_notices_is_a_page_aware_superset_of_display(): void {
         $this->resetAfterTest();
 
         $user = $this->getDataGenerator()->create_user();
@@ -284,10 +286,22 @@ final class helper_test extends \advanced_testcase {
 
         $this->setUser($user);
 
-        // The probe says yes from anywhere: that is what keeps the module loading.
+        // Without a page the probe answers the page-independent question, as before.
         $this->assertTrue(helper::has_candidate_notices());
 
-        // The display path judges the page, and does so in both directions.
+        // With a page it narrows: nothing can appear on a course page...
+        $oncourse = new page_probe('/course/view.php?id=2', '/course/view.php?id=2', null, null);
+        $this->assertFalse(helper::has_candidate_notices($oncourse));
+
+        // ...while the target page still admits, so the module still loads where it must.
+        $ondashboard = new page_probe('/my/', '/my/index.php', null, null);
+        $this->assertTrue(helper::has_candidate_notices($ondashboard));
+
+        // A probe that knows nothing about the page must fail open and keep loading the module.
+        $unknown = new page_probe(null, null, null, null);
+        $this->assertTrue(helper::has_candidate_notices($unknown));
+
+        // The display path judges the page, and does so in both directions, exactly as before.
         $this->assertCount(1, helper::retrieve_user_notices('/my/'));
         $this->assertSame([], helper::retrieve_user_notices('/'));
     }
