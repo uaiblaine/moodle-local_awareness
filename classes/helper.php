@@ -647,16 +647,37 @@ class helper {
                 }
             }
 
-            // Filter out notices by course completion.
+            /*
+             * Filter out notices by course completion.
+             *
+             * Resolved for the whole set before the loop, exactly as the cohort rule above hoists
+             * cohort_get_user_cohorts() out of its loop. Fetching the course inside the loop cost a
+             * statement per notice, and repeated it outright when two notices required the same
+             * course. This block runs during page generation, so that cost sat inside the TTFB of
+             * every page load rather than in the asynchronous call like the rest of the per-notice
+             * work — it is the only rule in the plugin that delays the paint.
+             */
             if ($checkcompletion) {
+                $requiredids = [];
                 foreach ($notices as $notice) {
                     if ($notice->get('reqcourse') > 0) {
-                        if ($course = $DB->get_record('course', ['id' => $notice->get('reqcourse')])) {
-                            $completion = new \completion_info($course);
-                            if ($completion->is_course_complete($USER->id)) {
-                                unset($usernotices[$notice->get('id')]);
-                            }
-                        }
+                        $requiredids[(int) $notice->get('reqcourse')] = true;
+                    }
+                }
+
+                // One answer per course, not per notice. A course that no longer exists simply has
+                // no entry, which leaves its notices shown — the behaviour of the guarded fetch
+                // this replaces.
+                $iscomplete = [];
+                foreach ($DB->get_records_list('course', 'id', array_keys($requiredids)) as $course) {
+                    $completion = new \completion_info($course);
+                    $iscomplete[(int) $course->id] = $completion->is_course_complete($USER->id);
+                }
+
+                foreach ($notices as $notice) {
+                    $required = (int) $notice->get('reqcourse');
+                    if ($required > 0 && !empty($iscomplete[$required])) {
+                        unset($usernotices[$notice->get('id')]);
                     }
                 }
             }
