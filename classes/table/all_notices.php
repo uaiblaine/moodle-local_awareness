@@ -60,6 +60,17 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
         $this->set_attribute('class', 'local-awareness awarenesss');
 
+        /*
+         * A name for the table itself. Screen readers list a page's tables and announce each by its
+         * accessible name; without one this is "table", which on an admin page that has several is
+         * no help at all. Hidden visually because the heading above it already says this in print —
+         * set_caption() and render_caption() are on flexible_table on both 4.5 and 5.2.
+         */
+        $this->set_caption(
+            get_string('manage:table:caption', 'local_awareness'),
+            ['class' => 'visually-hidden']
+        );
+
         // Set protected properties. setup() refines currpage from the request on a full page load.
         $this->pagesize = $perpage;
         $this->currpage = $page;

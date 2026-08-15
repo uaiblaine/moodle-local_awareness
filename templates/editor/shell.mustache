@@ -1,8 +1,15 @@
 {{!
     @template local_awareness/editor/shell
 
-    The notice editor: a page head, the moodleform rendered in place, and the preview and audience
-    panels underneath it.
+    The notice editor: a page head, the moodleform rendered in place, and the audience panel
+    underneath it. The preview is a dialogue, opened from the page head by live_preview.js.
+
+    The preview markup is rendered here, once, inside a template element. Template content is inert
+    — not laid out, not focusable, not exposed to assistive technology — so the markup can wait in
+    the page without any of the costs the clipped container below had, and live_preview hands it to
+    core/modal as the dialogue body. core/modal is the whole point of the exercise: it traps focus,
+    closes on Escape and returns focus to the button that opened it, none of which a hand-made
+    dialogue gets for free.
 
     The form declares its own sections, so each one is a core collapsible fieldset — accordion
     behaviour, keyboard handling and the expand/collapse-all control all come from core. Its own
@@ -51,7 +58,7 @@
                         <span class="la-status-badge-ping" aria-hidden="true"></span>
                         {{statuslabel}}
                     </span>
-                    <button type="button" class="la-btn la-btn--soft" data-action="preview-fullscreen">
+                    <button type="button" class="la-btn la-btn--soft" data-action="preview">
                         <i class="fa fa-eye" aria-hidden="true"></i> {{#str}}editor:action:preview, local_awareness{{/str}}
                     </button>
                 </div>
@@ -71,11 +78,12 @@
 
             {{{formhtml}}}
 
-            <div class="la-editor-panels">
-                {{> local_awareness/editor/preview_card }}
-                {{> local_awareness/editor/audience_panel }}
-            </div>
+            {{> local_awareness/editor/audience_panel }}
 
         </main>
     </div>
+
+    <template data-region="la-preview-source">
+        {{> local_awareness/editor/preview_card }}
+    </template>
 </div>

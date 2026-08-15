@@ -14,238 +14,319 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Live preview synchroniser. Listens to changes on the moodleform fields and
- * mirrors the visible state into the preview card slots in place.
+ * The notice preview dialogue.
+ *
+ * The preview is a core/modal, opened from the page head. Everything that makes a dialogue usable
+ * from the keyboard — the focus trap, Escape, returning focus to the button that opened it — comes
+ * from core; a hand-made dialogue gets none of it, which is the only reason this module knows about
+ * modals at all.
+ *
+ * The markup is not built here. The shell renders it once inside an inert template element and this
+ * module hands that markup to core/modal as the dialogue body, so the slots keep the values no
+ * JavaScript recomputes and the strings are resolved server side.
+ *
+ * State is read from the form when the dialogue opens, rather than mirrored into it as the author
+ * types. The dialogue covers the form, so there is nothing to mirror while it is open — and reading
+ * late is what makes the content pane correct: the previous version bound to TinyMCE at boot, when
+ * core has not finished injecting it, and silently showed an empty body for the whole session.
  *
  * @module     local_awareness/live_preview
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-define(['core/str'], function(str) {
-    'use strict';
 
-    var SLOTS = {};
-    var debounceTimer = null;
+import ModalCancel from 'core/modal_cancel';
+import Notification from 'core/notification';
+import Pending from 'core/pending';
+import {getStrings} from 'core/str';
 
-    /**
-     * Truncate to N chars without breaking inside a word.
-     *
-     * @param {string} text Raw text to shorten.
-     * @param {number} max Maximum number of characters to keep.
-     * @returns {string} Truncated text, with an ellipsis when shortened.
-     */
-    function truncate(text, max) {
-        if (!text) {
-            return '';
-        }
-        text = String(text).replace(/\s+/g, ' ').trim();
-        if (text.length <= max) {
-            return text;
-        }
-        return text.substring(0, max).replace(/\s\S*$/, '') + '…';
-    }
+const SELECTORS = {
+    editor: '[data-region="la-editor"]',
+    trigger: '[data-action="preview"]',
+    source: 'template[data-region="la-preview-source"]',
+    preview: '[data-region="la-preview"]',
+    toggle: '.la-preview-tab',
+};
 
-    /**
-     * Read the current value of a named form field.
-     *
-     * @param {string} name The field name attribute to look up.
-     * @returns {string} The field value, or an empty string when absent.
-     */
-    function getValue(name) {
-        var el = document.querySelector('[name="' + name + '"]');
-        return el ? (el.value || '') : '';
-    }
+/** How wide the mock modal is drawn when the Mobile viewport is selected. */
+const MOBILE_WIDTH = '240px';
 
-    /**
-     * Resolve whether a named checkbox/select field is in the "on" state.
-     *
-     * @param {string} name The field name attribute to look up.
-     * @returns {boolean} True when checked, or when a select's value equals 1.
-     */
-    function isChecked(name) {
-        var el = document.querySelector('[name="' + name + '"]');
-        if (!el) {
-            return false;
-        }
-        if (el.tagName === 'SELECT') {
-            return parseInt(el.value, 10) === 1;
-        }
-        return !!el.checked;
-    }
+/** How much of the notice body the preview shows. */
+const CONTENT_CHARS = 200;
 
-    /**
-     * Read the current content from the WYSIWYG editor area; falls back to the
-     * underlying textarea value for non-WYSIWYG modes.
-     */
-    function getContent() {
-        // Atto / contenteditable.
-        var editable = document.querySelector('#id_contenteditable');
-        if (editable) {
-            return editable.innerText || editable.textContent || '';
-        }
-        // TinyMCE iframe.
-        if (window.tinymce && window.tinymce.get('id_content')) {
-            try {
-                return window.tinymce.get('id_content').getContent({format: 'text'}) || '';
-            } catch (e) {
-                // Editor not initialised yet — fall through.
-            }
-        }
-        // Plain textarea fallback.
-        var ta = document.getElementById('id_content');
-        if (ta && ta.value) {
-            // Strip tags for preview.
-            return ta.value.replace(/<[^>]+>/g, ' ');
-        }
+/** The dialogue's data slots, captured once from the modal body. */
+const SLOTS = {};
+
+/** Resolved once, reused for the life of the page. */
+let stringsPromise = null;
+
+/** The dialogue itself, created on the first open and reused after that. */
+let modalPromise = null;
+
+/**
+ * Truncate to a length without breaking inside a word.
+ *
+ * @param {string} text Raw text to shorten.
+ * @param {number} max Maximum number of characters to keep.
+ * @returns {string} The text, with an ellipsis when it was shortened.
+ */
+const truncate = (text, max) => {
+    if (!text) {
         return '';
     }
 
-    /**
-     * Mirror the current form state into the preview card.
-     *
-     * @param {object} strings Resolved language strings used in the preview.
-     */
-    function sync(strings) {
-        if (!SLOTS.title) {
-            return;
-        }
+    const collapsed = String(text).replace(/\s+/g, ' ').trim();
 
-        var title = getValue('title');
-        SLOTS.title.textContent = title || strings.placeholderTitle;
+    if (collapsed.length <= max) {
+        return collapsed;
+    }
 
-        var content = truncate(getContent(), 200);
-        SLOTS.content.textContent = content || strings.placeholderContent;
+    return collapsed.substring(0, max).replace(/\s\S*$/, '') + '…';
+};
 
-        var width = getValue('modal_width').trim();
-        if (SLOTS.modal) {
-            if (width !== '') {
-                // Treat bare numbers as px.
-                var w = /^\d+$/.test(width) ? width + 'px' : width;
-                SLOTS.modal.style.maxWidth = w;
-            } else {
-                SLOTS.modal.style.maxWidth = '';
-            }
-        }
+/**
+ * Read the current value of a named form field.
+ *
+ * @param {string} name The field's name attribute.
+ * @returns {string} The value, or an empty string when the field is absent.
+ */
+const getValue = name => {
+    const element = document.querySelector('[name="' + name + '"]');
 
-        var reqack = isChecked('reqack');
-        var outsideclick = isChecked('outsideclick');
-        var forcelogout = isChecked('forcelogout');
+    return element ? (element.value || '') : '';
+};
 
-        if (SLOTS.actions) {
-            SLOTS.actions.innerHTML = '';
-            if (reqack) {
-                SLOTS.actions.appendChild(makeBtn(strings.iAmAware, 'la-btn--brand'));
-            } else {
-                SLOTS.actions.appendChild(makeBtn(strings.later, 'la-btn--ghost'));
-                SLOTS.actions.appendChild(makeBtn(strings.gotIt, 'la-btn--brand'));
-            }
-        }
+/**
+ * Resolve whether a named field is in the "on" state.
+ *
+ * Every one of these is a selectyesno in the form, so the select branch is the live one; the
+ * checkbox branch is there because the field type is the form's business, not the preview's.
+ *
+ * @param {string} name The field's name attribute.
+ * @returns {boolean} True when checked, or when a select's value is 1.
+ */
+const isChecked = name => {
+    const element = document.querySelector('[name="' + name + '"]');
 
-        if (SLOTS.metaReqack) {
-            SLOTS.metaReqack.textContent = reqack ? strings.required : strings.optional;
-        }
-        if (SLOTS.metaOutsideClick) {
-            SLOTS.metaOutsideClick.textContent = outsideclick ? strings.yes : strings.no;
-        }
-        if (SLOTS.metaForceLogout) {
-            SLOTS.metaForceLogout.textContent = forcelogout ? strings.forced : strings.no;
-        }
+    if (!element) {
+        return false;
+    }
 
-        // Status badge: live when 'enabled' is on (and not in the middle of editing yet-disabled notice).
-        if (SLOTS.status) {
-            var live = isChecked('enabled');
-            SLOTS.status.textContent = live ? strings.live : strings.draft;
+    if (element.tagName === 'SELECT') {
+        return parseInt(element.value, 10) === 1;
+    }
+
+    return !!element.checked;
+};
+
+/**
+ * Read the notice body out of whichever editor the site runs.
+ *
+ * Called when the dialogue opens, never at boot: core loads TinyMCE by injecting an async script,
+ * so at boot window.tinymce is normally still undefined and the textarea below it holds the last
+ * saved value rather than what the author just typed.
+ *
+ * @returns {string} The body as plain text.
+ */
+const getContent = () => {
+    const editable = document.querySelector('#id_contenteditable');
+
+    if (editable) {
+        return editable.innerText || editable.textContent || '';
+    }
+
+    if (window.tinymce && window.tinymce.get('id_content')) {
+        return window.tinymce.get('id_content').getContent({format: 'text'}) || '';
+    }
+
+    const textarea = document.getElementById('id_content');
+
+    if (textarea && textarea.value) {
+        return textarea.value.replace(/<[^>]+>/g, ' ');
+    }
+
+    return '';
+};
+
+/**
+ * Describe the reset interval the way the form's duration selector does.
+ *
+ * The unit's own option text is the label, so this needs no strings of its own and cannot drift
+ * out of step with the field it reports.
+ *
+ * @returns {string|null} The formatted interval, or null when the field is not on the page.
+ */
+const getFrequency = () => {
+    const number = document.querySelector('[name="resetinterval[number]"]');
+    const unit = document.querySelector('[name="resetinterval[timeunit]"]');
+
+    if (!number || !unit) {
+        return null;
+    }
+
+    const count = parseInt(number.value, 10);
+
+    if (!count) {
+        return '0';
+    }
+
+    const selected = unit.options[unit.selectedIndex];
+
+    return count + ' ' + (selected ? selected.text : '');
+};
+
+/**
+ * Build one of the mock modal's action buttons.
+ *
+ * A span, not a button. This is a picture of the notice, so a real control here would be focusable
+ * and announced as actionable inside a dialogue where activating it does nothing.
+ *
+ * @param {string} label The visible text.
+ * @param {string} variant The class controlling the button style.
+ * @returns {HTMLElement} The constructed element.
+ */
+const makeAction = (label, variant) => {
+    const action = document.createElement('span');
+
+    action.className = 'la-btn ' + variant;
+    action.textContent = label;
+
+    return action;
+};
+
+/**
+ * Apply a width to the mock modal, treating a bare number as pixels.
+ *
+ * @param {string} width The raw value from the width field, or an empty string.
+ */
+const applyWidth = width => {
+    if (!SLOTS.modal) {
+        return;
+    }
+
+    const trimmed = width.trim();
+
+    if (trimmed === '') {
+        SLOTS.modal.style.maxWidth = '';
+
+        return;
+    }
+
+    SLOTS.modal.style.maxWidth = /^\d+$/.test(trimmed) ? trimmed + 'px' : trimmed;
+};
+
+/**
+ * Draw the mock at whichever viewport is currently selected.
+ *
+ * One function decides the width, from one piece of state — which toggle is pressed. Splitting it,
+ * so that the click handler set the mobile width and sync() set the form's, is how the dialogue
+ * came to reopen at desktop width with the Mobile button still reporting aria-pressed="true": the
+ * modal is kept rather than destroyed on close, so the pressed state outlives the width that was
+ * meant to go with it.
+ */
+const applyViewport = () => {
+    const pressed = (SLOTS.toggles || []).filter(toggle => toggle.getAttribute('aria-pressed') === 'true');
+    const mobile = pressed.length > 0 && pressed[0].dataset.tab === 'mobile';
+
+    applyWidth(mobile ? MOBILE_WIDTH : getValue('modal_width'));
+};
+
+/**
+ * Mirror the form's current state into the dialogue.
+ *
+ * @param {Object} strings The resolved preview strings.
+ */
+const sync = strings => {
+    if (!SLOTS.title) {
+        return;
+    }
+
+    SLOTS.title.textContent = getValue('title') || strings.placeholderTitle;
+    SLOTS.content.textContent = truncate(getContent(), CONTENT_CHARS) || strings.placeholderContent;
+
+    applyViewport();
+
+    const reqack = isChecked('reqack');
+
+    if (SLOTS.actions) {
+        SLOTS.actions.innerHTML = '';
+
+        if (reqack) {
+            SLOTS.actions.appendChild(makeAction(strings.iAmAware, 'la-btn--brand'));
+        } else {
+            SLOTS.actions.appendChild(makeAction(strings.later, 'la-btn--ghost'));
+            SLOTS.actions.appendChild(makeAction(strings.gotIt, 'la-btn--brand'));
         }
     }
 
-    /**
-     * Build a preview action button element.
-     *
-     * @param {string} label Visible button text.
-     * @param {string} cls Extra CSS class controlling the button style.
-     * @returns {HTMLButtonElement} The constructed button element.
-     */
-    function makeBtn(label, cls) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'la-btn ' + cls;
-        b.textContent = label;
-        return b;
+    if (SLOTS.metaReqack) {
+        SLOTS.metaReqack.textContent = reqack ? strings.required : strings.optional;
     }
 
-    /**
-     * Debounce a preview sync call by 250ms to coalesce rapid edits.
-     *
-     * @param {object} strings Resolved language strings used in the preview.
-     */
-    function debouncedSync(strings) {
-        if (debounceTimer) {
-            clearTimeout(debounceTimer);
-        }
-        debounceTimer = setTimeout(function() {
-            sync(strings);
-            debounceTimer = null;
-        }, 250);
+    if (SLOTS.metaOutsideClick) {
+        SLOTS.metaOutsideClick.textContent = isChecked('outsideclick') ? strings.yes : strings.no;
     }
 
-    /**
-     * Wire editor change listeners (Atto contenteditable and TinyMCE) to the
-     * debounced preview sync.
-     *
-     * @param {object} strings Resolved language strings used in the preview.
-     */
-    function bindEditor(strings) {
-        // Atto: contenteditable area.
-        var editable = document.querySelector('#id_contenteditable');
-        if (editable) {
-            editable.addEventListener('input', function() {
-                debouncedSync(strings);
+    if (SLOTS.metaForceLogout) {
+        SLOTS.metaForceLogout.textContent = isChecked('forcelogout') ? strings.forced : strings.no;
+    }
+
+    const frequency = getFrequency();
+
+    if (SLOTS.metaFrequency && frequency !== null) {
+        SLOTS.metaFrequency.textContent = frequency;
+    }
+
+    if (SLOTS.status) {
+        SLOTS.status.textContent = isChecked('enabled') ? strings.live : strings.draft;
+    }
+};
+
+/**
+ * Cache the dialogue's data slots.
+ *
+ * @param {HTMLElement} root The dialogue body.
+ */
+const captureSlots = root => {
+    SLOTS.title = root.querySelector('[data-slot="title"]');
+    SLOTS.content = root.querySelector('[data-slot="content"]');
+    SLOTS.modal = root.querySelector('[data-slot="mockmodal"]');
+    SLOTS.actions = root.querySelector('[data-slot="actions"]');
+    SLOTS.metaFrequency = root.querySelector('[data-slot="meta-frequency"]');
+    SLOTS.metaReqack = root.querySelector('[data-slot="meta-reqack"]');
+    SLOTS.metaOutsideClick = root.querySelector('[data-slot="meta-outsideclick"]');
+    SLOTS.metaForceLogout = root.querySelector('[data-slot="meta-forcelogout"]');
+    SLOTS.status = root.querySelector('[data-slot="status"]');
+    SLOTS.toggles = Array.from(root.querySelectorAll(SELECTORS.toggle));
+};
+
+/**
+ * Wire the Desktop and Mobile viewport toggles.
+ *
+ * Runs once, on the toggles captured by captureSlots().
+ */
+const bindToggles = () => {
+    SLOTS.toggles.forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            SLOTS.toggles.forEach(other => {
+                other.classList.toggle('is-on', other === toggle);
+                other.setAttribute('aria-pressed', other === toggle ? 'true' : 'false');
             });
-        }
-        // TinyMCE: editor 'input' event, set up after init.
-        if (window.tinymce) {
-            try {
-                window.tinymce.on('AddEditor', function(e) {
-                    if (e.editor && e.editor.id === 'id_content') {
-                        e.editor.on('input keyup change', function() {
-                            debouncedSync(strings);
-                        });
-                    }
-                });
-            } catch (err) {
-                // Continue silently.
-            }
-        }
-    }
 
-    /**
-     * Cache the preview card slot elements for later updates.
-     *
-     * @returns {boolean} True when the preview region exists and slots were cached.
-     */
-    function captureSlots() {
-        var preview = document.querySelector('[data-region="la-preview"]');
-        if (!preview) {
-            return false;
-        }
-        SLOTS.title = preview.querySelector('[data-slot="title"]');
-        SLOTS.content = preview.querySelector('[data-slot="content"]');
-        SLOTS.modal = preview.querySelector('[data-slot="mockmodal"]');
-        SLOTS.actions = preview.querySelector('[data-slot="actions"]');
-        SLOTS.metaReqack = preview.querySelector('[data-slot="meta-reqack"]');
-        SLOTS.metaOutsideClick = preview.querySelector('[data-slot="meta-outsideclick"]');
-        SLOTS.metaForceLogout = preview.querySelector('[data-slot="meta-forcelogout"]');
-        SLOTS.status = preview.querySelector('[data-slot="status"]');
-        return true;
-    }
+            applyViewport();
+        });
+    });
+};
 
-    /**
-     * Load and map the preview language strings.
-     *
-     * @returns {Promise<object>} Promise resolving to the named strings object.
-     */
-    function loadStrings() {
-        return str.get_strings([
+/**
+ * Load the strings the dialogue fills itself with.
+ *
+ * @returns {Promise<Object>} Resolves to the named strings.
+ */
+const loadStrings = () => {
+    if (!stringsPromise) {
+        stringsPromise = getStrings([
+            {key: 'editor:preview:title', component: 'local_awareness'},
             {key: 'editor:preview:placeholder:title', component: 'local_awareness'},
             {key: 'editor:preview:placeholder:content', component: 'local_awareness'},
             {key: 'editor:preview:btn:iam_aware', component: 'local_awareness'},
@@ -257,75 +338,116 @@ define(['core/str'], function(str) {
             {key: 'editor:preview:meta:yes', component: 'local_awareness'},
             {key: 'editor:preview:meta:no', component: 'local_awareness'},
             {key: 'editor:status:live', component: 'local_awareness'},
-            {key: 'editor:status:draft', component: 'local_awareness'}
-        ]).then(function(s) {
-            return {
-                placeholderTitle: s[0],
-                placeholderContent: s[1],
-                iAmAware: s[2],
-                later: s[3],
-                gotIt: s[4],
-                required: s[5],
-                optional: s[6],
-                forced: s[7],
-                yes: s[8],
-                no: s[9],
-                live: s[10],
-                draft: s[11]
-            };
+            {key: 'editor:status:draft', component: 'local_awareness'},
+            {key: 'closebuttontitle', component: 'core'},
+        ]).then(resolved => ({
+            dialogueTitle: resolved[0],
+            placeholderTitle: resolved[1],
+            placeholderContent: resolved[2],
+            iAmAware: resolved[3],
+            later: resolved[4],
+            gotIt: resolved[5],
+            required: resolved[6],
+            optional: resolved[7],
+            forced: resolved[8],
+            yes: resolved[9],
+            no: resolved[10],
+            live: resolved[11],
+            draft: resolved[12],
+            close: resolved[13],
+        })).catch(error => {
+            stringsPromise = null;
+
+            throw error;
         });
     }
 
-    return {
-        init: function() {
-            if (!captureSlots()) {
-                return;
-            }
-            loadStrings().then(function(strings) {
-                sync(strings);
-                bindEditor(strings);
+    return stringsPromise;
+};
 
-                // Listen to plain inputs/selects in the source form.
-                ['title', 'modal_width', 'modal_height', 'reqack', 'outsideclick',
-                    'forcelogout', 'enabled'].forEach(function(name) {
-                    document.querySelectorAll('[name="' + name + '"]').forEach(function(el) {
-                        el.addEventListener('change', function() {
-                            debouncedSync(strings);
-                        });
-                        el.addEventListener('input', function() {
-                            debouncedSync(strings);
-                        });
-                    });
-                });
-                return null;
-            }).catch(function() {
-                // String-loading failures are non-fatal — preview just won't update.
-            });
+/**
+ * Build the dialogue, once.
+ *
+ * @param {HTMLElement} source The template element holding the preview markup.
+ * @param {HTMLElement} trigger The button that opens the dialogue.
+ * @param {Object} strings The resolved preview strings.
+ * @returns {Promise<Object>} Resolves to the core/modal instance.
+ */
+const buildModal = (source, trigger, strings) => {
+    if (!modalPromise) {
+        modalPromise = ModalCancel.create({
+            title: strings.dialogueTitle,
+            body: source.innerHTML,
+            large: true,
+            removeOnClose: false,
+            returnElement: trigger,
+            buttons: {cancel: strings.close},
+        }).then(modal => {
+            const body = modal.getBody()[0].querySelector(SELECTORS.preview);
 
-            // Tab switching desktop/mobile.
-            document.querySelectorAll('.la-preview-tab').forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    document.querySelectorAll('.la-preview-tab').forEach(function(b) {
-                        b.classList.remove('is-on');
-                        b.setAttribute('aria-selected', 'false');
-                    });
-                    btn.classList.add('is-on');
-                    btn.setAttribute('aria-selected', 'true');
-                    var modal = SLOTS.modal;
-                    if (modal) {
-                        if (btn.getAttribute('data-tab') === 'mobile') {
-                            modal.style.maxWidth = '240px';
-                        } else {
-                            modal.style.maxWidth = '';
-                            // Re-apply width from form.
-                            var w = getValue('modal_width').trim();
-                            if (w !== '') {
-                                modal.style.maxWidth = /^\d+$/.test(w) ? w + 'px' : w;
-                            }
-                        }
-                    }
-                });
-            });
-        }
-    };
-});
+            captureSlots(body);
+            bindToggles();
+
+            return modal;
+        }).catch(error => {
+            /*
+             * A failed build must not stay memoised. Caching the rejection would leave the next
+             * click resolving instantly to the same failure, which is precisely the state this
+             * whole change exists to end: a Preview button that does nothing.
+             */
+            modalPromise = null;
+
+            throw error;
+        });
+    }
+
+    return modalPromise;
+};
+
+/**
+ * Open the dialogue on the form's current state.
+ *
+ * @param {HTMLElement} source The template element holding the preview markup.
+ * @param {HTMLElement} trigger The button that opens the dialogue.
+ * @returns {Promise} Resolves once the dialogue is showing.
+ */
+const openPreview = async(source, trigger) => {
+    /*
+     * The whole open is registered as pending work, not just the modal's own creation. Nothing is
+     * in flight while the strings resolve, so a page watched for quiescence looks settled during a
+     * window in which the dialogue does not exist yet.
+     */
+    const pending = new Pending('local_awareness/live_preview:open');
+
+    try {
+        const strings = await loadStrings();
+        const modal = await buildModal(source, trigger, strings);
+
+        sync(strings);
+
+        await modal.show();
+    } finally {
+        pending.resolve();
+    }
+};
+
+export const init = () => {
+    const editor = document.querySelector(SELECTORS.editor);
+
+    if (!editor) {
+        return;
+    }
+
+    const source = editor.querySelector(SELECTORS.source);
+    const trigger = editor.querySelector(SELECTORS.trigger);
+
+    if (!source || !trigger) {
+        return;
+    }
+
+    trigger.addEventListener('click', event => {
+        event.preventDefault();
+
+        openPreview(source, trigger).catch(Notification.exception);
+    });
+};

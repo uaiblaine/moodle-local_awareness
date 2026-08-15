@@ -1,116 +1,86 @@
-# Prompt — Fase 3 do redesenho das telas administrativas
+# Fase 3 do redesenho das telas administrativas — entregue
 
-Continuação do PR #25 (`refactor/admin-surfaces-theme-tokens`). As fases 0, 1 e 2 estão
-entregues e verdes; este documento é o que falta e o que você precisa saber para não
-refazer investigação já paga.
+Continuação do PR #25 (`refactor/admin-surfaces-theme-tokens`). As fases 0 a 3 estão entregues.
+Este documento deixou de ser uma lista de pendências: é o registro do que a fase 3 fez, do que
+sobrou (e por quê), e do harness que mediu isso — que é a parte cara de redescobrir.
 
-## Estado atual
+O que mudou, item a item, está no `CHANGELOG.md` sob a versão `2026081512`. Aqui fica só o que não
+cabe num changelog.
 
-Branch `refactor/admin-surfaces-theme-tokens`, versão `2026081511`. CI completo verde em
-`MOODLE_405_STABLE` e `MOODLE_502_STABLE`; 194 testes PHPUnit e 23 cenários Behat (252
-passos) no m501 com as checagens de acessibilidade ligadas.
+## O que sobrou, e é do core
 
-As duas telas já estão reconstruídas sobre o Bootstrap do tema:
+A sonda de acessibilidade roda contra o DOM renderizado das três superfícies (lista, editor,
+diálogo de pré-visualização). Depois das correções, tudo o que ela ainda aponta pertence ao core:
 
-- **`managenotice.php`** — seis colunas, barra de filtros (nome, status incluindo "com
-  conflito", vigência), 25 por página, tudo por AJAX via `\core_table\dynamic` e o web
-  service do core. Contagem de resultados e estado vazio são renderizados **pela própria
-  tabela**, dentro da região que o refresh substitui.
-- **`editnotice.php`** — coluna única, seções colapsáveis nativas do moodleform (o
-  formulário declara os próprios `header`), preview e público em painéis abaixo do
-  formulário.
+- o interruptor de modo de edição na barra de navegação (30×15);
+- três itens da barra de status do TinyMCE (o caminho do elemento, a contagem de palavras e a
+  assinatura), todos com 17 px de altura;
+- o botão de fechar do cabeçalho do modal do core, 16×31.
 
-## Tarefa 1 — preview em modal
+O último merece uma nota, porque parece nosso: o critério 2.5.8 da WCAG 2.2 aceita um **controle
+equivalente na mesma página**, e o botão Fechar do rodapé do diálogo — que este plugin acrescentou
+ao pedir `buttons: {cancel: …}` ao `core/modal_cancel` — é exatamente isso. Não é uma falha do
+diálogo; é o motivo de haver um botão no rodapé em vez de confiar só no × do cabeçalho.
 
-Hoje o preview é um painel abaixo do formulário (`templates/editor/preview_card.mustache`,
-renderizado dentro de `.la-editor-panels` pela `shell.mustache`). O modelo aprovado pede um
-**modal**, aberto pelo botão "Pré-visualizar" que já existe no cabeçalho da página com
-`data-action="preview-fullscreen"`.
+O id duplicado `yui3-css-stamp`, previsto na rodada anterior, não apareceu: o formulário de criação
+não renderiza `date_time_selector` nas seções expandidas por padrão.
 
-O que fazer:
+## O harness — como repetir a medição
 
-- Usar `core/modal` — **não** um modal próprio. É o que traz foco preso, `Esc` para fechar e
-  devolução do foco ao botão que abriu; o protótipo em `docs/mockups/edit-notice.html` não
-  faz nada disso e diz isso no comentário.
-- `amd/src/live_preview.js` (331 linhas) escreve nos slots de `.la-preview`. Ele precisa
-  passar a escrever no corpo do modal, ou o modal precisa receber o mesmo markup. Prefira
-  mover o markup para dentro do modal e manter os mesmos `data-slot`, para não reescrever a
-  lógica de preenchimento.
-- Manter as abas Desktop/Celular do mockup.
+Não dá para logar no stack por automação. O caminho, em quatro passos:
 
-Cuidado registrado: o painel atual **funciona em qualquer largura**, que já era o ponto
-principal — o rail antigo sumia abaixo de 1280 px de viewport. Virar modal é refinamento;
-não regride a acessibilidade se o `core/modal` for usado, mas regride se for um modal
-artesanal.
+1. **Force um faildump.** Um arquivo temporário em `tests/behat/` com uma cena por superfície, cada
+   uma terminando numa asserção que não pode valer. Tag própria (por exemplo `@la_a11y_dump`) e
+   **sem** a tag `@local_awareness`, para não entrar na suíte normal. Depois `mdl behat-init m501`
+   — um arquivo `.feature` novo não existe para o Behat sem isso — e `mdl behat m501 @la_a11y_dump`.
+   Os `.html` e `.png` saem em `~/dev/moodle-dev/data/m501/faildumps/<timestamp>/`. **Apague o
+   arquivo temporário e rode `mdl behat-init` de novo quando terminar.**
 
-## Tarefa 2 — passada de acessibilidade nas páginas ao vivo
+2. **Sirva o dump pela própria origem do stack.** O `wwwroot` do site de Behat é
+   `http://webserver`, que só resolve dentro da rede do compose. Reescreva para caminhos relativos,
+   remova os `<script>` (o dump já contém o que o JavaScript construiu; reexecutar só faz a página
+   sair do estado capturado) e grave em `~/dev/moodle-501/public/_a11y/<nome>.html`. O Apache serve
+   arquivo existente direto — o `RewriteCond %{REQUEST_FILENAME} !-f` do roteador não intercepta —
+   então a página abre em `http://localhost:8501/_a11y/<nome>.html` com CSS e fontes na **mesma
+   origem**. Isso não é detalhe: `@font-face` passa por CORS contra a origem do documento, e uma
+   folha vinda de outra porta transforma todo glifo do Font Awesome em caixa. Um proxy também
+   resolve, mas precisa reescrever o corpo do CSS além do HTML; o webroot não precisa de nada.
 
-O verificador que escrevi rodou nos **mockups**, não nas páginas renderizadas. Ele mede
-contraste por nó de texto contra o fundo efetivo, nome acessível de cada controle, tamanho
-de alvo (24×24 da WCAG 2.2), ordem de títulos, semântica de tabela, ligação ARIA e ids
-duplicados.
+3. **Purgue os caches antes de medir.** `mdl behat-init` reconstrói o CSS do *site de Behat*; a
+   porta 8501 continua servindo o CSS compilado do site normal. Sem
+   `admin/cli/purge_caches.php` a medição é feita sobre a folha antiga — e o sintoma é o pior
+   possível, porque a página abre e parece plausível.
 
-Para rodar nas páginas de verdade sem login: force um faildump do Behat (cenário temporário
-que falha de propósito), sirva o HTML numa origem só — **as fontes passam por CORS contra a
-origem do documento, então CSS vindo de outra porta deixa todo glifo do Font Awesome como
-caixa** — e injete o script. O harness que fiz isso está descrito abaixo.
+4. **Injete a sonda.** `XMLHttpRequest` síncrono + `eval` sobre um `.js` no mesmo diretório servido.
+   Ela mede, contra os estilos computados: contraste por nó de texto sobre o fundo efetivo (com
+   composição de alfa, e recusando-se a dar número quando há imagem de fundo), nome acessível de
+   cada controle, tamanho de alvo (24×24 da 2.5.8), ordem de títulos, semântica de tabela,
+   referências ARIA que não resolvem e ids duplicados.
 
-Achados conhecidos que já **não** devem aparecer: contraste do painel de público, alvos de
-27×15 px na lista, `h1` duplicado, campos focáveis invisíveis. Os que devem sobrar são do
-core: barra de status do TinyMCE e o id duplicado `yui3-css-stamp` (que vem do
-`date_time_selector`, não do plugin — o plugin tem zero YUI).
+**A sonda também erra.** A primeira versão acusou três botões do moodleform de não terem nome
+acessível: para um `input` do tipo submit/button o nome vem do atributo `value`, e `textContent` é
+sempre vazio. Um verificador com uma classe de falso positivo é pior do que nenhum — ensina a
+passar os olhos pela saída. Mutation-teste cada regra antes de confiar nela.
 
-## Tarefa 3 — o marcador de obrigatório, se incomodar
+## Armadilhas novas — não repita
 
-Resolvido sobrescrevendo `margin-left` em `.form-label-addon`. A saída oficial do core é
-`set_display_vertical()`, que adiciona `.full-width-labels` — **não usei de propósito**:
-no CSS compilado do stack, várias regras `.mform.full-width-labels` vêm do
-`mod_interactivevideo` montado ali e desenham bordas e fundos com as variáveis daquele
-plugin. Se for reconsiderar, confira o efeito num stack sem esse plugin antes.
-
-## Como trabalhar neste repositório
-
-- `mdl ci moodle-local_awareness --branch MOODLE_405_STABLE` e `--branch MOODLE_502_STABLE`
-  antes de qualquer push. As duas pontas divergem: o phpcs do 5.02 reprovou um comentário
-  começando em minúscula que o 5.01 deixou passar.
-- Depois de bumpar `version.php`: `mdl upgrade m501 && mdl behat-init m501`, senão o Behat
-  sai com zero cenários e **parece verde**.
-- `mdl behat m501 @local_awareness` — seleção por caminho de arquivo **não funciona** neste
-  setup; use a tag.
-- O passo do gerador é `the following site notices exist`, **sem dois-pontos**. Com
-  dois-pontos o Behat trata como passo diferente e reclama de step ausente.
-- **Leia a string de idioma antes de escrever a asserção.** Errei o rótulo três vezes nesta
-  sessão ("Path match" era "Apply to URL match", "Width" era "Modal width"), a ~4 minutos de
-  Behat cada.
-
-### Harness para ver as páginas renderizadas
-
-Não é possível logar no stack por automação (não digito senha). O caminho que funcionou:
-
-1. Force um faildump: cenário temporário em `tests/behat/`, `mdl behat-init m501`, rode a
-   suíte pela tag, pegue o `.html` e o `.png` em `~/dev/moodle-dev/data/m501/faildumps/`.
-   **Apague o cenário temporário depois.**
-2. O `.png` pode ser lido direto como imagem — foi assim que encontrei o editor de conteúdo
-   em meia coluna e o rótulo "Content" quebrado em duas linhas.
-3. Para interagir, reescreva `http://webserver/` para caminhos relativos e sirva o arquivo
-   por um proxy que repassa o que não achar para `localhost:8501`. Mesma origem para tudo,
-   ou as fontes quebram.
-
-## Armadilhas que já custaram tempo — não repita
-
-- **`repeat(auto-fit, minmax(19rem, 1fr))` não limita colunas**: num card de 1083 px entrega
-  três. Limitar pede `minmax(max(19rem, 45%), 1fr)`, que o stylelint do Moodle **recusa**
-  (`Invalid value for "grid-template-columns"`), assim como recusa `@container` e
-  `container-type`. A saída válida é flex com base percentual.
-- **Seletor por markup interno de widget não casa**: `:has(.editor_tiny_wrapper)` era chute
-  e não casava com nada, silenciosamente. Os campos largos são listados por `id`.
-- **`flexible_table::$totalrows` é público** — declarar uma propriedade com esse nome na
-  subclasse é erro fatal. A classe base já guarda o total filtrado via `pagesize()`.
-- **`\core_table\dynamic` constrói a tabela só com `$uniqueid`** — todo argumento seguinte do
-  construtor precisa ser opcional, e isso falha **apenas** por AJAX.
-- **Um debounce é invisível para a espera do Behat.** Registre `core/pending` em volta da
-  janela, não só da requisição.
-- **Texto em `.visually-hidden` é texto da página.** Asserções `should not see` de página
-  inteira perto do selo de conflito são não confiáveis — asserte pela contagem de resultados.
-- **O lint de Mustache valida partials isolados**: um `form="..."` apontando para um
-  formulário fora do partial reprova a validação de HTML.
+- **Custom properties não alcançam um `core/modal`.** Elas herdam pela árvore do DOM, e o core
+  anexa o modal a um elemento próprio em `document.body` — irmão da página, não descendente. Um
+  bloco de tokens declarado em `.local-awareness-editor` deixa todo `var(--la-*)` dentro do diálogo
+  sem valor, e valor ausente **não** cai para o literal do `var()`: invalida a declaração inteira no
+  tempo de valor computado. O herói ficou sem cor, o palco sem fundo e "Got it" virou texto branco
+  sobre nada. Vale para a regra de `:focus-visible` pelo mesmo motivo — foi o segundo lugar onde
+  isso mordeu, depois de corrigido o primeiro.
+- **Escrever a regra não é aplicá-la.** O marcador de obrigatório estava registrado como resolvido
+  na versão anterior e nunca funcionou: `.mform:not(.full-width-labels) .col-form-label
+  .form-label-addon` do core pontua (0,4,0) — `:not()` conta o argumento — e a sobrescrita
+  pontuava igual, o que deixa a ordem decidir; na folha compilada a regra do core cai depois. Só a
+  captura de tela mostrou. Meça no CSS compilado (`curl .../theme/styles.php/<tema>/1/all`) quando
+  uma sobrescrita "não pega".
+- **`mdl grunt` local não mostra o que o `mdl ci` reprova.** Um `no-nested-ternary` passou pelo
+  grunt local sem imprimir uma linha e derrubou o leg do 5.02. Rode `mdl ci` antes de concluir que
+  o front-end está limpo.
+- **Um estado pressionado sobrevive ao fechamento do diálogo.** Com `removeOnClose: false` o modal
+  é escondido, não destruído. Se a largura for decidida em dois lugares — o clique no botão e o
+  `sync()` da reabertura — o `aria-pressed` continua num viewport que não está na tela. Uma função
+  decide, a partir de um estado só.

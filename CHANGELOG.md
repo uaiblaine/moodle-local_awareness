@@ -6,6 +6,92 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the preview is a dialogue, and the button that opens it now does something (version 2026081512)
+
+- **The preview opens as a `core/modal`.** It was a panel below the form; the approved model asks
+  for a dialogue, and the page head has carried a Preview button since the redesign began —
+  wired to nothing. A grep for its `data-action` found it in the template and in the design notes,
+  and nowhere else: the button was dead markup for the whole of phases 1 and 2.
+
+- **`core/modal`, not a dialogue of our own.** The focus trap, Escape, and returning focus to the
+  button that opened it are the reasons — none of which the HTML prototype in `docs/mockups/` does,
+  as its own comment says. A Behat scenario asserts Escape closes it, so replacing core's dialogue
+  with a hand-made one cannot be a silent change; nothing else in the pipeline would notice.
+
+- **The markup waits in a `<template>` element**, rendered server side once and handed to the modal
+  as its body, so the slots keep the values no JavaScript recomputes and the strings resolve once.
+  Template content is genuinely inert — not laid out, not focusable, not exposed to assistive
+  technology. That distinction is the whole history of this page: the shape it replaced kept the
+  form off screen with a 1×1 clip, which is the technique whose *purpose* is to keep content
+  available to a screen reader, and shipped two fields a keyboard could reach and an eye could not.
+
+- **The preview reads the form when it opens, instead of mirroring it as the author types.** The
+  dialogue covers the form, so there is nothing to mirror while it is open. Reading late also fixes
+  audit finding M5: the module used to bind to TinyMCE at boot, which is before core has finished
+  injecting it, so `window.tinymce` was normally still undefined, the whole binding was skipped, and
+  the content pane stayed empty for the session with nothing logged. At open time the editor is
+  there. The reset interval is now read the same way, from the duration selector's own option text,
+  rather than left at whatever was saved.
+
+- **The mock modal's action buttons are `<span>`s.** They are a picture of the notice, so real
+  buttons made them focusable and announced as actionable inside a dialogue where activating them
+  does nothing.
+
+- **Desktop and Mobile are `aria-pressed` toggles, not tabs.** They resize one preview rather than
+  switching between two panels, and the previous `role="tab"` markup controlled no `tabpanel` — a
+  promise to a screen reader that nothing kept. Their hit area went from 27×15 to 28 px tall, past
+  the 24×24 WCAG 2.2 asks of a pointer target.
+
+### Fixed — three things only the rendered page could show (version 2026081512)
+
+Found by running an accessibility probe against the live DOM of each surface, captured from a Behat
+faildump and served from the stack's own webroot so that the document, its stylesheet and its fonts
+share one origin. Measured, not reasoned about.
+
+- **The preview dialogue rendered with no colour at all.** The plugin's `--la-*` tokens were
+  declared on `.local-awareness-editor`; core attaches a modal to its own element on `document.body`,
+  a sibling of the editor rather than a descendant, and custom properties inherit down the DOM tree.
+  Every `var(--la-*)` inside the dialogue therefore resolved to nothing — which does not fall back
+  to the literal, it makes the whole declaration invalid at computed-value time. The hero lost its
+  brand fill, the stage its scrim, and "Got it" became white text on nothing. The token block is
+  declared on the preview root as well now.
+
+- **The required-field marker was still at the far end of the row.** The previous release recorded
+  it as fixed; it was not. Core's `.mform:not(.full-width-labels) .col-form-label .form-label-addon`
+  scores (0,4,0), and so did the override, which leaves source order to decide — and in the compiled
+  sheet core's rule lands at byte 1295582 against the override at 525383. Matching core's own
+  `:not()` takes the override to (0,5,0) and settles it. The screenshot is what caught this: the
+  rule was written, shipped, and never applied.
+
+- **The "Notice" chip on the preview's hero read at 3.84:1.** A translucent *white* scrim over the
+  brand colour lightens it, so white text on top loses. Darkening instead clears 4.5:1 over every
+  brand tried, down to a white one, and over a background image as well.
+
+- **The notice table now has a caption**, hidden visually because the heading above already says it
+  in print. A screen reader lists a page's tables by name; unnamed, this one announced as "table".
+
+Everything else the probe reports on these three surfaces belongs to core: the edit-mode switch in
+the navbar, three items in the TinyMCE status bar, and the 16×31 close button in core's own modal
+header — the last of which the dialogue's full-size footer Close button already satisfies as the
+equivalent control WCAG 2.2 SC 2.5.8 allows.
+
+### Fixed — two the review panel found in the dialogue itself (version 2026081512)
+
+- **The Mobile viewport reported itself as pressed over a desktop-width preview.** The dialogue is
+  built once and hidden rather than destroyed, so the toggles' pressed state outlives a close — but
+  the width was decided in two places, the click handler setting the mobile width and `sync()`
+  resetting it to the form's on every open. Reopening therefore redrew the mock at desktop width
+  with `aria-pressed="true"` still on Mobile: a screen reader was told a viewport was selected that
+  was not on screen, and getting it back meant clicking a control that already claimed to be
+  pressed. One function decides the width now, from the one piece of state that should decide it.
+  A scenario asserts both halves, because the button alone was already right while the bug was live.
+
+- **The viewport toggles wore the browser's focus ring instead of the plugin's.** Same root cause as
+  the token block above — the rule was scoped to `.local-awareness-editor` and the dialogue is not
+  inside it. Measured rather than assumed: the toggles do take focus and Chrome does draw
+  `outline: auto 1px`, so this was never a bare 2.4.7 failure, but they were the only controls on
+  the plugin's surfaces not wearing its 3px brand ring.
+
 ### Fixed — the required marker sat at the far end of the row, and the editor gained tests (version 2026081511)
 
 - **The required-field marker is back beside its label.** Boost pushes it away with

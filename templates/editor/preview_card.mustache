@@ -1,8 +1,18 @@
 {{!
     @template local_awareness/editor/preview_card
 
-    Static-HTML mock of the end-user notice modal. The live_preview.js AMD
-    module updates the data slots in place as the form changes.
+    Body of the preview dialogue: a static mock of the notice the end user will be shown.
+
+    The shell renders this partial inside an inert template element and live_preview.js hands that
+    markup to core/modal as the dialogue body, then fills the data slots from the form's current
+    state every time the dialogue opens. Rendering it server side is what keeps the values no
+    JavaScript recomputes — the background image — and resolves the strings once. The alternative,
+    a container that is hidden but live, is the shape that already shipped a keyboard trap on this
+    page: clipped to 1x1 it stayed focusable and stayed announced.
+
+    Desktop and Mobile are pressed-state toggle buttons rather than tabs. They resize one preview
+    instead of switching between two panels, and a tab role with no tabpanel to control is a
+    promise to a screen reader that nothing here keeps.
 
     Context variables required:
     * preview.title (string)
@@ -32,25 +42,20 @@
         }
     }
 }}
-<section class="la-preview" data-region="la-preview" aria-label="{{#str}}editor:preview:title, local_awareness{{/str}}">
-    <header class="la-preview-head">
-        <h3 class="la-preview-title">
-            <i class="fa fa-desktop" aria-hidden="true"></i>
-            {{#str}}editor:preview:title, local_awareness{{/str}}
-        </h3>
+<div class="la-preview" data-region="la-preview">
+    <div class="la-preview-bar">
+        <div class="la-preview-toggle" role="group" aria-label="{{#str}}editor:preview:viewport, local_awareness{{/str}}">
+            <button type="button" class="la-preview-tab is-on" data-tab="desktop" aria-pressed="true">
+                <i class="fa fa-laptop" aria-hidden="true"></i> {{#str}}editor:preview:tab:desktop, local_awareness{{/str}}
+            </button>
+            <button type="button" class="la-preview-tab" data-tab="mobile" aria-pressed="false">
+                <i class="fa fa-mobile" aria-hidden="true"></i> {{#str}}editor:preview:tab:mobile, local_awareness{{/str}}
+            </button>
+        </div>
         <span class="la-preview-pill" data-slot="status">
             {{#preview.statusislive}}{{#str}}editor:status:live, local_awareness{{/str}}{{/preview.statusislive}}
             {{^preview.statusislive}}{{#str}}editor:status:draft, local_awareness{{/str}}{{/preview.statusislive}}
         </span>
-    </header>
-
-    <div class="la-preview-tabs" role="tablist">
-        <button type="button" class="la-preview-tab is-on" data-tab="desktop" role="tab" aria-selected="true">
-            <i class="fa fa-laptop" aria-hidden="true"></i> {{#str}}editor:preview:tab:desktop, local_awareness{{/str}}
-        </button>
-        <button type="button" class="la-preview-tab" data-tab="mobile" role="tab" aria-selected="false">
-            <i class="fa fa-mobile" aria-hidden="true"></i> {{#str}}editor:preview:tab:mobile, local_awareness{{/str}}
-        </button>
     </div>
 
     <div class="la-preview-stage" data-slot="stage">
@@ -60,16 +65,16 @@
                 <span class="la-mockmodal-close" aria-hidden="true">×</span>
             </div>
             <div class="la-mockmodal-body">
-                <h4 data-slot="title">{{preview.title}}</h4>
-                <p data-slot="content">{{preview.contentpreview}}</p>
+                <p class="la-mockmodal-title" data-slot="title">{{preview.title}}</p>
+                <p class="la-mockmodal-text" data-slot="content">{{preview.contentpreview}}</p>
             </div>
             <div class="la-mockmodal-actions" data-slot="actions">
                 {{#preview.reqack}}
-                    <button type="button" class="la-btn la-btn--brand">{{#str}}editor:preview:btn:iam_aware, local_awareness{{/str}}</button>
+                    <span class="la-btn la-btn--brand">{{#str}}editor:preview:btn:iam_aware, local_awareness{{/str}}</span>
                 {{/preview.reqack}}
                 {{^preview.reqack}}
-                    <button type="button" class="la-btn la-btn--ghost">{{#str}}editor:preview:btn:later, local_awareness{{/str}}</button>
-                    <button type="button" class="la-btn la-btn--brand">{{#str}}editor:preview:btn:gotit, local_awareness{{/str}}</button>
+                    <span class="la-btn la-btn--ghost">{{#str}}editor:preview:btn:later, local_awareness{{/str}}</span>
+                    <span class="la-btn la-btn--brand">{{#str}}editor:preview:btn:gotit, local_awareness{{/str}}</span>
                 {{/preview.reqack}}
             </div>
         </div>
@@ -102,4 +107,4 @@
             </dd>
         </div>
     </dl>
-</section>
+</div>

@@ -285,7 +285,15 @@
    fallback is a literal chosen to match Boost's light palette.
    =========================================================================== */
 
-.local-awareness-editor {
+/*
+ * Declared on the preview root as well as on the editor. Custom properties inherit down the DOM
+ * tree, and core attaches a modal to its own element on document.body — a sibling of the editor,
+ * not a descendant. Scoped to the editor alone, every var(--la-*) inside the dialogue would resolve
+ * to nothing, which does not fall back to the literal: it makes the whole declaration invalid at
+ * computed-value time, so the preview would render with no surface, no borders and no colour.
+ */
+.local-awareness-editor,
+.la-preview {
     --la-brand: var(--bs-primary, var(--primary, #0f6cbf));
     --la-brand-strong: var(--bs-primary-text-emphasis, #0a4a84);
     --la-brand-soft: var(--bs-primary-bg-subtle, #e7f1fa);
@@ -299,20 +307,36 @@
     --la-danger: var(--bs-danger, var(--danger, #ca3120));
     --la-radius: 12px;
     color: var(--la-ink);
+}
+
+/* Clearance for the sticky action bar — the editor's business, not the dialogue's. */
+.local-awareness-editor {
     padding-bottom: 80px;
 }
 
 .local-awareness-editor *,
 .local-awareness-editor *::before,
-.local-awareness-editor *::after {
+.local-awareness-editor *::after,
+.la-preview *,
+.la-preview *::before,
+.la-preview *::after {
     box-sizing: border-box;
 }
 
+/*
+ * The preview root is listed for the same reason it is listed above: the dialogue is attached to
+ * document.body, outside the editor. Without it the viewport toggles fall back to the browser's own
+ * ring — measured on the rendered dialogue as `outline: auto 1px`, so a focus indicator exists and
+ * this is not a bare 2.4.7 failure, but it is the wrong one, and the only controls the dialogue
+ * owns would be the only controls on the plugin's surfaces not wearing its ring.
+ */
 .local-awareness-editor button:focus-visible,
 .local-awareness-editor a:focus-visible,
 .local-awareness-editor input:focus-visible,
 .local-awareness-editor select:focus-visible,
-.local-awareness-editor textarea:focus-visible {
+.local-awareness-editor textarea:focus-visible,
+.la-preview button:focus-visible,
+.la-preview a:focus-visible {
     outline: 3px solid var(--la-brand);
     outline-offset: 2px;
 }
@@ -551,8 +575,14 @@
  * because its effect could not be observed cleanly: the compiled stylesheet on the dev stack mixes
  * in a sibling plugin's own .mform.full-width-labels rules, which draw borders and backgrounds
  * from that plugin's variables. Overriding the one property is smaller and has no such reach.
+ *
+ * The :not() is load-bearing, not decoration. Core's selector scores (0,4,0) — :not() contributes
+ * its argument — and so did this one without it, which leaves source order to decide; in the
+ * compiled sheet core's rule lands at byte 1295582 against this one at 525383, so core won and the
+ * marker stayed at the far end of the row. Measured on the rendered page, not reasoned about:
+ * matching core's own :not() takes this to (0,5,0) and settles it whatever the order.
  */
-.local-awareness-editor .mform .col-form-label .form-label-addon {
+.local-awareness-editor .mform:not(.full-width-labels) .col-form-label .form-label-addon {
     margin-left: 0.35rem;
 }
 
@@ -566,19 +596,6 @@
     min-height: 24px;
     align-items: center;
     justify-content: center;
-}
-
-/* Preview and audience sit under the form now, side by side when there is room. */
-.la-editor-panels {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-top: 1.5rem;
-}
-
-.la-editor-panels > * {
-    flex: 1 1 22rem;
-    min-width: 0;
 }
 
 /*
@@ -673,33 +690,16 @@
     text-decoration: none;
 }
 
-/* Preview card */
-.la-preview {
-    background: var(--la-paper);
-    border: 1px solid var(--la-line);
-    border-radius: 14px;
-    overflow: hidden;
-}
-
-.la-preview-head {
+/*
+ * Preview dialogue. This markup is the body of a core/modal, so the surrounding chrome — the
+ * surface, the border, the radius, the title — belongs to core and is not repeated here.
+ */
+.la-preview-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--la-line);
-}
-
-.la-preview-title {
-    font-weight: 700;
-    font-size: .92rem;
-    display: flex;
-    align-items: center;
-    gap: .45rem;
-    margin: 0;
-}
-
-.la-preview-title i {
-    color: var(--la-brand-strong);
+    gap: 12px;
+    margin-bottom: 12px;
 }
 
 .la-preview-pill {
@@ -712,20 +712,25 @@
     letter-spacing: .04em;
 }
 
-.la-preview-tabs {
+.la-preview-toggle {
     display: flex;
     gap: 4px;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--la-line);
+    padding: 4px;
+    border-radius: 8px;
     background: var(--la-surface);
 }
 
+/*
+ * Sized past the 24x24 CSS pixels WCAG 2.2 asks of a pointer target: at the font size these
+ * carry, the padding alone left them 27x15.
+ */
 .la-preview-tab {
     border: none;
     background: transparent;
     font-size: .78rem;
     color: var(--la-ink);
-    padding: 5px 10px;
+    padding: 5px 12px;
+    min-height: 28px;
     border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
@@ -746,9 +751,10 @@
  */
 .la-preview-stage {
     background: var(--la-surface);
-    border-top: 1px solid var(--la-line);
+    border: 1px solid var(--la-line);
+    border-radius: 10px;
     padding: 22px;
-    min-height: 280px;
+    min-height: 220px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -773,11 +779,18 @@
     color: #fff;
 }
 
+/*
+ * A dark scrim, not a light one. Measured on the rendered dialogue: white on the previous
+ * rgba(255,255,255,.18) over Boost's primary is 3.84:1, under the 4.5:1 AA floor for text this
+ * size. Darkening instead of lightening also makes the chip independent of the site's own primary,
+ * which is the point of reading the colour from the theme in the first place — at .55 white clears
+ * 4.5:1 over every brand tried, down to a white one, and over a background image as well.
+ */
 .la-mockmodal-tag {
     position: absolute;
     top: 10px;
     left: 10px;
-    background: rgba(255, 255, 255, .18);
+    background: rgba(0, 0, 0, .55);
     color: #fff;
     border: 1px solid rgba(255, 255, 255, .25);
     border-radius: 999px;
@@ -796,7 +809,7 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, .25);
+    background: rgba(0, 0, 0, .55);
     color: #fff;
     display: inline-flex;
     align-items: center;
@@ -808,13 +821,18 @@
     padding: 14px 16px;
 }
 
-.la-mockmodal-body h4 {
+/*
+ * Not a heading. The mock notice's title is content of an illustration, not structure of the page
+ * it sits on, and marking it up as one puts an h4 into the document outline underneath the h5 that
+ * core's modal template uses for the dialogue's own title.
+ */
+.la-mockmodal-title {
     font-size: 1rem;
     font-weight: 700;
     margin: 0 0 6px;
 }
 
-.la-mockmodal-body p {
+.la-mockmodal-text {
     font-size: .82rem;
     color: var(--la-ink-muted);
     margin: 0;
@@ -827,19 +845,21 @@
     padding: 0 16px 14px;
 }
 
+/* Pictures of the notice's buttons, not controls: nothing here is clickable. */
 .la-mockmodal-actions .la-btn {
     flex: 1;
     justify-content: center;
+    cursor: default;
 }
 
 .la-preview-meta {
-    padding: 12px 16px;
+    padding: 14px 2px 0;
     border-top: 1px solid var(--la-line);
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
     font-size: .78rem;
-    margin: 0;
+    margin: 16px 0 0;
 }
 
 .la-preview-meta-item {
