@@ -6,6 +6,47 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added — the notice list has a filter bar, and it refreshes over AJAX (version 2026081508)
+
+The front half of the change whose SQL landed in 2026081505.
+
+- **A filter bar over the list**: search by name, status (active / draft / competing) and validity
+  (permanent / current / scheduled / expired), with a "clear filters" button that appears only when
+  there is something to clear. The filters are also URL parameters, so a narrowed list can be linked
+  to and survives a reload; the AJAX path carries them in the filterset instead, and both end up in
+  the same object.
+
+- **No web service of the plugin's own.** `amd/src/manage_list.js` translates the controls into a
+  filterset and hands it to `core_table/dynamic`; core fetches and swaps the table's markup. The
+  module knows nothing about how a page of notices is loaded.
+
+- **The result count and the empty state are rendered by the table, not by the page around it.**
+  Both live inside the region the AJAX refresh replaces, so neither can end up describing a
+  different list than the rows on screen. The first attempt put the count in the page and had
+  JavaScript read `data-table-total-rows` back out and re-fetch a language string on every
+  keystroke; moving it into `wrap_html_start()` deleted that whole path. The empty state has two
+  shapes on purpose: a site with no notices is invited to create one, and a filter that matched
+  nothing is offered a way back out instead.
+
+- **The debounce registers pending work.** `setFilters()` registers its own, but the 250 ms window
+  before it is a gap where nothing is in flight and the page looks idle — long enough for anything
+  watching for quiescence to conclude the list had settled and read the previous rows.
+
+- A strip of site totals sits above the table: active, drafts, combined reach and competing. These
+  describe the **site**, not the filtered set — the dynamic-table service returns table HTML and
+  nothing else, so filtered totals would need a service of the plugin's own, and the result count
+  already answers "how many matched".
+
+- Five Behat scenarios cover the filters end to end, including that searching "manutencao" finds
+  "Manutenção" through a real browser against a real database. One of them asserts through the
+  result count rather than a "should not see" on the other title: the conflict badge names its rival
+  inside a visually-hidden explanation, so that title is legitimately in the page text even when its
+  row is gone — which is the point of the badge, and makes whole-page negative assertions near it
+  unreliable.
+
+- `templates/editor/manage_shell.mustache` is deleted; the manage page had been borrowing the
+  editor's chrome.
+
 ### Added — the notice list filters and pages in SQL (version 2026081505)
 
 Back end only; the filter bar that drives it lands next.

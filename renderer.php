@@ -85,6 +85,6 @@ class local_awareness_renderer extends plugin_renderer_base {
      * @return string
      */
     public function render_manage_page(manage_page $page) {
-        return $this->render_from_template('local_awareness/editor/manage_shell', $page->export_for_template($this));
+        return $this->render_from_template('local_awareness/manage/page', $page->export_for_template($this));
     }
 }

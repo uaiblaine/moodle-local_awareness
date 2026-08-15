@@ -207,6 +207,90 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     }
 
     /**
+     * How many notices matched, printed just above the rows.
+     *
+     * Inside the table on purpose. start_html() calls this within the dynamic-table wrapper, so
+     * the AJAX refresh replaces it along with the rows and the number can never describe a
+     * different list than the one on screen. Rendering it in the page around the table would have
+     * meant JavaScript reading data-table-total-rows back out and re-fetching a language string
+     * on every keystroke — more moving parts, and a window where the two disagree.
+     *
+     * @return void
+     */
+    public function wrap_html_start() {
+        echo \html_writer::tag(
+            'p',
+            get_string('manage:resultcount', 'local_awareness', number_format($this->get_total_rows())),
+            ['class' => 'local-awareness-resultcount', 'aria-live' => 'polite']
+        );
+    }
+
+    /**
+     * What an empty result looks like.
+     *
+     * Overridden rather than rendered by the page around the table, because the AJAX refresh
+     * replaces the table's own HTML and nothing else: an empty state living outside it would still
+     * be showing the previous answer after a filter narrowed the list to nothing.
+     *
+     * The two cases read differently on purpose. A site with no notices at all needs an invitation
+     * to create one; a filter that matched nothing needs a way back out, and offering "create a
+     * notice" there would answer a question nobody asked.
+     *
+     * @return void
+     */
+    public function print_nothing_to_display(): void {
+        global $OUTPUT;
+
+        echo $this->get_dynamic_table_html_start();
+        echo $this->render_reset_button();
+        $this->print_initials_bar();
+
+        if ($this->has_active_filters()) {
+            echo $OUTPUT->render_from_template('local_awareness/manage/empty', [
+                'message' => get_string('manage:empty:filtered', 'local_awareness'),
+                'showclear' => true,
+                'clearlabel' => get_string('manage:filter:clear', 'local_awareness'),
+            ]);
+        } else {
+            echo $OUTPUT->render_from_template('local_awareness/manage/empty', [
+                'message' => get_string('manage:empty:none', 'local_awareness'),
+                'showcreate' => true,
+                'createurl' => (new moodle_url(
+                    '/local/awareness/editnotice.php',
+                    ['noticeid' => 0, 'sesskey' => sesskey()]
+                ))->out(false),
+                'createlabel' => get_string('notice:create', 'local_awareness'),
+            ]);
+        }
+
+        echo $this->get_dynamic_table_html_end();
+    }
+
+    /**
+     * Whether the current request carries a filter that actually narrows anything.
+     *
+     * @return bool
+     */
+    protected function has_active_filters(): bool {
+        $filterset = $this->get_filterset();
+        if ($filterset === null) {
+            return false;
+        }
+
+        foreach (['name', 'status', 'validity'] as $name) {
+            if (!$filterset->has_filter($name)) {
+                continue;
+            }
+            $values = $filterset->get_filter($name)->get_filter_values();
+            if (trim((string) reset($values)) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Turn the filterset into a WHERE clause and its parameters.
      *
      * Every filter is a SQL predicate, never a post-query array_filter. Narrowing the rows after

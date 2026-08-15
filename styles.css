@@ -116,6 +116,103 @@
     justify-content: center;
 }
 
+/* ---------------------------------------------------------------------------
+   Manage-notice page chrome
+
+   Colours come from the theme, as everywhere else on these surfaces; see the
+   token block below.
+   --------------------------------------------------------------------------- */
+
+.local-awareness-manage .local-awareness-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.local-awareness-manage .local-awareness-lede {
+    margin: 0;
+    color: var(--bs-secondary-color, #6a737b);
+}
+
+.local-awareness-manage .local-awareness-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.local-awareness-manage .local-awareness-stat {
+    padding: 0.75rem 1rem;
+    background: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+}
+
+.local-awareness-manage .local-awareness-stat-label {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color, #6a737b);
+}
+
+.local-awareness-manage .local-awareness-stat-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.local-awareness-manage .local-awareness-stat--accent .local-awareness-stat-value {
+    color: var(--bs-primary, var(--primary, #0f6cbf));
+}
+
+/*
+ * The filter bar wraps on its own: the search grows, the two selects keep a usable floor, and the
+ * whole row reflows when the card is narrow. No breakpoint is involved, because the width that
+ * matters is the card's and not the window's.
+ */
+.local-awareness-manage .local-awareness-filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.local-awareness-manage .local-awareness-filter {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    min-width: 9rem;
+}
+
+.local-awareness-manage .local-awareness-filter--grow {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+.local-awareness-manage .local-awareness-filter label {
+    margin-bottom: 0.2rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color, #6a737b);
+}
+
+.local-awareness-manage .local-awareness-resultcount {
+    padding: 0.6rem 1.25rem 0;
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color, #6a737b);
+}
+
+.local-awareness-empty {
+    padding: 3rem 1rem;
+    color: var(--bs-secondary-color, #6a737b);
+    text-align: center;
+}
+
 /*
  * A notice title has no length cap in the database. Clamp to two lines and keep the whole string
  * in the node — clipped for the eye, intact for a screen reader — with the full name in the title
