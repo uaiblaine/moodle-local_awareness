@@ -71,23 +71,28 @@ class all_notices extends table_sql implements renderable {
      * Table columns and corresponding headers.
      */
     protected function define_table_columns() {
+        /*
+         * Six columns, down from twelve. Four of the removed ones were yes/no columns that are now
+         * chips in "behaviour", drawn only when the setting is ON: an on/off pair told apart by
+         * colour is invisible to a reader with a colour vision deficiency, and absence carries
+         * "off" perfectly well. "Time modified" is gone outright — it guided no decision on this
+         * page, and the value still lives on the notice.
+         *
+         * Status is a column of its own rather than a badge glued to the title, so it can be
+         * filtered and sorted like the data it is.
+         */
         $cols = [
             'title' => get_string('notice:title', 'local_awareness'),
-            'resetinterval' => get_string('notice:resetinterval', 'local_awareness'),
-            'reqack' => get_string('notice:reqack', 'local_awareness'),
-            'forcelogout' => get_string('notice:forcelogout', 'local_awareness'),
-            'reqcourse' => get_string('notice:reqcourse', 'local_awareness'),
-            'timestart' => get_string('notice:activefrom', 'local_awareness'),
-            'timeend' => get_string('notice:expiry', 'local_awareness'),
-            'cohort' => get_string('notice:cohort', 'local_awareness'),
+            'status' => get_string('notice:status', 'local_awareness'),
+            'behaviour' => get_string('notice:behaviour', 'local_awareness'),
             'audience' => get_string('notice:audience', 'local_awareness'),
-            'content' => get_string('notice:content', 'local_awareness'),
+            'validity' => get_string('notice:validity', 'local_awareness'),
             'actions' => get_string('actions'),
-            'timemodified' => get_string('notice:timemodified', 'local_awareness'),
         ];
 
         $this->define_columns(array_keys($cols));
         $this->define_headers(array_values($cols));
+        $this->column_class('actions', 'text-end');
     }
 
     /**
@@ -144,88 +149,200 @@ class all_notices extends table_sql implements renderable {
      */
     protected function col_actions(awareness $awareness): string {
         global $OUTPUT;
-        $links = '';
-        $editnotice = '/local/awareness/editnotice.php';
 
-        $buildlink = static function (moodle_url $url, string $iconhtml, string $label, string $extraclass = ''): string {
-            $classes = trim('local-awareness-action ' . $extraclass);
-            $attrs = [
-                'title' => $label,
-                'aria-label' => $label,
-                'class' => $classes,
-            ];
-            return html_writer::link($url, $iconhtml, $attrs);
+        $id = (int) $awareness->get('id');
+        $action = static function (string $name) use ($id): moodle_url {
+            return new moodle_url('/local/awareness/editnotice.php', [
+                'noticeid' => $id,
+                'action' => $name,
+                'sesskey' => sesskey(),
+            ]);
         };
 
-        // Edit.
-        $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'edit', 'sesskey' => sesskey()];
-        $editurl = new moodle_url($editnotice, $editparams);
-        $label = get_string('edit');
-        $icon = $OUTPUT->pix_icon('t/edit', $label);
-        $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--edit');
-        $links .= ' ' . $editlink;
+        /*
+         * A core action_menu, not a hand-rolled dropdown. It carries both Bootstrap data-API
+         * attribute spellings, the keyboard handling and the ARIA wiring, and — the reason it
+         * matters most here — it emits a .dropdown, which is what Boost's
+         * `.table-responsive .dropdown { position: static }` rule keys off. That rule is what lets
+         * the menu escape the scroll container's overflow clip; a .btn-group wrapper is
+         * position:relative and traps it, so the last row's menu is cut off.
+         */
+        $menu = new \core\output\action_menu();
+        $menu->set_kebab_trigger(get_string('actions'));
 
-        // Enable/Disable.
-        if ($awareness->get('enabled')) {
-            $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'disable', 'sesskey' => sesskey()];
-            $editurl = new moodle_url($editnotice, $editparams);
-            $label = get_string('notice:disable', 'local_awareness');
-            $icon = $OUTPUT->pix_icon('t/hide', $label);
-            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--toggle');
-        } else {
-            $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'enable', 'sesskey' => sesskey()];
-            $editurl = new moodle_url($editnotice, $editparams);
-            $label = get_string('notice:enable', 'local_awareness');
-            $icon = $OUTPUT->pix_icon('t/show', $label);
-            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--toggle');
+        $primary = [
+            ['edit', get_string('edit'), 't/edit'],
+            $awareness->get('enabled')
+                ? ['disable', get_string('notice:disable', 'local_awareness'), 't/hide']
+                : ['enable', get_string('notice:enable', 'local_awareness'), 't/show'],
+        ];
+        foreach ($primary as [$name, $label, $icon]) {
+            $menu->add_primary_action(new \core\output\action_menu\link_primary(
+                $action($name),
+                new \pix_icon($icon, ''),
+                $label,
+                ['title' => $label, 'aria-label' => $label, 'class' => 'local-awareness-action']
+            ));
         }
-        $links .= ' ' . $editlink;
 
-        // Recalculate the audience.
-        $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'recalculate', 'sesskey' => sesskey()];
-        $editurl = new moodle_url($editnotice, $editparams);
-        $label = get_string('notice:audience:recalculate', 'local_awareness');
-        $icon = $OUTPUT->pix_icon('i/calc', $label);
-        $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--recalculate');
-        $links .= ' ' . $editlink;
+        /*
+         * Preview posts nothing: it opens the stored content in a modal, and preview.js binds to
+         * .notice-preview reading data-noticecontent. It used to be a "View" link in a column of
+         * its own, which cost a whole column for one link.
+         */
+        $previewlabel = get_string('notice:preview', 'local_awareness');
+        $menu->add_primary_action(new \core\output\action_menu\link_primary(
+            new moodle_url('#'),
+            new \pix_icon('i/preview', ''),
+            $previewlabel,
+            [
+                'title' => $previewlabel,
+                'aria-label' => $previewlabel,
+                'class' => 'local-awareness-action notice-preview',
+                'data-noticecontent' => helper::render_content($awareness),
+            ]
+        ));
 
-        // Reset.
-        $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'reset', 'sesskey' => sesskey()];
-        $editurl = new moodle_url($editnotice, $editparams);
-        $label = get_string('notice:reset', 'local_awareness');
-        $icon = $OUTPUT->pix_icon('t/reset', $label);
-        $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--reset');
-        $links .= ' ' . $editlink;
-
+        $secondary = [
+            ['recalculate', get_string('notice:audience:recalculate', 'local_awareness'), 'i/calc'],
+            ['reset', get_string('notice:reset', 'local_awareness'), 't/reset'],
+        ];
         if ($awareness->get('reqack')) {
-            // Acknowledge Report.
-            $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'acknowledged_report', 'sesskey' => sesskey()];
-            $editurl = new moodle_url($editnotice, $editparams);
-            $label = get_string('report:button:ack', 'local_awareness');
-            $icon = $OUTPUT->pix_icon('i/report', $label);
-            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--report local-awareness-action--report-start');
-            $links .= ' ' . $editlink;
-
-            // Dismiss Report.
-            $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'dismissed_report', 'sesskey' => sesskey()];
-            $editurl = new moodle_url($editnotice, $editparams);
-            $label = get_string('report:button:dis', 'local_awareness');
-            $icon = $OUTPUT->pix_icon('i/report', $label);
-            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--report');
-            $links .= ' ' . $editlink;
+            $secondary[] = ['acknowledged_report', get_string('report:button:ack', 'local_awareness'), 'i/report'];
+            $secondary[] = ['dismissed_report', get_string('report:button:dis', 'local_awareness'), 'i/report'];
         }
-
-        // Delete (kept last because it is destructive).
+        // Delete stays last because it is destructive.
         if (get_config('local_awareness', 'allow_delete')) {
-            $editparams = ['noticeid' => $awareness->get('id'), 'action' => 'unconfirmeddelete', 'sesskey' => sesskey()];
-            $editurl = new moodle_url($editnotice, $editparams);
-            $label = get_string('notice:delete', 'local_awareness');
-            $icon = $OUTPUT->pix_icon('t/delete', $label);
-            $editlink = $buildlink($editurl, $icon, $label, 'local-awareness-action--delete');
-            $links .= ' ' . $editlink;
+            $secondary[] = ['unconfirmeddelete', get_string('notice:delete', 'local_awareness'), 't/delete'];
         }
 
-        return $links;
+        foreach ($secondary as [$name, $label, $icon]) {
+            $menu->add_secondary_action(new \core\output\action_menu\link_secondary(
+                $action($name),
+                new \pix_icon($icon, ''),
+                $label
+            ));
+        }
+
+        return $OUTPUT->render($menu);
+    }
+
+    /**
+     * Status column: whether the notice is published, plus a conflict warning when it competes.
+     *
+     * @param awareness $awareness a notice record.
+     * @return string
+     */
+    protected function col_status(awareness $awareness): string {
+        /*
+         * Every background states its text colour. Bootstrap 4 gives .badge no colour at all and
+         * Bootstrap 5 defaults it to white, so the two branches fail on disjoint sets of fills;
+         * tests/local/bootstrap_compat_test.php enforces the pairing.
+         */
+        if ($awareness->get('enabled')) {
+            $status = html_writer::tag('span', get_string('notice:status:live', 'local_awareness'), [
+                'class' => 'badge bg-success text-white',
+            ]);
+        } else {
+            $status = html_writer::tag('span', get_string('notice:status:draft', 'local_awareness'), [
+                'class' => 'badge bg-secondary text-dark',
+            ]);
+        }
+
+        $clashes = $this->clashtitles[(int) $awareness->get('id')] ?? [];
+        if (!empty($clashes)) {
+            $explanation = get_string('collision:badgetooltip', 'local_awareness', implode(', ', $clashes));
+            /*
+             * The badge explains itself twice: title for the pointer, and a visually-hidden sibling
+             * for assistive technology. aria-label on a bare span has no role to attach to and is
+             * not announced reliably, which is what the previous version relied on.
+             */
+            $status .= html_writer::tag(
+                'span',
+                get_string('collision:badge', 'local_awareness')
+                    . html_writer::tag('span', ' — ' . $explanation, ['class' => 'visually-hidden']),
+                ['class' => 'badge bg-warning text-dark', 'title' => $explanation]
+            );
+        }
+
+        return html_writer::div($status, 'local-awareness-statuscell');
+    }
+
+    /**
+     * Behaviour column: one chip per setting that is switched ON, and nothing for the rest.
+     *
+     * @param awareness $awareness a notice record.
+     * @return string
+     */
+    protected function col_behaviour(awareness $awareness): string {
+        $chips = [];
+
+        $interval = (int) $awareness->get('resetinterval');
+        if ($interval > 0) {
+            /*
+             * format_time() gives "1 day"; the old column ran the raw interval through a DateInterval
+             * format string and printed "1 day(s), 0 hour(s), 0 minute(s) and 0 second(s)" — three
+             * wrapped lines per cell for a value that is almost always round.
+             */
+            $chips[] = get_string('notice:behaviour:repeat', 'local_awareness', format_time($interval));
+        }
+        if ($awareness->get('reqack')) {
+            $chips[] = get_string('notice:reqack', 'local_awareness');
+        }
+        if ($awareness->get('forcelogout')) {
+            $chips[] = get_string('notice:forcelogout', 'local_awareness');
+        }
+        if ($awareness->get('reqcourse')) {
+            $chips[] = get_string('notice:reqcourse', 'local_awareness');
+        }
+
+        if (empty($chips)) {
+            return html_writer::tag(
+                'span',
+                get_string('notice:behaviour:none', 'local_awareness'),
+                ['class' => 'text-muted']
+            );
+        }
+
+        $rendered = array_map(static function (string $chip): string {
+            return html_writer::tag('span', $chip, ['class' => 'local-awareness-chip']);
+        }, $chips);
+
+        return html_writer::div(implode('', $rendered), 'local-awareness-chips');
+    }
+
+    /**
+     * Validity column: the scheduled window, or "permanent" when there is none.
+     *
+     * @param awareness $awareness a notice record.
+     * @return string
+     */
+    protected function col_validity(awareness $awareness): string {
+        $start = (int) $awareness->get('timestart');
+        $end = (int) $awareness->get('timeend');
+
+        if (!$start && !$end) {
+            return html_writer::tag(
+                'span',
+                get_string('notice:validity:permanent', 'local_awareness'),
+                ['class' => 'text-muted']
+            );
+        }
+
+        $format = get_string('strftimedatefullshort');
+        $window = ($start ? userdate($start, $format) : '…') . ' → ' . ($end ? userdate($end, $format) : '…');
+
+        $now = time();
+        if ($end && $end < $now) {
+            $statekey = 'notice:validity:expired';
+        } else if ($start && $start > $now) {
+            $statekey = 'notice:validity:scheduled';
+        } else {
+            $statekey = 'notice:validity:current';
+        }
+
+        return html_writer::span($window)
+            . html_writer::tag('span', get_string($statekey, 'local_awareness'), ['class' => 'local-awareness-subline']);
     }
 
     /**
@@ -286,7 +403,35 @@ class all_notices extends table_sql implements renderable {
             ['class' => $whenclass]
         );
 
-        return $value . $when;
+        return $value . $when . $this->cohort_line($awareness);
+    }
+
+    /**
+     * The cohort restriction, as a muted line under the audience count.
+     *
+     * The cohort names used to own a column. They are a property OF the audience, not a sibling
+     * of it, so they read better underneath the number — and a notice targeting everyone, which is
+     * the common case, now says nothing instead of spending a column to say "All users".
+     *
+     * @param awareness $awareness a notice record.
+     * @return string Empty string when the notice targets everyone.
+     */
+    protected function cohort_line(awareness $awareness): string {
+        $cohorts = $awareness->get('cohorts');
+        if (empty($cohorts)) {
+            return '';
+        }
+
+        $names = array_map(static function ($cohortid) {
+            return helper::get_cohort_name($cohortid);
+        }, $cohorts);
+        $list = implode(', ', $names);
+
+        return html_writer::tag(
+            'span',
+            get_string('notice:audience:cohorts', 'local_awareness', $list),
+            ['class' => 'local-awareness-subline', 'title' => $list]
+        );
     }
 
     /**
@@ -297,141 +442,24 @@ class all_notices extends table_sql implements renderable {
      */
     protected function col_title(awareness $awareness): string {
         $title = $awareness->get('title');
-        $clashes = $this->clashtitles[(int) $awareness->get('id')] ?? [];
-        if (empty($clashes)) {
-            return $title;
-        }
 
         /*
-         * bg-warning carries text-dark on purpose. Bootstrap 4 gives .badge no colour at all and
-         * Bootstrap 5 defaults it to white, so a light fill left to its own devices renders white
-         * on near-white on 5.x. The pairing is enforced by tests/local/bootstrap_compat_test.php.
-         *
-         * The tooltip is a plain title attribute rather than a Bootstrap one: those need the JS
-         * data-API, which takes different attribute names on 4.5 and 5.x, and this needs no script
-         * at all to work.
-         *
-         * ms-1 alone, never paired with ml-1. The ms/me spacers are in the 116-line forward bridge
-         * Moodle 4.5 ships, so the Bootstrap 5 spelling resolves on both branches — while 5.x paints
-         * ml-1 as deprecated under the designer outline and Moodle 6.0 drops it (MDL-84465).
+         * A notice title has no length cap in the database, so the cell clamps it to two lines in
+         * CSS and carries the whole string in the title attribute. The full text stays in the node
+         * — clipped for the eye, intact for a screen reader.
          */
-        $label = get_string('collision:badge', 'local_awareness');
-        $explanation = get_string('collision:badgetooltip', 'local_awareness', implode(', ', $clashes));
-
-        $badge = html_writer::tag('span', $label, [
-            'class' => 'badge bg-warning text-dark ms-1',
-            'title' => $explanation,
-            'aria-label' => $explanation,
+        $cell = html_writer::tag('span', $title, [
+            'class' => 'local-awareness-celltitle',
+            'title' => $title,
         ]);
 
-        return $title . ' ' . $badge;
-    }
+        $path = trim((string) $awareness->get('pathmatch'));
+        $where = $path !== '' ? $path : get_string('notice:pathmatch:anywhere', 'local_awareness');
+        $cell .= html_writer::tag('span', $where, [
+            'class' => 'local-awareness-subline',
+            'title' => $where,
+        ]);
 
-    /**
-     * Custom reset interval column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_resetinterval(awareness $awareness): string {
-        return helper::format_interval_time($awareness->get('resetinterval'));
-    }
-
-    /**
-     * Custom reset cohort column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_cohort(awareness $awareness): string {
-        if (empty($awareness->get('cohorts'))) {
-            $cohort = get_string('notice:cohort:all', 'local_awareness');
-        } else {
-            $cohorts = array_map(function ($cohortid) {
-                return helper::get_cohort_name($cohortid);
-            }, $awareness->get('cohorts'));
-
-            $cohort = implode(', ', $cohorts);
-        }
-
-        return $cohort;
-    }
-
-    /**
-     * Custom reset require acknowledge column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_reqack(awareness $awareness): string {
-        return helper::format_boolean($awareness->get('reqack'));
-    }
-
-    /**
-     * The force logout column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_forcelogout(awareness $awareness): string {
-        return helper::format_boolean($awareness->get('forcelogout'));
-    }
-
-    /**
-     * The timestart column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_timestart(awareness $awareness): string {
-        return $awareness->get('timestart') == 0 ? "-" : userdate($awareness->get('timestart'));
-    }
-
-    /**
-     * The timeend column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_timeend(awareness $awareness): string {
-        return $awareness->get('timeend') == 0 ? '-' : userdate($awareness->get('timeend'));
-    }
-
-    /**
-     * Custom require course completion column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_reqcourse(awareness $awareness): string {
-        return helper::get_course_name($awareness->get('reqcourse'));
-    }
-
-    /**
-     * Custom reset time modified column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_timemodified(awareness $awareness): string {
-        if ($awareness->get('timemodified')) {
-            return userdate($awareness->get('timemodified'));
-        } else {
-            return '-';
-        }
-    }
-
-    /**
-     * Custom content column.
-     *
-     * @param awareness $awareness a notice record.
-     * @return string
-     */
-    protected function col_content(awareness $awareness): string {
-        return html_writer::link(
-            "#",
-            get_string('view'),
-            ['class' => 'notice-preview', 'data-noticecontent' => helper::render_content($awareness)]
-        );
+        return $cell;
     }
 }

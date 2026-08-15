@@ -6,6 +6,41 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the notice list is six columns instead of twelve (version 2026081504)
+
+- **Four yes/no columns became chips in one "Behaviour" column, and only the settings that are ON
+  are drawn.** An on/off pair told apart by colour is invisible to a reader with a colour vision
+  deficiency and slow for everyone else; absence carries "off", and each chip that is there says
+  what it is in words. A notice with nothing special set says so.
+
+- **"Reset every" no longer prints "1 day(s), 0 hour(s), 0 minute(s) and 0 second(s)"** — three
+  wrapped lines per cell for a value that is almost always round. It is `format_time()` now: "1 day".
+
+- **Status is a column of its own** rather than a badge glued to the title, so it reads as the data
+  it is. The conflict badge now explains itself twice: `title` for the pointer and a
+  `visually-hidden` sibling for assistive technology. It relied on `aria-label` on a bare `<span>`,
+  which has no role to attach to and is not announced reliably.
+
+- **"Active from" and "Expiry" became one "Validity" column** — "Permanent", or the window in short
+  dates with its state (current / scheduled / expired) underneath. The two full `userdate()` columns
+  wrapped to two lines each.
+
+- **"Time modified" is gone.** It guided no decision on this page; the value still lives on the
+  notice. **"Cohort" is gone as a column** and became a muted line under the audience count, which
+  is what it is a property of — and a notice targeting everyone now says nothing instead of spending
+  a column to say "All users". **"Content" is gone as a column**: its one link is the Preview action.
+
+- **Row actions are a core `action_menu`.** Edit, enable/disable and preview stay visible;
+  recalculate, reset, the two reports and delete move into the kebab menu — seven inline links
+  became three plus a menu. It also fixes a clipping bug by construction: `action_menu` emits a
+  `.dropdown`, which is what Boost's `.table-responsive .dropdown { position: static }` rule keys
+  off so the menu escapes the scroll container's overflow. The old inline links measured 27×15 px,
+  under the 24×24 floor of WCAG 2.2 SC 2.5.8; they are 24×24 now.
+
+- The Bootstrap 4 polyfill gained `visually-hidden`, which 4.5 does not define under that name —
+  caught by `test_every_bs5_utility_used_is_polyfilled` on the first run after the badge started
+  using it, which is what that test is for.
+
 ### Changed — the admin stylesheet reads the theme's tokens instead of inventing a palette (version 2026081503)
 
 First slice of the admin-surface redesign; it changes no layout and no markup, only where the

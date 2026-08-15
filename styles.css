@@ -99,47 +99,75 @@
     display: none;
 }
 
-/* Action links in manage-notice table */
+/* ---------------------------------------------------------------------------
+   Manage-notice table cells
+
+   The separator rules the old inline action links needed are gone with them:
+   the row actions are a core action_menu now, which brings its own spacing and
+   its own focus treatment.
+   --------------------------------------------------------------------------- */
+
 .local-awareness .local-awareness-action {
     display: inline-flex;
     align-items: center;
-    margin-right: 0.2rem;
+    /* WCAG 2.2 SC 2.5.8 asks for 24x24; the icons alone measured 27x15. */
+    min-width: 24px;
+    min-height: 24px;
+    justify-content: center;
 }
 
-.local-awareness .local-awareness-action--report-start {
-    margin-left: 0.35rem;
-    padding-left: 0.45rem;
-    border-left: 1px solid var(--bs-border-color, #d5d9dd);
+/*
+ * A notice title has no length cap in the database. Clamp to two lines and keep the whole string
+ * in the node — clipped for the eye, intact for a screen reader — with the full name in the title
+ * attribute. The -webkit- and standard properties are paired, which is the form Moodle's stylelint
+ * accepts and what core and sibling plugins already ship.
+ */
+.local-awareness .local-awareness-celltitle {
+    display: -webkit-box;
+    max-width: 22rem;
+    overflow: hidden;
+    font-weight: 600;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
 }
 
-.local-awareness .local-awareness-action--delete {
-    margin-left: 0.35rem;
-    padding-left: 0.45rem;
-    border-left: 1px solid var(--bs-border-color, #d5d9dd);
+.local-awareness .local-awareness-subline {
+    display: block;
+    max-width: 22rem;
+    overflow: hidden;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color, #6a737b);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.local-awareness .local-awareness-action--report:hover,
-.local-awareness .local-awareness-action--report:focus {
-    color: var(--bs-primary, var(--primary, #0f6cbf));
-    text-decoration: none;
+.local-awareness .local-awareness-statuscell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
 }
 
-.local-awareness .local-awareness-action--report:focus {
-    outline: 2px solid var(--bs-primary, var(--primary, #0f6cbf));
-    outline-offset: 2px;
-    border-radius: 3px;
+/*
+ * One appearance only: a chip is present when the setting is on and absent when it is off, so
+ * nothing here asks the reader to tell two colours apart. This replaced four yes/no columns.
+ */
+.local-awareness .local-awareness-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
 }
 
-.local-awareness .local-awareness-action--delete:hover,
-.local-awareness .local-awareness-action--delete:focus {
-    color: var(--bs-danger, var(--danger, #ca3120));
-    text-decoration: none;
-}
-
-.local-awareness .local-awareness-action--delete:focus {
-    outline: 2px solid var(--bs-danger, var(--danger, #ca3120));
-    outline-offset: 2px;
-    border-radius: 3px;
+.local-awareness .local-awareness-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.55rem;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--bs-body-color, #1d2125);
+    background: var(--bs-secondary-bg, #f1f3f5);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 1rem;
 }
 
 /* ===========================================================================
@@ -1136,4 +1164,26 @@ body.local-awareness-bs4 .gap-2 {
 
 body.local-awareness-bs4 .lh-1 {
     line-height: 1;
+}
+
+/*
+ * Bootstrap 4 calls this .sr-only; 5.x renamed it and 4.5 has no .visually-hidden at all. The
+ * conflict badge needs it to carry its explanation for assistive technology, so the class has to
+ * mean something on both branches — and writing .sr-only alongside is exactly the deprecated
+ * pairing bootstrap_compat_test forbids.
+ *
+ * Bootstrap's own declaration is all !important, which Moodle's stylelint refuses
+ * (declaration-no-important). Nothing competes with this selector on 4.5, so plain declarations
+ * behind the body gate do the same job.
+ */
+body.local-awareness-bs4 .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
