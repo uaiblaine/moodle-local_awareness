@@ -312,6 +312,116 @@ final class audience_estimator_test extends \advanced_testcase {
     }
 
     /**
+     * Every rule at once, in one statement, without a placeholder collision.
+     *
+     * The total and the per-rule chips are now conditional columns of a single query, so each rule's
+     * predicate appears in it at least twice. Moodle counts placeholder OCCURRENCES against the
+     * parameter array and throws duplicateparaminsql when a name repeats, which makes "many rules
+     * set together" the failure mode of the whole design — and the one no other test here reaches,
+     * since they set two rules at most.
+     *
+     * The counts are asserted as well as the shape: a query that merely runs could still be
+     * correlating a subquery against the wrong copy of an alias.
+     */
+    public function test_every_rule_at_once_counts_in_one_statement(): void {
+        global $DB;
+
+        $generator = $this->getDataGenerator();
+        $category = $generator->create_category();
+        $course = $generator->create_course(['category' => $category->id, 'format' => 'topics']);
+        $required = $generator->create_course(['enablecompletion' => 1]);
+        $cohort = $generator->create_cohort();
+        $roleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+
+        $matches = $generator->create_user();
+        $generator->enrol_user($matches->id, $course->id, 'student');
+        cohort_add_member($cohort->id, $matches->id);
+
+        // A second user failing exactly one rule — the cohort — so the total has something to cut.
+        $nearly = $generator->create_user();
+        $generator->enrol_user($nearly->id, $course->id, 'student');
+
+        $competency = $this->create_competency();
+        $this->record_proficiency($matches->id, (int) $course->id, $competency, 1);
+        $this->record_proficiency($nearly->id, (int) $course->id, $competency, 1);
+
+        $criteria = estimator::normalise([
+            'cohorts' => [$cohort->id],
+            'filter_role' => [$roleid],
+            'filter_role_context' => CONTEXT_COURSE,
+            'reqcourse' => $required->id,
+            'filter_category' => [$category->id],
+            'filter_course' => [$course->id],
+            'filter_format' => ['topics'],
+            'filter_competency_rules' => [['id' => $competency, 'proficient' => 1, 'name' => 'c']],
+        ]);
+
+        $result = (new estimator())->estimate($criteria);
+
+        $this->assertSame(1, $result['count'], 'only the user who satisfies every rule');
+
+        $chips = array_column($result['breakdown'], 'count', 'key');
+        $this->assertSame(estimator::audience_rules_in($criteria), array_keys($chips));
+        $this->assertSame(1, $chips['cohorts'], 'one cohort member');
+        $this->assertSame(2, $chips['filter_course'], 'both users are enrolled in the course');
+        $this->assertSame(2, $chips['filter_competency_rules'], 'both users are proficient');
+    }
+
+    /**
+     * The estimate costs the same number of reads whatever the rule count.
+     *
+     * This is the property the conditional-aggregation rewrite exists for, and the only one that
+     * cannot be seen in a result: the counts were already correct as N+1 separate statements. Each
+     * of those was a full pass over {user}, so on a site with hundreds of thousands of users the
+     * rule count multiplied the cost of a number the author reads once.
+     *
+     * Compared against a one-rule estimate rather than asserted as a literal, so it keeps meaning
+     * if the surrounding code ever reads a config value on the way past.
+     */
+    public function test_the_estimate_does_not_cost_more_reads_as_rules_are_added(): void {
+        global $DB;
+
+        $generator = $this->getDataGenerator();
+        $category = $generator->create_category();
+        $course = $generator->create_course(['category' => $category->id, 'format' => 'topics']);
+        $cohort = $generator->create_cohort();
+        $roleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+        $user = $generator->create_user();
+        $generator->enrol_user($user->id, $course->id, 'student');
+        cohort_add_member($cohort->id, $user->id);
+        $competency = $this->create_competency();
+        $this->record_proficiency($user->id, (int) $course->id, $competency, 1);
+
+        $one = estimator::normalise(['cohorts' => [$cohort->id]]);
+        $all = estimator::normalise([
+            'cohorts' => [$cohort->id],
+            'filter_role' => [$roleid],
+            'filter_role_context' => CONTEXT_COURSE,
+            'reqcourse' => $generator->create_course()->id,
+            'filter_category' => [$category->id],
+            'filter_course' => [$course->id],
+            'filter_format' => ['topics'],
+            'filter_competency_rules' => [['id' => $competency, 'proficient' => 1, 'name' => 'c']],
+        ]);
+
+        // Warm anything either path reads once and caches, so the comparison is of the queries the
+        // estimate itself issues.
+        (new estimator())->estimate($one);
+        (new estimator())->estimate($all);
+
+        $before = $DB->perf_get_reads();
+        (new estimator())->estimate($one);
+        $onerule = $DB->perf_get_reads() - $before;
+
+        $before = $DB->perf_get_reads();
+        (new estimator())->estimate($all);
+        $sevenrules = $DB->perf_get_reads() - $before;
+
+        $this->assertSame(1, $onerule, 'one statement, whatever the rules');
+        $this->assertSame($onerule, $sevenrules, 'seven rules cost what one rule costs');
+    }
+
+    /**
      * The course count never claims more people than the per-user rule would admit.
      *
      * The bulk predicate models the enrolment branch of can_access_course() and not the viewer

@@ -132,7 +132,11 @@ class estimate_audience extends \core\task\adhoc_task {
             /*
              * The per-rule breakdown is drawn only by the editor's panel, which raises jobs with no
              * notice attached. A job refreshing a saved notice's stored total feeds a list column
-             * that shows one number, so it skips the extra pass per rule.
+             * showing one number, so it asks for the total alone.
+             *
+             * No longer a saving of one table scan per rule — the counts share a single pass now —
+             * but each chip is still a conditional column with its own EXISTS evaluated per row, so
+             * dropping seven of them roughly halves the work.
              */
             $withbreakdown = (int) $job->get('noticeid') <= 0;
             $result = (new estimator())->estimate($criteria, $withbreakdown);

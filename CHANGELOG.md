@@ -6,6 +6,33 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the audience estimate is one pass over {user}, whatever the rule count (version 2026081502)
+
+- **The total and every breakdown chip are now conditional columns of a single statement.** They
+  were N+1 separate queries, each a full pass over `{user}` differing only in its predicate — so on
+  a site with hundreds of thousands of users the rule count multiplied the cost of a number the
+  author reads once. With all seven rules set that was eight scans; it is one.
+
+- Each rule's predicate is **rebuilt under its own suffix** rather than reused between columns.
+  Moodle's `fix_sql_params()` counts placeholder *occurrences* against the parameter array and
+  throws `duplicateparaminsql` when a name appears twice, so a fragment that appears in the total
+  and again in its own chip has to carry two sets of names — and two sets of subquery aliases, so a
+  correlated competency lookup cannot bind to the wrong copy of the enclosing course row.
+  `role_scope::sql()` takes a suffix for the same reason; called without one it produces exactly the
+  SQL it did before, which is what `helper::user_matches_role_filter()` still gets.
+
+- The four course-scoped rules stay **one combined EXISTS** in the total rather than becoming four.
+  They are answered against the same course at runtime, and splitting them would quietly change the
+  question to "some eligible course satisfies each rule" — a wider audience than the notice has.
+
+- Pinned by two tests that no result can show: one sets **every rule at once** (the only shape that
+  can trigger a placeholder collision, and the one no other test reached), and one asserts the
+  estimate issues **the same number of reads for seven rules as for one**.
+
+- The `$withbreakdown` flag stays, with its rationale corrected: skipping the chips no longer saves
+  a table scan per rule, but each is still a conditional column with its own EXISTS evaluated per
+  row, so dropping seven roughly halves the work for the list column's refresh.
+
 ### Changed — the audience estimate belongs to the saved notice, not to the form (version 2026081501)
 
 Sized for the sites this plugin actually runs on, which carry more than 200,000 active users. At
