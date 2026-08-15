@@ -46,44 +46,57 @@ class role_scope {
      * only the category list; a course context takes the UNION of the two lists, so holding the
      * role in any course of a listed category counts even when that course is not one named.
      *
+     * The estimator now asks this question several times in ONE statement — once for the combined
+     * count and once per rule for the breakdown chips — so both the aliases and the parameter names
+     * have to be unique per instance. $suffix is what makes them so. Moodle counts placeholder
+     * OCCURRENCES against the parameter array and rejects any name that appears twice, so reusing a
+     * fragment verbatim is not an option; it has to be rebuilt under a fresh suffix. The default is
+     * empty, which is exactly the single-fragment SQL this produced before.
+     *
      * @param array $filters Decoded filtervalues, or normalised estimator criteria.
      * @param int $rolectx Context level from filter_role_context; 0 means any context.
+     * @param string $suffix Appended to every alias and parameter name this builds.
+     * @param string $ra Alias of the {role_assignments} row the fragments attach to.
      * @return array [$join, $where, $params] — fragments plus their bound parameters.
      * @throws \dml_exception
      * @throws \coding_exception
      */
-    public static function sql(array $filters, int $rolectx): array {
+    public static function sql(array $filters, int $rolectx, string $suffix = '', string $ra = 'ra'): array {
         global $DB;
 
         $join = '';
         $where = '';
         $params = [];
+        $ctx = 'ctx' . $suffix;
+        $crs = 'crs' . $suffix;
 
         if ($rolectx == CONTEXT_SYSTEM) {
             $syscontext = \context_system::instance();
-            $where = " AND ra.contextid = " . $syscontext->id;
+            $where = " AND {$ra}.contextid = " . $syscontext->id;
         } else if ($rolectx == CONTEXT_COURSECAT) {
-            $join = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSECAT;
+            $join = " JOIN {context} {$ctx} ON {$ctx}.id = {$ra}.contextid"
+                . " AND {$ctx}.contextlevel = " . CONTEXT_COURSECAT;
             if (!empty($filters['filter_category'])) {
                 $catids = array_map('intval', $filters['filter_category']);
-                [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rcat');
-                $where = " AND ctx.instanceid {$catinsql}";
+                [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rcat' . $suffix);
+                $where = " AND {$ctx}.instanceid {$catinsql}";
                 $params += $catinparams;
             }
         } else if ($rolectx == CONTEXT_COURSE) {
-            $join = " JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = " . CONTEXT_COURSE;
+            $join = " JOIN {context} {$ctx} ON {$ctx}.id = {$ra}.contextid"
+                . " AND {$ctx}.contextlevel = " . CONTEXT_COURSE;
             $coursewheres = [];
             if (!empty($filters['filter_course'])) {
                 $courseids = array_map('intval', $filters['filter_course']);
-                [$cinsql, $cinparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED, 'rcrs');
-                $coursewheres[] = "ctx.instanceid {$cinsql}";
+                [$cinsql, $cinparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED, 'rcrs' . $suffix);
+                $coursewheres[] = "{$ctx}.instanceid {$cinsql}";
                 $params += $cinparams;
             }
             if (!empty($filters['filter_category'])) {
                 $catids = array_map('intval', $filters['filter_category']);
-                [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rccat');
-                $join .= " LEFT JOIN {course} crs ON crs.id = ctx.instanceid";
-                $coursewheres[] = "crs.category {$catinsql}";
+                [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rccat' . $suffix);
+                $join .= " LEFT JOIN {course} {$crs} ON {$crs}.id = {$ctx}.instanceid";
+                $coursewheres[] = "{$crs}.category {$catinsql}";
                 $params += $catinparams;
             }
             if (!empty($coursewheres)) {

@@ -153,37 +153,62 @@ class estimator {
      * @return array
      */
     public function estimate(array $criteria, bool $withbreakdown = true): array {
+        global $DB;
+
         $audiencerules = self::audience_rules_in($criteria);
         $contextrules = self::context_rules_in($criteria);
 
+        [$base, $params] = self::base_predicate();
+
+        /*
+         * One pass, not one per rule. Every count here reads the same rows — the whole {user} table
+         * — and asks a different question of each; as separate statements that was N+1 sequential
+         * scans of a table with hundreds of thousands of rows, for answers that differ only in the
+         * predicate. Conditional aggregation asks all of them while the rows are already in hand.
+         *
+         * Each fragment is rebuilt under its own suffix rather than reused. Moodle counts
+         * placeholder OCCURRENCES against the parameter array (fix_sql_params) and throws
+         * duplicateparaminsql when a name appears twice, so the same predicate appearing in two
+         * columns must carry two sets of names.
+         */
+        [$totalsql, $totalparams] = self::predicate($criteria, null, 't');
+        $columns = ["SUM(CASE WHEN {$totalsql} THEN 1 ELSE 0 END) AS total"];
+        $params += $totalparams;
+
+        $keys = [];
+        if ($withbreakdown) {
+            foreach (array_values($audiencerules) as $i => $rule) {
+                /*
+                 * Two arguments, because "the rule alone" is two separate questions. isolate_rule()
+                 * decides what the rule is allowed to READ — filter_role has to keep the category
+                 * and course lists or it stops being scoped. The second decides which rules are
+                 * APPLIED, and naming only this one is what stops those same lists from also
+                 * counting as their own rule inside the role's chip, which would make every chip
+                 * approximate the total instead of its own share.
+                 */
+                [$rulesql, $ruleparams] = self::predicate(self::isolate_rule($criteria, $rule), [$rule], "b{$i}");
+                $columns[] = "SUM(CASE WHEN {$rulesql} THEN 1 ELSE 0 END) AS rule{$i}";
+                $params += $ruleparams;
+                $keys[$i] = $rule;
+            }
+        }
+
+        $sql = "SELECT " . implode(",\n               ", $columns)
+            . "\n          FROM {user} u\n         WHERE " . implode(' AND ', $base);
+        $row = $DB->get_record_sql($sql, $params);
+
+        // SUM() over no matching rows is NULL in both drivers, and (int) null is the 0 we want.
         $result = [
-            'count' => self::count_combined($criteria),
+            'count' => (int) $row->total,
             'breakdown' => [],
             'context_only_filters' => $contextrules,
             'has_audience_rules' => !empty($audiencerules),
         ];
 
-        /*
-         * The breakdown costs one more full pass over {user} per rule — with every rule set, eight
-         * scans instead of one for a row of chips only the editor's panel draws. Callers that are
-         * refreshing a saved notice's stored total ask for the total alone.
-         */
-        if (!$withbreakdown) {
-            return $result;
-        }
-
-        foreach ($audiencerules as $rule) {
-            /*
-             * Two arguments, because "the rule alone" is two separate questions. isolate_rule()
-             * decides what the rule is allowed to READ — filter_role has to keep the category and
-             * course lists or it stops being scoped. The second argument decides which rules are
-             * APPLIED, and naming only this one is what stops those same lists from also counting
-             * as their own rule inside the role's chip, which would make every chip approximate the
-             * total instead of its own share.
-             */
+        foreach ($keys as $i => $rule) {
             $result['breakdown'][] = [
                 'key' => $rule,
-                'count' => self::count_combined(self::isolate_rule($criteria, $rule), [$rule]),
+                'count' => (int) $row->{'rule' . $i},
             ];
         }
 
@@ -261,56 +286,87 @@ class estimator {
     }
 
     /**
-     * Build and execute the COUNT(DISTINCT u.id) query for an arbitrary subset of audience-shaping rules.
+     * The population every count here is taken from: real, active users.
      *
-     * With no rules applied this is the site's population of real, active users, which is the
-     * answer the editor wants for a notice that has not been narrowed yet.
+     * Mirrors what Moodle considers a "real" user at login. It is the WHERE of the single statement
+     * rather than part of any rule's predicate, so the rows are filtered once and every conditional
+     * column is evaluated over the same set.
+     *
+     * SUM(CASE …), not COUNT(DISTINCT u.id): the FROM clause is {user} alone and every rule is an
+     * EXISTS or a comparison on u, so a user is one row and cannot be counted twice.
+     *
+     * THIS DEPENDS ON THE FROM CLAUSE STAYING JOIN-FREE. Anything that joins a one-to-many table in
+     * here multiplies the rows and silently overcounts; keep new predicates inside an EXISTS as
+     * every existing one is.
+     *
+     * @return array [$whereparts, $params]
+     */
+    private static function base_predicate(): array {
+        return [
+            [
+                'u.deleted = 0',
+                'u.suspended = 0',
+                'u.confirmed = 1',
+                'u.id <> :guestid',
+                // Guest is excluded by username too, to be robust on sites imported from elsewhere
+                // where it does not hold id 1.
+                'u.username <> :guestname',
+            ],
+            ['guestid' => 1, 'guestname' => 'guest'],
+        ];
+    }
+
+    /**
+     * The audience-rule predicate for one conditional column.
+     *
+     * Everything it builds — parameter names and subquery aliases alike — is suffixed, because
+     * several of these end up in the same statement and Moodle rejects a placeholder that appears
+     * more than once. With no rules applied it is "1 = 1", the whole site, which is the answer the
+     * editor wants for a notice that has not been narrowed yet.
      *
      * @param array $criteria Normalised criteria. Rules absent from it are not applied either way.
      * @param array|null $applyrules Audience rule keys to apply; null applies every rule present.
      *                               A rule may still be READ for another rule's scope while absent
      *                               from this list — see the call in estimate().
-     * @return int
+     * @param string $suffix Unique per column; appended to every name this builds.
+     * @return array [$sql, $params]
      */
-    private static function count_combined(array $criteria, ?array $applyrules = null): int {
+    private static function predicate(array $criteria, ?array $applyrules, string $suffix): array {
         global $DB, $CFG;
 
         $applies = function (string $rule) use ($criteria, $applyrules): bool {
             return !empty($criteria[$rule]) && ($applyrules === null || in_array($rule, $applyrules, true));
         };
 
-        // Base set: real, active users. Mirrors what Moodle considers a "real" user at login.
-        $where = ["u.deleted = 0", "u.suspended = 0", "u.confirmed = 1", "u.id <> :guestid"];
-        $params = ['guestid' => 1]; // Guest user has id=1 only on fresh installs; safer to also check by username.
-
-        // Refine: exclude guest by username too, to be robust on imported sites.
-        $where[] = "u.username <> :guestname";
-        $params['guestname'] = 'guest';
+        $where = [];
+        $params = [];
 
         if ($applies('cohorts')) {
             [$insql, $inparams] = $DB->get_in_or_equal(
                 array_map('intval', $criteria['cohorts']),
                 SQL_PARAMS_NAMED,
-                'coh'
+                'coh' . $suffix
             );
-            $where[] = "EXISTS (SELECT 1 FROM {cohort_members} cm
-                                  WHERE cm.userid = u.id AND cm.cohortid {$insql})";
+            $cm = 'cm' . $suffix;
+            $where[] = "EXISTS (SELECT 1 FROM {cohort_members} {$cm}
+                                  WHERE {$cm}.userid = u.id AND {$cm}.cohortid {$insql})";
             $params += $inparams;
         }
 
         if ($applies('filter_role')) {
             $roleids = array_map('intval', $criteria['filter_role']);
             $rolectx = (int) ($criteria['filter_role_context'] ?? 0);
+            $ra = 'ra' . $suffix;
             $clauses = [];
 
             // Real assignments.
-            [$insql, $inparams] = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED, 'role');
+            [$insql, $inparams] = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED, 'role' . $suffix);
 
-            [$ctxjoin, $ctxwhere, $ctxparams] = role_scope::sql($criteria, $rolectx);
+            [$ctxjoin, $ctxwhere, $ctxparams] = role_scope::sql($criteria, $rolectx, $suffix, $ra);
             $inparams += $ctxparams;
 
-            $clauses[] = "EXISTS (SELECT 1 FROM {role_assignments} ra {$ctxjoin}
-                                    WHERE ra.userid = u.id AND ra.roleid {$insql} {$ctxwhere})";
+            $clauses[] = "EXISTS (SELECT 1 FROM {role_assignments} {$ra} {$ctxjoin}
+                                    WHERE {$ra}.userid = u.id AND {$ra}.roleid {$insql} {$ctxwhere})";
             $params += $inparams;
 
             // Implicit default-user role: applies to every confirmed, non-guest user.
@@ -333,36 +389,27 @@ class estimator {
         }
 
         if ($applies('reqcourse')) {
-            $params['reqcourseid'] = (int) $criteria['reqcourse'];
-            // Notice fires for users who have NOT completed the required course.
-            // Mirrors the course-completion block in helper::retrieve_user_notices() — being
-            // present in {course_completions} only counts when timecompleted is set. Named rather
-            // than cited by line, which the previous reference had already drifted past.
-            $where[] = "NOT EXISTS (SELECT 1 FROM {course_completions} cc
-                                      WHERE cc.userid = u.id
-                                        AND cc.course = :reqcourseid
-                                        AND cc.timecompleted IS NOT NULL
-                                        AND cc.timecompleted > 0)";
+            $params['reqcourseid' . $suffix] = (int) $criteria['reqcourse'];
+            $cc = 'cc' . $suffix;
+            /*
+             * Notice fires for users who have NOT completed the required course. Mirrors the
+             * course-completion block in helper::retrieve_user_notices() — being present in
+             * {course_completions} only counts when timecompleted is set.
+             */
+            $where[] = "NOT EXISTS (SELECT 1 FROM {course_completions} {$cc}
+                                      WHERE {$cc}.userid = u.id
+                                        AND {$cc}.course = :reqcourseid{$suffix}
+                                        AND {$cc}.timecompleted IS NOT NULL
+                                        AND {$cc}.timecompleted > 0)";
         }
 
-        [$coursesql, $courseparams] = self::course_scope_sql($criteria, $applies);
+        [$coursesql, $courseparams] = self::course_scope_sql($criteria, $applies, $suffix);
         if ($coursesql !== '') {
             $where[] = $coursesql;
             $params += $courseparams;
         }
 
-        /*
-         * COUNT(*), not COUNT(DISTINCT u.id). The FROM clause is {user} alone and every rule is an
-         * EXISTS or a comparison on u, so a user can be matched at most once and DISTINCT only buys
-         * the database a sort or hash over the whole table — measurable on a site with hundreds of
-         * thousands of users, and buying nothing.
-         *
-         * THIS DEPENDS ON THE FROM CLAUSE STAYING JOIN-FREE. Anything that joins a one-to-many
-         * table in here multiplies the rows and silently overcounts; restore DISTINCT in the same
-         * edit, or keep the new predicate inside an EXISTS as the others are.
-         */
-        $sql = "SELECT COUNT(*) FROM {user} u WHERE " . implode(' AND ', $where);
-        return (int) $DB->count_records_sql($sql, $params);
+        return [empty($where) ? '1 = 1' : '(' . implode(' AND ', $where) . ')', $params];
     }
 
     /**
@@ -393,9 +440,10 @@ class estimator {
      *
      * @param array $criteria Normalised criteria.
      * @param callable $applies Predicate deciding whether a rule key is present and applied.
+     * @param string $suffix Unique per conditional column; appended to every name this builds.
      * @return array [$sql, $params] — an empty string when no rule here is in play.
      */
-    private static function course_scope_sql(array $criteria, callable $applies): array {
+    private static function course_scope_sql(array $criteria, callable $applies, string $suffix = ''): array {
         global $DB;
 
         $hascategory = $applies('filter_category');
@@ -415,32 +463,36 @@ class estimator {
             return ['1 = 0', []];
         }
 
+        $ue = 'ue' . $suffix;
+        $e = 'e' . $suffix;
+        $c = 'c' . $suffix;
+
         // Rounded, as core does, so the DB can cache the plan across calls.
         $now = round(time(), -2);
         $params = [
-            'csactive' => ENROL_USER_ACTIVE,
-            'csenabled' => ENROL_INSTANCE_ENABLED,
-            'csnow1' => $now,
-            'csnow2' => $now,
-            'cssiteid' => SITEID,
+            'csactive' . $suffix => ENROL_USER_ACTIVE,
+            'csenabled' . $suffix => ENROL_INSTANCE_ENABLED,
+            'csnow1' . $suffix => $now,
+            'csnow2' . $suffix => $now,
+            'cssiteid' . $suffix => SITEID,
         ];
         $conditions = [
-            'ue.userid = u.id',
-            'ue.status = :csactive',
-            'e.status = :csenabled',
-            'ue.timestart < :csnow1',
-            '(ue.timeend = 0 OR ue.timeend > :csnow2)',
-            'c.id <> :cssiteid',
-            'c.visible = 1',
+            "{$ue}.userid = u.id",
+            "{$ue}.status = :csactive{$suffix}",
+            "{$e}.status = :csenabled{$suffix}",
+            "{$ue}.timestart < :csnow1{$suffix}",
+            "({$ue}.timeend = 0 OR {$ue}.timeend > :csnow2{$suffix})",
+            "{$c}.id <> :cssiteid{$suffix}",
+            "{$c}.visible = 1",
         ];
 
         if ($hascategory) {
             [$insql, $inparams] = $DB->get_in_or_equal(
                 array_map('intval', $criteria['filter_category']),
                 SQL_PARAMS_NAMED,
-                'cscat'
+                'cscat' . $suffix
             );
-            $conditions[] = "c.category {$insql}";
+            $conditions[] = "{$c}.category {$insql}";
             $params += $inparams;
         }
 
@@ -448,9 +500,9 @@ class estimator {
             [$insql, $inparams] = $DB->get_in_or_equal(
                 array_map('intval', $criteria['filter_course']),
                 SQL_PARAMS_NAMED,
-                'cscrs'
+                'cscrs' . $suffix
             );
-            $conditions[] = "c.id {$insql}";
+            $conditions[] = "{$c}.id {$insql}";
             $params += $inparams;
         }
 
@@ -458,22 +510,22 @@ class estimator {
             [$insql, $inparams] = $DB->get_in_or_equal(
                 array_map('strval', $criteria['filter_format']),
                 SQL_PARAMS_NAMED,
-                'csfmt'
+                'csfmt' . $suffix
             );
-            $conditions[] = "c.format {$insql}";
+            $conditions[] = "{$c}.format {$insql}";
             $params += $inparams;
         }
 
         if ($hascompetency) {
-            [$compsql, $compparams] = self::competency_sql($criteria);
+            [$compsql, $compparams] = self::competency_sql($criteria, $suffix, $c);
             $conditions[] = $compsql;
             $params += $compparams;
         }
 
         $sql = "EXISTS (SELECT 1
-                          FROM {user_enrolments} ue
-                          JOIN {enrol} e ON e.id = ue.enrolid
-                          JOIN {course} c ON c.id = e.courseid
+                          FROM {user_enrolments} {$ue}
+                          JOIN {enrol} {$e} ON {$e}.id = {$ue}.enrolid
+                          JOIN {course} {$c} ON {$c}.id = {$e}.courseid
                          WHERE " . implode("\n                           AND ", $conditions) . ")";
 
         return [$sql, $params];
@@ -488,21 +540,24 @@ class estimator {
      * as "not proficient" excludes the people who are.
      *
      * @param array $criteria Normalised criteria carrying filter_competency_rules.
+     * @param string $suffix Unique per conditional column; appended to every name this builds.
+     * @param string $course Alias of the enclosing {course} row to correlate against.
      * @return array [$sql, $params]
      */
-    private static function competency_sql(array $criteria): array {
+    private static function competency_sql(array $criteria, string $suffix, string $course): array {
         $requireall = !empty($criteria['filter_competency_requireall']);
         $conditions = [];
         $params = [];
 
         foreach (array_values($criteria['filter_competency_rules']) as $i => $rule) {
-            $params["cscomp{$i}"] = (int) $rule['id'];
+            $params["cscomp{$suffix}_{$i}"] = (int) $rule['id'];
+            $ucc = "ucc{$suffix}_{$i}";
             $exists = "EXISTS (SELECT 1
-                                 FROM {competency_usercompcourse} ucc{$i}
-                                WHERE ucc{$i}.userid = u.id
-                                  AND ucc{$i}.courseid = c.id
-                                  AND ucc{$i}.competencyid = :cscomp{$i}
-                                  AND ucc{$i}.proficiency = 1)";
+                                 FROM {competency_usercompcourse} {$ucc}
+                                WHERE {$ucc}.userid = u.id
+                                  AND {$ucc}.courseid = {$course}.id
+                                  AND {$ucc}.competencyid = :cscomp{$suffix}_{$i}
+                                  AND {$ucc}.proficiency = 1)";
             $conditions[] = ($requireall || !empty($rule['proficient'])) ? $exists : "NOT {$exists}";
         }
 
