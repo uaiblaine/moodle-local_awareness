@@ -1,0 +1,557 @@
+<title>Protótipo — Editar aviso</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /*
+   * Tokens mirror Moodle Boost's palette; the shipped plugin reads the theme's own custom
+   * properties instead — var(--bs-primary, var(--primary, #0f6cbf)) and friends, which resolve
+   * on Bootstrap 4 (Moodle 4.5) and Bootstrap 5 (5.x) alike.
+   */
+  :root {
+    --brand: #0f6cbf;
+    --brand-ink: #0a4a84;
+    --brand-soft: #e7f1fa;
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface-2: #f1f3f5;
+    --ink: #1d2125;
+    --ink-2: #5b6470;
+    --line: #dee2e6;
+    --muted-bg: #ced4da;
+    --muted-ink: #1d2125;
+    --shadow: 0 1px 2px rgba(29, 33, 37, .06);
+    --radius: .5rem;
+    --motion: 150ms cubic-bezier(.4, 0, .2, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --brand: #4da3e8; --brand-ink: #8ec4f0; --brand-soft: #1d2f40; --bg: #14171a;
+      --surface: #1f2429; --surface-2: #262c33; --ink: #e8eaed; --ink-2: #9aa4b0;
+      --line: #343b43; --muted-bg: #3a4149; --muted-ink: #e8eaed;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --brand: #4da3e8; --brand-ink: #8ec4f0; --brand-soft: #1d2f40; --bg: #14171a;
+    --surface: #1f2429; --surface-2: #262c33; --ink: #e8eaed; --ink-2: #9aa4b0;
+    --line: #343b43; --muted-bg: #3a4149; --muted-ink: #e8eaed;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* Clearance for the sticky footer. */
+  .page { max-width: 1140px; margin: 0 auto; padding: 1.5rem 1rem 8rem; }
+
+  h1 { margin: 0 0 .25rem; font-size: 1.75rem; font-weight: 700; letter-spacing: -.02em; }
+  .lede { margin: 0; color: var(--ink-2); }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: flex-end;
+    justify-content: space-between; gap: .75rem; margin-bottom: 1.25rem;
+  }
+  .toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+    min-height: 2.25rem; padding: .375rem .75rem; border: 1px solid transparent;
+    border-radius: .25rem; background: transparent; color: var(--ink);
+    font: inherit; line-height: 1.4; text-decoration: none; cursor: pointer;
+  }
+  .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .btn-outline { border-color: var(--line); background: var(--surface); }
+  .btn-outline:hover { background: var(--surface-2); }
+  .btn-sm { min-height: 2rem; padding: .25rem .6rem; font-size: .875rem; }
+
+  .badge {
+    display: inline-block; padding: .2rem .5rem; border-radius: .25rem;
+    background: var(--muted-bg); color: var(--muted-ink);
+    font-size: .75rem; font-weight: 600; line-height: 1.4;
+  }
+
+  /* ── Sections as accordions ──────────────────────────────────────── */
+  .section {
+    margin-bottom: .75rem; background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .section-h { margin: 0; font-size: inherit; }
+  .section-toggle {
+    display: flex; align-items: center; gap: .85rem; width: 100%;
+    padding: .9rem 1.1rem; border: 0; border-radius: var(--radius);
+    background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  }
+  .section-toggle:hover { background: var(--surface-2); }
+  /* A bare button gets no focus ring from the theme — restore it from the accent. */
+  .section-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+
+  .section-icon {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--surface-2); color: var(--brand);
+  }
+  .section-text { flex: 1 1 auto; min-width: 0; }
+  .section-title { display: block; font-size: 1.0625rem; font-weight: 600; line-height: 1.3; }
+  /* The toggle lives inside an h2, so the description has to opt out of the heading weight. */
+  .section-desc { display: block; font-size: .875rem; font-weight: 400; color: var(--ink-2); }
+  .section-chevron { flex: 0 0 auto; color: var(--ink-2); transition: transform var(--motion); }
+  .section-toggle[aria-expanded="true"] .section-chevron { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .section-chevron { transition: none; } }
+
+  .section-panel { padding: 0 1.1rem 1rem; border-top: 1px solid var(--line); }
+  .section-panel[hidden] { display: none; }
+
+  /*
+   * The density rule. Field rows flow into 2 or 3 columns whenever the CARD is wide enough —
+   * intrinsic, never a viewport media query, because the region the page lives in is narrower
+   * than the window by however wide the block drawer happens to be.
+   *
+   * Flex with a percentage basis, not grid. The obvious grid spelling caps nothing:
+   * repeat(auto-fit, minmax(19rem, 1fr)) reads as "two columns" and silently yields three on a
+   * wide card. Capping it needs minmax(max(19rem, 45%), 1fr) — and Moodle's stylelint rejects
+   * that outright ("Invalid value for grid-template-columns", csstree/validator), as it rejects
+   * @container and container-type. Both were measured against the real gate. A percentage
+   * flex-basis caps the count with plain, valid CSS: three items of 45% cannot share a row.
+   */
+  .fields { display: flex; flex-wrap: wrap; gap: 0 2rem; }
+  .fields--1up > .field { flex: 1 1 100%; }
+  .fields--2up > .field { flex: 1 1 45%; min-width: 19rem; }
+  .fields--3up > .field { flex: 1 1 28%; min-width: 15rem; }
+
+  .field { padding: .75rem 0; border-bottom: 1px solid var(--line); }
+  .fields > .field--wide { flex: 1 1 100%; }
+  .fields > .field:last-child { border-bottom: 0; }
+
+  .field label { display: block; margin-bottom: .25rem; font-weight: 500; }
+  .field .hint { display: block; margin-top: .25rem; font-size: .8125rem; color: var(--ink-2); }
+  .req { color: #a4322a; }
+
+  .control {
+    width: 100%; min-height: 2.25rem; padding: .375rem .75rem;
+    border: 1px solid var(--line); border-radius: .25rem;
+    background: var(--surface); color: var(--ink); font: inherit;
+  }
+  .control:focus-visible { outline: 2px solid var(--brand); outline-offset: -1px; }
+  textarea.control { min-height: 9rem; resize: vertical; }
+  .control-row { display: flex; gap: .5rem; }
+  .control-row .control { flex: 1 1 auto; }
+  .control-row .control--narrow { flex: 0 0 6rem; }
+
+  .filedrop {
+    padding: 2rem 1rem; border: 2px dashed var(--line); border-radius: var(--radius);
+    background: var(--surface-2); color: var(--ink-2); text-align: center;
+  }
+
+  /* ── Audience reach: the result, after the rules ─────────────────── */
+  .reach {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.25rem;
+    padding: .85rem 1.1rem; margin-top: 1rem;
+    border: 1px solid var(--line); border-left: 3px solid var(--brand);
+    border-radius: var(--radius); background: var(--surface-2);
+  }
+  .reach-label { display: block; font-size: .8125rem; color: var(--ink-2); }
+  .reach-value { display: block; font-size: 1.75rem; font-weight: 600; line-height: 1.1; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .reach-note { flex: 1 1 12rem; font-size: .8125rem; color: var(--ink-2); }
+
+  /* ── Sticky footer: core's pattern — buttons only, centred, no colour variant ─ */
+  .stickyfooter {
+    position: fixed; right: 0; bottom: 0; left: 0; z-index: 3;
+    min-height: 5rem; background: var(--surface); border-top: 1px solid var(--line);
+    box-shadow: 0 0 1rem rgba(0, 0, 0, .15);
+  }
+  .sticky-content {
+    display: flex; align-items: center; justify-content: center; gap: .5rem;
+    height: 100%; min-height: 5rem; padding: .5rem 1rem;
+  }
+  .sticky-content .btn {
+    flex-direction: column; gap: .1rem; min-width: 6rem; padding: .35rem .75rem;
+    font-size: .875rem;
+  }
+  .sticky-content .glyph { font-size: 1.1rem; line-height: 1.2; }
+
+  /* ── Preview modal ───────────────────────────────────────────────── */
+  .modal {
+    position: fixed; inset: 0; z-index: 1050; display: flex; align-items: center;
+    justify-content: center; padding: 1rem; background: rgba(0, 0, 0, .5);
+  }
+  .modal[hidden] { display: none; }
+  .modal-box {
+    width: 100%; max-width: 40rem; background: var(--surface);
+    border-radius: var(--radius); box-shadow: 0 1rem 2rem rgba(0, 0, 0, .3);
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .85rem 1.1rem; border-bottom: 1px solid var(--line);
+  }
+  .modal-head h2 { margin: 0; font-size: 1.05rem; }
+  .modal-body { padding: 1.1rem; }
+  .stage { padding: 1.5rem; background: var(--surface-2); border-radius: var(--radius); }
+
+  .mock {
+    max-width: 26rem; margin: 0 auto; overflow: hidden; background: var(--surface);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 1rem 2rem -1rem rgba(0, 0, 0, .4);
+  }
+  .mock--mobile { max-width: 20rem; }
+  .mock-hero { height: 6rem; background: var(--brand); }
+  .mock-body { padding: 1rem; }
+  .mock-body h3 { margin: 0 0 .35rem; font-size: 1.0625rem; }
+  .mock-body p { margin: 0; color: var(--ink-2); }
+  .mock-actions { display: flex; gap: .5rem; padding: 0 1rem 1rem; }
+  .mock-actions .btn { flex: 1 1 0; }
+  .mock-actions .btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  .seg { display: inline-flex; margin-bottom: 1rem; }
+  .seg .btn { border-color: var(--line); border-radius: 0; }
+  .seg .btn:first-child { border-radius: .25rem 0 0 .25rem; }
+  .seg .btn:last-child { border-radius: 0 .25rem .25rem 0; margin-left: -1px; }
+  .seg .btn[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand-ink); }
+
+  .visually-hidden {
+    position: absolute !important; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  .note {
+    max-width: 60rem; margin: 2rem auto 0; padding: 1rem 1.15rem;
+    background: var(--brand-soft); border-left: 3px solid var(--brand);
+    border-radius: var(--radius); font-size: .9rem; color: var(--ink-2);
+  }
+  .note b { color: var(--ink); }
+</style>
+
+<div class="page">
+
+  <div class="toolbar">
+    <div>
+      <h1>Criar aviso</h1>
+      <p class="lede">Aviso contextual exibido quando as regras coincidem.</p>
+    </div>
+    <div class="toolbar-actions">
+      <span class="badge">Rascunho</span>
+      <button type="button" class="btn btn-outline btn-sm" data-action="preview">🖵 Pré-visualizar</button>
+      <button type="button" class="btn btn-outline btn-sm" data-action="toggle-all" aria-expanded="false">
+        <span data-slot="toggle-all-glyph">⌄⌄</span> <span data-slot="toggle-all-label">Expandir tudo</span>
+      </button>
+    </div>
+  </div>
+
+  <form data-region="form">
+
+    <!-- 01 — Conteúdo -->
+    <section class="section" id="sec-content">
+      <h2 class="section-h">
+        <button type="button" class="section-toggle" data-accordion="sec-content"
+                aria-expanded="true" aria-controls="sec-content-p">
+          <span class="section-icon" aria-hidden="true">▤</span>
+          <span class="section-text">
+            <span class="section-title">Conteúdo</span>
+            <span class="section-desc">O que o usuário verá no modal.</span>
+          </span>
+          <span class="section-chevron" aria-hidden="true">⌄</span>
+        </button>
+      </h2>
+      <div class="section-panel" id="sec-content-p">
+        <div class="fields fields--1up">
+          <div class="field field--wide">
+            <label for="f-title">Título <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" id="f-title" class="control" value="">
+          </div>
+          <div class="field field--wide">
+            <label for="f-content">Conteúdo <span class="req" aria-hidden="true">*</span></label>
+            <textarea id="f-content" class="control" placeholder="Editor de texto do Moodle"></textarea>
+          </div>
+          <div class="field field--wide">
+            <label for="f-bg">Imagem de fundo</label>
+            <div class="filedrop" id="f-bg">Arraste um arquivo aqui ou clique para escolher</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 — Exibição -->
+    <section class="section" id="sec-display">
+      <h2 class="section-h">
+        <button type="button" class="section-toggle" data-accordion="sec-display"
+                aria-expanded="true" aria-controls="sec-display-p">
+          <span class="section-icon" aria-hidden="true">⚙</span>
+          <span class="section-text">
+            <span class="section-title">Exibição</span>
+            <span class="section-desc">Quando aparece, com que frequência e como é dispensado.</span>
+          </span>
+          <span class="section-chevron" aria-hidden="true">⌄</span>
+        </button>
+      </h2>
+      <div class="section-panel" id="sec-display-p">
+        <div class="fields fields--2up">
+          <div class="field">
+            <label for="f-enabled">Aviso ativo</label>
+            <select id="f-enabled" class="control"><option>Sim</option><option selected>Não</option></select>
+          </div>
+          <div class="field">
+            <label for="f-reset">Repetir a cada</label>
+            <div class="control-row">
+              <input type="number" id="f-reset" class="control control--narrow" value="0">
+              <select class="control" aria-label="Unidade do intervalo">
+                <option>minutos</option><option>horas</option><option selected>dias</option>
+              </select>
+            </div>
+            <span class="hint">Zero mostra o aviso uma vez só.</span>
+          </div>
+          <div class="field">
+            <label for="f-ack">Exige ciência</label>
+            <select id="f-ack" class="control"><option>Sim</option><option selected>Não</option></select>
+          </div>
+          <div class="field">
+            <label for="f-outside">Fecha ao clicar fora</label>
+            <select id="f-outside" class="control"><option selected>Sim</option><option>Não</option></select>
+          </div>
+          <div class="field">
+            <label for="f-logout">Força logout</label>
+            <select id="f-logout" class="control"><option>Sim</option><option selected>Não</option></select>
+          </div>
+          <div class="field">
+            <label for="f-perpetual">Permanente</label>
+            <select id="f-perpetual" class="control"><option selected>Sim</option><option>Não</option></select>
+            <span class="hint">Sem data de início nem de fim.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 — Público -->
+    <section class="section" id="sec-audience">
+      <h2 class="section-h">
+        <button type="button" class="section-toggle" data-accordion="sec-audience"
+                aria-expanded="true" aria-controls="sec-audience-p">
+          <span class="section-icon" aria-hidden="true">👥</span>
+          <span class="section-text">
+            <span class="section-title">Público</span>
+            <span class="section-desc">Quem recebe o aviso. Os filtros combinam por interseção.</span>
+          </span>
+          <span class="section-chevron" aria-hidden="true">⌄</span>
+        </button>
+      </h2>
+      <div class="section-panel" id="sec-audience-p">
+        <div class="fields fields--3up">
+          <div class="field">
+            <label for="f-cohorts">Coortes</label>
+            <select id="f-cohorts" class="control"><option>Todos os usuários</option></select>
+          </div>
+          <div class="field">
+            <label for="f-role">Papéis</label>
+            <select id="f-role" class="control"><option>Todos</option></select>
+          </div>
+          <div class="field">
+            <label for="f-rolectx">Contexto do papel</label>
+            <select id="f-rolectx" class="control">
+              <option selected>Todos</option><option>Sistema</option>
+              <option>Categoria</option><option>Curso</option>
+            </select>
+            <span class="hint">Hoje este campo existe no formulário mas nunca chega à tela.</span>
+          </div>
+          <div class="field">
+            <label for="f-course">Exige conclusão de curso</label>
+            <select id="f-course" class="control"><option>Não</option></select>
+          </div>
+          <div class="field">
+            <label for="f-compall">Exigir todas as competências</label>
+            <select id="f-compall" class="control"><option>Sim</option><option selected>Não</option></select>
+          </div>
+          <div class="field field--wide">
+            <label>Competências</label>
+            <button type="button" class="btn btn-outline">+ Adicionar competências</button>
+          </div>
+        </div>
+
+        <!-- The estimate is a RESULT, so it sits after the rules that produce it. -->
+        <div class="reach" aria-live="polite">
+          <div>
+            <span class="reach-label">Alcance estimado</span>
+            <span class="reach-value">~ 1.284</span>
+          </div>
+          <div class="reach-note">Calculado há 2 minutos · 3 coortes, 1 papel, 1 curso</div>
+          <button type="button" class="btn btn-outline btn-sm">⚡ Recalcular</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 — Restrições de exibição -->
+    <section class="section" id="sec-restrictions">
+      <h2 class="section-h">
+        <button type="button" class="section-toggle" data-accordion="sec-restrictions"
+                aria-expanded="false" aria-controls="sec-restrictions-p">
+          <span class="section-icon" aria-hidden="true">⛃</span>
+          <span class="section-text">
+            <span class="section-title">Restrições de exibição</span>
+            <span class="section-desc">Onde na plataforma o aviso dispara. Opcional.</span>
+          </span>
+          <span class="section-chevron" aria-hidden="true">⌄</span>
+        </button>
+      </h2>
+      <div class="section-panel" id="sec-restrictions-p" hidden>
+        <div class="fields fields--3up">
+          <div class="field">
+            <label for="f-path">Caminho da URL</label>
+            <input type="text" id="f-path" class="control" placeholder="/course/view.php">
+          </div>
+          <div class="field">
+            <label for="f-cat">Categoria</label>
+            <select id="f-cat" class="control"><option>Todas</option></select>
+          </div>
+          <div class="field">
+            <label for="f-filtercourse">Curso</label>
+            <select id="f-filtercourse" class="control"><option>Todos</option></select>
+          </div>
+          <div class="field">
+            <label for="f-format">Formato do curso</label>
+            <select id="f-format" class="control"><option>Todos</option></select>
+          </div>
+          <div class="field">
+            <label for="f-theme">Tema</label>
+            <select id="f-theme" class="control"><option>Todos</option></select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 — Aparência do modal -->
+    <section class="section" id="sec-appearance">
+      <h2 class="section-h">
+        <button type="button" class="section-toggle" data-accordion="sec-appearance"
+                aria-expanded="false" aria-controls="sec-appearance-p">
+          <span class="section-icon" aria-hidden="true">⤢</span>
+          <span class="section-text">
+            <span class="section-title">Aparência do modal</span>
+            <span class="section-desc">Tamanho da janela. Deixe em branco para o padrão.</span>
+          </span>
+          <span class="section-chevron" aria-hidden="true">⌄</span>
+        </button>
+      </h2>
+      <div class="section-panel" id="sec-appearance-p" hidden>
+        <div class="fields fields--2up">
+          <div class="field">
+            <label for="f-w">Largura</label>
+            <input type="text" id="f-w" class="control" placeholder="480px">
+          </div>
+          <div class="field">
+            <label for="f-h">Altura</label>
+            <input type="text" id="f-h" class="control" placeholder="320px">
+          </div>
+        </div>
+      </div>
+    </section>
+  </form>
+
+  <p class="note">
+    <b>O rodapé é o <code>\core\output\sticky_footer</code> do Moodle.</b> Ele é renderizado
+    depois do conteúdo, então os botões nascem fora do <code>&lt;form&gt;</code> — o elo é o
+    atributo <code>form="&lt;id do form&gt;"</code>. Segue o padrão do core já usado em
+    <code>local_groupdist</code> e <code>local_dimensions</code>: só botões, ícone acima do
+    rótulo, sem variante de cor, linha centralizada.
+  </p>
+</div>
+
+<!-- The sticky footer is a page-level bar and lives outside the form on purpose. -->
+<div class="stickyfooter" id="sticky-footer">
+  <div class="sticky-content">
+    <a class="btn" href="manage-notices.html"><span class="glyph" aria-hidden="true">✕</span><span>Cancelar</span></a>
+    <button type="button" class="btn" data-action="preview"><span class="glyph" aria-hidden="true">🖵</span><span>Pré-visualizar</span></button>
+    <button type="submit" class="btn" form="notice-form"><span class="glyph" aria-hidden="true">✓</span><span>Salvar aviso</span></button>
+  </div>
+</div>
+
+<div class="modal" data-slot="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+    <div class="modal-head">
+      <h2 id="preview-title">Pré-visualização</h2>
+      <button type="button" class="btn btn-sm" data-action="close" aria-label="Fechar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="seg" role="group" aria-label="Tamanho da tela">
+        <button type="button" class="btn btn-outline btn-sm" data-width="desktop" aria-pressed="true">Desktop</button>
+        <button type="button" class="btn btn-outline btn-sm" data-width="mobile" aria-pressed="false">Celular</button>
+      </div>
+      <div class="stage">
+        <div class="mock" data-slot="mock">
+          <div class="mock-hero"></div>
+          <div class="mock-body">
+            <h3>Título do aviso</h3>
+            <p>O conteúdo do aviso aparece aqui.</p>
+          </div>
+          <div class="mock-actions">
+            <button type="button" class="btn btn-outline">Depois</button>
+            <button type="button" class="btn btn-primary">Entendi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var SECTIONS = ['sec-content', 'sec-display', 'sec-audience', 'sec-restrictions', 'sec-appearance'];
+    document.querySelector('[data-region="form"]').id = 'notice-form';
+
+    function setSection(id, open) {
+        var btn = document.querySelector('[data-accordion="' + id + '"]');
+        var panel = document.getElementById(id + '-p');
+        if (!btn || !panel) { return; }
+        btn.setAttribute('aria-expanded', String(open));
+        panel.hidden = !open;
+    }
+
+    document.querySelectorAll('[data-accordion]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            setSection(btn.getAttribute('data-accordion'), btn.getAttribute('aria-expanded') !== 'true');
+        });
+    });
+
+    var toggleAll = document.querySelector('[data-action="toggle-all"]');
+    toggleAll.addEventListener('click', function () {
+        var expand = toggleAll.getAttribute('aria-expanded') !== 'true';
+        SECTIONS.forEach(function (id) { setSection(id, expand); });
+        toggleAll.setAttribute('aria-expanded', String(expand));
+        document.querySelector('[data-slot="toggle-all-label"]').textContent = expand ? 'Recolher tudo' : 'Expandir tudo';
+        document.querySelector('[data-slot="toggle-all-glyph"]').textContent = expand ? '⌃⌃' : '⌄⌄';
+    });
+
+    /* Preview modal. The shipped page uses core/modal, which also traps focus, closes on Escape
+       and returns focus to the trigger — this prototype only mimics the layout. */
+    var modal = document.querySelector('[data-slot="modal"]');
+    var opener = null;
+    document.querySelectorAll('[data-action="preview"]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            opener = btn;
+            modal.hidden = false;
+            modal.querySelector('[data-action="close"]').focus();
+        });
+    });
+    modal.querySelector('[data-action="close"]').addEventListener('click', function () {
+        modal.hidden = true;
+        if (opener) { opener.focus(); }
+    });
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && !modal.hidden) {
+            modal.hidden = true;
+            if (opener) { opener.focus(); }
+        }
+    });
+    modal.querySelectorAll('[data-width]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            modal.querySelectorAll('[data-width]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+            btn.setAttribute('aria-pressed', 'true');
+            modal.querySelector('[data-slot="mock"]').classList.toggle('mock--mobile', btn.dataset.width === 'mobile');
+        });
+    });
+}());
+</script>
