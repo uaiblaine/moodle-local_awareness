@@ -36,9 +36,9 @@ require_once($CFG->libdir . '/tablelib.php');
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class all_notices extends table_sql implements renderable {
-    /** @var int */
-    protected $page;
+class all_notices extends table_sql implements \core_table\dynamic, renderable {
+    /** @var int Rows per page. */
+    public const PER_PAGE = 25;
 
     /** @var array Notice id to the titles of the repeating notices it competes with, for this page of rows. */
     protected $clashtitles = [];
@@ -46,25 +46,81 @@ class all_notices extends table_sql implements renderable {
     /**
      * all_notices constructor.
      *
+     * Everything after $uniqueid is optional because the dynamic-table web service constructs the
+     * class with the unique id alone (\core_table\external\dynamic\get) and then feeds it a
+     * filterset. guess_base_url() supplies the URL in that path.
+     *
      * @param string $uniqueid table unique id
-     * @param \moodle_url $url base url
+     * @param \moodle_url|null $url base url
      * @param int $page current page
      * @param int $perpage number of records per page
      */
-    public function __construct(string $uniqueid, \moodle_url $url, int $page = 0, int $perpage = 20) {
+    public function __construct(string $uniqueid, ?\moodle_url $url = null, int $page = 0, int $perpage = self::PER_PAGE) {
         parent::__construct($uniqueid);
 
         $this->set_attribute('class', 'local-awareness awarenesss');
 
-        // Set protected properties.
+        // Set protected properties. setup() refines currpage from the request on a full page load.
         $this->pagesize = $perpage;
-        $this->page = $page;
+        $this->currpage = $page;
 
         // Define columns in the table.
         $this->define_table_columns();
 
         // Define configs.
-        $this->define_table_configs($url);
+        $this->define_table_configs($url ?? new moodle_url('/local/awareness/managenotice.php'));
+    }
+
+    /**
+     * The filterset class this table accepts.
+     *
+     * @return string Fully qualified class name.
+     */
+    public static function get_filterset_class(): string {
+        return all_notices_filterset::class;
+    }
+
+    /**
+     * The context the dynamic-table web service validates against.
+     *
+     * Derived here rather than accepted as a parameter: notices are a site-level thing, and a
+     * context id arriving from the client is a context the client chose.
+     *
+     * @return \context
+     */
+    public function get_context(): \context {
+        return \context_system::instance();
+    }
+
+    /**
+     * Whether the current user may see this table.
+     *
+     * @return bool
+     */
+    public function has_capability(): bool {
+        return has_capability('local/awareness:manage', $this->get_context());
+    }
+
+    /**
+     * Base URL used when the table is refreshed over AJAX.
+     *
+     * @return void
+     */
+    public function guess_base_url(): void {
+        $this->baseurl = new moodle_url('/local/awareness/managenotice.php');
+    }
+
+    /**
+     * How many rows match the current filters, across every page.
+     *
+     * Reads flexible_table's own public $totalrows, which pagesize() sets from the filtered count
+     * in query_db(). Shadowing it with a property of the same name is a fatal error, since the
+     * base declares it public.
+     *
+     * @return int
+     */
+    public function get_total_rows(): int {
+        return (int) $this->totalrows;
     }
 
     /**
@@ -117,12 +173,21 @@ class all_notices extends table_sql implements renderable {
      * @param bool $useinitialsbar initial bar
      */
     public function query_db($pagesize, $useinitialsbar = true): void {
-        $records = awareness::get_records([], 'enabled, timemodified', 'DESC', $this->pagesize * $this->page, $this->pagesize);
-        $total = awareness::count_records();
+        global $DB;
+
+        [$where, $params] = $this->build_filter_sql();
+        $table = '{' . awareness::TABLE . '}';
+
+        // The filtered total lands on $this->totalrows via pagesize(), which is what the pager reads.
+        $total = $DB->count_records_sql("SELECT COUNT(1) FROM $table WHERE $where", $params);
         $this->pagesize($pagesize, $total);
 
+        $sql = "SELECT * FROM $table WHERE $where ORDER BY enabled DESC, timemodified DESC, id DESC";
+        $records = $DB->get_records_sql($sql, $params, $this->get_page_start(), $this->get_page_size());
+
         foreach ($records as $record) {
-            $this->rawdata[] = $record;
+            // Same hydration persistent::get_records() does, so every col_* method still sees a persistent.
+            $this->rawdata[] = new awareness(0, $record);
         }
 
         /*
@@ -139,6 +204,97 @@ class all_notices extends table_sql implements renderable {
         if ($useinitialsbar) {
             $this->initialbars($total > $pagesize);
         }
+    }
+
+    /**
+     * Turn the filterset into a WHERE clause and its parameters.
+     *
+     * Every filter is a SQL predicate, never a post-query array_filter. Narrowing the rows after
+     * the query would make paging lie: it would fetch a page of 25 and display however many
+     * survived, while the pager kept counting the unfiltered total.
+     *
+     * @return array [where clause, parameters]
+     * @throws \coding_exception
+     * @throws \dml_exception
+     */
+    protected function build_filter_sql(): array {
+        global $DB;
+
+        $wheres = ['1 = 1'];
+        $params = [];
+        $filterset = $this->get_filterset();
+
+        if ($filterset === null) {
+            return [implode(' AND ', $wheres), $params];
+        }
+
+        if ($filterset->has_filter('name')) {
+            $values = $filterset->get_filter('name')->get_filter_values();
+            $needle = trim((string) reset($values));
+            if ($needle !== '') {
+                /*
+                 * Accent- and case-insensitive: "manutencao" has to find "Manutenção". On
+                 * PostgreSQL that is unaccent() on both operands when the extension is present,
+                 * and on MySQL/MariaDB the collation already does it. ILIKE is PostgreSQL-only,
+                 * which is why this goes through the helper rather than being written inline.
+                 */
+                $wheres[] = helper::sql_like_ai('title', ':name');
+                $params['name'] = '%' . $DB->sql_like_escape($needle) . '%';
+            }
+        }
+
+        if ($filterset->has_filter('status')) {
+            $values = $filterset->get_filter('status')->get_filter_values();
+            $status = (string) reset($values);
+
+            if ($status === all_notices_filterset::STATUS_LIVE) {
+                $wheres[] = 'enabled = :statuslive';
+                $params['statuslive'] = 1;
+            } else if ($status === all_notices_filterset::STATUS_DRAFT) {
+                $wheres[] = 'enabled = :statusdraft';
+                $params['statusdraft'] = 0;
+            } else if ($status === all_notices_filterset::STATUS_CLASH) {
+                $ids = collision::clashing_ids();
+                if (empty($ids)) {
+                    // No notice competes: an empty IN () is not portable, so say so directly.
+                    $wheres[] = '1 = 0';
+                } else {
+                    [$insql, $inparams] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'clash');
+                    $wheres[] = "id $insql";
+                    $params += $inparams;
+                }
+            }
+        }
+
+        if ($filterset->has_filter('validity')) {
+            $values = $filterset->get_filter('validity')->get_filter_values();
+            $validity = (string) reset($values);
+            $now = time();
+
+            /*
+             * Each occurrence gets its own placeholder name. fix_sql_params() counts placeholder
+             * OCCURRENCES against the parameter array and throws duplicateparaminsql when a name
+             * appears twice, so one :now compared against both ends of the window is two names
+             * bound to the same value, not one name reused.
+             */
+            if ($validity === all_notices_filterset::VALIDITY_PERMANENT) {
+                $wheres[] = 'timestart = 0 AND timeend = 0';
+            } else if ($validity === all_notices_filterset::VALIDITY_SCHEDULED) {
+                $wheres[] = 'timestart > :nowstart';
+                $params['nowstart'] = $now;
+            } else if ($validity === all_notices_filterset::VALIDITY_EXPIRED) {
+                $wheres[] = 'timeend > 0 AND timeend < :nowend';
+                $params['nowend'] = $now;
+            } else if ($validity === all_notices_filterset::VALIDITY_CURRENT) {
+                $wheres[] = '(timestart <> 0 OR timeend <> 0)'
+                    . ' AND (timestart = 0 OR timestart <= :nowcurstart)'
+                    . ' AND (timeend = 0 OR timeend >= :nowcurend)';
+                $params['nowcurstart'] = $now;
+                $params['nowcurend'] = $now;
+            }
+        }
+
+        return [implode(' AND ', $wheres), $params];
     }
 
     /**

@@ -6,6 +6,42 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added — the notice list filters and pages in SQL (version 2026081505)
+
+Back end only; the filter bar that drives it lands next.
+
+- **`query_db()` is a real query now.** It read the whole thing through
+  `awareness::get_records()`, whose filter argument is equality and nothing else — no `LIKE`, no
+  date ranges — so filtering could only have happened in PHP after the fetch. That is the trap this
+  change exists to avoid: narrowing rows after the query makes paging lie, fetching a page of 25 and
+  rendering however many survived while the pager keeps counting the unfiltered total. A test
+  asserts the total describes the filtered set and that every row on every page is one the filter
+  kept.
+
+- **`all_notices` implements `\core_table\dynamic`** with an `all_notices_filterset` of three
+  optional filters: name, status (live / draft / **competing**) and validity (permanent / current /
+  scheduled / expired). No new web service: core's `core_table_get_dynamic_table_content` serves it,
+  the way the participants page is served. The constructor's arguments after `$uniqueid` became
+  optional because that service builds the table with the unique id alone — a detail that would
+  otherwise have failed only over AJAX, never on a page load and never in a test written the way the
+  page builds it. A test asserts the whole contract for that reason.
+
+- **The name search is accent-insensitive**, which is what `sql_like_ai()` was ported for: searching
+  "manutencao" finds "Manutenção". The test asserts the accent-folding half only where the database
+  can do it, and the case-folding half everywhere.
+
+- **"Competing" cannot be a SQL predicate**, because whether two notices clash is decided by
+  comparing page-reach patterns through `check_path_match()`. `collision::clashing_ids()` resolves
+  the set once and the query narrows with `id IN (...)`, so the predicate stays inside the SQL and
+  paging stays honest. It shares its overlap test with the badge, so filter and badge cannot
+  disagree about what a clash is. The empty case is its own branch: an empty `IN ()` is not
+  portable, and getting it wrong would show the entire table under a filter meaning the opposite.
+
+- Each occurrence of "now" in the validity predicates carries **its own placeholder name**.
+  `fix_sql_params()` counts placeholder occurrences against the parameter array and throws
+  `duplicateparaminsql` when a name appears twice, so one value compared against both ends of a
+  window is two names bound to the same value.
+
 ### Changed — the notice list is six columns instead of twelve (version 2026081504)
 
 - **Four yes/no columns became chips in one "Behaviour" column, and only the settings that are ON

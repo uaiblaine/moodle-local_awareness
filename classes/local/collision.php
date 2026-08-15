@@ -163,6 +163,44 @@ class collision {
     }
 
     /**
+     * The ids of every notice that competes with at least one other.
+     *
+     * Whether two notices clash is decided by comparing page-reach patterns through
+     * check_path_match(), which no database can be asked to do — so the "competing" filter on the
+     * manage list resolves the set here, once, and the list narrows with `id IN (...)`. Bounded by
+     * the number of enabled repeating notices, and it keeps the predicate inside the SQL, which is
+     * what keeps pagination honest: filtering after the query would fetch a page of 25 and show 9.
+     *
+     * Shares enabled_repeating_notices() and pathmatch_overlaps() with clash_titles_for(), so the
+     * filter and the badge cannot disagree about what a clash is.
+     *
+     * @return array List of notice ids, empty when nothing competes.
+     * @throws \coding_exception
+     * @throws \dml_exception
+     */
+    public static function clashing_ids(): array {
+        $repeating = self::enabled_repeating_notices();
+        if (count($repeating) < 2) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($repeating as $notice) {
+            foreach ($repeating as $other) {
+                if ((int) $other->get('id') === (int) $notice->get('id')) {
+                    continue;
+                }
+                if (self::pathmatch_overlaps($notice->get('pathmatch'), $other->get('pathmatch'))) {
+                    $ids[] = (int) $notice->get('id');
+                    break;
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Every enabled notice that repeats.
      *
      * Read straight from the table rather than through the enabled-notices cache, which also
