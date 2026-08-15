@@ -517,7 +517,15 @@ define([
 
     /** Bind change/input listeners to ALL form fields that affect criteria. */
     function bindFormChanges() {
-        var form = document.querySelector('form.la-shell') || document.querySelector('#la-moodleform-source form');
+        /*
+         * The moodleform, by its own class. It used to be found as form.la-shell or inside
+         * #la-moodleform-source, both of which the editor rebuild removed — and this function
+         * returns early when it finds nothing, so the estimator simply stopped reacting to field
+         * changes without a word. Scoped to the editor region first so it cannot latch onto some
+         * other form on the page.
+         */
+        var form = document.querySelector('.local-awareness-editor form.mform')
+            || document.querySelector('form.mform');
         if (!form) {
             return;
         }

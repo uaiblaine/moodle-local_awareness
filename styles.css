@@ -498,16 +498,42 @@
 }
 
 /*
- * The wide ones span the row: an editor, a file picker and a multi-select autocomplete are all
- * unusable at half width, and a date selector wraps its own controls.
+ * The wide ones span the row: an editor, a file picker, a multi-select autocomplete and a date
+ * selector are all unusable at half width.
+ *
+ * Listed by field id rather than matched on the widget's internal markup. The first version used
+ * :has(.editor_tiny_wrapper) and friends and silently matched nothing — the class names were
+ * guesses — which put the content editor in a half-width column with its label wrapped to
+ * "Cont/ent". An id cannot miss quietly: if a field is renamed the rule stops applying, and that
+ * is visible immediately.
  */
-.local-awareness-editor .mform .fcontainer > .fitem:has(.editor_tiny_wrapper),
-.local-awareness-editor .mform .fcontainer > .fitem:has(.filepicker-filelist),
-.local-awareness-editor .mform .fcontainer > .fitem:has(.form-autocomplete-selection),
-.local-awareness-editor .mform .fcontainer > .fitem:has(fieldset),
-.local-awareness-editor .mform .fcontainer > .felement,
-.local-awareness-editor .mform .fcontainer > .fitem.femptylabel {
+.local-awareness-editor .mform #fitem_id_content,
+.local-awareness-editor .mform #fitem_id_bgimage,
+.local-awareness-editor .mform #fitem_id_timestart,
+.local-awareness-editor .mform #fitem_id_timeend,
+.local-awareness-editor .mform #fitem_id_cohorts,
+.local-awareness-editor .mform #fitem_id_filter_role,
+.local-awareness-editor .mform #fitem_id_reqcourse,
+.local-awareness-editor .mform #fitem_id_filter_category,
+.local-awareness-editor .mform #fitem_id_filter_course,
+.local-awareness-editor .mform #fitem_id_filter_format,
+.local-awareness-editor .mform #fitem_id_filter_theme,
+.local-awareness-editor .mform #fitem_id_filter_competency_label,
+.local-awareness-editor .mform #fgroup_id_buttonar {
     flex: 1 1 100%;
+}
+
+/*
+ * Label above field, not beside it. moodleform lays a row out as col-md-3 + col-md-9, which in a
+ * 45%-wide flex item leaves the label a quarter of a half — narrow enough to break "Content" across
+ * two lines.
+ */
+.local-awareness-editor .mform .fcontainer > .fitem > .col-md-3,
+.local-awareness-editor .mform .fcontainer > .fitem > .col-md-9 {
+    flex: 0 0 100%;
+    max-width: 100%;
+    padding-left: 0;
+    text-align: left;
 }
 
 .local-awareness-editor .mform .fcontainer > .fitem .col-form-label {

@@ -6,6 +6,30 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — three things the editor rebuild left behind (version 2026081510)
+
+Found by looking at the rendered page, which the previous change had not done.
+
+- **The content editor and the file picker sat in half-width columns**, with "Content" broken
+  across two lines. The rules meant to make them span the row matched on the widgets' internal
+  markup — `:has(.editor_tiny_wrapper)` and friends — and those class names were guesses, so they
+  matched nothing at all. They are listed by field id now: an id cannot miss quietly, because a
+  renamed field makes the rule stop applying visibly.
+
+- **Labels sat beside their fields inside a 45 % column.** moodleform lays a row out as
+  `col-md-3` + `col-md-9`, which leaves the label a quarter of a half. They stack above the field
+  now, which is also what the approved mockup does.
+
+- **The audience estimator had stopped reacting to field changes.** It located the form as
+  `form.la-shell`, or inside `#la-moodleform-source` — both removed by the rebuild — and its
+  `bindFormChanges()` returns early when it finds neither, so the auto-recompute died without a
+  word and every Behat scenario stayed green, because they click Calculate explicitly. It finds the
+  form by `form.mform` inside the editor region now. The dead `formSourceId` config the page still
+  passed to the AMD module went with it.
+
+Verified on the rendered page: one `h1` where there had been two, and `filter_role_context` is a
+normal visible form row rather than a clipped one.
+
 ### Fixed — two form fields were reachable by keyboard and painted nowhere (version 2026081509)
 
 The editor hid the whole moodleform in a 1×1 clipped container and moved its rendered rows into
