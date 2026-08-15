@@ -6,6 +6,28 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the required marker sat at the far end of the row, and the editor gained tests (version 2026081511)
+
+- **The required-field marker is back beside its label.** Boost pushes it away with
+  `.mform:not(.full-width-labels) .col-form-label .form-label-addon { margin-left: auto }`, which
+  reads correctly while the label column is a narrow `col-md-3` and reads as a stray icon once the
+  column spans the row, as it does here. Core's own escape hatch is `set_display_vertical()`, which
+  adds `.full-width-labels` — not used, because its effect could not be observed cleanly: the
+  compiled stylesheet on the dev stack mixes in a sibling plugin's `.mform.full-width-labels` rules,
+  which draw borders and backgrounds from that plugin's own variables. Overriding the one property
+  is smaller and has no such reach.
+
+- **Three Behat scenarios pin the editor's structure**, the first of them on the regression the
+  rebuild exists for: every field is on the page, named individually for the two that used to be
+  lost. It would have failed against the previous release.
+
+- **The validation-error risk recorded in the design proposal needs no code.** A section holding an
+  error is expanded by core itself — `formslib.php` calls `setExpanded($header, true, true)` for any
+  header whose section contains one — which the plugin now gets simply by letting the form declare
+  its own sections. Writing the test is what surfaced that: the modal-width rule is a *client*-side
+  one, so the form never posts and there is no server-side error to provoke; the scenario asserts
+  what actually happens, and the server-side guarantee is cited rather than faked.
+
 ### Fixed — three things the editor rebuild left behind (version 2026081510)
 
 Found by looking at the rendered page, which the previous change had not done.
