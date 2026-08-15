@@ -242,5 +242,16 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026081501, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026081503) {
+        /*
+         * Accent-insensitive notice search. On PostgreSQL it needs the unaccent extension, which
+         * is DDL and therefore belongs to upgrade rather than to the search request. An account
+         * without the privilege keeps accent-sensitive search; see helper::ensure_unaccent().
+         */
+        \local_awareness\helper::ensure_unaccent();
+
+        upgrade_plugin_savepoint(true, 2026081503, 'local', 'awareness');
+    }
+
     return true;
 }

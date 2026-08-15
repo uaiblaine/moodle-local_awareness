@@ -310,12 +310,16 @@ class all_notices extends table_sql implements renderable {
          * The tooltip is a plain title attribute rather than a Bootstrap one: those need the JS
          * data-API, which takes different attribute names on 4.5 and 5.x, and this needs no script
          * at all to work.
+         *
+         * ms-1 alone, never paired with ml-1. The ms/me spacers are in the 116-line forward bridge
+         * Moodle 4.5 ships, so the Bootstrap 5 spelling resolves on both branches — while 5.x paints
+         * ml-1 as deprecated under the designer outline and Moodle 6.0 drops it (MDL-84465).
          */
         $label = get_string('collision:badge', 'local_awareness');
         $explanation = get_string('collision:badgetooltip', 'local_awareness', implode(', ', $clashes));
 
         $badge = html_writer::tag('span', $label, [
-            'class' => 'badge bg-warning text-dark ml-1 ms-1',
+            'class' => 'badge bg-warning text-dark ms-1',
             'title' => $explanation,
             'aria-label' => $explanation,
         ]);

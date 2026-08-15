@@ -5,14 +5,14 @@
 }
 
 .awareness .modal-header {
-    border-bottom: 1px solid #dee2e6;
-    background-color: #f8f9fa;
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    background-color: var(--bs-secondary-bg, #f8f9fa);
     padding: 1rem 1.5rem;
 }
 
 .awareness .modal-footer {
-    border-top: 1px solid #dee2e6;
-    background-color: #fff;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+    background-color: var(--bs-body-bg, #fff);
     padding: 1rem 1.5rem;
 }
 
@@ -24,7 +24,7 @@
 
 .awareness .form-check-label {
     font-size: 0.95rem;
-    color: #495057;
+    color: var(--bs-body-color, #495057);
     cursor: pointer;
     user-select: none;
 }
@@ -38,15 +38,15 @@
 #awareness-acceptbtn:disabled {
     opacity: 0.65;
     cursor: not-allowed;
-    background-color: #6c757d;
-    border-color: #6c757d;
+    background-color: var(--bs-secondary, var(--secondary, #6c757d));
+    border-color: var(--bs-secondary, var(--secondary, #6c757d));
 }
 
 /* Ensure focus visibility for accessibility */
 .awareness button:focus,
 .awareness input:focus {
     outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    box-shadow: 0 0 0 0.2rem rgba(15, 108, 191, 0.25);
 }
 
 /* Background Image Modal Styles */
@@ -109,67 +109,71 @@
 .local-awareness .local-awareness-action--report-start {
     margin-left: 0.35rem;
     padding-left: 0.45rem;
-    border-left: 1px solid #d5d9dd;
+    border-left: 1px solid var(--bs-border-color, #d5d9dd);
 }
 
 .local-awareness .local-awareness-action--delete {
     margin-left: 0.35rem;
     padding-left: 0.45rem;
-    border-left: 1px solid #d5d9dd;
+    border-left: 1px solid var(--bs-border-color, #d5d9dd);
 }
 
 .local-awareness .local-awareness-action--report:hover,
 .local-awareness .local-awareness-action--report:focus {
-    color: #0b5cad;
+    color: var(--bs-primary, var(--primary, #0f6cbf));
     text-decoration: none;
 }
 
 .local-awareness .local-awareness-action--report:focus {
-    outline: 2px solid #0b5cad;
+    outline: 2px solid var(--bs-primary, var(--primary, #0f6cbf));
     outline-offset: 2px;
     border-radius: 3px;
 }
 
 .local-awareness .local-awareness-action--delete:hover,
 .local-awareness .local-awareness-action--delete:focus {
-    color: #a10000;
+    color: var(--bs-danger, var(--danger, #ca3120));
     text-decoration: none;
 }
 
 .local-awareness .local-awareness-action--delete:focus {
-    outline: 2px solid #c62828;
+    outline: 2px solid var(--bs-danger, var(--danger, #ca3120));
     outline-offset: 2px;
     border-radius: 3px;
 }
 
 /* ===========================================================================
-   Notice editor — redesigned shell
+   Notice editor — admin shell
    All selectors are scoped under .local-awareness-editor so the layout never
-   leaks to the rest of the Moodle UI. Uses CSS custom properties for theming
-   and CSS Grid for the 3-column layout (works in BS4 and BS5 contexts).
+   leaks to the rest of the Moodle UI.
+
+   Every colour is READ FROM THE THEME, never invented. The chain
+   var(--bs-x, var(--x, literal)) resolves on both branches: Moodle 4.5 defines
+   the Bootstrap 4 names on :root (--primary, --success, --danger, --warning)
+   and 5.x defines the --bs-* set; neither defines both, and the literal is the
+   last resort for a theme that defines neither. Reading them is also what makes
+   these pages follow the site into dark mode, which 5.1 and 5.2 ship via
+   .theme-dark and [data-bs-theme="dark"] — a hardcoded palette renders a light
+   slab inside a dark page there.
+
+   The subtle/emphasis tokens have no Bootstrap 4 equivalent at all, so their
+   fallback is a literal chosen to match Boost's light palette.
    =========================================================================== */
 
 .local-awareness-editor {
-    --la-ink-900: #0e1116;
-    --la-ink-700: #363b44;
-    --la-ink-500: #6b7280;
-    --la-ink-300: #c9ced6;
-    --la-ink-200: #e3e6eb;
-    --la-ink-100: #eef0f3;
-    --la-paper: #fff;
-    --la-brand: #2c4a8a;
-    --la-brand-strong: #1f366c;
-    --la-brand-soft: #eef2fb;
-    --la-warn: #c98424;
-    --la-danger: #c62828;
-    --la-ok: #2e8b57;
+    --la-brand: var(--bs-primary, var(--primary, #0f6cbf));
+    --la-brand-strong: var(--bs-primary-text-emphasis, #0a4a84);
+    --la-brand-soft: var(--bs-primary-bg-subtle, #e7f1fa);
+    --la-paper: var(--bs-body-bg, #fff);
+    --la-surface: var(--bs-secondary-bg, #f1f3f5);
+    --la-line: var(--bs-border-color, #dee2e6);
+    --la-ink: var(--bs-body-color, #1d2125);
+    --la-ink-muted: var(--bs-secondary-color, #6a737b);
+    --la-ok: var(--bs-success, var(--success, #357a32));
+    --la-warn: var(--bs-warning, var(--warning, #f0ad4e));
+    --la-danger: var(--bs-danger, var(--danger, #ca3120));
     --la-radius: 12px;
-    background:
-        radial-gradient(1200px 600px at -10% -20%, #eef2fb 0%, transparent 60%),
-        radial-gradient(900px 500px at 110% 0%, #fff7e9 0%, transparent 60%),
-        #f4f5f7;
-    color: var(--la-ink-900);
-    margin: -1rem -1rem 0;
+    color: var(--la-ink);
     padding-bottom: 80px;
 }
 
@@ -195,7 +199,7 @@
     gap: 28px;
     max-width: 1480px;
     margin: 0 auto;
-    padding: 28px;
+    padding: 28px 0;
 }
 
 .la-shell--single {
@@ -253,7 +257,7 @@
 }
 
 .la-pagehead-sub {
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
     margin-top: 6px;
     font-size: .92rem;
     margin-bottom: 0;
@@ -269,7 +273,7 @@
 .la-status-badge {
     background: var(--la-brand-soft);
     color: var(--la-brand-strong);
-    border: 1px solid #d4dcef;
+    border: 1px solid var(--la-line);
     border-radius: 999px;
     padding: .3rem .65rem;
     font-size: .76rem;
@@ -288,19 +292,25 @@
 
 .la-status-badge--live .la-status-badge-ping {
     background: var(--la-ok);
-    box-shadow: 0 0 0 3px rgba(46, 139, 87, .25);
+    box-shadow: 0 0 0 3px rgba(53, 122, 50, .25);
 }
 
+/*
+ * Digits line up through font-variant-numeric, not through a monospace family. Swapping the
+ * family here was the visible half of the "different typography" the admin pages carried: the
+ * theme's own face reads as part of Moodle, a second family reads as a different product.
+ */
 .la-pagehead-autosaved {
     font-size: .74rem;
-    color: var(--la-ink-500);
-    font-family: monospace;
+    color: var(--la-ink-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 /* Required fields banner */
 .la-req-banner {
-    background: linear-gradient(180deg, #fff7e9, var(--la-paper));
-    border: 1px solid #f1d6a4;
+    background: var(--la-surface);
+    border: 1px solid var(--la-line);
+    border-left: 3px solid var(--la-warn);
     border-radius: var(--la-radius);
     padding: 12px 14px;
     margin-bottom: 18px;
@@ -308,7 +318,7 @@
     align-items: center;
     gap: 10px;
     font-size: .88rem;
-    color: var(--la-ink-700);
+    color: var(--la-ink);
 }
 
 .la-req-banner i {
@@ -328,7 +338,7 @@
 /* Side nav */
 .la-sidenav {
     background: var(--la-paper);
-    border: 1px solid var(--la-ink-200);
+    border: 1px solid var(--la-line);
     border-radius: var(--la-radius);
     padding: 6px;
     display: flex;
@@ -342,7 +352,7 @@
     gap: .65rem;
     padding: .55rem .7rem;
     border-radius: 8px;
-    color: var(--la-ink-700);
+    color: var(--la-ink);
     text-decoration: none;
     font-weight: 500;
     font-size: .9rem;
@@ -350,34 +360,34 @@
 }
 
 .la-sidenav-link:hover {
-    background: var(--la-ink-100);
-    color: var(--la-ink-900);
+    background: var(--la-surface);
+    color: var(--la-ink);
     text-decoration: none;
 }
 
 .la-sidenav-link[aria-current='step'] {
     background: var(--la-brand-soft);
     color: var(--la-brand-strong);
-    border-color: #d4dcef;
+    border-color: var(--la-line);
 }
 
 .la-sidenav-num {
     width: 22px;
     height: 22px;
     border-radius: 6px;
-    background: var(--la-ink-100);
+    background: var(--la-surface);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-size: .7rem;
     font-weight: 700;
-    color: var(--la-ink-700);
-    font-family: monospace;
+    color: var(--la-ink);
+    font-variant-numeric: tabular-nums;
 }
 
 .la-sidenav-link[aria-current='step'] .la-sidenav-num {
     background: var(--la-brand);
-    color: white;
+    color: var(--la-paper);
 }
 
 .la-sidenav-icon {
@@ -387,12 +397,12 @@
 
 .la-navhelp {
     margin-top: 16px;
-    background: linear-gradient(180deg, #fff7e9, var(--la-paper));
-    border: 1px solid var(--la-ink-200);
+    background: var(--la-surface);
+    border: 1px solid var(--la-line);
     border-radius: var(--la-radius);
     padding: 14px;
     font-size: .85rem;
-    color: var(--la-ink-700);
+    color: var(--la-ink);
 }
 
 .la-navhelp-title {
@@ -413,9 +423,8 @@
 /* Section cards */
 .la-card {
     background: var(--la-paper);
-    border: 1px solid var(--la-ink-200);
+    border: 1px solid var(--la-line);
     border-radius: 14px;
-    box-shadow: 0 1px 0 rgba(14, 17, 22, .02), 0 8px 22px -18px rgba(14, 17, 22, .18);
     overflow: hidden;
     scroll-margin-top: 80px;
 }
@@ -429,7 +438,7 @@
     align-items: flex-start;
     gap: 14px;
     padding: 18px 22px;
-    border-bottom: 1px solid var(--la-ink-100);
+    border-bottom: 1px solid var(--la-line);
 }
 
 .la-card-icon {
@@ -443,7 +452,7 @@
     align-items: center;
     justify-content: center;
     font-size: 1rem;
-    border: 1px solid #d4dcef;
+    border: 1px solid var(--la-line);
 }
 
 .la-card-meta {
@@ -459,15 +468,15 @@
 }
 
 .la-card-desc {
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
     font-size: .85rem;
     margin: 2px 0 0;
 }
 
 .la-card-num {
-    font-family: monospace;
     font-size: .75rem;
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 .la-card-body {
@@ -479,12 +488,12 @@
 }
 
 .la-card-body .empty {
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
     font-size: .85rem;
     padding: 1rem 0;
 }
 
-/* Make the relocated moodleform-rows blend into the card body with an Apple-style list layout. */
+/* Make the relocated moodleform-rows blend into the card body. */
 .la-card-body .fitem,
 .la-card-body .form-group {
     display: flex;
@@ -492,7 +501,7 @@
     justify-content: space-between;
     padding: 14px 0;
     margin: 0;
-    border-bottom: 1px solid var(--la-ink-100);
+    border-bottom: 1px solid var(--la-line);
 }
 
 .la-card-body .fitem:last-child,
@@ -512,7 +521,7 @@
 .la-card-body .fitemtitle {
     font-weight: 500;
     font-size: .92rem;
-    color: var(--la-ink-900);
+    color: var(--la-ink);
 }
 
 .la-card-body .felement,
@@ -531,7 +540,7 @@
 .la-card-body .form-select,
 .la-card-body .custom-select {
     border-radius: 9px;
-    border-color: var(--la-ink-200);
+    border-color: var(--la-line);
     width: auto;
     max-width: 100%;
 }
@@ -539,7 +548,7 @@
 .la-card-body .form-control:focus,
 .la-card-body .form-select:focus {
     border-color: var(--la-brand);
-    box-shadow: 0 0 0 4px rgba(44, 74, 138, .14);
+    box-shadow: 0 0 0 4px rgba(15, 108, 191, .14);
 }
 
 /* Action bar buttons stay clickable even though the bar itself passes clicks through. */
@@ -558,9 +567,9 @@
     pointer-events: none;
     margin-top: 24px;
     background: var(--la-paper);
-    border: 1px solid var(--la-ink-200);
+    border: 1px solid var(--la-line);
     border-radius: 14px;
-    box-shadow: 0 10px 30px -10px rgba(14, 17, 22, .18);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .18);
     padding: 12px 16px;
     display: flex;
     align-items: center;
@@ -573,7 +582,7 @@
     display: flex;
     align-items: center;
     gap: .55rem;
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
     font-size: .82rem;
 }
 
@@ -616,46 +625,45 @@
 .la-btn--brand {
     background: var(--la-brand);
     border-color: var(--la-brand);
-    color: white;
+    color: #fff;
 }
 
 .la-btn--brand:hover:not(:disabled) {
     background: var(--la-brand-strong);
     border-color: var(--la-brand-strong);
-    color: white;
+    color: #fff;
 }
 
 .la-btn--soft {
-    background: var(--la-ink-100);
-    border-color: var(--la-ink-200);
-    color: var(--la-ink-900);
+    background: var(--la-surface);
+    border-color: var(--la-line);
+    color: var(--la-ink);
 }
 
 .la-btn--soft:hover {
-    background: var(--la-ink-200);
-    color: var(--la-ink-900);
+    background: var(--la-line);
+    color: var(--la-ink);
     text-decoration: none;
 }
 
 .la-btn--ghost {
     background: transparent;
-    border-color: var(--la-ink-200);
-    color: var(--la-ink-700);
+    border-color: var(--la-line);
+    color: var(--la-ink);
 }
 
 .la-btn--ghost:hover {
-    background: var(--la-ink-100);
-    color: var(--la-ink-900);
+    background: var(--la-surface);
+    color: var(--la-ink);
     text-decoration: none;
 }
 
 /* Preview card */
 .la-preview {
     background: var(--la-paper);
-    border: 1px solid var(--la-ink-200);
+    border: 1px solid var(--la-line);
     border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 1px 0 rgba(14, 17, 22, .02), 0 8px 22px -18px rgba(14, 17, 22, .18);
 }
 
 .la-preview-head {
@@ -663,7 +671,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    border-bottom: 1px solid var(--la-ink-100);
+    border-bottom: 1px solid var(--la-line);
 }
 
 .la-preview-title {
@@ -680,12 +688,11 @@
 }
 
 .la-preview-pill {
-    font-family: monospace;
     font-size: .68rem;
-    background: var(--la-ink-100);
+    background: var(--la-surface);
     padding: 2px 8px;
     border-radius: 999px;
-    color: var(--la-ink-700);
+    color: var(--la-ink-muted);
     text-transform: uppercase;
     letter-spacing: .04em;
 }
@@ -694,15 +701,15 @@
     display: flex;
     gap: 4px;
     padding: 8px 10px;
-    border-bottom: 1px solid var(--la-ink-100);
-    background: #f6f8fa;
+    border-bottom: 1px solid var(--la-line);
+    background: var(--la-surface);
 }
 
 .la-preview-tab {
     border: none;
     background: transparent;
     font-size: .78rem;
-    color: var(--la-ink-700);
+    color: var(--la-ink);
     padding: 5px 10px;
     border-radius: 6px;
     font-weight: 600;
@@ -714,14 +721,17 @@
 
 .la-preview-tab.is-on {
     background: var(--la-paper);
-    color: var(--la-ink-900);
+    color: var(--la-ink);
     box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
 }
 
+/*
+ * A flat scrim, not a gradient. The stage stands for "a page behind a modal", and the theme's
+ * own muted surface says that without inventing a second palette.
+ */
 .la-preview-stage {
-    background:
-        linear-gradient(rgba(14, 17, 22, .35), rgba(14, 17, 22, .35)),
-        repeating-linear-gradient(45deg, #e8eaf0 0 12px, #f1f3f7 12px 24px);
+    background: var(--la-surface);
+    border-top: 1px solid var(--la-line);
     padding: 22px;
     min-height: 280px;
     display: flex;
@@ -736,16 +746,16 @@
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 20px 60px -20px rgba(0, 0, 0, .5);
-    border: 1px solid rgba(255, 255, 255, .4);
+    border: 1px solid var(--la-line);
 }
 
 .la-mockmodal-hero {
     height: 100px;
-    background: linear-gradient(135deg, #4a5fa0, #7148a3);
+    background-color: var(--la-brand);
     background-size: cover;
     background-position: center;
     position: relative;
-    color: white;
+    color: #fff;
 }
 
 .la-mockmodal-tag {
@@ -753,7 +763,7 @@
     top: 10px;
     left: 10px;
     background: rgba(255, 255, 255, .18);
-    color: white;
+    color: #fff;
     border: 1px solid rgba(255, 255, 255, .25);
     border-radius: 999px;
     padding: 3px 8px;
@@ -772,7 +782,7 @@
     height: 22px;
     border-radius: 50%;
     background: rgba(0, 0, 0, .25);
-    color: white;
+    color: #fff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -791,7 +801,7 @@
 
 .la-mockmodal-body p {
     font-size: .82rem;
-    color: var(--la-ink-700);
+    color: var(--la-ink-muted);
     margin: 0;
     line-height: 1.45;
 }
@@ -809,7 +819,7 @@
 
 .la-preview-meta {
     padding: 12px 16px;
-    border-top: 1px solid var(--la-ink-100);
+    border-top: 1px solid var(--la-line);
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
@@ -823,25 +833,24 @@
 }
 
 .la-preview-meta-item dt {
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
     font-weight: 500;
 }
 
 .la-preview-meta-item dd {
-    color: var(--la-ink-900);
+    color: var(--la-ink);
     font-weight: 600;
-    font-family: monospace;
     margin: 0;
+    font-variant-numeric: tabular-nums;
 }
 
 /* Audience panel */
 .la-audience {
     margin-top: 16px;
     background: var(--la-paper);
-    border: 1px solid var(--la-ink-200);
+    border: 1px solid var(--la-line);
     border-radius: 14px;
     padding: 14px 16px;
-    box-shadow: 0 1px 0 rgba(14, 17, 22, .02), 0 8px 22px -18px rgba(14, 17, 22, .18);
 }
 
 .la-audience-head {
@@ -874,7 +883,7 @@
     justify-content: space-between;
     padding: 6px 0;
     font-size: .82rem;
-    border-bottom: 1px dashed var(--la-ink-100);
+    border-bottom: 1px dashed var(--la-line);
 }
 
 .la-audience-summary-item:last-child {
@@ -882,23 +891,24 @@
 }
 
 .la-audience-summary-item dt {
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
     font-weight: 500;
     margin: 0;
 }
 
 .la-audience-summary-item dd {
-    font-family: monospace;
-    color: var(--la-ink-900);
+    color: var(--la-ink);
     font-weight: 600;
     margin: 0;
+    font-variant-numeric: tabular-nums;
 }
 
 .la-audience-reach {
     margin-top: 12px;
     padding: 12px 14px;
-    background: var(--la-brand-soft);
-    border: 1px solid #d4dcef;
+    background: var(--la-surface);
+    border: 1px solid var(--la-line);
+    border-left: 3px solid var(--la-brand);
     border-radius: 10px;
     display: flex;
     flex-direction: column;
@@ -911,7 +921,7 @@
     align-items: baseline;
     gap: 8px;
     font-size: .74rem;
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
 }
 
 .la-audience-reach-label {
@@ -927,6 +937,7 @@
     font-weight: 800;
     font-size: 1.1rem;
     color: var(--la-brand-strong);
+    font-variant-numeric: tabular-nums;
 }
 
 .la-audience-actions {
@@ -955,7 +966,7 @@
 .la-audience-context {
     margin-top: 14px;
     padding-top: 12px;
-    border-top: 1px dashed var(--la-ink-200);
+    border-top: 1px dashed var(--la-line);
 }
 
 .la-audience-context[hidden] {
@@ -969,12 +980,12 @@
     display: flex;
     align-items: center;
     gap: .35rem;
-    color: var(--la-ink-700);
+    color: var(--la-ink);
 }
 
 .la-audience-context-hint {
     font-size: .76rem;
-    color: var(--la-ink-500);
+    color: var(--la-ink-muted);
     margin: 0 0 .5rem;
     line-height: 1.4;
 }
@@ -991,9 +1002,9 @@
 .la-chip {
     display: inline-flex;
     align-items: center;
-    background: var(--la-ink-100);
-    color: var(--la-ink-900);
-    border: 1px solid var(--la-ink-200);
+    background: var(--la-surface);
+    color: var(--la-ink);
+    border: 1px solid var(--la-line);
     border-radius: 8px;
     padding: 3px 8px;
     font-size: .76rem;
@@ -1002,12 +1013,12 @@
 
 .la-chip--muted {
     background: transparent;
-    color: var(--la-ink-700);
+    color: var(--la-ink-muted);
 }
 
 .la-chip--brand {
     background: var(--la-brand-soft);
-    border-color: #d4dcef;
+    border-color: var(--la-line);
     color: var(--la-brand-strong);
 }
 
@@ -1016,7 +1027,7 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    border: 2px solid var(--la-ink-200);
+    border: 2px solid var(--la-line);
     border-top-color: var(--la-brand);
     display: inline-block;
     vertical-align: middle;
@@ -1029,6 +1040,17 @@
         transform: rotate(360deg);
     }
 }
+
+@media (prefers-reduced-motion: reduce) {
+    .la-spinner {
+        animation-duration: 3s;
+    }
+
+    .la-btn {
+        transition: none;
+    }
+}
+
 /* The notice modal's title carried fw-bold, a Bootstrap 5 utility that resolves to nothing
    on Moodle 4.5. notice.js shows this modal on arbitrary pages, where the plugin has no body
    class to gate a polyfill on, so the weight is owned here under the modal's own .awareness
@@ -1048,6 +1070,8 @@
 
       Writing BS4 names in the markup instead was rejected: 5.x wraps every back-ported BS4
       name in @include deprecated-styles() and Moodle 6.0 removes that sheet (MDL-84465).
+      Measured on 5.1 with the designer outline on, mr-, ml-, text-left and sr-only are painted
+      as deprecated the moment they appear — bootstrap_compat_test asserts they never do.
 
       GATED on body.local-awareness-bs4, added by local_awareness\local\bootstrap when
       $CFG->branch < 500. The gate is not optional: plugin CSS loads after core's, so an

@@ -15,19 +15,25 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details.
+ * Install-time hook.
  *
  * @package    local_awareness
- * @copyright  Catalyst IT
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
+/**
+ * Runs once, right after the plugin's tables are created.
+ *
+ * @return bool Always true; a failure to provision unaccent is not a failure to install.
+ */
+function xmldb_local_awareness_install() {
+    /*
+     * Accent-insensitive notice search needs the PostgreSQL unaccent extension, and creating it
+     * is DDL that belongs here rather than on a request path. A database account without the
+     * privilege simply keeps accent-sensitive search — see helper::ensure_unaccent().
+     */
+    \local_awareness\helper::ensure_unaccent();
 
-$plugin->component = 'local_awareness'; // Full name of the plugin (used for diagnostics).
-$plugin->version   = 2026081503;         // The current module version (Date: YYYYMMDDXX).
-$plugin->release = 'v1.0';
-$plugin->requires = 2024100700;          // Requires Moodle 4.5 or later.
-$plugin->supported = [405, 502];  // Supported from Moodle 4.5 to 5.2.
-$plugin->maturity = MATURITY_STABLE;
+    return true;
+}

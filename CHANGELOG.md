@@ -6,6 +6,69 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the admin stylesheet reads the theme's tokens instead of inventing a palette (version 2026081503)
+
+First slice of the admin-surface redesign; it changes no layout and no markup, only where the
+colours and the type come from.
+
+- **Every colour now resolves through `var(--bs-x, var(--x, literal))`.** Measured on the running
+  stacks: Moodle 4.5 defines the Bootstrap 4 names on `:root` (`--primary`, `--success`, `--danger`,
+  `--warning`) and 5.1/5.2 define the `--bs-*` set — neither defines both, so the chain is what
+  works on both branches. The plugin had `--la-brand: #2c4a8a` cravado while Boost's primary is
+  `#0f6cbf`, which meant every site with its own brand colour saw the plugin's navy instead of its
+  own.
+
+- **The pages follow the site into dark mode.** 5.1 and 5.2 ship it (`.theme-dark` ×77 and
+  `[data-bs-theme="dark"]` ×15 in the compiled sheet) and the plugin had thirteen hardcoded light
+  values and no handling at all, so the editor rendered a light slab inside a dark page. Reading the
+  theme's tokens is the whole fix; there is no second palette to maintain.
+
+- **Gone:** the two `radial-gradient`s behind the editor, the `monospace` family on numbers, pills
+  and metadata, and `margin: -1rem -1rem 0`, which made the block 32 px wider than `#region-main`
+  and let it ride over the admin tab bar when that bar wrapped. Digits still line up, now through
+  `font-variant-numeric: tabular-nums`, which aligns them without changing the typeface.
+
+- A `prefers-reduced-motion` block slows the spinner and drops the button transition.
+
+### Added — the Bootstrap contract now also bans deprecated Bootstrap 4 names (version 2026081503)
+
+- `bootstrap_compat_test` gained `test_markup_carries_no_deprecated_bootstrap4_names()`. The
+  asymmetry runs both ways: `ml-1`, `text-left`, `sr-only` and friends *do* resolve on 5.x, but only
+  through `bs4-compat.scss`, which wraps each in `@include deprecated-styles()` — a red outline under
+  behat-site and themedesignermode — and which Moodle 6.0 removes (MDL-84465). Their Bootstrap 5
+  spellings are all inside the 116-line forward bridge 4.5 ships, so the BS5 name alone is correct
+  on both branches and the paired form buys nothing.
+
+- It caught one live offender on its first run: the collision badge carried `ml-1 ms-1`. Now `ms-1`.
+
+- The BS5-only detection list was re-measured and widened from five families to twenty-one. It is a
+  detector, not a polyfill, so the extra entries cost nothing until somebody reaches for one — and
+  the accompanying "polyfill carries nothing unused" test still holds the polyfill itself to exactly
+  what the markup uses.
+
+### Added — accent-insensitive search helpers, ported from local_dimensions (version 2026081503)
+
+- `helper::has_unaccent()`, `helper::ensure_unaccent()` and `helper::sql_like_ai()`, so a search for
+  "manutencao" also finds "Manutenção". On MySQL/MariaDB the collation already does this; on
+  PostgreSQL it needs the `unaccent` extension, which the plugin now provisions from the new
+  `db/install.php` and from an upgrade step.
+
+- **Provisioning is DDL, so it never touches a request path.** A least-privilege database account
+  cannot create extensions at all; the failure is swallowed and the site simply keeps
+  accent-sensitive search, which `sql_like_ai()` learns from `has_unaccent()` rather than from a
+  statement that would fail on every keystroke of every search box.
+
+- `has_unaccent()` asks the `pg_extension` catalogue on every call instead of caching. PostgreSQL
+  PHPUnit wraps each test in a rolled-back transaction, so a cached "created" flag goes stale the
+  moment the `CREATE EXTENSION` is undone, and the next query references a function that no longer
+  exists.
+
+- The PostgreSQL technique follows the `local_aise` plugin ("Accent Insensitive Search Enabler",
+  © 2023 Austrian Federal Ministry of Education, GPL v3 or later), as `local_dimensions` does.
+
+- The helpers ship ahead of their first caller: the notice-name search in the reworked manage list
+  is what will use `sql_like_ai()`.
+
 ### Changed — the audience estimate is one pass over {user}, whatever the rule count (version 2026081502)
 
 - **The total and every breakdown chip are now conditional columns of a single statement.** They
