@@ -50,12 +50,73 @@ final class bootstrap_compat_test extends \basic_testcase {
      * @return array Regex => family label.
      */
     private function bs5_only_utilities(): array {
+        /*
+         * Re-measured on the running stacks on 2026-08-15 by diffing the class vocabulary of the
+         * compiled theme CSS — 9108 selectors on 4.5 (boost_union) against 9815 on 5.2 (boost).
+         * Two caveats that make the raw diff lie, both handled here: the compiled sheet contains
+         * every plugin mounted on that stack, so plugin-owned names look like core's; and a family
+         * this plugin already polyfills disappears from the diff, which is why gap-*, fw-*,
+         * form-select, form-label and lh-1 had to be confirmed by reading the rule that defines
+         * them (all of them resolved to body.local-awareness-bs4, i.e. to us, not to 4.5).
+         *
+         * The list is wider than current usage on purpose: it is a detector, not a polyfill, and
+         * it costs nothing until somebody reaches for one of these.
+         */
         return [
             '/\\bform-select(-sm)?\\b/' => 'form-select',
             '/\\bform-label\\b/' => 'form-label',
-            '/\\bfw-(bold|semibold)\\b/' => 'fw-*',
+            '/\\bform-switch\\b/' => 'form-switch',
+            '/\\bform-check-reverse\\b/' => 'form-check-reverse',
+            '/\\bfw-(bold|semibold|light|lighter|bolder|medium|normal)\\b/' => 'fw-*',
+            '/\\bfs-[1-6]\\b/' => 'fs-*',
+            '/\\bfst-italic\\b/' => 'fst-italic',
+            '/\\bfont-monospace\\b/' => 'font-monospace',
             '/\\bgap-[0-9]\\b/' => 'gap-*',
-            '/\\blh-1\\b/' => 'lh-1',
+            '/\\b(row|column)-gap-[0-9]\\b/' => 'row-gap-* / column-gap-*',
+            '/\\bg-[1-6]\\b/' => 'g-*',
+            '/\\blh-(1|base|lg|sm)\\b/' => 'lh-*',
+            '/\\bd-grid\\b/' => 'd-grid',
+            '/\\bvisually-hidden(-focusable)?\\b/' => 'visually-hidden',
+            '/\\btext-bg-[a-z]+\\b/' => 'text-bg-*',
+            '/\\bbg-body(-secondary|-tertiary)?\\b/' => 'bg-body*',
+            '/\\bborder-[1-5]\\b/' => 'border-*',
+            '/\\bobject-fit-[a-z]+\\b/' => 'object-fit-*',
+            '/\\bz-[0-3]\\b/' => 'z-*',
+            '/\\btranslate-middle\\b/' => 'translate-middle',
+            '/\\b(start|end)-0\\b/' => 'start-0 / end-0',
+        ];
+    }
+
+    /**
+     * Bootstrap 4 class names that Moodle 5.x back-ports but marks deprecated.
+     *
+     * The asymmetry runs both ways. These names DO resolve on 5.x, through bs4-compat.scss — but
+     * every one of them is wrapped in @include deprecated-styles(), which paints a red outline
+     * under behat-site and themedesignermode, and Moodle 6.0 removes that sheet entirely
+     * (MDL-84465). Their Bootstrap 5 spellings are all inside the 116-line forward bridge Moodle
+     * 4.5 ships, so the BS5 name alone is correct on both branches.
+     *
+     * Writing both spellings side by side therefore buys nothing and costs a deprecation: it is
+     * the mistake this rule exists to stop, and it had shipped once, in the collision badge.
+     *
+     * @return array Regex matching the deprecated name => the Bootstrap 5 spelling to use instead.
+     */
+    private function deprecated_bs4_names(): array {
+        return [
+            '/\\bml-([0-9]|auto)\\b/' => 'ms-*',
+            '/\\bmr-([0-9]|auto)\\b/' => 'me-*',
+            '/\\bpl-[0-9]\\b/' => 'ps-*',
+            '/\\bpr-[0-9]\\b/' => 'pe-*',
+            '/\\btext-left\\b/' => 'text-start',
+            '/\\btext-right\\b/' => 'text-end',
+            '/\\bfloat-left\\b/' => 'float-start',
+            '/\\bfloat-right\\b/' => 'float-end',
+            '/\\bborder-left\\b/' => 'border-start',
+            '/\\bborder-right\\b/' => 'border-end',
+            '/\\brounded-left\\b/' => 'rounded-start',
+            '/\\brounded-right\\b/' => 'rounded-end',
+            '/\\bsr-only(-focusable)?\\b/' => 'visually-hidden',
+            '/\\bno-gutters\\b/' => 'g-0',
         ];
     }
 
@@ -342,6 +403,45 @@ final class bootstrap_compat_test extends \basic_testcase {
             $offenders,
             'Bootstrap 4 listens on data-toggle and Bootstrap 5 on data-bs-toggle, so markup-wired '
                 . 'components need both spellings side by side: ' . implode('; ', $offenders)
+        );
+    }
+
+    /**
+     * The markup must never carry a Bootstrap 4 name that Moodle 5.x has deprecated.
+     *
+     * Includes the paired form — "ml-1 ms-1" — which reads like belt and braces and is instead a
+     * deprecation with no upside: ms-1 alone already resolves on 4.5. Skipping comment lines keeps
+     * the rule's own prose, and the block comment above the polyfill, from tripping it.
+     *
+     * @return void
+     */
+    public function test_markup_carries_no_deprecated_bootstrap4_names(): void {
+        $offenders = [];
+        $scanned = 0;
+        foreach ($this->markup_files() as $path) {
+            $scanned++;
+            foreach (file($path) as $number => $line) {
+                if ($this->is_comment_line($line)) {
+                    continue;
+                }
+                foreach ($this->deprecated_bs4_names() as $pattern => $replacement) {
+                    if (preg_match($pattern, $line, $matches)) {
+                        $offenders[] = basename($path) . ':' . ($number + 1)
+                            . ' has ' . $matches[0] . ', use ' . $replacement;
+                    }
+                }
+            }
+        }
+
+        /* A scan that found no files would assert nothing and stay green for ever. */
+        $this->assertGreaterThan(0, $scanned, 'Found no markup files to scan — the scan is broken, not the code.');
+        $this->assertSame(
+            [],
+            $offenders,
+            'Moodle 5.x back-ports these Bootstrap 4 names only through bs4-compat.scss, which marks '
+                . 'them deprecated and which Moodle 6.0 removes; their Bootstrap 5 spellings are in '
+                . '4.5\'s own forward bridge, so the BS5 name alone is correct on both branches: '
+                . implode('; ', $offenders)
         );
     }
 

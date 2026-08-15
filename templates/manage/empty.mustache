@@ -1,0 +1,53 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_awareness/manage/empty
+
+    Empty state for the notice list. Rendered by the table itself rather than by the page around
+    it, because an AJAX refresh replaces the table's HTML and nothing else — an empty state living
+    outside would keep showing the previous answer.
+
+    Two shapes, deliberately different: a site with no notices at all is invited to create one, and
+    a filter that matched nothing is offered a way back out instead.
+
+    Context variables required for this template:
+    * message (string) - what happened
+    * showcreate (bool) - offer the create-notice call to action
+    * createurl (string) - where that goes
+    * createlabel (string) - its label
+    * showclear (bool) - offer to clear the filters
+    * clearlabel (string) - its label
+
+    @copyright  2026 Anderson Blaine
+    @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+
+    Example context (json):
+    {
+        "message": "No notices match these filters.",
+        "showclear": true,
+        "clearlabel": "Clear filters"
+    }
+}}
+<div class="local-awareness-empty" data-region="la-empty">
+    <p class="mb-3">{{message}}</p>
+    {{#showcreate}}
+        <a class="btn btn-primary" href="{{createurl}}">{{createlabel}}</a>
+    {{/showcreate}}
+    {{#showclear}}
+        <button type="button" class="btn btn-outline-secondary" data-action="clear-filters">{{clearlabel}}</button>
+    {{/showclear}}
+</div>

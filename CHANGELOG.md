@@ -6,6 +6,350 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the preview is a dialogue, and the button that opens it now does something (version 2026081512)
+
+- **The preview opens as a `core/modal`.** It was a panel below the form; the approved model asks
+  for a dialogue, and the page head has carried a Preview button since the redesign began —
+  wired to nothing. A grep for its `data-action` found it in the template and in the design notes,
+  and nowhere else: the button was dead markup for the whole of phases 1 and 2.
+
+- **`core/modal`, not a dialogue of our own.** The focus trap, Escape, and returning focus to the
+  button that opened it are the reasons — none of which the HTML prototype in `docs/mockups/` does,
+  as its own comment says. A Behat scenario asserts Escape closes it, so replacing core's dialogue
+  with a hand-made one cannot be a silent change; nothing else in the pipeline would notice.
+
+- **The markup waits in a `<template>` element**, rendered server side once and handed to the modal
+  as its body, so the slots keep the values no JavaScript recomputes and the strings resolve once.
+  Template content is genuinely inert — not laid out, not focusable, not exposed to assistive
+  technology. That distinction is the whole history of this page: the shape it replaced kept the
+  form off screen with a 1×1 clip, which is the technique whose *purpose* is to keep content
+  available to a screen reader, and shipped two fields a keyboard could reach and an eye could not.
+
+- **The preview reads the form when it opens, instead of mirroring it as the author types.** The
+  dialogue covers the form, so there is nothing to mirror while it is open. Reading late also fixes
+  audit finding M5: the module used to bind to TinyMCE at boot, which is before core has finished
+  injecting it, so `window.tinymce` was normally still undefined, the whole binding was skipped, and
+  the content pane stayed empty for the session with nothing logged. At open time the editor is
+  there. The reset interval is now read the same way, from the duration selector's own option text,
+  rather than left at whatever was saved.
+
+- **The mock modal's action buttons are `<span>`s.** They are a picture of the notice, so real
+  buttons made them focusable and announced as actionable inside a dialogue where activating them
+  does nothing.
+
+- **Desktop and Mobile are `aria-pressed` toggles, not tabs.** They resize one preview rather than
+  switching between two panels, and the previous `role="tab"` markup controlled no `tabpanel` — a
+  promise to a screen reader that nothing kept. Their hit area went from 27×15 to 28 px tall, past
+  the 24×24 WCAG 2.2 asks of a pointer target.
+
+### Fixed — three things only the rendered page could show (version 2026081512)
+
+Found by running an accessibility probe against the live DOM of each surface, captured from a Behat
+faildump and served from the stack's own webroot so that the document, its stylesheet and its fonts
+share one origin. Measured, not reasoned about.
+
+- **The preview dialogue rendered with no colour at all.** The plugin's `--la-*` tokens were
+  declared on `.local-awareness-editor`; core attaches a modal to its own element on `document.body`,
+  a sibling of the editor rather than a descendant, and custom properties inherit down the DOM tree.
+  Every `var(--la-*)` inside the dialogue therefore resolved to nothing — which does not fall back
+  to the literal, it makes the whole declaration invalid at computed-value time. The hero lost its
+  brand fill, the stage its scrim, and "Got it" became white text on nothing. The token block is
+  declared on the preview root as well now.
+
+- **The required-field marker was still at the far end of the row.** The previous release recorded
+  it as fixed; it was not. Core's `.mform:not(.full-width-labels) .col-form-label .form-label-addon`
+  scores (0,4,0), and so did the override, which leaves source order to decide — and in the compiled
+  sheet core's rule lands at byte 1295582 against the override at 525383. Matching core's own
+  `:not()` takes the override to (0,5,0) and settles it. The screenshot is what caught this: the
+  rule was written, shipped, and never applied.
+
+- **The "Notice" chip on the preview's hero read at 3.84:1.** A translucent *white* scrim over the
+  brand colour lightens it, so white text on top loses. Darkening instead clears 4.5:1 over every
+  brand tried, down to a white one, and over a background image as well.
+
+- **The notice table now has a caption**, hidden visually because the heading above already says it
+  in print. A screen reader lists a page's tables by name; unnamed, this one announced as "table".
+
+Everything else the probe reports on these three surfaces belongs to core: the edit-mode switch in
+the navbar, three items in the TinyMCE status bar, and the 16×31 close button in core's own modal
+header — the last of which the dialogue's full-size footer Close button already satisfies as the
+equivalent control WCAG 2.2 SC 2.5.8 allows.
+
+### Fixed — two the review panel found in the dialogue itself (version 2026081512)
+
+- **The Mobile viewport reported itself as pressed over a desktop-width preview.** The dialogue is
+  built once and hidden rather than destroyed, so the toggles' pressed state outlives a close — but
+  the width was decided in two places, the click handler setting the mobile width and `sync()`
+  resetting it to the form's on every open. Reopening therefore redrew the mock at desktop width
+  with `aria-pressed="true"` still on Mobile: a screen reader was told a viewport was selected that
+  was not on screen, and getting it back meant clicking a control that already claimed to be
+  pressed. One function decides the width now, from the one piece of state that should decide it.
+  A scenario asserts both halves, because the button alone was already right while the bug was live.
+
+- **The viewport toggles wore the browser's focus ring instead of the plugin's.** Same root cause as
+  the token block above — the rule was scoped to `.local-awareness-editor` and the dialogue is not
+  inside it. Measured rather than assumed: the toggles do take focus and Chrome does draw
+  `outline: auto 1px`, so this was never a bare 2.4.7 failure, but they were the only controls on
+  the plugin's surfaces not wearing its 3px brand ring.
+
+### Fixed — the required marker sat at the far end of the row, and the editor gained tests (version 2026081511)
+
+- **The required-field marker is back beside its label.** Boost pushes it away with
+  `.mform:not(.full-width-labels) .col-form-label .form-label-addon { margin-left: auto }`, which
+  reads correctly while the label column is a narrow `col-md-3` and reads as a stray icon once the
+  column spans the row, as it does here. Core's own escape hatch is `set_display_vertical()`, which
+  adds `.full-width-labels` — not used, because its effect could not be observed cleanly: the
+  compiled stylesheet on the dev stack mixes in a sibling plugin's `.mform.full-width-labels` rules,
+  which draw borders and backgrounds from that plugin's own variables. Overriding the one property
+  is smaller and has no such reach.
+
+- **Three Behat scenarios pin the editor's structure**, the first of them on the regression the
+  rebuild exists for: every field is on the page, named individually for the two that used to be
+  lost. It would have failed against the previous release.
+
+- **The validation-error risk recorded in the design proposal needs no code.** A section holding an
+  error is expanded by core itself — `formslib.php` calls `setExpanded($header, true, true)` for any
+  header whose section contains one — which the plugin now gets simply by letting the form declare
+  its own sections. Writing the test is what surfaced that: the modal-width rule is a *client*-side
+  one, so the form never posts and there is no server-side error to provoke; the scenario asserts
+  what actually happens, and the server-side guarantee is cited rather than faked.
+
+### Fixed — three things the editor rebuild left behind (version 2026081510)
+
+Found by looking at the rendered page, which the previous change had not done.
+
+- **The content editor and the file picker sat in half-width columns**, with "Content" broken
+  across two lines. The rules meant to make them span the row matched on the widgets' internal
+  markup — `:has(.editor_tiny_wrapper)` and friends — and those class names were guesses, so they
+  matched nothing at all. They are listed by field id now: an id cannot miss quietly, because a
+  renamed field makes the rule stop applying visibly.
+
+- **Labels sat beside their fields inside a 45 % column.** moodleform lays a row out as
+  `col-md-3` + `col-md-9`, which leaves the label a quarter of a half. They stack above the field
+  now, which is also what the approved mockup does.
+
+- **The audience estimator had stopped reacting to field changes.** It located the form as
+  `form.la-shell`, or inside `#la-moodleform-source` — both removed by the rebuild — and its
+  `bindFormChanges()` returns early when it finds neither, so the auto-recompute died without a
+  word and every Behat scenario stayed green, because they click Calculate explicitly. It finds the
+  form by `form.mform` inside the editor region now. The dead `formSourceId` config the page still
+  passed to the AMD module went with it.
+
+Verified on the rendered page: one `h1` where there had been two, and `filter_role_context` is a
+normal visible form row rather than a clipped one.
+
+### Fixed — two form fields were reachable by keyboard and painted nowhere (version 2026081509)
+
+The editor hid the whole moodleform in a 1×1 clipped container and moved its rendered rows into
+hand-made cards with JavaScript, driven by a map of field names. Anything the map forgot stayed in
+that container — and the container is hidden by the *clip* technique, the one that keeps content
+available to assistive technology. **`filter_role_context` and the competency filter's label were
+invisible on screen while remaining focusable and announced.** A keyboard user tabbed into nothing;
+a screen-reader user could set a role-context filter that nobody looking at the page could see or
+undo.
+
+- **The form declares its own sections now.** `setDisableShortforms(false)` and one `header` per
+  section makes each a core collapsible fieldset, which brings the accordion behaviour, the keyboard
+  handling and the expand/collapse-all control with it. Short forms had been disabled precisely
+  because core's collapse JS never settled on a hidden form — the reason disappears with the hiding.
+
+- **The relocation is gone**, and with it the field map, the hidden copy, the side nav, the
+  scroll-spy and the regex surgery that rewrote the form's own `<form>` tag into a `<div>`. This is
+  a class of bug being removed, not an instance: any field added to the form in future is visible by
+  construction rather than by remembering to update a list in JavaScript.
+
+- **Sections are reordered around what they answer**: content, display, audience, display
+  restrictions, modal appearance. The competency rules moved out of the display restrictions and
+  into the audience, which is the question they answer.
+
+- **The last two sections start collapsed, unless the notice already uses them** — and then they
+  open past any stored user preference. A collapsed section holding a value is worse than an
+  expanded empty one: the author cannot act on a filter the page will not admit is there.
+
+- The sticky action bar is the form's own button group, styled in place. Buttons outside the form
+  would need a `form=""` attribute — valid HTML, but the mustache lint cannot validate it in a
+  partial rendered on its own, and it would mean two submit paths where one will do. Cancel stays
+  native, so `is_cancelled()` keeps working.
+
+- Preview and audience moved from a right-hand rail to panels under the form. The rail was
+  `display: none` below 1280 px of *viewport*, which removed both without a substitute on every
+  laptop and tablet.
+
+### Added — the notice list has a filter bar, and it refreshes over AJAX (version 2026081508)
+
+The front half of the change whose SQL landed in 2026081505.
+
+- **A filter bar over the list**: search by name, status (active / draft / competing) and validity
+  (permanent / current / scheduled / expired), with a "clear filters" button that appears only when
+  there is something to clear. The filters are also URL parameters, so a narrowed list can be linked
+  to and survives a reload; the AJAX path carries them in the filterset instead, and both end up in
+  the same object.
+
+- **No web service of the plugin's own.** `amd/src/manage_list.js` translates the controls into a
+  filterset and hands it to `core_table/dynamic`; core fetches and swaps the table's markup. The
+  module knows nothing about how a page of notices is loaded.
+
+- **The result count and the empty state are rendered by the table, not by the page around it.**
+  Both live inside the region the AJAX refresh replaces, so neither can end up describing a
+  different list than the rows on screen. The first attempt put the count in the page and had
+  JavaScript read `data-table-total-rows` back out and re-fetch a language string on every
+  keystroke; moving it into `wrap_html_start()` deleted that whole path. The empty state has two
+  shapes on purpose: a site with no notices is invited to create one, and a filter that matched
+  nothing is offered a way back out instead.
+
+- **The debounce registers pending work.** `setFilters()` registers its own, but the 250 ms window
+  before it is a gap where nothing is in flight and the page looks idle — long enough for anything
+  watching for quiescence to conclude the list had settled and read the previous rows.
+
+- A strip of site totals sits above the table: active, drafts, combined reach and competing. These
+  describe the **site**, not the filtered set — the dynamic-table service returns table HTML and
+  nothing else, so filtered totals would need a service of the plugin's own, and the result count
+  already answers "how many matched".
+
+- Five Behat scenarios cover the filters end to end, including that searching "manutencao" finds
+  "Manutenção" through a real browser against a real database. One of them asserts through the
+  result count rather than a "should not see" on the other title: the conflict badge names its rival
+  inside a visually-hidden explanation, so that title is legitimately in the page text even when its
+  row is gone — which is the point of the badge, and makes whole-page negative assertions near it
+  unreliable.
+
+- `templates/editor/manage_shell.mustache` is deleted; the manage page had been borrowing the
+  editor's chrome.
+
+### Added — the notice list filters and pages in SQL (version 2026081505)
+
+Back end only; the filter bar that drives it lands next.
+
+- **`query_db()` is a real query now.** It read the whole thing through
+  `awareness::get_records()`, whose filter argument is equality and nothing else — no `LIKE`, no
+  date ranges — so filtering could only have happened in PHP after the fetch. That is the trap this
+  change exists to avoid: narrowing rows after the query makes paging lie, fetching a page of 25 and
+  rendering however many survived while the pager keeps counting the unfiltered total. A test
+  asserts the total describes the filtered set and that every row on every page is one the filter
+  kept.
+
+- **`all_notices` implements `\core_table\dynamic`** with an `all_notices_filterset` of three
+  optional filters: name, status (live / draft / **competing**) and validity (permanent / current /
+  scheduled / expired). No new web service: core's `core_table_get_dynamic_table_content` serves it,
+  the way the participants page is served. The constructor's arguments after `$uniqueid` became
+  optional because that service builds the table with the unique id alone — a detail that would
+  otherwise have failed only over AJAX, never on a page load and never in a test written the way the
+  page builds it. A test asserts the whole contract for that reason.
+
+- **The name search is accent-insensitive**, which is what `sql_like_ai()` was ported for: searching
+  "manutencao" finds "Manutenção". The test asserts the accent-folding half only where the database
+  can do it, and the case-folding half everywhere.
+
+- **"Competing" cannot be a SQL predicate**, because whether two notices clash is decided by
+  comparing page-reach patterns through `check_path_match()`. `collision::clashing_ids()` resolves
+  the set once and the query narrows with `id IN (...)`, so the predicate stays inside the SQL and
+  paging stays honest. It shares its overlap test with the badge, so filter and badge cannot
+  disagree about what a clash is. The empty case is its own branch: an empty `IN ()` is not
+  portable, and getting it wrong would show the entire table under a filter meaning the opposite.
+
+- Each occurrence of "now" in the validity predicates carries **its own placeholder name**.
+  `fix_sql_params()` counts placeholder occurrences against the parameter array and throws
+  `duplicateparaminsql` when a name appears twice, so one value compared against both ends of a
+  window is two names bound to the same value.
+
+### Changed — the notice list is six columns instead of twelve (version 2026081504)
+
+- **Four yes/no columns became chips in one "Behaviour" column, and only the settings that are ON
+  are drawn.** An on/off pair told apart by colour is invisible to a reader with a colour vision
+  deficiency and slow for everyone else; absence carries "off", and each chip that is there says
+  what it is in words. A notice with nothing special set says so.
+
+- **"Reset every" no longer prints "1 day(s), 0 hour(s), 0 minute(s) and 0 second(s)"** — three
+  wrapped lines per cell for a value that is almost always round. It is `format_time()` now: "1 day".
+
+- **Status is a column of its own** rather than a badge glued to the title, so it reads as the data
+  it is. The conflict badge now explains itself twice: `title` for the pointer and a
+  `visually-hidden` sibling for assistive technology. It relied on `aria-label` on a bare `<span>`,
+  which has no role to attach to and is not announced reliably.
+
+- **"Active from" and "Expiry" became one "Validity" column** — "Permanent", or the window in short
+  dates with its state (current / scheduled / expired) underneath. The two full `userdate()` columns
+  wrapped to two lines each.
+
+- **"Time modified" is gone.** It guided no decision on this page; the value still lives on the
+  notice. **"Cohort" is gone as a column** and became a muted line under the audience count, which
+  is what it is a property of — and a notice targeting everyone now says nothing instead of spending
+  a column to say "All users". **"Content" is gone as a column**: its one link is the Preview action.
+
+- **Row actions are a core `action_menu`.** Edit, enable/disable and preview stay visible;
+  recalculate, reset, the two reports and delete move into the kebab menu — seven inline links
+  became three plus a menu. It also fixes a clipping bug by construction: `action_menu` emits a
+  `.dropdown`, which is what Boost's `.table-responsive .dropdown { position: static }` rule keys
+  off so the menu escapes the scroll container's overflow. The old inline links measured 27×15 px,
+  under the 24×24 floor of WCAG 2.2 SC 2.5.8; they are 24×24 now.
+
+- The Bootstrap 4 polyfill gained `visually-hidden`, which 4.5 does not define under that name —
+  caught by `test_every_bs5_utility_used_is_polyfilled` on the first run after the badge started
+  using it, which is what that test is for.
+
+### Changed — the admin stylesheet reads the theme's tokens instead of inventing a palette (version 2026081503)
+
+First slice of the admin-surface redesign; it changes no layout and no markup, only where the
+colours and the type come from.
+
+- **Every colour now resolves through `var(--bs-x, var(--x, literal))`.** Measured on the running
+  stacks: Moodle 4.5 defines the Bootstrap 4 names on `:root` (`--primary`, `--success`, `--danger`,
+  `--warning`) and 5.1/5.2 define the `--bs-*` set — neither defines both, so the chain is what
+  works on both branches. The plugin had `--la-brand: #2c4a8a` cravado while Boost's primary is
+  `#0f6cbf`, which meant every site with its own brand colour saw the plugin's navy instead of its
+  own.
+
+- **The pages follow the site into dark mode.** 5.1 and 5.2 ship it (`.theme-dark` ×77 and
+  `[data-bs-theme="dark"]` ×15 in the compiled sheet) and the plugin had thirteen hardcoded light
+  values and no handling at all, so the editor rendered a light slab inside a dark page. Reading the
+  theme's tokens is the whole fix; there is no second palette to maintain.
+
+- **Gone:** the two `radial-gradient`s behind the editor, the `monospace` family on numbers, pills
+  and metadata, and `margin: -1rem -1rem 0`, which made the block 32 px wider than `#region-main`
+  and let it ride over the admin tab bar when that bar wrapped. Digits still line up, now through
+  `font-variant-numeric: tabular-nums`, which aligns them without changing the typeface.
+
+- A `prefers-reduced-motion` block slows the spinner and drops the button transition.
+
+### Added — the Bootstrap contract now also bans deprecated Bootstrap 4 names (version 2026081503)
+
+- `bootstrap_compat_test` gained `test_markup_carries_no_deprecated_bootstrap4_names()`. The
+  asymmetry runs both ways: `ml-1`, `text-left`, `sr-only` and friends *do* resolve on 5.x, but only
+  through `bs4-compat.scss`, which wraps each in `@include deprecated-styles()` — a red outline under
+  behat-site and themedesignermode — and which Moodle 6.0 removes (MDL-84465). Their Bootstrap 5
+  spellings are all inside the 116-line forward bridge 4.5 ships, so the BS5 name alone is correct
+  on both branches and the paired form buys nothing.
+
+- It caught one live offender on its first run: the collision badge carried `ml-1 ms-1`. Now `ms-1`.
+
+- The BS5-only detection list was re-measured and widened from five families to twenty-one. It is a
+  detector, not a polyfill, so the extra entries cost nothing until somebody reaches for one — and
+  the accompanying "polyfill carries nothing unused" test still holds the polyfill itself to exactly
+  what the markup uses.
+
+### Added — accent-insensitive search helpers, ported from local_dimensions (version 2026081503)
+
+- `helper::has_unaccent()`, `helper::ensure_unaccent()` and `helper::sql_like_ai()`, so a search for
+  "manutencao" also finds "Manutenção". On MySQL/MariaDB the collation already does this; on
+  PostgreSQL it needs the `unaccent` extension, which the plugin now provisions from the new
+  `db/install.php` and from an upgrade step.
+
+- **Provisioning is DDL, so it never touches a request path.** A least-privilege database account
+  cannot create extensions at all; the failure is swallowed and the site simply keeps
+  accent-sensitive search, which `sql_like_ai()` learns from `has_unaccent()` rather than from a
+  statement that would fail on every keystroke of every search box.
+
+- `has_unaccent()` asks the `pg_extension` catalogue on every call instead of caching. PostgreSQL
+  PHPUnit wraps each test in a rolled-back transaction, so a cached "created" flag goes stale the
+  moment the `CREATE EXTENSION` is undone, and the next query references a function that no longer
+  exists.
+
+- The PostgreSQL technique follows the `local_aise` plugin ("Accent Insensitive Search Enabler",
+  © 2023 Austrian Federal Ministry of Education, GPL v3 or later), as `local_dimensions` does.
+
+- The helpers ship ahead of their first caller: the notice-name search in the reworked manage list
+  is what will use `sql_like_ai()`.
+
 ### Changed — the audience estimate is one pass over {user}, whatever the rule count (version 2026081502)
 
 - **The total and every breakdown chip are now conditional columns of a single statement.** They

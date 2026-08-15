@@ -1,0 +1,100 @@
+# local_awareness — design documentation
+
+This directory is `export-ignore`d in `.gitattributes`: it is versioned for
+development and review, and never ships in the release zip.
+
+## Approved UI mockups
+
+The HTML files under [`mockups/`](mockups/) are the self-contained prototypes
+the admin-surface redesign was designed and approved against. Open them in any
+browser; they carry no external dependencies and follow Moodle Boost's visual
+language, including its light and dark palettes.
+
+Labels inside the mockups are in Brazilian Portuguese because they mirror the
+approved `pt_br` UI strings — the shipped plugin resolves every label through
+the language packs (`en` + `pt_br`). Everything else — file names, markup,
+comments and this document — is in English, per the fleet standard.
+
+| File | Screen |
+|------|--------|
+| [`mockups/manage-notices.html`](mockups/manage-notices.html) | Manage notices (`managenotice.php`) — page shell renders first and the list arrives over AJAX; name search, Status filter (active / draft / **has conflict**), validity filter, 25 per page, summary tiles computed over the filtered set, per-row action menu, empty and no-result states |
+| [`mockups/edit-notice.html`](mockups/edit-notice.html) | Edit notice (`editnotice.php`) — single content column, every section an accordion with expand/collapse all, 1/2/3-column field grids, audience estimate after the rules it results from, preview in a modal, actions in core's sticky footer |
+
+The mockups link to each other the way the real pages flow.
+
+## Why the redesign
+
+The pages ran a design system parallel to Moodle's: a gradient page
+background, a monospace type role, a hardcoded brand colour, and a fixed
+three-column grid governed by **viewport** media queries while living inside
+`#region-main`, which is narrower than the viewport by however wide the block
+drawer happens to be. Measured on a 1440 px viewport with the drawer open, the
+grid resolved to `240px │ 315px │ 380px` — the form column was the narrowest of
+the three, its title input 161 px wide.
+
+Full diagnosis, measurements and the migration plan live in the design
+proposal; the decisions that shape the markup are summarised below.
+
+## Design decisions worth knowing
+
+- **Read the theme's tokens, never invent them.** `var(--bs-primary, var(--primary, #0f6cbf))`
+  resolves on both branches: Moodle 4.5 defines the Bootstrap 4 names on
+  `:root` (`--primary`) and 5.x defines `--bs-*`; neither defines both. This is
+  also what makes the pages follow the theme into dark mode, which 5.1 and 5.2
+  ship (`.theme-dark`, `[data-bs-theme="dark"]`).
+
+- **Intrinsic column counts, not media queries — and flex, not grid.** The card's
+  width is the only input, so the block drawer cannot break the layout. The
+  obvious grid spelling caps nothing: `repeat(auto-fit, minmax(19rem, 1fr))`
+  reads as "two columns" and silently yields three on a wide card. Capping it
+  needs `minmax(max(19rem, 45%), 1fr)`, and **Moodle's stylelint rejects that** —
+  `Invalid value for "grid-template-columns"` from `csstree/validator`, measured
+  against the real gate, which also rejects `@container` and `container-type`
+  (`Unknown at-rule`, `Unknown property`). A percentage flex-basis does the same
+  job in valid CSS: three items of `flex: 1 1 45%` cannot share a row, and a
+  `min-width` in rem keeps each column usable.
+
+- **Only what is on is drawn.** The behaviour column shows a chip per enabled
+  setting and nothing for the disabled ones. An on/off pair separated by colour
+  is invisible to a reader with a colour vision deficiency; absence carries
+  "off", and every chip present says what it is in words.
+
+- **Every badge states its text colour.** Bootstrap 4's `.badge` sets no colour
+  and Bootstrap 5's defaults to white, so the two branches fail on disjoint sets
+  of backgrounds. The mockups pair each background token with its own ink token,
+  which is also what keeps them legible when the palette flips to dark.
+
+- **Row action menus use `.dropdown`, never `.btn-group`.** Boost forces
+  `.table-responsive .dropdown { position: static }` precisely so the menu's
+  containing block lands outside the scroll container and escapes its overflow
+  clip. `.btn-group` is `position: relative` and puts the clip straight back —
+  the last row's menu is cut off. The shipped page uses core's `\action_menu`,
+  which emits the structure that rule expects.
+
+- **The sticky footer carries buttons only.** Core's raw pattern: icon above a
+  centred label, no colour variant, the row centred, no status text. It is
+  rendered after the page content and therefore outside the moodleform, so the
+  submit button carries `form="<form id>"`.
+
+- **Long titles clamp to two lines.** Notice titles have no length cap in the
+  database. The full string stays in the node — clipped for the eye, intact for
+  a screen reader — with the whole name in the `title` attribute. Paired
+  `-webkit-line-clamp` + `line-clamp`, the form the fleet's stylelint accepts.
+
+- **The conflict badge explains itself twice.** A `title` for the pointer and a
+  `visually-hidden` sibling for assistive technology: `aria-label` on a bare
+  `<span>` has no role to attach to and is not reliably announced. What a
+  conflict *is* is explained once, in a help popover on the Status column
+  header, rather than repeated on every row.
+
+- **The list loads after the page.** The server request returns shell, filters
+  and skeleton without touching `{awareness}`; rows arrive over AJAX. No new web
+  service: `table_sql` implements `\core_table\dynamic` with a `filterset`, and
+  core's `core_table_get_dynamic_table_content` serves each page — the same
+  arrangement core's own participants page uses.
+
+- **Accent-insensitive name search.** Ported from `local_dimensions`: on
+  PostgreSQL the query wraps both operands in `unaccent()` when the extension is
+  present (provisioned at install/upgrade, never on a request path); on
+  MySQL/MariaDB the collation already does it; anywhere else it degrades to an
+  accent-sensitive `LIKE`.

@@ -50,14 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || in_array($action, $actionsrequiress
 $managenoticepage = new moodle_url('/local/awareness/managenotice.php');
 $thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid, 'action' => $action]);
 $PAGE->set_url($thispage);
-// The notice_editor module handles field relocation, side-nav, live preview and audience estimator.
-// It internally calls notice_form/init() once the form fields have been moved into cards.
-$PAGE->requires->js_call_amd('local_awareness/notice_editor', 'init', [[
-    'formSourceId' => 'la-moodleform-source',
-    'threshold' => editor_page::RULE_THRESHOLD,
-    'pollIntervalMs' => editor_page::POLL_INTERVAL_MS,
-    'pollMax' => editor_page::POLL_MAX,
-]]);
+// The notice_editor module boots notice_form, the live preview, the audience estimator and the
+// collision warning. Everything they need is on data attributes in the markup they own.
+$PAGE->requires->js_call_amd('local_awareness/notice_editor', 'init');
 
 $awareness = awareness::get_record(['id' => $noticeid]);
 $customdata = [

@@ -48,14 +48,27 @@ class notice_form extends \core\form\persistent {
         global $CFG, $DB;
         $mform =& $this->_form;
 
-        // The editor relocates these fields into custom cards and hides the raw
-        // moodleform, so core's collapsesections JS never settles on the hidden
-        // form (it times out the Behat estimator scenario). Disabling collapsible
-        // short-forms turns that JS off; harmless since users only see the cards.
-        $mform->setDisableShortforms(true);
+        /*
+         * Collapsible short-forms back ON, which is what makes each section an accordion and gets
+         * the expand/collapse-all control for free. They were disabled because the editor used to
+         * hide this whole form and move its rendered rows into cards with JavaScript: core's
+         * collapsesections JS never settled on a hidden form. The form is rendered in place now,
+         * so the reason is gone — and with it the defect that hack produced, where any field the
+         * relocation map forgot stayed inside a 1x1 clipped container: reachable by keyboard and
+         * announced by a screen reader, but painted nowhere. filter_role_context and the competency
+         * label had been invisible that way.
+         */
+        $mform->setDisableShortforms(false);
 
         $mform->addElement('hidden', 'id', 0);
         $mform->setType('id', PARAM_INT);
+
+        // Needed throughout: several sections pre-load defaults from the saved notice.
+        $persistent = $this->get_persistent();
+
+        // Content.
+        $mform->addElement('header', 'header_content', get_string('editor:section:content', 'local_awareness'));
+        $mform->setExpanded('header_content', true);
 
         $mform->addElement('text', 'title', get_string('notice:title', 'local_awareness'));
         $mform->setType('title', PARAM_TEXT);
@@ -71,28 +84,64 @@ class notice_form extends \core\form\persistent {
         $mform->setType('content', PARAM_RAW);
         $mform->addRule('content', get_string('required'), 'required', null, 'client');
 
+        // Background Image.
+        $mform->addElement(
+            'filepicker',
+            'bgimage',
+            get_string('notice:bgimage', 'local_awareness'),
+            null,
+            [
+                'maxbytes' => $CFG->maxbytes,
+                'accepted_types' => ['image'],
+                'maxfiles' => 1,
+            ]
+        );
+        $mform->addHelpButton('bgimage', 'notice:bgimage', 'local_awareness');
+
+        // Display.
+        $mform->addElement('header', 'header_behavior', get_string('editor:section:behavior', 'local_awareness'));
+        $mform->setExpanded('header_behavior', true);
+
+        $mform->addElement('selectyesno', 'enabled', get_string('notice:enable', 'local_awareness'));
+        $mform->setDefault('enabled', 1);
+
         $mform->addElement('duration', 'resetinterval', get_string('notice:resetinterval', 'local_awareness'));
         $mform->addHelpButton('resetinterval', 'notice:resetinterval', 'local_awareness');
         $mform->setDefault('resetinterval', 0);
 
         $mform->addElement('selectyesno', 'reqack', get_string('notice:reqack', 'local_awareness'));
         $mform->addHelpButton('reqack', 'notice:reqack', 'local_awareness');
-
         $mform->setDefault('reqack', 0);
-
-        $mform->addElement('selectyesno', 'forcelogout', get_string('notice:forcelogout', 'local_awareness'));
-        $mform->addHelpButton('forcelogout', 'notice:forcelogout', 'local_awareness');
-
-        $mform->setDefault('forcelogout', 0);
 
         $mform->addElement('selectyesno', 'outsideclick', get_string('notice:outsideclick', 'local_awareness'));
         $mform->addHelpButton('outsideclick', 'notice:outsideclick', 'local_awareness');
         $mform->setDefault('outsideclick', 1);
 
-        // Get persistent early — needed for pre-loading defaults in audience and filter sections.
-        $persistent = $this->get_persistent();
+        $mform->addElement('selectyesno', 'forcelogout', get_string('notice:forcelogout', 'local_awareness'));
+        $mform->addHelpButton('forcelogout', 'notice:forcelogout', 'local_awareness');
+        $mform->setDefault('forcelogout', 0);
 
+        $mform->addElement('selectyesno', 'perpetual', get_string('notice:perpetual', 'local_awareness'));
+        $mform->setDefault('perpetual', 1);
+
+        /*
+         * Computed, not a literal: a hardcoded stopyear silently stops accepting dates once it
+         * arrives, and the whole non-perpetual scheduling path goes with it.
+         */
+        $stopyear = (int) date('Y') + 10;
+        $activeoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear];
+        $mform->addElement('date_time_selector', 'timestart', get_string('notice:activefrom', 'local_awareness'), $activeoptions);
+        $mform->addHelpButton('timestart', 'notice:activefrom', 'local_awareness');
+        $mform->hideIf('timestart', 'perpetual', 'eq', 1);
+
+        $expiryoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear, 'defaulttime' => time() + HOURSECS];
+        $mform->addElement('date_time_selector', 'timeend', get_string('notice:expiry', 'local_awareness'), $expiryoptions);
+        $mform->addHelpButton('timeend', 'notice:expiry', 'local_awareness');
+        $mform->hideIf('timeend', 'perpetual', 'eq', 1);
+
+        // Audience.
         $mform->addElement('header', 'header_audience', get_string('editor:section:audience', 'local_awareness'));
+        $mform->setExpanded('header_audience', true);
 
         // Context / Filter fields.
         $mform->addElement(
@@ -173,61 +222,78 @@ class notice_form extends \core\form\persistent {
         $mform->addHelpButton('reqcourse', 'notice:reqcourse', 'local_awareness');
         $mform->setDefault('reqcourse', 0);
 
-        $mform->addElement('selectyesno', 'perpetual', get_string('notice:perpetual', 'local_awareness'));
-        $mform->setDefault('perpetual', 1);
+        /*
+         * The competency rules belong to the audience, not to the display restrictions they used to
+         * sit under: they say WHO sees the notice, the same question the cohorts and roles above
+         * answer. Its static label is what carries the help button, and it was one of the two
+         * elements the old JS relocation left behind in the hidden form.
+         */
+        if (helper::is_competency_filter_enabled()) {
+            $existingrules = [];
+            if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
+                $existingfilters = json_decode($persistent->get('filtervalues'), true);
+                $existingrules = helper::normalise_competency_rules($existingfilters['filter_competency_rules'] ?? []);
 
-        // Computed, not a literal: a hardcoded stopyear silently stops accepting dates once it
-        // arrives, and the whole non-perpetual scheduling path goes with it.
-        $stopyear = (int) date('Y') + 10;
-        $activeoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear];
-        $mform->addElement('date_time_selector', 'timestart', get_string('notice:activefrom', 'local_awareness'), $activeoptions);
-        $mform->addHelpButton('timestart', 'notice:activefrom', 'local_awareness');
-        $mform->hideIf('timestart', 'perpetual', 'eq', 1);
+                if (!empty($existingrules)) {
+                    $ids = array_map(function (array $rule): int {
+                        return (int) ($rule['id'] ?? 0);
+                    }, $existingrules);
+                    $names = helper::get_competency_names($ids);
 
-        $expiryoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear, 'defaulttime' => time() + HOURSECS];
-        $mform->addElement('date_time_selector', 'timeend', get_string('notice:expiry', 'local_awareness'), $expiryoptions);
-        $mform->addHelpButton('timeend', 'notice:expiry', 'local_awareness');
-        $mform->hideIf('timeend', 'perpetual', 'eq', 1);
+                    foreach ($existingrules as $index => $rule) {
+                        if (empty($existingrules[$index]['name']) && !empty($names[$rule['id']])) {
+                            $existingrules[$index]['name'] = $names[$rule['id']];
+                        }
+                    }
+                }
+            }
 
-        // Background Image.
-        $mform->addElement(
-            'filepicker',
-            'bgimage',
-            get_string('notice:bgimage', 'local_awareness'),
-            null,
-            [
-                'maxbytes' => $CFG->maxbytes,
-                'accepted_types' => ['image'],
-                'maxfiles' => 1,
-            ]
-        );
-        $mform->addHelpButton('bgimage', 'notice:bgimage', 'local_awareness');
+            $mform->addElement('static', 'filter_competency_label', get_string('filter_competency', 'local_awareness'), '');
+            $mform->addHelpButton('filter_competency_label', 'filter_competency', 'local_awareness');
+            $mform->addElement(
+                'html',
+                '<div id="awareness-competency-filter" class="mb-3"
+                    data-contextid="' . (int) \context_system::instance()->id . '"
+                    data-proficient-label="' . s(get_string('filter_competency_proficient', 'local_awareness')) . '"
+                    data-yes-label="' . s(get_string('booleanformat:true', 'local_awareness')) . '"
+                    data-no-label="' . s(get_string('booleanformat:false', 'local_awareness')) . '"
+                    data-remove-label="' . s(get_string('filter_competency_remove', 'local_awareness')) . '"
+                    data-picker-title="' . s(get_string('filter_competency_picker_title', 'local_awareness')) . '"
+                    data-picker-framework="' . s(get_string('filter_competency_picker_framework', 'local_awareness')) . '"
+                    data-picker-search="' . s(get_string('search')) . '"
+                    data-picker-noframeworks="' . s(get_string('filter_competency_picker_noframeworks', 'local_awareness')) . '"
+                    data-picker-nocompetencies="' . s(get_string('filter_competency_picker_nocompetencies', 'local_awareness')) . '"
+                    data-picker-loading="' . s(get_string('loading', 'admin')) . '"
+                    data-picker-addselected="' . s(get_string('filter_competency_picker_addselected', 'local_awareness')) . '"
+                    data-picker-cancel="' . s(get_string('cancel')) . '">
+                    <button type="button" id="id_awareness_add_competencies" class="btn btn-secondary">' .
+                        s(get_string('filter_competency_add', 'local_awareness')) . '
+                    </button>
+                    <div id="id_awareness_competency_rules" class="mt-2"></div>
+                </div>'
+            );
 
-        // Modal Dimensions.
-        $mform->addElement('text', 'modal_width', get_string('notice:modal_width', 'local_awareness'));
-        $mform->setType('modal_width', PARAM_RAW);
-        $mform->addHelpButton('modal_width', 'notice:modal_width', 'local_awareness');
-        $mform->addRule(
-            'modal_width',
-            get_string('notice:modal_dimension_invalid', 'local_awareness'),
-            'regex',
-            '/^(\d+(\.\d+)?(px|%|vw|vh))?$/',
-            'client'
-        );
+            $mform->addElement('hidden', 'filter_competency_rules', json_encode($existingrules));
+            $mform->setType('filter_competency_rules', PARAM_RAW);
 
-        $mform->addElement('text', 'modal_height', get_string('notice:modal_height', 'local_awareness'));
-        $mform->setType('modal_height', PARAM_RAW);
-        $mform->addHelpButton('modal_height', 'notice:modal_height', 'local_awareness');
-        $mform->addRule(
-            'modal_height',
-            get_string('notice:modal_dimension_invalid', 'local_awareness'),
-            'regex',
-            '/^(\d+(\.\d+)?(px|%|vw|vh))?$/',
-            'client'
-        );
+            $mform->addElement(
+                'selectyesno',
+                'filter_competency_requireall',
+                get_string('filter_competency_requireall', 'local_awareness')
+            );
+            $mform->setDefault('filter_competency_requireall', 0);
+            $mform->addHelpButton('filter_competency_requireall', 'filter_competency_requireall', 'local_awareness');
 
-        // Filters.
-        $mform->addElement('header', 'header_filters', get_string('filters', 'local_awareness'));
+            if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
+                $existingfilters = json_decode($persistent->get('filtervalues'), true);
+                if (!empty($existingfilters['filter_competency_requireall'])) {
+                    $mform->setDefault('filter_competency_requireall', 1);
+                }
+            }
+        }
+
+        // Display restrictions.
+        $mform->addElement('header', 'header_filters', get_string('editor:section:filters', 'local_awareness'));
 
         // Path Match.
         $mform->addElement('text', 'pathmatch', get_string('pathmatch', 'local_awareness'));
@@ -301,72 +367,41 @@ class notice_form extends \core\form\persistent {
             ]
         );
 
-        if (helper::is_competency_filter_enabled()) {
-            $existingrules = [];
-            if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
-                $existingfilters = json_decode($persistent->get('filtervalues'), true);
-                $existingrules = helper::normalise_competency_rules($existingfilters['filter_competency_rules'] ?? []);
+        // Modal appearance.
+        $mform->addElement('header', 'header_appearance', get_string('editor:section:appearance', 'local_awareness'));
 
-                if (!empty($existingrules)) {
-                    $ids = array_map(function (array $rule): int {
-                        return (int) ($rule['id'] ?? 0);
-                    }, $existingrules);
-                    $names = helper::get_competency_names($ids);
+        $mform->addElement('text', 'modal_width', get_string('notice:modal_width', 'local_awareness'));
+        $mform->setType('modal_width', PARAM_RAW);
+        $mform->addHelpButton('modal_width', 'notice:modal_width', 'local_awareness');
+        $mform->addRule(
+            'modal_width',
+            get_string('notice:modal_dimension_invalid', 'local_awareness'),
+            'regex',
+            '/^(\d+(\.\d+)?(px|%|vw|vh))?$/',
+            'client'
+        );
 
-                    foreach ($existingrules as $index => $rule) {
-                        if (empty($existingrules[$index]['name']) && !empty($names[$rule['id']])) {
-                            $existingrules[$index]['name'] = $names[$rule['id']];
-                        }
-                    }
-                }
-            }
+        $mform->addElement('text', 'modal_height', get_string('notice:modal_height', 'local_awareness'));
+        $mform->setType('modal_height', PARAM_RAW);
+        $mform->addHelpButton('modal_height', 'notice:modal_height', 'local_awareness');
+        $mform->addRule(
+            'modal_height',
+            get_string('notice:modal_dimension_invalid', 'local_awareness'),
+            'regex',
+            '/^(\d+(\.\d+)?(px|%|vw|vh))?$/',
+            'client'
+        );
 
-            $mform->addElement('static', 'filter_competency_label', get_string('filter_competency', 'local_awareness'), '');
-            $mform->addHelpButton('filter_competency_label', 'filter_competency', 'local_awareness');
-            $mform->addElement(
-                'html',
-                '<div id="awareness-competency-filter" class="mb-3"
-                    data-contextid="' . (int) \context_system::instance()->id . '"
-                    data-proficient-label="' . s(get_string('filter_competency_proficient', 'local_awareness')) . '"
-                    data-yes-label="' . s(get_string('booleanformat:true', 'local_awareness')) . '"
-                    data-no-label="' . s(get_string('booleanformat:false', 'local_awareness')) . '"
-                    data-remove-label="' . s(get_string('filter_competency_remove', 'local_awareness')) . '"
-                    data-picker-title="' . s(get_string('filter_competency_picker_title', 'local_awareness')) . '"
-                    data-picker-framework="' . s(get_string('filter_competency_picker_framework', 'local_awareness')) . '"
-                    data-picker-search="' . s(get_string('search')) . '"
-                    data-picker-noframeworks="' . s(get_string('filter_competency_picker_noframeworks', 'local_awareness')) . '"
-                    data-picker-nocompetencies="' . s(get_string('filter_competency_picker_nocompetencies', 'local_awareness')) . '"
-                    data-picker-loading="' . s(get_string('loading', 'admin')) . '"
-                    data-picker-addselected="' . s(get_string('filter_competency_picker_addselected', 'local_awareness')) . '"
-                    data-picker-cancel="' . s(get_string('cancel')) . '">
-                    <button type="button" id="id_awareness_add_competencies" class="btn btn-secondary">' .
-                        s(get_string('filter_competency_add', 'local_awareness')) . '
-                    </button>
-                    <div id="id_awareness_competency_rules" class="mt-2"></div>
-                </div>'
-            );
-
-            $mform->addElement('hidden', 'filter_competency_rules', json_encode($existingrules));
-            $mform->setType('filter_competency_rules', PARAM_RAW);
-
-            $mform->addElement(
-                'selectyesno',
-                'filter_competency_requireall',
-                get_string('filter_competency_requireall', 'local_awareness')
-            );
-            $mform->setDefault('filter_competency_requireall', 0);
-            $mform->addHelpButton('filter_competency_requireall', 'filter_competency_requireall', 'local_awareness');
-
-            if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
-                $existingfilters = json_decode($persistent->get('filtervalues'), true);
-                if (!empty($existingfilters['filter_competency_requireall'])) {
-                    $mform->setDefault('filter_competency_requireall', 1);
-                }
-            }
-        }
-
-        $mform->addElement('selectyesno', 'enabled', get_string('notice:enable', 'local_awareness'));
-        $mform->setDefault('enabled', 1);
+        /*
+         * The last two sections start collapsed because most notices never touch them — but a
+         * section that already holds a value opens regardless, and forces past any stored user
+         * preference to do it. Hiding a filter somebody set is worse than showing an empty section:
+         * the author cannot act on what the page does not admit is there.
+         */
+        $this->set_optional_section_state('header_filters', [
+            'pathmatch', 'filter_category', 'filter_course', 'filter_format', 'filter_theme',
+        ]);
+        $this->set_optional_section_state('header_appearance', ['modal_width', 'modal_height']);
 
         $buttonarray = [];
 
@@ -376,6 +411,47 @@ class notice_form extends \core\form\persistent {
         $mform->addGroup($buttonarray, 'buttonar', '', ' ', false);
     }
 
+
+    /**
+     * Collapse an optional section, unless the notice being edited already uses it.
+     *
+     * A collapsed section that holds a value is worse than an expanded empty one: the author
+     * cannot act on a filter the page does not admit is there, and nothing on screen suggests
+     * looking. $ignoreuserpref is deliberately true in that case — a stored "I keep this closed"
+     * preference must not win over data the notice actually carries.
+     *
+     * Reads pathmatch straight off the notice and the rest out of the filtervalues JSON, which is
+     * where the display restrictions and modal dimensions live.
+     *
+     * @param string $header Name of the header element.
+     * @param array $fields Field names the section owns.
+     * @return void
+     */
+    protected function set_optional_section_state(string $header, array $fields): void {
+        $mform =& $this->_form;
+        $persistent = $this->get_persistent();
+
+        $used = false;
+        if ($persistent && $persistent->get('id') > 0) {
+            $filters = [];
+            if (!empty($persistent->get('filtervalues'))) {
+                $filters = json_decode($persistent->get('filtervalues'), true) ?: [];
+            }
+
+            foreach ($fields as $field) {
+                $value = $filters[$field] ?? null;
+                if ($value === null && \local_awareness\persistent\awareness::has_property($field)) {
+                    $value = $persistent->get($field);
+                }
+                if (is_array($value) ? !empty($value) : trim((string) $value) !== '') {
+                    $used = true;
+                    break;
+                }
+            }
+        }
+
+        $mform->setExpanded($header, $used, $used);
+    }
 
     /**
      * Returns a default data.

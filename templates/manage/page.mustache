@@ -1,0 +1,113 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_awareness/manage/page
+
+    The manage-notices page: a lede and the create action, a strip of site totals, the filter bar,
+    and the notices table. The table brings its own dynamic-table wrapper, so an AJAX refresh
+    replaces its markup and leaves everything here in place — which is why the result count is
+    updated from the table's data-table-total-rows by manage_list.js rather than rendered here.
+
+    The stat tiles describe the SITE, not the filtered set: the dynamic-table web service returns
+    table HTML and nothing else, so filtered totals would need a web service of the plugin's own.
+    The line under the filter bar is the one that answers "how many matched".
+
+    Context variables required for this template:
+    * lede (string)
+    * createurl (string), createlabel (string)
+    * stats (array of {label, value, accent})
+    * filters (object) - see below
+    * tablehtml (raw HTML) - the rendered notices table
+
+    @copyright  2026 Anderson Blaine
+    @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+
+    Example context (json):
+    {
+        "lede": "Modal notices shown to users when the rules match.",
+        "createurl": "/local/awareness/editnotice.php",
+        "createlabel": "Create notice",
+        "stats": [
+            {"label": "Active notices", "value": "2", "accent": false},
+            {"label": "Total reach", "value": "1,596", "accent": true}
+        ],
+        "filters": {
+            "namelabel": "Search by name",
+            "nameplaceholder": "Search by name…",
+            "statuslabel": "Status",
+            "statusoptions": [{"value": "", "label": "All", "selected": true}],
+            "validitylabel": "Validity",
+            "validityoptions": [{"value": "", "label": "All", "selected": true}],
+            "clearlabel": "Clear filters"
+        },
+        "tablehtml": "<table><tbody><tr><td>Example</td></tr></tbody></table>"
+    }
+}}
+<div class="local-awareness-manage" data-region="la-manage">
+
+    <div class="local-awareness-toolbar">
+        <p class="local-awareness-lede">{{lede}}</p>
+        <a class="btn btn-primary" href="{{createurl}}">{{createlabel}}</a>
+    </div>
+
+    <div class="local-awareness-stats">
+        {{#stats}}
+            <div class="local-awareness-stat {{#accent}}local-awareness-stat--accent{{/accent}}">
+                <span class="local-awareness-stat-label">{{label}}</span>
+                <span class="local-awareness-stat-value">{{value}}</span>
+            </div>
+        {{/stats}}
+    </div>
+
+    <div class="card">
+        <div class="card-body local-awareness-filterbar">
+            <div class="local-awareness-filter local-awareness-filter--grow">
+                <label for="la-filter-name">{{filters.namelabel}}</label>
+                <input type="search" id="la-filter-name" class="form-control"
+                       placeholder="{{filters.nameplaceholder}}" autocomplete="off"
+                       data-filter="name">
+            </div>
+            <div class="local-awareness-filter">
+                <label for="la-filter-status">{{filters.statuslabel}}</label>
+                <select id="la-filter-status" class="form-select" data-filter="status">
+                    {{#filters.statusoptions}}
+                        <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
+                    {{/filters.statusoptions}}
+                </select>
+            </div>
+            <div class="local-awareness-filter">
+                <label for="la-filter-validity">{{filters.validitylabel}}</label>
+                <select id="la-filter-validity" class="form-select" data-filter="validity">
+                    {{#filters.validityoptions}}
+                        <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
+                    {{/filters.validityoptions}}
+                </select>
+            </div>
+            <button type="button" class="btn btn-link local-awareness-filter-clear"
+                    data-action="clear-filters" hidden>{{filters.clearlabel}}</button>
+        </div>
+
+        {{! The result count is emitted by the table itself, inside the region the AJAX refresh
+            replaces, so it can never describe a different list than the rows below it. }}
+        {{{tablehtml}}}
+    </div>
+</div>
+{{#js}}
+require(['local_awareness/manage_list'], function(ManageList) {
+    ManageList.init();
+});
+{{/js}}

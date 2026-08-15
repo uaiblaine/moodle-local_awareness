@@ -1,19 +1,34 @@
 {{!
     @template local_awareness/editor/shell
 
-    Three-column shell that wraps the (hidden) moodleform and provides the new
-    notice-editor UX: side nav, section cards, sticky preview rail and action bar.
+    The notice editor: a page head, the moodleform rendered in place, and the audience panel
+    underneath it. The preview is a dialogue, opened from the page head by live_preview.js.
+
+    The preview markup is rendered here, once, inside a template element. Template content is inert
+    — not laid out, not focusable, not exposed to assistive technology — so the markup can wait in
+    the page without any of the costs the clipped container below had, and live_preview hands it to
+    core/modal as the dialogue body. core/modal is the whole point of the exercise: it traps focus,
+    closes on Escape and returns focus to the button that opened it, none of which a hand-made
+    dialogue gets for free.
+
+    The form declares its own sections, so each one is a core collapsible fieldset — accordion
+    behaviour, keyboard handling and the expand/collapse-all control all come from core. Its own
+    button group is the sticky action bar, styled in place: buttons outside the form would need a
+    form="" attribute, which is real HTML but which the mustache lint cannot validate in a partial
+    rendered on its own, and two submit paths where one will do.
+
+    This template used to hide the form in a clipped 1x1 container and let JavaScript move its rendered
+    rows into hand-made cards; any field the relocation map forgot stayed in that container, still
+    focusable and still announced by a screen reader, but painted nowhere.
 
     Context variables required:
-    * pagetitle (string) — heading shown above the shell
-    * subtitle (string)
+    * pagetitle (string), subtitle (string)
     * statuslabel (string), statusislive (bool)
-    * autosaved (string)
-    * formhtml (raw) — rendered moodleform (kept hidden, fields relocated by JS)
-    * sections (array of {id, num, icon, title, desc})
+    * requirements (string) — a warning to show above the form, or empty
+    * formhtml (raw) — the rendered moodleform, tag and all
+    * helptitle (string), helpbody (raw — may include <b>)
     * preview (object) — see preview_card.mustache
-    * actionbar (object) — see action_bar.mustache
-    * sidenav (object) — see sidenav.mustache
+    * audience (object) — see audience_panel.mustache
 
     Example context (json):
     {
@@ -21,31 +36,21 @@
         "subtitle": "Crie um modal contextual.",
         "statuslabel": "Rascunho",
         "statusislive": false,
-        "autosaved": "salvo automaticamente há 2 min",
-        "form_attributes": "id=\"mform1\"",
-        "formhtml": "<div class=\"la-mform-wrapper\">...</div>",
-        "sections": [{"id": "sec-content", "num": "01", "icon": "fa-file-text-o", "title": "Conteúdo", "desc": "..."}],
-        "preview": {},
-        "audience": {},
-        "actionbar": {},
-        "sidenav": {}
+        "requirements": "",
+        "formhtml": "<form id=\"mform1\"><input type=\"text\"></form>",
+        "helptitle": "Como funciona",
+        "helpbody": "Os filtros combinam por <b>interseção</b>.",
+        "preview": {"title": "Título do aviso", "contentpreview": "Texto do aviso."},
+        "audience": {}
     }
 }}
 <div class="local-awareness-editor" data-region="la-editor">
-
-
-
-    <form {{{form_attributes}}} class="la-shell">
-
-        <aside class="la-shell-nav">
-            {{> local_awareness/editor/sidenav }}
-        </aside>
-
+    <div class="la-shell la-shell--single">
         <main class="la-shell-main">
 
             <div class="la-pagehead">
                 <div class="la-pagehead-title">
-                    <h1>{{pagetitle}}</h1>
+                    <h2>{{pagetitle}}</h2>
                     <p class="la-pagehead-sub">{{subtitle}}</p>
                 </div>
                 <div class="la-pagehead-meta">
@@ -53,7 +58,9 @@
                         <span class="la-status-badge-ping" aria-hidden="true"></span>
                         {{statuslabel}}
                     </span>
-                    {{#autosaved}}<span class="la-pagehead-autosaved">{{autosaved}}</span>{{/autosaved}}
+                    <button type="button" class="la-btn la-btn--soft" data-action="preview">
+                        <i class="fa fa-eye" aria-hidden="true"></i> {{#str}}editor:action:preview, local_awareness{{/str}}
+                    </button>
                 </div>
             </div>
 
@@ -64,33 +71,19 @@
                 </div>
             {{/requirements}}
 
-            <div id="la-moodleform-source" class="la-moodleform-source" data-region="la-form-source" hidden>
-                {{{formhtml}}}
+            <div class="la-navhelp" role="note">
+                <h3 class="la-navhelp-title"><i class="fa fa-info-circle" aria-hidden="true"></i> {{helptitle}}</h3>
+                <div class="la-navhelp-body">{{{helpbody}}}</div>
             </div>
 
-            {{#sections}}
-                <section class="la-card" id="{{id}}" role="region" aria-labelledby="{{id}}-title">
-                    <header class="la-card-head">
-                        <span class="la-card-icon" aria-hidden="true"><i class="fa {{icon}}"></i></span>
-                        <div class="la-card-meta">
-                            <h2 id="{{id}}-title" class="la-card-title">{{title}}</h2>
-                            <p class="la-card-desc">{{desc}}</p>
-                        </div>
-                        <span class="la-card-num" aria-hidden="true">{{num}}</span>
-                    </header>
-                    <div class="la-card-body" data-region="la-card-body" data-section="{{id}}">
-                        {{!-- moodleform fields are moved here by notice_editor JS at init --}}
-                    </div>
-                </section>
-            {{/sections}}
+            {{{formhtml}}}
 
-            {{> local_awareness/editor/action_bar }}
+            {{> local_awareness/editor/audience_panel }}
 
         </main>
+    </div>
 
-        <aside class="la-shell-rail">
-            {{> local_awareness/editor/preview_card }}
-            {{> local_awareness/editor/audience_panel }}
-        </aside>
-    </form>
+    <template data-region="la-preview-source">
+        {{> local_awareness/editor/preview_card }}
+    </template>
 </div>
