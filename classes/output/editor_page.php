@@ -74,43 +74,14 @@ class editor_page implements renderable, templatable {
         $isedit = (bool) $this->awareness;
         $statusislive = $isedit && (int) $this->awareness->get('enabled') === 1;
 
-        $formattributes = '';
+        /*
+         * The form is rendered as it comes. This used to rewrite its <form> tag into a <div> so the
+         * shell could re-emit the tag around a hidden copy and JavaScript could move the fields into
+         * cards; the form now declares its own sections, so the surgery, the hidden copy and the
+         * whole relocation step are gone — along with the class of bug where a field the map forgot
+         * stayed reachable by keyboard while being painted nowhere.
+         */
         $formhtml = $this->formhtml;
-        if (preg_match('/<form\b([^>]*\bid="([^"]+)"[^>]*)>/', $formhtml, $m)) {
-            $formattributes = $m[1];
-            $formattributes = preg_replace('/\s*class=[\'"][^\'"]*[\'"]/', '', $formattributes);
-        }
-        $formhtml = preg_replace('/<form\b[^>]*>/', '<div class="la-mform-wrapper">', $formhtml);
-        $formhtml = preg_replace('/<\/form>/', '</div>', $formhtml);
-
-        $sections = [
-            ['id' => 'sec-content', 'num' => '01', 'icon' => 'fa-file-text-o',
-             'title' => get_string('editor:section:content', 'local_awareness'),
-             'desc' => get_string('editor:section:content:desc', 'local_awareness')],
-            ['id' => 'sec-behavior', 'num' => '02', 'icon' => 'fa-sliders',
-             'title' => get_string('editor:section:behavior', 'local_awareness'),
-             'desc' => get_string('editor:section:behavior:desc', 'local_awareness')],
-            ['id' => 'sec-appearance', 'num' => '03', 'icon' => 'fa-arrows-alt',
-             'title' => get_string('editor:section:appearance', 'local_awareness'),
-             'desc' => get_string('editor:section:appearance:desc', 'local_awareness')],
-            ['id' => 'sec-audience', 'num' => '04', 'icon' => 'fa-users',
-             'title' => get_string('editor:section:audience', 'local_awareness'),
-             'desc' => get_string('editor:section:audience:desc', 'local_awareness')],
-            ['id' => 'sec-filters', 'num' => '05', 'icon' => 'fa-filter',
-             'title' => get_string('editor:section:filters', 'local_awareness'),
-             'desc' => get_string('editor:section:filters:desc', 'local_awareness')],
-        ];
-
-        $sidenavitems = [];
-        foreach ($sections as $i => $s) {
-            $sidenavitems[] = [
-                'id' => $s['id'],
-                'num' => $s['num'],
-                'icon' => $s['icon'],
-                'label' => $s['title'],
-                'active' => $i === 0,
-            ];
-        }
 
         $preview = [
             'title' => $isedit ? $this->awareness->get('title') : '',
@@ -184,14 +155,6 @@ class editor_page implements renderable, templatable {
             );
         }
 
-        $actionbar = [
-            'formid' => $this->formid,
-            'cancelurl' => $this->cancelurl->out(false),
-            'cansavedraft' => false, // Save-draft path is identical to publish in this plugin (the form has a single submit).
-            'canpublish' => true,
-            'disablepublish' => false,
-        ];
-
         return [
             'pagetitle' => $isedit
                 ? get_string('editor:title:edit', 'local_awareness')
@@ -203,17 +166,11 @@ class editor_page implements renderable, templatable {
             'statusislive' => $statusislive,
             'autosaved' => '',
             'requirements' => '',
-            'form_attributes' => $formattributes,
             'formhtml' => $formhtml,
-            'sections' => $sections,
-            'sidenav' => [
-                'items' => $sidenavitems,
-                'helptitle' => get_string('editor:nav:howitworks', 'local_awareness'),
-                'helpbody' => get_string('editor:nav:howitworks:body', 'local_awareness'),
-            ],
+            'helptitle' => get_string('editor:nav:howitworks', 'local_awareness'),
+            'helpbody' => get_string('editor:nav:howitworks:body', 'local_awareness'),
             'preview' => $preview,
             'audience' => $audience,
-            'actionbar' => $actionbar,
         ];
     }
 

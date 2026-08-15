@@ -6,6 +6,43 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — two form fields were reachable by keyboard and painted nowhere (version 2026081509)
+
+The editor hid the whole moodleform in a 1×1 clipped container and moved its rendered rows into
+hand-made cards with JavaScript, driven by a map of field names. Anything the map forgot stayed in
+that container — and the container is hidden by the *clip* technique, the one that keeps content
+available to assistive technology. **`filter_role_context` and the competency filter's label were
+invisible on screen while remaining focusable and announced.** A keyboard user tabbed into nothing;
+a screen-reader user could set a role-context filter that nobody looking at the page could see or
+undo.
+
+- **The form declares its own sections now.** `setDisableShortforms(false)` and one `header` per
+  section makes each a core collapsible fieldset, which brings the accordion behaviour, the keyboard
+  handling and the expand/collapse-all control with it. Short forms had been disabled precisely
+  because core's collapse JS never settled on a hidden form — the reason disappears with the hiding.
+
+- **The relocation is gone**, and with it the field map, the hidden copy, the side nav, the
+  scroll-spy and the regex surgery that rewrote the form's own `<form>` tag into a `<div>`. This is
+  a class of bug being removed, not an instance: any field added to the form in future is visible by
+  construction rather than by remembering to update a list in JavaScript.
+
+- **Sections are reordered around what they answer**: content, display, audience, display
+  restrictions, modal appearance. The competency rules moved out of the display restrictions and
+  into the audience, which is the question they answer.
+
+- **The last two sections start collapsed, unless the notice already uses them** — and then they
+  open past any stored user preference. A collapsed section holding a value is worse than an
+  expanded empty one: the author cannot act on a filter the page will not admit is there.
+
+- The sticky action bar is the form's own button group, styled in place. Buttons outside the form
+  would need a `form=""` attribute — valid HTML, but the mustache lint cannot validate it in a
+  partial rendered on its own, and it would mean two submit paths where one will do. Cancel stays
+  native, so `is_cancelled()` keeps working.
+
+- Preview and audience moved from a right-hand rail to panels under the form. The rail was
+  `display: none` below 1280 px of *viewport*, which removed both without a substitute on every
+  laptop and tablet.
+
 ### Added — the notice list has a filter bar, and it refreshes over AJAX (version 2026081508)
 
 The front half of the change whose SQL landed in 2026081505.

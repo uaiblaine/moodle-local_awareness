@@ -320,7 +320,7 @@
 /* Shell layout */
 .la-shell {
     display: grid;
-    grid-template-columns: 240px 1fr 380px;
+    grid-template-columns: 1fr;
     gap: 28px;
     max-width: 1480px;
     margin: 0 auto;
@@ -330,33 +330,6 @@
 .la-shell--single {
     grid-template-columns: 1fr;
     max-width: 1280px;
-}
-
-@media (max-width: 1280px) {
-    .la-shell {
-        grid-template-columns: 220px 1fr;
-    }
-
-    .la-shell-rail {
-        display: none;
-    }
-}
-
-@media (max-width: 900px) {
-    .la-shell {
-        grid-template-columns: 1fr;
-    }
-
-    .la-shell-nav {
-        display: none;
-    }
-}
-
-.la-shell-nav,
-.la-shell-rail {
-    position: sticky;
-    top: 76px;
-    align-self: start;
 }
 
 .la-shell-main {
@@ -451,75 +424,6 @@
     font-size: 1.1rem;
 }
 
-/* Hidden form source — kept in DOM so AMD can move its fields into cards. */
-.la-moodleform-source {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-}
-
-/* Side nav */
-.la-sidenav {
-    background: var(--la-paper);
-    border: 1px solid var(--la-line);
-    border-radius: var(--la-radius);
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.la-sidenav-link {
-    display: flex;
-    align-items: center;
-    gap: .65rem;
-    padding: .55rem .7rem;
-    border-radius: 8px;
-    color: var(--la-ink);
-    text-decoration: none;
-    font-weight: 500;
-    font-size: .9rem;
-    border: 1px solid transparent;
-}
-
-.la-sidenav-link:hover {
-    background: var(--la-surface);
-    color: var(--la-ink);
-    text-decoration: none;
-}
-
-.la-sidenav-link[aria-current='step'] {
-    background: var(--la-brand-soft);
-    color: var(--la-brand-strong);
-    border-color: var(--la-line);
-}
-
-.la-sidenav-num {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    background: var(--la-surface);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .7rem;
-    font-weight: 700;
-    color: var(--la-ink);
-    font-variant-numeric: tabular-nums;
-}
-
-.la-sidenav-link[aria-current='step'] .la-sidenav-num {
-    background: var(--la-brand);
-    color: var(--la-paper);
-}
-
-.la-sidenav-icon {
-    color: inherit;
-    opacity: .65;
-}
-
 .la-navhelp {
     margin-top: 16px;
     background: var(--la-surface);
@@ -545,184 +449,129 @@
     line-height: 1.45;
 }
 
-/* Section cards */
-.la-card {
+/* ---------------------------------------------------------------------------
+   Form sections
+
+   These are moodleform's OWN collapsible fieldsets now, not hand-made cards
+   with relocated rows: the form declares a header per section, so the accordion
+   behaviour, the keyboard handling and the expand/collapse-all control are
+   core's. Styling them as cards is all that is left to do.
+   --------------------------------------------------------------------------- */
+
+.local-awareness-editor .mform > fieldset {
+    padding: 0 1.25rem 1rem;
+    margin-bottom: 0.75rem;
     background: var(--la-paper);
     border: 1px solid var(--la-line);
     border-radius: 14px;
-    overflow: hidden;
-    scroll-margin-top: 80px;
 }
 
-.la-card + .la-card {
-    margin-top: 18px;
+.local-awareness-editor .mform > fieldset > legend {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
 }
 
-.la-card-head {
+.local-awareness-editor .mform .fcontainer {
+    padding-top: 0.5rem;
+}
+
+/*
+ * Two columns when the card is wide enough, and never three. The percentage basis is what caps
+ * the count — two items of 45% fit a row and a third cannot — while the rem floor keeps a column
+ * usable. It is flex rather than grid because Moodle's stylelint rejects the grid spelling that
+ * caps a column count: minmax(max(19rem, 45%), 1fr) fails csstree/validator outright, as do
+ * container queries. The width that matters is the card's, not the window's, so no media query
+ * could express this anyway.
+ */
+.local-awareness-editor .mform .fcontainer {
     display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 18px 22px;
-    border-bottom: 1px solid var(--la-line);
+    flex-wrap: wrap;
+    gap: 0 2rem;
 }
 
-.la-card-icon {
-    flex: 0 0 auto;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: var(--la-brand-soft);
-    color: var(--la-brand-strong);
+.local-awareness-editor .mform .fcontainer > .fitem {
+    flex: 1 1 45%;
+    min-width: 19rem;
+    padding: 0.5rem 0;
+    margin: 0;
+}
+
+/*
+ * The wide ones span the row: an editor, a file picker and a multi-select autocomplete are all
+ * unusable at half width, and a date selector wraps its own controls.
+ */
+.local-awareness-editor .mform .fcontainer > .fitem:has(.editor_tiny_wrapper),
+.local-awareness-editor .mform .fcontainer > .fitem:has(.filepicker-filelist),
+.local-awareness-editor .mform .fcontainer > .fitem:has(.form-autocomplete-selection),
+.local-awareness-editor .mform .fcontainer > .fitem:has(fieldset),
+.local-awareness-editor .mform .fcontainer > .felement,
+.local-awareness-editor .mform .fcontainer > .fitem.femptylabel {
+    flex: 1 1 100%;
+}
+
+.local-awareness-editor .mform .fcontainer > .fitem .col-form-label {
+    padding-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+/*
+ * moodleform renders its help buttons at 21x17, under the 24x24 floor of WCAG 2.2 SC 2.5.8. Core's
+ * markup, but on our surface, and padding the hit area does not move the glyph.
+ */
+.local-awareness-editor .mform .btn-link.p-0 {
     display: inline-flex;
+    min-width: 24px;
+    min-height: 24px;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
-    border: 1px solid var(--la-line);
 }
 
-.la-card-meta {
-    flex: 1;
+/* Preview and audience sit under the form now, side by side when there is room. */
+.la-editor-panels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.la-editor-panels > * {
+    flex: 1 1 22rem;
     min-width: 0;
 }
 
-.la-card-title {
-    font-weight: 700;
-    font-size: 1rem;
-    margin: 0;
-    letter-spacing: -.01em;
-}
-
-.la-card-desc {
-    color: var(--la-ink-muted);
-    font-size: .85rem;
-    margin: 2px 0 0;
-}
-
-.la-card-num {
-    font-size: .75rem;
-    color: var(--la-ink-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-.la-card-body {
-    padding: 8px 22px 18px;
-}
-
-.la-card--plain {
-    box-shadow: none;
-}
-
-.la-card-body .empty {
-    color: var(--la-ink-muted);
-    font-size: .85rem;
-    padding: 1rem 0;
-}
-
-/* Make the relocated moodleform-rows blend into the card body. */
-.la-card-body .fitem,
-.la-card-body .form-group {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 0;
-    margin: 0;
-    border-bottom: 1px solid var(--la-line);
-}
-
-.la-card-body .fitem:last-child,
-.la-card-body .form-group:last-child {
-    border-bottom: none;
-}
-
-.la-card-body .col-md-3,
-.la-card-body .fitemtitle {
-    flex: 1 1 auto;
-    padding: 0 16px 0 0;
-    margin: 0;
-    max-width: none;
-    text-align: left;
-}
-
-.la-card-body .fitemtitle {
-    font-weight: 500;
-    font-size: .92rem;
-    color: var(--la-ink);
-}
-
-.la-card-body .felement,
-.la-card-body .col-md-9 {
-    flex: 0 0 auto;
-    max-width: 60%;
-    padding: 0;
-    margin: 0;
+/*
+ * The sticky action bar IS the moodleform's own button group. Buttons outside the form would need
+ * a form="" attribute, which is valid HTML but which the mustache lint cannot validate in a partial
+ * rendered on its own — and it would mean two submit paths where one will do. Cancel stays native,
+ * so is_cancelled() keeps working.
+ */
+.local-awareness-editor .mform #fgroup_id_buttonar {
+    position: sticky;
+    bottom: 18px;
+    z-index: 30;
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
-}
-
-.la-card-body .form-control,
-.la-card-body .form-select,
-.la-card-body .custom-select {
-    border-radius: 9px;
-    border-color: var(--la-line);
-    width: auto;
-    max-width: 100%;
-}
-
-.la-card-body .form-control:focus,
-.la-card-body .form-select:focus {
-    border-color: var(--la-brand);
-    box-shadow: 0 0 0 4px rgba(15, 108, 191, .14);
-}
-
-/* Action bar buttons stay clickable even though the bar itself passes clicks through. */
-.la-actionbar button,
-.la-actionbar a {
-    pointer-events: auto;
-}
-
-/* Action bar (sticky) */
-.la-actionbar {
-    position: sticky;
-    bottom: 18px;
-    /* The empty footer area lets clicks fall through to the fields behind it
-       (buttons re-enable pointer events above). Fixes Behat clicking the
-       autocomplete that sits under the sticky footer in the headless viewport. */
-    pointer-events: none;
+    gap: 12px;
+    padding: 12px 16px;
     margin-top: 24px;
     background: var(--la-paper);
     border: 1px solid var(--la-line);
     border-radius: 14px;
     box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .18);
-    padding: 12px 16px;
+}
+
+/*
+ * The bar is the width of the buttons it holds, so there is no empty strip over the fields and
+ * nothing to pass clicks through. The previous bar spanned the column and needed
+ * pointer-events: none plus a re-enable on each button, which is also what made a headless Behat
+ * click land on the autocomplete underneath it.
+ */
+.local-awareness-editor .mform #fgroup_id_buttonar .felement {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
     gap: 12px;
-    z-index: 30;
-}
-
-.la-actionbar-left {
-    display: flex;
-    align-items: center;
-    gap: .55rem;
-    color: var(--la-ink-muted);
-    font-size: .82rem;
-}
-
-.la-actionbar-ok {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--la-ok);
-}
-
-.la-actionbar-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    margin: 0;
 }
 
 /* Buttons */
