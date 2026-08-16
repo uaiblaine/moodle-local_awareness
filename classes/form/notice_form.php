@@ -441,10 +441,37 @@ class notice_form extends \core\form\persistent {
 
         $buttonarray = [];
 
+        /*
+         * Preview sits with Save and Cancel because it is the third thing an author does with the
+         * whole form, not a property of the page head. type="button" and no name of its own: it
+         * must never submit, and the JS finds it by its data-action.
+         */
+        $buttonarray[] = $mform->createElement(
+            'button',
+            'previewnotice',
+            get_string('editor:action:preview', 'local_awareness'),
+            ['data-action' => 'preview', 'type' => 'button']
+        );
         $buttonarray[] = $mform->createElement('submit', 'submitbutton', get_string('savechanges'));
         $buttonarray[] = $mform->createElement('cancel');
 
         $mform->addGroup($buttonarray, 'buttonar', '', ' ', false);
+
+        /*
+         * closeHeaderBefore() is not decoration. The renderer wraps the group's HTML in the sticky
+         * footer IN PLACE, so without this the footer is emitted inside the last section's
+         * collapsible container — and collapsing "Modal appearance" took Save and Cancel with it.
+         * It is the same call course/edit_form.php makes for the same reason.
+         */
+        $mform->closeHeaderBefore('buttonar');
+
+        /*
+         * Core's sticky footer, not a hand-rolled one. set_sticky_footer() exists on all supported
+         * branches and is what course/edit_form.php and moodleform_mod.php use; the plugin used to
+         * make the button group position:sticky itself, which left the buttons inside the last
+         * section's card instead of at the foot of the page.
+         */
+        $mform->set_sticky_footer('buttonar');
     }
 
 
