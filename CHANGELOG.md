@@ -6,6 +6,50 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — two asynchronous defects in the JavaScript (version 2026081608, audit JS-02, JS-03)
+
+- **A stale estimate could overwrite a fresher one.** `pollOnce()` read the job id at send time and
+  never checked the answer still belonged to the current request, and `trigger()` started a new
+  estimate without stopping the poll already in flight. Since the editor debounces on typing, every
+  pause can start a round trip — so an older answer landing last would repaint the reach figure for
+  a question the author had already changed, with nothing on screen to say so. A monotonic
+  `state.sequence`, captured at send time and compared on **both** the success and failure paths,
+  plus `stopPolling()` at the head of `trigger()`. The counter discards an answer already on the
+  wire; `stopPolling()` stops one not yet sent — neither covers the other. Spelled exactly as
+  `collision_warning.js` spells it, which already shipped this pattern.
+
+- **A failed dismissal looked exactly like a successful one.** Both click handlers called
+  `modal.hide()` synchronously, before the web service had answered. An expired session, a dropped
+  connection or a 500 therefore produced the same thing a success produced — the notice vanished —
+  while the error went to the browser console and the acknowledgement report simply had no row. For
+  a plugin whose purpose is evidence that a notice was seen, that is the worst available failure
+  mode. The hide now happens in exactly one place, the empty-queue branch of `nextNotice()`, so a
+  call that did not reach the server leaves the notice on screen.
+
+  The re-entry guard that comes with it is required, not scope creep: `modal.hide()` on click was
+  what made a second click impossible, and `modal_notice.js` routes outside-click and escape into a
+  synthetic close-button click, so the window is not only a fast double-tap. `inflight` is set on
+  entry to both write paths and released in `.always()`.
+
+`amd/build` is rebuilt and committed in the same change, and a test asserts the bundles carry the
+guards — a source fix shipped without its bundle changes nothing on any site, and fails silently.
+
+**On how these are tested.** Neither defect is reachable by the tests this fleet runs: PHPUnit
+never loads a JS file, and Behat drives a real browser where a response arriving out of order is
+the one thing that will not reproduce on demand. The observer is therefore a source contract,
+`tests/local/async_contract_test.php`, on the same footing as `criteria_contract_test` and
+`bootstrap_compat_test` beside it. A source scan pins a shape rather than a behaviour, which is a
+real limitation, so each assertion names the defect it exists for.
+
+Two of those assertions were too weak on the first draft and mutation testing is the only reason
+that is not still true. One asserted merely that `state.sequence` appeared somewhere in
+`pollOnce()`, and passed with the `.then` guard deleted, because the capture line still mentioned
+it — it counts the guard now, and requires one on each path. The other scanned a function body
+extracted with a hard-coded four-space terminator, which over-read in `notice.js`, where functions
+sit at eight inside the `define()` wrapper: the body of `dismissNotice()` came back with
+`acknowledgeNotice()` attached, so a guard deleted from the first was still found in the second.
+The terminator is explicit per module now, and the reason is recorded in the file.
+
 ### Fixed — the site switch now reaches the web services (version 2026081607, audit WS-08)
 
 `local_awareness/enabled` is the only way an administrator can stop this plugin talking to users,
