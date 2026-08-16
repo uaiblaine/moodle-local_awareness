@@ -39,15 +39,16 @@ defeito continua lá.
 | Severidade | corrigido | sem objeto | parcial | aberto | total |
 |---|---:|---:|---:|---:|---:|
 | Alto | 10 | 0 | 0 | 0 | **10** |
-| Médio | 16 | 4 | 8 | 5 | **33** |
+| Médio | 25 | 4 | 4 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
 | Baixo | 37 | 7 | 7 | 45 | **96** |
-| Informativo | 10 | 5 | 4 | 33 | **52** |
-| **Total** | **78** | **17** | **20** | **83** | **198** |
+| Informativo | 11 | 5 | 4 | 32 | **52** |
+| **Total** | **88** | **17** | **16** | **77** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **95 dos 198 estão encerrados; 103 continuam a merecer
-uma decisão.**
+*sem objeto*. Somando corrigido e sem objeto, **105 dos 198 estão encerrados; 93 continuam a merecer
+uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
+parciais, com o que falta nomeado.
 
 > **Atualizado em 2026-08-16 pela fase 5** (versão `2026081604`, branch `fix/phase-5-residue-and-coverage`).
 > Oito achados passaram a *corrigido* nessa fase: **C6** (`\Throwable` no gancho de rodapé), **C4**
@@ -55,6 +56,12 @@ uma decisão.**
 > `awareness_disabled` finalmente disparam), **PRIV-02** e **PRIV-03** (a erasure passou a respeitar
 > quem o aprovador aprovou), **M20** e **TEST-01** (os testes que faltavam), e **TPL-03** (o exemplo
 > de contexto do painel de público). Os números acima já os contam.
+>
+> **Atualizado de novo pela fase 6** (versão `2026081605`, branch `test/phase-6-coverage`). Dez
+> achados passaram a *corrigido*: **M11**, **M26**, **M27**, **M28**, **M29**, **M30** (os buracos
+> de cobertura), **M31**, **M32**, **M33** (os pontos cegos do `bootstrap_compat_test`) e
+> **SQL-04** (o convidado excluído por um id literal). Alargar o observador encontrou de imediato
+> dois defeitos reais que ninguém procurava — ver abaixo.
 
 ## O que sobrevive, e por quê
 
@@ -70,7 +77,16 @@ que uma tabela com `userid` está *declarada*; nunca chama `export_user_data()` 
 eliminação nenhum, portanto qualquer uma das quatro correções podia ser revertida com a suíte verde.
 A fase 5 escreveu esses testes (M20) e, ao escrevê-los, encontrou mais dois defeitos no mesmo
 ficheiro — PRIV-02 e PRIV-03, a erasure a ignorar quem o aprovador tinha aprovado. **Foi o teste que
-os achou, não a leitura**, que é exatamente o argumento para fechar os buracos que restam.
+os achou, não a leitura.**
+
+A fase 6 fechou o resto e repetiu o padrão pela terceira vez. Alargar o `bootstrap_compat_test`
+para varrer a raiz do plugin em vez de três diretórios nomeados fez aparecer, no primeiro
+arranque, que **`report/acknowledged_systemreport.php` e `report/dismissed_systemreport.php` nunca
+chamavam `bootstrap::mark_page()`** — o polyfill do Bootstrap 4 está preso à classe de body que
+essa chamada acrescenta, portanto as duas páginas renderizavam sem estilo no Moodle 4.5 com todos
+os gates verdes. O teste antigo não podia vê-las: fazia `glob('*.php')` só na raiz. **Três fases
+seguidas em que o teste encontrou o que a leitura não encontrou** é o resultado mais transferível
+deste trabalho todo.
 
 Os restantes agrupam-se em três temas de dívida, todos de baixa severidade e alta contagem: o
 `html_writer` (que **cresceu** de 4 para 24 usos, todos em `all_notices.php` e nos dois
@@ -173,7 +189,7 @@ diz o que resta e onde.
 - **H10** · corrigido — The five test_stress_datasource tests are gated behind PHPUNIT_LONGTEST, which moodle-plugin-ci never sets — they hide three real failures
   <br>`grep -rn 'PHPUNIT_LONGTEST' tests/ .github/` returns no `markTestSkipped` — only five docblocks stating the gate was removed: all_notices_test.php:191, acknowledged_notices_test.php:186, dismissed_notices_test.php:185, link_history_test.php:171, notice_views_test.php:176.
 
-### Importantes (M1–M33) — 13 de 33 em aberto
+### Importantes (M1–M33) — 4 de 33 em aberto
 
 - **M1** · corrigido — A stale Claude Code worktree is committed as a gitlink (submodule entry) with no .gitmodules, breaking every git submodule command
   <br>`git ls-files -s \| awk '$1=="160000"'` returns 0 rows and `git ls-files -s .claude` returns nothing; `git submodule status` now exits 0 with empty output. /Users/uaiblaine/dev/moodle-local_awareness/.gitignore lines 14-17 add `.claude/worktrees/` with a comment naming this exact gitlink incident.
@@ -197,9 +213,8 @@ diz o que resta e onde.
   <br>/Users/uaiblaine/dev/moodle-local_awareness/classes/helper.php:1671-1700 now resolves the client-supplied courseid and then discards it unless the caller may enter: `if ($course && !can_access_course($course, null, '', true)) { $course = null; }` at :1694, with $onlyactive = true deliberately chosen…
 - **M10** · corrigido — No external function rejects the guest user, so one guest dismissal hides a notice from every subsequent guest
   <br>Solved by session-scoping rather than by rejection, and the stated impact is gone. classes/helper.php:912-937 add_to_viewed_notices() takes a $sessiononly flag; dismiss_notice() (:970-994) passes isguestuser() into it and skips create_new_acknowledge_record() for guests (:978); acknowledge_notice()…
-- **M11** · **aberto** — get_estimate() and search_courses() capability checks have no test; the local/awareness:viewreports capability has zero coverage anywhere
-  <br>`grep -rn viewreports tests/` returns nothing, while all four enforcement points still exist: classes/reportbuilder/local/systemreports/acknowledged_notice.php:113 and dismissed_notice.php:113 (`has_capability('local/awareness:viewreports', …)` in can_view()), report/acknowledged_systemreport.php:36 and report/dismissed_systemreport.php:36 (require_capability). `grep -rn search_courses tests/` returns 0 hits although classes/external.php:465 still ships it behind require_capability.
-  <br>*Falta:* All three named gaps are still open. Needed: (1) a negative test for external::get_estimate() mirroring audience_external_test.php:39-44; (2) any test at all for external::search_courses(), positive and negative; (3) a tests/reportbuilder/local/systemreports/ test asserting can_view() is false for a plain user and true after assign_capability('local/awareness:viewreports', CAP_ALLOW, …) at system context — that pair is what makes the four enforcement points mutation-sensitive.
+- **M11** · corrigido — get_estimate() and search_courses() capability checks have no test; the local/awareness:viewreports capability has zero coverage anywhere
+  <br>Fechado na fase 6 (2026-08-16): `tests/reportbuilder/systemreports_test.php` (viewreports, os dois relatórios, triplo plain/manage-só/viewreports-só), `tests/external/search_courses_external_test.php` e um teste negativo para `get_estimate()`.
 - **M12** · corrigido — forcelogout + reqack=0 traps the user: after one dismissal, Accept becomes a silent no-op and the modal returns on every page load
   <br>The two drifted predicates were collapsed into one: classes/helper.php:1245-1257 `must_reshow()` carries all four conditions, including `($dismissed && (int) $notice->get('forcelogout') === 1 && !is_siteadmin())` at :1256.
 - **M13** · corrigido — A notice targeted at a hidden cohort is never shown to anyone, while the estimator reports the full cohort size
@@ -228,30 +243,22 @@ diz o que resta e onde.
   <br>`grep -rn "other_cols" --include='*.php' .` returns zero hits in the whole repo — the override is gone with classes/table/acknowledged_notice.php (deleted in 2c2e787).
 - **M25** · corrigido — local_awareness_hlinks_his declares no index and no foreign key on hlinkid or userid, yet every query filters on them
   <br>db/install.xml:79-83 now declares both keys on local_awareness_hlinks_his: `<KEY NAME="hlinkid" TYPE="foreign" FIELDS="hlinkid" REFTABLE="local_awareness_hlinks" REFFIELDS="id"/>` (line 81) and the userid foreign key (line 82).
-- **M26** · **aberto** — local_awareness_pluginfile()'s capability gate on files of disabled notices has no test
-  <br>The gate is still in lib.php:57-62 (`awareness::get_record(['id' => $itemid])`, then `if (!has_capability('local/awareness:manage', ...) && !$notice->get('enabled')) { return false; }`). No test exercises it: there is no tests/lib_test.php (`ls tests` shows only audience_estimator/audience_live_mode/audience_notice_audience/awareness/cache_reuse/completion_cost/display_queue/helper/role_filter plus subdirectories), and `grep -rn "local_awareness_pluginfile\|get_bgimage_url\|process_bgimage" tests/` returns nothing.…
-  <br>*Falta:* No test invokes local_awareness_pluginfile(). Add tests/lib_test.php asserting false for (a) an unknown itemid and (b) a disabled notice viewed by a plain user, with a capability holder as the positive control (assign_capability, not setAdminUser); cover helper::get_bgimage_url() there too.
-- **M27** · **aberto** — test_estimate_excludes_deleted_and_suspended_users never puts the deleted user in the cohort — the `u.deleted = 0` predicate is untested
-  <br>tests/audience_estimator_test.php:220-233 is unchanged in substance: $u3 is created with ['deleted' => 1] at line 225, is never added to the cohort (line 227 still comments "Cannot add deleted user — skip"), and line 229 is still the no-op `$u3->id; // Appease phpcs.`. The assertion at line 232 is satisfied by the cohort-membership EXISTS clause, not by `u.deleted = 0` (classes/audience/estimator.php:307).
-  <br>*Falta:* Add a cohort member that is flagged deleted after joining ($DB->set_field('user','deleted',1,...)), so removing classes/audience/estimator.php:307 turns the test red; the same control is still missing for `u.confirmed = 1` (line 309) and the guest exclusion (lines 310-313).
-- **M28** · **aberto** — The plugin's only write-capability gate (check_manage_capability, 6 call sites) has no negative test — deleting it turns nothing red
-  <br>The gate still exists at classes/helper.php:1192-1195 (`check_manage_capability()` → require_capability) with six call sites: helper.php:82, 153, 316, 341, 366, 391. `grep -rn "expectException" tests/` returns six results, and the only three for required_capability_exception are in the external layer — tests/external/audience_external_test.php:42 (estimate_audience), collision_external_test.php:95 (check_collision), notice_external_test.php:533 (search_roles).
-  <br>*Falta:* No negative test on any of the six write entry points. Add a dataProvider-driven test that sets a plain user and expects required_capability_exception from each of helper.php:82/153/316/341/366/391.
-- **M29** · **parcial** — Six of the eight registered external functions have no test, and the two that do bypass call_external_function()/clean_returnvalue()
-  <br>db/services.php now registers nine functions (dismiss, acknowledge, tracklink, getnotices, check_collision, search_roles, search_courses, estimate_audience, get_estimate). Eight are exercised — `grep -rho 'external::[a-z_]*' tests/` shows dismiss_notice, acknowledge_notice, track_link, get_notices, check_collision, search_roles, estimate_audience, get_estimate — and two now round-trip through the WS layer: tests/external/collision_external_test.php:110 and tests/external/notice_external_test.php:404/415 use \core_e…
-  <br>*Falta:* Two gaps survive. (1) search_courses has no test at all: `grep -rn "search_courses" tests/` returns nothing, and it is the one carrying a capability check. (2) The original pair still bypasses the WS layer — tests/external/audience_external_test.php calls the statics bare at lines 43, 57, 84, 105, 134, 165, 195 with no call_external_function/clean_returnvalue anywhere in that file, so estimate_audience_returns()/get_estimate_returns() are still never applied to a real payload.
-- **M30** · **parcial** — helper::check_filters() — 184 lines and six targeting branches — has one test, which only reaches the early return; check_path_match() has none
-  <br>The headline claims no longer hold. check_filters() is asserted false in several mutation-sensitive tests: tests/role_filter_test.php:91, :113, :144-151, :201, :242, :255 (role branch across CONTEXT_SYSTEM/COURSE/COURSECAT) and tests/helper_test.php:675, :685 (theme branch, with a deliberate control at :675).
-  <br>*Falta:* check_path_match() still has no direct test (`grep -rn "check_path_match" tests/` returns only prose comments) — coverage is entirely through two callers. And four of check_filters()' own branches still have no test asserting false: filter_category, filter_course, filter_format and filter_competency_rules (classes/helper.php:1708-1765).
-- **M31** · **aberto** — bootstrap_compat_test scans only templates/, amd/src/ and classes/, and its entry-point scan globs only the plugin root — the four report/ pages are invisible to it
-  <br>Both scopes are unchanged. tests/local/bootstrap_compat_test.php:165 still reads `$dirs = [$root . '/templates', $root . '/amd/src', $root . '/classes'];` (the RecursiveIteratorIterator at :171 only walks those three), and the entry-point scan at :490 is still `foreach (glob($root . '/*.php') ?: [] as $path)`, which does not descend into report/.
-  <br>*Falta:* markup_files() must walk the plugin root with an exclusion list (amd/build, tests, docs, lang) instead of the three-directory inclusion list at line 165, and the entry-point scan at line 490 must recurse so report/ is covered. Only two of the four report pages the audit named still exist (the two *_report.php were deleted in 2c2e787); the two *_systemreport.php remain uncovered.
-- **M32** · **parcial** — bs5_only_utilities() guards 5 of the ~20 BS5-only families named in the house standard, and its regexes miss siblings within the families it does list
-  <br>bs5_only_utilities() (tests/local/bootstrap_compat_test.php:65-87) grew from 5 entries to 21 and records its re-derivation method in the comment at :53-64. The within-family widening the finding asked for largely landed: fw-* now `/\bfw-(bold\|semibold\|light\|lighter\|bolder\|medium\|normal)\b/` (line 70), lh-* now `(1\|base\|lg\|sm)` (line 77), and row-gap/column-gap got their own entry (line 75).
-  <br>*Falta:* Families from the house list still unguarded: `ratio*` and `vr` (zero occurrences in the file — `grep -n 'ratio\|\bvr\b' tests/local/bootstrap_compat_test.php` matches only unrelated prose), and positional `top-*`/`bottom-*` (line 86 covers only `(start\|end)-0`, so start-50/start-100/top-0 pass). Sibling gaps inside listed families remain: form-select-lg (line 66 is `(-sm)?` only), fst-normal (line 72), responsive gap variants such as gap-lg-3 (line 74 is `gap-[0-9]`), and translate-middle-x/-y (line 85).
-- **M33** · **parcial** — bootstrap_compat_test knows 5 of the ~25 Bootstrap 5-only families, so almost any new BS5 utility ships green
-  <br>Same map, same file as M32: tests/local/bootstrap_compat_test.php:65-87. The five-entry list the finding quotes is gone — 21 patterns now, including every token this finding measured as absent from 4.5 (d-grid line 78, fst-italic 72, text-bg-* 80, border-* 82, translate-middle 85, bg-body* 81, fs-* 71, lh-sm via 77) and the widened fw-*/lh-* patterns at 70 and 77.
-  <br>*Falta:* Identical to M32: `vr`, `ratio*` and `top-*`/`bottom-*` are still absent from the map, and form-select-lg (line 66), fst-normal (72), gap-lg-* (74) and translate-middle-x/-y (85) slip past the listed families. Writing class="vr" or class="ratio ratio-16x9" still ships green.
+- **M26** · corrigido — local_awareness_pluginfile()'s capability gate on files of disabled notices has no test
+  <br>Fechado na fase 6 (2026-08-16): `tests/lib_test.php` cobre o gate do `local_awareness_pluginfile()`. Removê-lo faz o callback **servir o ficheiro**, que é o que o caso apanha.
+- **M27** · corrigido — test_estimate_excludes_deleted_and_suspended_users never puts the deleted user in the cohort — the `u.deleted = 0` predicate is untested
+  <br>Fechado na fase 6 (2026-08-16): os membros passam a ser adicionados à coorte ANTES de serem marcados. Remover `u.deleted = 0`, `u.suspended = 0`, `u.confirmed = 1` ou os dois predicados de convidado torna o teste vermelho.
+- **M28** · corrigido — The plugin's only write-capability gate (check_manage_capability, 6 call sites) has no negative test — deleting it turns nothing red
+  <br>Fechado na fase 6 (2026-08-16): `tests/helper_capability_test.php`, os seis pontos de escrita, recusa mais controlo positivo via `assign_capability()`.
+- **M29** · corrigido — Six of the eight registered external functions have no test, and the two that do bypass call_external_function()/clean_returnvalue()
+  <br>Fechado na fase 6 (2026-08-16): `search_courses` ganhou testes e as duas funções de público passaram a fazer round-trip por `call_external_function()`, aplicando os `execute_returns()`.
+- **M30** · corrigido — helper::check_filters() — 184 lines and six targeting branches — has one test, which only reaches the early return; check_path_match() has none
+  <br>Fechado na fase 6 (2026-08-16): `tests/check_filters_test.php` — 17 casos diretos de `check_path_match()` e asserções false para as quatro ramificações que não as tinham.
+- **M31** · corrigido — bootstrap_compat_test scans only templates/, amd/src/ and classes/, and its entry-point scan globs only the plugin root — the four report/ pages are invisible to it
+  <br>Fechado na fase 6 (2026-08-16): `markup_files()` percorre a raiz do plugin com lista de exclusão, e a varredura de entry points reutiliza-a. Encontrou de imediato dois defeitos reais nas páginas `report/*_systemreport.php`.
+- **M32** · corrigido — bs5_only_utilities() guards 5 of the ~20 BS5-only families named in the house standard, and its regexes miss siblings within the families it does list
+  <br>Fechado na fase 6 (2026-08-16): o mapa ganhou `ratio*`, `vr`, `fst-normal`, `top-*`/`bottom-*` e os irmãos `form-select-lg`, `gap-{bp}-*`, `translate-middle-x/-y`.
+- **M33** · corrigido — bootstrap_compat_test knows 5 of the ~25 Bootstrap 5-only families, so almost any new BS5 utility ships green
+  <br>Fechado na fase 6 (2026-08-16): mesmo mapa, mesmas adições — ver M32.
 
 ### Crítico de completude (C1–C7) — 1 de 7 em aberto
 
@@ -670,7 +677,7 @@ diz o que resta e onde.
   <br>The banned tag is gone: `grep -rn "@author" --include="*.php" .` over the whole repo returns no matches, and the August header (git show 896dfc2:classes/privacy/provider.php lines 30-32) carried `@author Anderson Blaine <…>` plus `@copyright Anderson Blaine <…>`. The current header at classes/privacy/provider.php:30-33 has @package, `@copyright Catalyst IT`, `@copyright 2026 Anderson Blaine`, @license.
   <br>*Falta:* A `@copyright` line with no year still stands at classes/privacy/provider.php:31 (`@copyright Catalyst IT`), added deliberately by commit da8e710 'docs: restore upstream copyright and normalise every file header' and repeated fleet-wide in this repo (db/caches.php:21, classes/table/all_notices.php:36). Under the reading that the finding meant the plugin's own copyright, that half is fixed too (`2026 Anderson Blaine` is present); under the literal reading, line 31 remains. Smallest fix if wanted: give the upstream line its year, e.g.
 
-### SQL / portabilidade — 2 de 5 em aberto
+### SQL / portabilidade — 1 de 5 em aberto
 
 - **SQL-01** · corrigido — Audience-estimate breakdown drops the role scoping keys, so the per-rule chip counts a site-wide role instead of the scoped one
   <br>classes/audience/estimator.php:189 builds each breakdown column from `self::isolate_rule($criteria, $rule)`, and isolate_rule() at classes/audience/estimator.php:237-251 keeps filter_role_context, filter_category and filter_course alongside filter_role (and filter_competency_requireall alongside the…
@@ -678,9 +685,8 @@ diz o que resta e onde.
   <br>Both tables that carried it were deleted in commit 2c2e787 (`git log --diff-filter=D --name-only -- classes/table/acknowledged_notice.php classes/table/dismissed_notice.php`); the cited line 126 was `$cols['timecreated_spreadsheet'] = …`, a non-column defined next to `$cols[$link->id]` under `sortab…
 - **SQL-03** · corrigido — ORDER BY on the manage-notices table applies DESC only to the second column, listing disabled notices first
   <br>classes/table/all_notices.php:203 now spells the direction on every key: `ORDER BY enabled DESC, timemodified DESC, id DESC`. The August code was `awareness::get_records([], 'enabled, timemodified', 'DESC', …)` (git show 896dfc2:classes/table/all_notices.php:110), which persistent::get_records conca…
-- **SQL-04** · **aberto** — Guest user is excluded by a hard-coded id of 1 instead of $CFG->siteguest
-  <br>classes/audience/estimator.php:310 `'u.id <> :guestid'` bound at classes/audience/estimator.php:315 to the literal `['guestid' => 1, …]`; `grep -rn "siteguest" --include="*.php" classes/` returns nothing anywhere in the plugin. Identical to the August code (git show 896dfc2:classes/audience/estimator.php), including the `u.username <> :guestname` belt-and-braces line.
-  <br>*Falta:* Still a hard-coded 1. Smallest fix: bind `$CFG->siteguest` instead of 1 at classes/audience/estimator.php:315 (the username check can stay).
+- **SQL-04** · corrigido — Guest user is excluded by a hard-coded id of 1 instead of $CFG->siteguest
+  <br>Fechado na fase 6 (2026-08-16): `estimator::base_predicate()` liga `guestid` a `$CFG->siteguest` em vez do literal 1.
 - **SQL-05** · **aberto** — Context id and context levels are string-concatenated into SQL instead of being bound as placeholders
   <br>The block moved out of classes/helper.php into classes/local/role_scope.php (commit history: role_scope::sql() is now the single definition, called from classes/audience/estimator.php:365 and helper's per-user role rule), and the concatenation moved with it: classes/local/role_scope.php:75 `$where = " AND {$ra}.contextid = " . $syscontext->id;`, :77-78 `… AND {$ctx}.contextlevel = " . CONTEXT_COURSECAT`, :86-87 the same with CONTEXT_COURSE. No placeholder is used for any of the three.
   <br>*Falta:* Carried over verbatim into the replacement file. Values are core-derived ints so nothing is injectable (which is why the audit rated it Informativo), but the fleet rule is placeholders. Smallest fix: bind three named params in role_scope::sql() (they already take $suffix, so name collisions are handled).

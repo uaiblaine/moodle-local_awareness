@@ -63,7 +63,7 @@ final class bootstrap_compat_test extends \basic_testcase {
          * it costs nothing until somebody reaches for one of these.
          */
         return [
-            '/\\bform-select(-sm)?\\b/' => 'form-select',
+            '/\\bform-select(-sm|-lg)?\\b/' => 'form-select',
             '/\\bform-label\\b/' => 'form-label',
             '/\\bform-switch\\b/' => 'form-switch',
             '/\\bform-check-reverse\\b/' => 'form-check-reverse',
@@ -71,7 +71,7 @@ final class bootstrap_compat_test extends \basic_testcase {
             '/\\bfs-[1-6]\\b/' => 'fs-*',
             '/\\bfst-italic\\b/' => 'fst-italic',
             '/\\bfont-monospace\\b/' => 'font-monospace',
-            '/\\bgap-[0-9]\\b/' => 'gap-*',
+            '/\\bgap-([a-z]{2}-)?[0-9]\\b/' => 'gap-*',
             '/\\b(row|column)-gap-[0-9]\\b/' => 'row-gap-* / column-gap-*',
             '/\\bg-[1-6]\\b/' => 'g-*',
             '/\\blh-(1|base|lg|sm)\\b/' => 'lh-*',
@@ -82,8 +82,13 @@ final class bootstrap_compat_test extends \basic_testcase {
             '/\\bborder-[1-5]\\b/' => 'border-*',
             '/\\bobject-fit-[a-z]+\\b/' => 'object-fit-*',
             '/\\bz-[0-3]\\b/' => 'z-*',
-            '/\\btranslate-middle\\b/' => 'translate-middle',
-            '/\\b(start|end)-0\\b/' => 'start-0 / end-0',
+            '/\\btranslate-middle(-[xy])?\\b/' => 'translate-middle',
+            // The lookbehind keeps border-top-0 / border-bottom-0 out: those are border utilities,
+            // present on both branches, and share the suffix with the BS5-only positional ones.
+            '/(?<!border-)\\b(top|bottom|start|end)-(0|50|100)\\b/' => 'top-* / bottom-* / start-* / end-*',
+            '/\\bratio(-[0-9]+x[0-9]+)?\\b/' => 'ratio*',
+            '/\\bvr\\b/' => 'vr',
+            '/\\bfst-normal\\b/' => 'fst-normal',
         ];
     }
 
@@ -162,22 +167,35 @@ final class bootstrap_compat_test extends \basic_testcase {
      */
     private function markup_files(): array {
         $root = $this->plugin_root();
-        $dirs = [$root . '/templates', $root . '/amd/src', $root . '/classes'];
+
+        /*
+         * An EXCLUSION list walked from the plugin root, not an inclusion list of three
+         * directories. The inclusion form named templates/, amd/src/ and classes/, which meant
+         * report/, renderer.php and every entry point at the root were outside every assertion in
+         * this file — and report/*_systemreport.php is exactly the kind of page that emits markup
+         * by hand. An inclusion list also fails silently the day a new directory appears: nothing
+         * reports that it is unscanned, because nothing knows it should have been.
+         */
+        $skip = ['amd/build', 'tests', 'docs', 'lang', '.git', 'node_modules', 'vendor'];
+
         $files = [];
-        foreach ($dirs as $dir) {
-            if (!is_dir($dir)) {
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iterator as $file) {
+            if (!$file->isFile()) {
                 continue;
             }
-            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir));
-            foreach ($iterator as $file) {
-                if (!$file->isFile()) {
-                    continue;
-                }
-                if (!in_array($file->getExtension(), ['mustache', 'js', 'php'], true)) {
-                    continue;
-                }
-                $files[] = $file->getPathname();
+            if (!in_array($file->getExtension(), ['mustache', 'js', 'php'], true)) {
+                continue;
             }
+            $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1));
+            foreach ($skip as $prefix) {
+                if (str_starts_with($relative, $prefix . '/')) {
+                    continue 2;
+                }
+            }
+            $files[] = $file->getPathname();
         }
         sort($files);
         return $files;
@@ -487,7 +505,17 @@ final class bootstrap_compat_test extends \basic_testcase {
         $root = $this->plugin_root();
         $offenders = [];
         $pages = 0;
-        foreach (glob($root . '/*.php') ?: [] as $path) {
+        /*
+         * Every PHP file the plugin ships, not glob('*.php') on the root. The root-only form left
+         * report/*_systemreport.php outside the check — pages that call $PAGE->set_url() and were
+         * never asked whether they mark the Bootstrap version. markup_files() already walks the
+         * whole tree with the right exclusions, so the scan reuses it rather than growing a second
+         * list that can drift from the first.
+         */
+        foreach ($this->markup_files() as $path) {
+            if (pathinfo($path, PATHINFO_EXTENSION) !== 'php') {
+                continue;
+            }
             $contents = file_get_contents($path);
             /* A real page, not lib.php or version.php: it gives $PAGE a URL of its own. */
             if (!str_contains($contents, '$PAGE->set_url(')) {
@@ -495,7 +523,7 @@ final class bootstrap_compat_test extends \basic_testcase {
             }
             $pages++;
             if (!str_contains($contents, 'bootstrap::mark_page()')) {
-                $offenders[] = basename($path);
+                $offenders[] = str_replace($root . '/', '', $path);
             }
         }
         /*
