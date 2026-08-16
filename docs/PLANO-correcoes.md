@@ -22,8 +22,7 @@ A coluna **conf.** diz como cada item chegou aqui, e é a diferença entre ler e
   corrigir.** Um verificador já errou nesta mesma sessão: refutou e confirmou o mesmo defeito do
   anel de foco em dois vereditos contraditórios, e só a medição no navegador resolveu.
 
-**Progresso:** fase 1 fechada (5 de 27 itens, contando o 2.6 que ela teve de puxar). Fases 2 a 4
-por começar.
+**Progresso:** fases 1 e 2 fechadas — 10 de 27 itens. Fases 3 e 4 por começar.
 
 ## Sobre o `docs/AUDIT-2026-08.md`
 
@@ -94,7 +93,7 @@ PHPUnit com `--fail-on-warning` — não havia como fechar a fase 1 deixando-o d
 Seis dos 191. Cada um tem a sua seção no `docs/AUDIT-2026-08.md` com o mecanismo completo; leia-a
 antes de corrigir, e **abra o arquivo** — a seção descreve o código como estava em agosto.
 
-- [ ] **2.1 · M3 · o estimador nunca envia `filter_role_context`** — `amd/src/audience_criteria.js`
+- [x] **2.1 · M3 · o estimador nunca envia `filter_role_context`** — `amd/src/audience_criteria.js`
   (~146) · conf. **~** · pequeno
 
   `read()` recolhe coortes, papel, curso, categoria, formato, tema, competências e pathmatch, e
@@ -103,7 +102,7 @@ antes de corrigir, e **abra o arquivo** — a seção descreve o código como es
   `role_scope::sql()` não emitir junção de contexto nenhuma. Uma regra de papel com escopo de curso
   é contada como se valesse em todo o site: o número no editor contradiz o número gravado.
 
-- [ ] **2.2 · M12 · `forcelogout` + `reqack=0` prende o utilizador** — `classes/helper.php:1121` ·
+- [x] **2.2 · M12 · `forcelogout` + `reqack=0` prende o utilizador** — `classes/helper.php:1121` ·
   conf. **~** · pequeno
 
   `check_if_already_acknowledged_by_user()` tem três condições de reexibição e nunca ganhou a quarta
@@ -111,7 +110,7 @@ antes de corrigir, e **abra o arquivo** — a seção descreve o código como es
   não-admin fecha, é deslogado, volta a entrar, e o aviso reaparece em cada página — com o Aceitar
   virado num no-op silencioso.
 
-- [ ] **2.3 · M13 · coorte oculta: ninguém vê, o estimador reporta a coorte inteira** —
+- [x] **2.3 · M13 · coorte oculta: ninguém vê, o estimador reporta a coorte inteira** —
   `classes/helper.php:393` · conf. **~** · pequeno
 
   Três caminhos discordam. `built_cohorts_options()` usa `cohort_get_all_cohorts(0, 0)`, sem filtro
@@ -122,7 +121,7 @@ antes de corrigir, e **abra o arquivo** — a seção descreve o código como es
 
   *Relacionado com 1.3* — decidir a regra de visibilidade uma vez e aplicá-la nos três caminhos.
 
-- [ ] **2.4 · M14 · editar o rótulo de um link destrói o histórico de cliques** —
+- [x] **2.4 · M14 · editar o rótulo de um link destrói o histórico de cliques** —
   `classes/helper.php:272` · conf. **~** · pequeno
 
   `noticelink::create_new_link()` identifica um link por `(noticeid, text, link)`. Corrigir uma gralha
@@ -130,7 +129,7 @@ antes de corrigir, e **abra o arquivo** — a seção descreve o código como es
   antigo e nunca toca em `linkhistory`. A contagem cai a zero em todos os relatórios e as linhas
   ficam órfãs para sempre.
 
-- [ ] **2.5 · M16 · web service tipado como leitura escreve em tabela do core** —
+- [x] **2.5 · M16 · web service tipado como leitura escreve em tabela do core** —
   `classes/helper.php:1414` · conf. **~** · pequeno
 
   `get_user_competency_proficiency()` chama `\core_competency\api::get_user_competency_in_course()`,
@@ -148,7 +147,11 @@ antes de corrigir, e **abra o arquivo** — a seção descreve o código como es
   *Depende de 4.6:* se as duas páginas de relatório antigas forem removidas, isto vai junto.
   Resolver 4.6 primeiro pode tornar este item vazio.
 
-**Fecho da fase 2:** commit `______` · PR `#____` · data `______`
+**Fase 2 fechada** em 2026-08-16, versão `2026081514`, branch `fix/audit-findings-phase-2`.
+Os cinco restantes corrigidos e mutation-testados (o 2.6 saiu na fase 1). O M13 foi resolvido
+com um resolvedor de pertença partilhado em vez de filtrar o menu, para que uma coorte oculta
+continue a ser um alvo legítimo — visibilidade governa quem pode *escolher* a coorte, o que a
+fase 1 já garante na gravação, e não quem está *dentro* dela.
 
 ---
 

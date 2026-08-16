@@ -166,6 +166,15 @@ define([], function() {
             });
         if (roles.length) {
             criteria.filter_role = roles;
+            /*
+             * Sent only alongside the roles it scopes, which is the same condition estimator's
+             * normalise() applies before keeping it. Omitting it made the server read 0 — "any
+             * context" — so a rule scoped to one course was estimated across the whole site, and
+             * where the role was the site's default the estimator took its `1 = 1` shortcut and
+             * reported the entire user base. The runtime honoured the stored context all along, so
+             * the panel and the notice disagreed by orders of magnitude. Audit finding M3.
+             */
+            criteria.filter_role_context = parseInt(readSingleValue('filter_role_context'), 10) || 0;
         }
 
         var reqcourse = parseInt(readSingleValue('reqcourse'), 10);

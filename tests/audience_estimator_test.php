@@ -657,9 +657,10 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * Record a user's proficiency for a competency in a course.
      *
-     * Writes the row helper::get_user_competency_proficiency() reads through
-     * core_competency\api::get_user_competency_in_course(), which is the state the notice rule and
-     * the estimate both ask about.
+     * Writes the {competency_usercompcourse} row that helper::get_user_competency_proficiency()
+     * reads directly, which is the state the notice rule and the estimate both ask about. It used
+     * to be read through core_competency\api::get_user_competency_in_course(), which creates the
+     * relation when it is missing — a write from a read-typed web service, audit finding M16.
      *
      * The grade is not decoration. user_competency_course::validate_proficiency() refuses a
      * proficiency without one and validate_grade() refuses a grade outside the competency's scale,

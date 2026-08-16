@@ -100,17 +100,33 @@ class noticelink extends persistent {
      * @return persistent
      */
     public static function create_new_link(\stdClass $data) {
+        /*
+         * A link is identified by where it goes, not by what it is called. Identity used to include
+         * the anchor text, so fixing a typo in a label — the destination untouched — minted a new id
+         * and retired the old one, and with it every recorded click: the count in each report
+         * dropped to zero and the history rows were left dangling behind an id nothing joined to any
+         * more. Audit finding M14.
+         *
+         * The consequence worth knowing: two anchors in one notice pointing at the same URL now
+         * share one tracked link, so their clicks are counted together. That is the better answer to
+         * "how many people went to this page", and it is the price of a label being editable.
+         */
         $linkpersistent = self::get_record([
             'noticeid' => $data->noticeid,
-            'text' => $data->text,
-            'link' => $data->link]);
+            'link' => $data->link,
+        ]);
+
         if (empty($linkpersistent)) {
-            // Create new link.
             $persistent = new noticelink(0, $data);
             return $persistent->create();
-        } else {
-            // Reuse old link.
-            return $linkpersistent;
         }
+
+        // Same destination under a new label: keep the id, and the history hanging off it.
+        if ($linkpersistent->get('text') !== $data->text) {
+            $linkpersistent->set('text', $data->text);
+            $linkpersistent->update();
+        }
+
+        return $linkpersistent;
     }
 }

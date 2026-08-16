@@ -289,9 +289,17 @@ class helper {
             $node->setAttribute('target', '_blank');
         }
 
-        // Clean up unused links.
+        /*
+         * Clean up links the notice no longer carries — history first. Deleting the link alone left
+         * its history rows behind, and every consumer inner-joins them back to the links table, so
+         * they became invisible to every report and impossible to clear by hand. delete_notice()
+         * has cleaned both up all along; this is the same pair on the edit path. Audit finding M14.
+         */
         $unusedlinks = array_diff_key($currentlinks, $newlinks);
-        noticelink::delete_links(array_keys($unusedlinks));
+        if (!empty($unusedlinks)) {
+            linkhistory::delete_link_history(array_keys($unusedlinks));
+            noticelink::delete_links(array_keys($unusedlinks));
+        }
 
         // New content of the notice (included link ids).
         $newcontent = $dom->saveHTML();
@@ -447,6 +455,29 @@ class helper {
         $allowed = array_map('intval', array_keys(self::built_cohorts_options()));
 
         return array_values(array_intersect(array_map('intval', $cohortids), $allowed));
+    }
+
+    /**
+     * The ids of every cohort a user belongs to, visible or not.
+     *
+     * One resolver, so that the form, the estimator and the runtime agree about what membership
+     * means. They did not: the runtime used cohort_get_user_cohorts(), whose SQL demands
+     * `c.visible = 1`, while the selector offered hidden cohorts as targets and the estimator
+     * counted `{cohort_members}` with no visibility predicate at all. An author picked a hidden
+     * cohort — the ordinary way to model a staff-only audience — the panel confirmed a number, and
+     * not one person was ever shown the notice, with nothing logged anywhere. Audit finding M13.
+     *
+     * Visibility is settled here rather than at display time on purpose: it governs who may *target*
+     * a cohort, which helper::allowed_cohorts() enforces when the notice is saved. Whether someone
+     * is *in* one is not a question about who is looking.
+     *
+     * @param int $userid The user whose memberships are wanted.
+     * @return array Cohort ids as ints.
+     */
+    public static function user_cohort_ids(int $userid): array {
+        global $DB;
+
+        return array_map('intval', $DB->get_fieldset_select('cohort_members', 'cohortid', 'userid = ?', [$userid]));
     }
 
     /**
@@ -660,18 +691,7 @@ class helper {
             if (!isset($notices[$noticeid])) {
                 continue;
             }
-            $notice = $notices[$noticeid];
-            $dissmised = $data['action'] == acknowledgement::ACTION_DISMISSED;
-            if (
-                // Notice has been updated/reset/enabled.
-                $data['timeviewed'] < $notice->get('timemodified')
-                // The reset interval has been past.
-                || (($notice->get('resetinterval') > 0) && ($data['timeviewed'] + $notice->get('resetinterval') < time()))
-                // The previous action is 'dismiss', so still require acknowledgement.
-                || ($dissmised && $notice->get('reqack') == true)
-                // The action is 'dismiss' and forced to be logged out, still show it (admins are special).
-                || ($dissmised && $notice->get('forcelogout') == true) && !is_siteadmin()
-            ) {
+            if (self::must_reshow($notices[$noticeid], (int) $data['timeviewed'], $data['action'])) {
                 unset($USER->viewednotices[$noticeid]);
             }
         }
@@ -719,10 +739,10 @@ class helper {
 
             // Filter out notices by cohorts.
             if ($checkcohorts) {
-                $usercohorts = cohort_get_user_cohorts($USER->id);
+                $usercohorts = self::user_cohort_ids((int) $USER->id);
                 foreach ($notices as $notice) {
-                    $cohorts = $notice->get('cohorts');
-                    if (!empty($cohorts) && !array_intersect($cohorts, array_keys($usercohorts))) {
+                    $cohorts = array_map('intval', $notice->get('cohorts'));
+                    if (!empty($cohorts) && !array_intersect($cohorts, $usercohorts)) {
                         unset($usernotices[$notice->get('id')]);
                     }
                 }
@@ -831,10 +851,9 @@ class helper {
             return false;
         }
 
-        $cohorts = $notice->get('cohorts');
+        $cohorts = array_map('intval', $notice->get('cohorts'));
         if (!empty($cohorts)) {
-            $usercohorts = cohort_get_user_cohorts($USER->id);
-            if (!array_intersect($cohorts, array_keys($usercohorts))) {
+            if (!array_intersect($cohorts, self::user_cohort_ids((int) $USER->id))) {
                 return false;
             }
         }
@@ -1176,19 +1195,50 @@ class helper {
         }
 
         $latestview = $latestview->to_record();
-        $notice = $notice->to_record();
-        if (
-            // Notice has been updated/reset/enabled.
-            $latestview->timemodified < $notice->timemodified
-            // The reset interval has been past.
-            || (($notice->resetinterval > 0) && ($latestview->timemodified + $notice->resetinterval < time()))
-            // The previous action is 'dismiss', so still require acknowledgement.
-            || ($latestview->action == acknowledgement::ACTION_DISMISSED && $notice->reqack == true)
-        ) {
+        if (self::must_reshow($notice, (int) $latestview->timemodified, $latestview->action)) {
             return false;
         }
-        $USER->viewednotices[$notice->id] = ['timeviewed' => $latestview->timemodified, 'action' => $latestview->action];
+
+        $USER->viewednotices[$notice->get('id')] = [
+            'timeviewed' => $latestview->timemodified,
+            'action' => $latestview->action,
+        ];
+
         return true;
+    }
+
+    /**
+     * Whether a notice this user has already seen has to be put in front of them again.
+     *
+     * One predicate, two callers. It used to be two copies of the same four conditions, except that
+     * the copy here only ever had three: the display path re-showed a dismissed notice whose author
+     * had asked for a forced logout, and the acknowledge path did not. Audit finding M12, and the
+     * shape of it is why it is written once now — the two lists drifted silently, and a reader
+     * comparing them had to notice an absence rather than a difference.
+     *
+     * What that cost: with reqack = 0 and forcelogout = 1, a non-admin who dismissed the notice got
+     * it back on every page load, and Accept then did nothing at all — no acknowledgement row, no
+     * event, no logout — because this method reported the notice as already acknowledged and
+     * acknowledge_notice() returned before doing any of it. Close was the only control with an
+     * effect, and its effect was to log them out again.
+     *
+     * @param awareness $notice The notice being judged.
+     * @param int $timeviewed When the user last acted on it.
+     * @param string $action What they did — see \local_awareness\persistent\acknowledgement.
+     * @return bool True when the notice must be shown again.
+     */
+    private static function must_reshow(awareness $notice, int $timeviewed, string $action): bool {
+        $dismissed = $action == acknowledgement::ACTION_DISMISSED;
+        $resetinterval = (int) $notice->get('resetinterval');
+
+        // The notice has been updated, reset or re-enabled since they saw it.
+        return $timeviewed < (int) $notice->get('timemodified')
+            // Its repeat interval has elapsed.
+            || ($resetinterval > 0 && $timeviewed + $resetinterval < time())
+            // They dismissed it, and it asks for an acknowledgement they have not given.
+            || ($dismissed && (int) $notice->get('reqack') === 1)
+            // They dismissed it, and it forces a logout — which admins are spared.
+            || ($dismissed && (int) $notice->get('forcelogout') === 1 && !is_siteadmin());
     }
 
     /**
@@ -1453,6 +1503,8 @@ class helper {
      * @return bool
      */
     private static function get_user_competency_proficiency(int $userid, int $courseid, int $competencyid): bool {
+        global $DB;
+
         static $cache = [];
 
         $cachekey = $userid . ':' . $courseid . ':' . $competencyid;
@@ -1460,12 +1512,23 @@ class helper {
             return $cache[$cachekey];
         }
 
-        try {
-            $usercompetency = \core_competency\api::get_user_competency_in_course($courseid, $userid, $competencyid);
-            $cache[$cachekey] = !empty($usercompetency) && !empty($usercompetency->get('proficiency'));
-        } catch (\Exception $e) {
-            $cache[$cachekey] = false;
-        }
+        /*
+         * Read the row; do not ask core's API for it. get_user_competency_in_course() is not a pure
+         * read — it creates the user_competency_course relation when none exists — and this runs
+         * from check_filters(), reached from local_awareness_getnotices, which db/services.php
+         * declares 'type' => 'read'. So merely loading a course page covered by a
+         * competency-filtered notice materialised competency state for a user nobody had assessed,
+         * and core's competency reports began listing them. Audit finding M16.
+         *
+         * A missing row means not proficient, which is what the absent relation meant anyway.
+         */
+        $proficiency = $DB->get_field('competency_usercompcourse', 'proficiency', [
+            'userid' => $userid,
+            'courseid' => $courseid,
+            'competencyid' => $competencyid,
+        ]);
+
+        $cache[$cachekey] = !empty($proficiency);
 
         return $cache[$cachekey];
     }
