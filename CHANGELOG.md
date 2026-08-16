@@ -6,6 +6,33 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the site switch now reaches the web services (version 2026081607, audit WS-08)
+
+`local_awareness/enabled` is the only way an administrator can stop this plugin talking to users,
+and it reached the footer hook alone. With it off the JavaScript was never injected — but all four
+reader-facing web services stayed answerable to a direct POST, so on a site whose administrator had
+switched the plugin off a notice could still be read, dismissed, acknowledged and click-tracked.
+
+`helper::is_delivery_enabled()` is the shared reader, and it is called at the four entry points in
+`classes/external.php` rather than inside the delivery helpers. The switch is off by default, so a
+plain truthy read is correct here — this is not one of the default-ON checkboxes where only a
+stored `'0'` counts as off. A disabled plugin returns an empty list and silently records nothing,
+rather than raising: it should look like a plugin with nothing to say.
+
+**Where the check goes was the whole problem, and getting it wrong first is what showed why.** The
+obvious placement — inside `retrieve_user_notices()`, `is_notice_available_to_user()` and
+`track_link()` — broke **34 tests**, because those helpers answer "what would this user be shown",
+a question worth being able to ask with the switch off. The lesson was not that 34 tests needed
+patching; mass-editing tests to restore green is exactly how this repository has produced tests
+that pass while exercising nothing. It was that the switch belongs at each **entry point**, which
+is where `hook_callbacks::should_load_on()` has always checked it. Moved there, the blast radius
+fell to 14 tests, all in the one file that tests that boundary.
+
+Those 14 now state the precondition once, in `setUp()`, with the reason written down — and
+`test_the_site_switch_gates_every_delivery_web_service()` asserts the gate separately, so switching
+delivery on for the rest of the file cannot hide the behaviour it was turned on to allow.
+Mutation-tested: neutralising any one of the four gates kills a test.
+
 ### Fixed — three functional defects, and the repo files that were never there (version 2026081606)
 
 Fourteen more findings closed. Five of those were already fixed by earlier phases and had only
