@@ -8,7 +8,8 @@
     Context variables required:
     * audience.autotrigger (bool) — true when the site is small enough to estimate as you edit
     * audience.auto (int) — the same decision as 1 or 0, read by the JS from data-auto
-    * audience.summary (array of {labelkey, value})
+    * audience.summary (array of {key, label, value}) — key feeds data-summary-key, which the JS
+      writes the recomputed count into; label is the already-resolved string
     * audience.hascount (bool) — whether a stored count exists to render
     * audience.initialcountformatted (string) — that count, formatted
     * audience.initialstate (string) — idle|cached|...
@@ -22,7 +23,7 @@
         "audience": {
             "autotrigger": true,
             "auto": 1,
-            "summary": [{"labelkey": "audience:summary:cohorts", "value": 0}],
+            "summary": [{"key": "cohorts", "label": "Cohorts", "value": 0}],
             "hascount": false,
             "initialcountformatted": "—",
             "initialstate": "idle",

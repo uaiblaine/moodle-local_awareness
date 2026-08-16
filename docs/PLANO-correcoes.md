@@ -32,6 +32,12 @@ ainda está aberto". São 191 achados; os PRs #2 a #21 corrigiram um subconjunto
 reconciliação do resto contra o código**. Fechar as fases 1 e 2 abaixo não fecha a auditoria — fecha
 os sete achados que esta varredura reencontrou. Os outros 184 continuam sem estado conhecido.
 
+> **Resolvido em 2026-08-16.** A reconciliação passou a existir:
+> [`RECONCILIACAO-2026-08.md`](RECONCILIACAO-2026-08.md) dá estado aos 198 achados (os 191 mais os 7
+> do crítico de completude) contra a `main` em `9e3bc72`. Os dez bloqueadores estão todos fechados;
+> 87 encerrados, 111 por decidir. **É esse o documento a ler para saber o que está aberto** — este
+> plano está fechado nos seus 27 itens e o `AUDIT-2026-08.md` continua a ser só o retrato de agosto.
+
 ---
 
 ## Fase 1 — Segurança
@@ -300,6 +306,18 @@ preview — aplicar ou remover?). O resto é remoção pura.
   evento estão completas e têm strings mantidas, e aparecem na lista de eventos da administração —
   onde um admin pode construir uma regra que nunca dispara.
 
+  > **Este item estava marcado como feito e não estava.** A reconciliação reencontrou-o como
+  > X1-01 e o `git log` das duas classes de evento mostra que nada lhes tocou desde `da8e710`, uma
+  > normalização de cabeçalhos; o `CHANGELOG.md` nunca as menciona. Corrigido de verdade na fase 5
+  > (2026-08-16), e agora pinado por `tests/event/events_test.php`, onde um caso afirma que os três
+  > verbos de atualização são distinguíveis entre si — três testes a afirmar `awareness_updated`
+  > cada um teriam passado durante todo o período em que o defeito existiu.
+  >
+  > **A lição é sobre o processo, não sobre o defeito.** Este plano foi escrito precisamente porque
+  > o repositório já tinha produzido duas vezes a ilusão de um defeito corrigido, e produziu-a uma
+  > terceira dentro de si mesmo. Marcar `[x]` não é evidência; um teste que morre quando a correção
+  > é revertida é.
+
 - [x] **4.6 · páginas de relatório antigas, inalcançáveis e com a capacidade errada** —
   `report/acknowledged_report.php:33` e `report/dismissed_report.php` · conf. **~** · médio
 
@@ -347,9 +365,17 @@ apagadas no 4.6, portanto o item deixou de ter objeto.
 - `linkhistory::count_clicked_links()` ficou sem chamador de produção. O report-builder cobre o
   histórico de cliques com linhas individuais, mas o método guarda os testes escritos para o
   achado M17 da auditoria — decidir apagar ou manter é escolha, não limpeza.
-- `rule_describer::describe()` trata apenas `pathmatch`, categoria, curso, formato e tema. Agora
+- ~~`rule_describer::describe()` trata apenas `pathmatch`, categoria, curso, formato e tema. Agora
   que a fase 2 tornou o `filter_role_context` um critério real, o painel de público não o sabe
-  nomear. Achado pequeno, encontrado ao caçar strings órfãs.
+  nomear.~~ **Retirado em 2026-08-16: não se sustenta.** O `filter_role_context` nunca chega ao
+  `describe()` — é um *modificador* do `filter_role` (`estimator.php:239`) e não consta de
+  `AUDIENCE_FIELDS` nem de `CONTEXT_FIELDS`, portanto nunca é passado como chave de regra. E as cinco
+  chaves que o `describe()` trata são exatamente as cinco strings `audience:rule:*` que carregam um
+  `{$a}`; o `ruleLabel()` descarta o `display` quando o rótulo não tem marcador
+  (`audience_estimator.js:252`). A função está alinhada com os seus consumidores e apagar a string
+  órfã foi certo. O que resta é decisão de produto, não defeito: o chip do papel diz "Has selected
+  roles" tanto para uma regra de site inteiro como para uma limitada a um curso, e a fase 2 fez desse
+  escopo algo que muda a contagem.
 
 ---
 

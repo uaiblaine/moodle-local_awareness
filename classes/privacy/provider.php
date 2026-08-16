@@ -150,18 +150,20 @@ class provider implements
      * @param \core_privacy\local\request\approved_contextlist $contextlist Context list.
      */
     public static function delete_data_for_user(approved_contextlist $contextlist) {
-        $contexts = $contextlist->get_contexts();
-        if (count($contexts) == 0) {
-            return;
-        }
-        $context = reset($contexts);
+        $userid = (int) $contextlist->get_user()->id;
 
-        if ($context->contextlevel !== CONTEXT_USER) {
-            return;
+        /*
+         * Every approved context, not just the first, and the userid comes from the contextlist
+         * rather than from the context. Taking it from the context happens to agree while the
+         * list holds one user context, and stops agreeing the moment it does not — at which
+         * point the plugin would erase whoever the first context happened to name.
+         */
+        foreach ($contextlist->get_contexts() as $context) {
+            if ($context->contextlevel === CONTEXT_USER && (int) $context->instanceid === $userid) {
+                self::delete_all_data_for_userid($userid);
+                return;
+            }
         }
-        $userid = $context->instanceid;
-
-        self::delete_all_data_for_userid($userid);
     }
 
     /**
@@ -209,9 +211,20 @@ class provider implements
     public static function delete_data_for_users(approved_userlist $userlist) {
         $context = $userlist->get_context();
 
-        if ($context instanceof \context_user) {
-            $userid = $context->instanceid;
-            self::delete_all_data_for_userid($userid);
+        if (!($context instanceof \context_user)) {
+            return;
+        }
+
+        /*
+         * Driven by the APPROVED ids, not by the context's instanceid. The two agree whenever the
+         * approver said yes, which is why the shortcut survives review — but when the approver
+         * withheld a user the list arrives empty and the shortcut erases them anyway, turning a
+         * refusal into a deletion. The context still bounds what may be touched.
+         */
+        foreach ($userlist->get_userids() as $userid) {
+            if ((int) $userid === (int) $context->instanceid) {
+                self::delete_all_data_for_userid((int) $userid);
+            }
         }
     }
 

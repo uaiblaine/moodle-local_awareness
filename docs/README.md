@@ -3,6 +3,20 @@
 This directory is `export-ignore`d in `.gitattributes`: it is versioned for
 development and review, and never ships in the release zip.
 
+## Audit and its reconciliation
+
+[`AUDIT-2026-08.md`](AUDIT-2026-08.md) is the August 2026 audit of commit `896dfc2` — 191 numbered
+findings plus 7 from a completeness critic. Its own header warns that it is the snapshot of the
+starting point, **not** a list of what is still open.
+
+[`RECONCILIACAO-2026-08.md`](RECONCILIACAO-2026-08.md) is that missing list: a verdict per finding
+against `main` at `9e3bc72`, with current-tree evidence for each. All ten blockers are closed;
+87 of the 198 are settled, 111 still want a decision. Read the reconciliation, not the audit, to
+know what is open.
+
+[`PLANO-correcoes.md`](PLANO-correcoes.md) is the four-phase work list that closed 27 items across
+PRs #26–#29; it is finished.
+
 ## Approved UI mockups
 
 The HTML files under [`mockups/`](mockups/) are the self-contained prototypes

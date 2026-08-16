@@ -721,7 +721,18 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @return string
      */
     protected function col_title(awareness $awareness): string {
-        $title = $awareness->get('title');
+        /*
+         * format_string(), not the raw value: `title` is PARAM_RAW_TRIMMED all the way from the
+         * form to the persistent, and html_writer::tag() does not escape its contents — so the
+         * stored string reached this page as markup. It is also the same treatment the modal now
+         * gives the title, which is the point: a multilang title that resolves in the modal and
+         * shows its markup here is worse than either behaviour alone.
+         */
+        $title = format_string(
+            $awareness->get('title'),
+            true,
+            ['context' => \context_system::instance()]
+        );
 
         /*
          * A notice title has no length cap in the database, so the cell clamps it to two lines in
@@ -733,8 +744,10 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             'title' => $title,
         ]);
 
+        // The path is PARAM_RAW as well, and it is a URL pattern rather than prose, so it wants
+        // escaping rather than filtering.
         $path = trim((string) $awareness->get('pathmatch'));
-        $where = $path !== '' ? $path : get_string('notice:pathmatch:anywhere', 'local_awareness');
+        $where = $path !== '' ? s($path) : get_string('notice:pathmatch:anywhere', 'local_awareness');
         $cell .= html_writer::tag('span', $where, [
             'class' => 'local-awareness-subline',
             'title' => $where,
