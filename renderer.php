@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-use local_awareness\table\dismissed_notice;
-use local_awareness\table\acknowledged_notice;
 use local_awareness\table\all_notices;
 use local_awareness\output\editor_page;
 use local_awareness\output\manage_page;
@@ -29,32 +27,6 @@ use local_awareness\output\manage_page;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class local_awareness_renderer extends plugin_renderer_base {
-    /**
-     * Render table.
-     * @param dismissed_notice $table dismissed notice table
-     * @return false|string
-     */
-    public function render_dismissed_notice(dismissed_notice $table) {
-        ob_start();
-        $table->out($table->pagesize, false);
-        $o = ob_get_contents();
-        ob_end_clean();
-        return $o;
-    }
-
-    /**
-     * Render table.
-     * @param acknowledged_notice $table acknowledged notice table
-     * @return false|string
-     */
-    public function render_acknowledged_notice(acknowledged_notice $table) {
-        ob_start();
-        $table->out($table->pagesize, false);
-        $o = ob_get_contents();
-        ob_end_clean();
-        return $o;
-    }
-
     /**
      * Render table.
      * @param all_notices $table all notice table

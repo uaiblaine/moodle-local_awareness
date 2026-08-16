@@ -32,9 +32,6 @@ $definitions = [
     'notice_view' => [
         'mode' => cache_store::MODE_APPLICATION,
     ],
-    'user_notices' => [
-        'mode' => cache_store::MODE_SESSION,
-    ],
     // The site's user count, which decides whether an audience estimate may run interactively.
     // Short-lived rather than invalidated: no event marks "the site got big", and being an hour
     // stale only shifts the estimate between two paths that both produce the same number.

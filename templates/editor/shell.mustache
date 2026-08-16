@@ -23,7 +23,9 @@
 
     Context variables required:
     * pagetitle (string), subtitle (string)
-    * statuslabel (string), statusislive (bool)
+    * statuslabel (string), statusislive (bool), statusisblocked (bool)
+    * savedlabel (string) — when the notice was last saved, empty when creating
+    * unsavedlabel (string) — what the save-state line says once the form is touched
     * requirements (string) — a warning to show above the form, or empty
     * formhtml (raw) — the rendered moodleform, tag and all
     * helptitle (string), helpbody (raw — may include <b>)
@@ -36,6 +38,9 @@
         "subtitle": "Crie um modal contextual.",
         "statuslabel": "Rascunho",
         "statusislive": false,
+        "statusisblocked": false,
+        "savedlabel": "Salvo em 16/08/26, 09:14",
+        "unsavedlabel": "Alterações não salvas",
         "requirements": "",
         "formhtml": "<form id=\"mform1\"><input type=\"text\"></form>",
         "helptitle": "Como funciona",
@@ -54,10 +59,14 @@
                     <p class="la-pagehead-sub">{{subtitle}}</p>
                 </div>
                 <div class="la-pagehead-meta">
-                    <span class="la-status-badge {{#statusislive}}la-status-badge--live{{/statusislive}}">
+                    <span class="la-status-badge {{#statusislive}}la-status-badge--live{{/statusislive}}{{#statusisblocked}}la-status-badge--blocked{{/statusisblocked}}">
                         <span class="la-status-badge-ping" aria-hidden="true"></span>
                         {{statuslabel}}
                     </span>
+                    {{#savedlabel}}
+                        <span class="la-pagehead-autosaved" data-region="la-savestate"
+                              data-label-unsaved="{{unsavedlabel}}">{{savedlabel}}</span>
+                    {{/savedlabel}}
                     <button type="button" class="la-btn la-btn--soft" data-action="preview">
                         <i class="fa fa-eye" aria-hidden="true"></i> {{#str}}editor:action:preview, local_awareness{{/str}}
                     </button>

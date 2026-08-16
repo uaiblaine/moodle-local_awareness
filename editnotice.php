@@ -152,26 +152,21 @@ if ($formdata = $mform->get_data()) {
     redirect($managenoticepage);
 }
 
-// Capture the moodleform's HTML so the new editor shell can render it inside
-// a hidden container; the JS module then walks the form-rows and moves them
-// into the cards. Validation, file API, autocompletes and CSRF stay intact.
-$rendermoodleform = function (notice_form $mform): array {
+// Capture the moodleform's HTML so the editor shell can render it in place. Validation, the file
+// API, autocompletes and CSRF all stay with the form; the shell only wraps it.
+$rendermoodleform = function (notice_form $mform): string {
     ob_start();
     $mform->display();
-    $html = (string) ob_get_clean();
-    $formid = '';
-    if (preg_match('/<form\b[^>]*\bid="([^"]+)"/', $html, $m)) {
-        $formid = $m[1];
-    }
-    return [$html, $formid];
+
+    return (string) ob_get_clean();
 };
 
 // Display form for new notice.
 if ($noticeid == 0 && $action == 'create') {
-    [$formhtml, $formid] = $rendermoodleform($mform);
+    $formhtml = $rendermoodleform($mform);
     $output = $PAGE->get_renderer('local_awareness');
     echo $OUTPUT->header();
-    echo $output->render_editor_page(new editor_page(null, $formhtml, $formid, $managenoticepage));
+    echo $output->render_editor_page(new editor_page(null, $formhtml));
     echo $OUTPUT->footer();
     die;
 }
@@ -250,10 +245,10 @@ switch ($action) {
         break;
     case 'edit':
         if (get_config('local_awareness', 'allow_update')) {
-            [$formhtml, $formid] = $rendermoodleform($mform);
+            $formhtml = $rendermoodleform($mform);
             $output = $PAGE->get_renderer('local_awareness');
             echo $OUTPUT->header();
-            echo $output->render_editor_page(new editor_page($awareness, $formhtml, $formid, $managenoticepage));
+            echo $output->render_editor_page(new editor_page($awareness, $formhtml));
             echo $OUTPUT->footer();
         } else {
             redirect($managenoticepage, get_string('notification:noupdateallowed', 'local_awareness'));

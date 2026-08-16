@@ -173,8 +173,6 @@ class awareness extends persistent {
      */
     protected function purge_caches() {
         self::get_enabled_notices_cache()->purge();
-        // Also purge the session-scoped user notices cache.
-        \cache::make('local_awareness', 'user_notices')->purge();
     }
 
     /**
