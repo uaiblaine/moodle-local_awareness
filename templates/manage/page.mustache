@@ -47,6 +47,7 @@
         ],
         "filters": {
             "namelabel": "Search by name",
+            "namevalue": "manutencao",
             "nameplaceholder": "Search by name…",
             "statuslabel": "Status",
             "statusoptions": [{"value": "", "label": "All", "selected": true}],
@@ -78,6 +79,7 @@
             <div class="local-awareness-filter local-awareness-filter--grow">
                 <label for="la-filter-name">{{filters.namelabel}}</label>
                 <input type="search" id="la-filter-name" class="form-control"
+                       value="{{filters.namevalue}}"
                        placeholder="{{filters.nameplaceholder}}" autocomplete="off"
                        data-filter="name">
             </div>

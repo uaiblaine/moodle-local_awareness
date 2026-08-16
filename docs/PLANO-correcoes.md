@@ -22,7 +22,8 @@ A coluna **conf.** diz como cada item chegou aqui, e é a diferença entre ler e
   corrigir.** Um verificador já errou nesta mesma sessão: refutou e confirmou o mesmo defeito do
   anel de foco em dois vereditos contraditórios, e só a medição no navegador resolveu.
 
-**Progresso:** fases 1 e 2 fechadas — 10 de 27 itens. Fases 3 e 4 por começar.
+**Progresso:** fases 1 a 3 fechadas — 17 de 27 itens. Falta a fase 4, mais o 3.6 que ficou
+sequenciado atrás do 4.6.
 
 ## Sobre o `docs/AUDIT-2026-08.md`
 
@@ -157,7 +158,7 @@ fase 1 já garante na gravação, e não quem está *dentro* dela.
 
 ## Fase 3 — Correção encontrada nesta varredura
 
-- [ ] **3.1 · o filtro de nome não volta para o campo, e o primeiro clique apaga-o** —
+- [x] **3.1 · o filtro de nome não volta para o campo, e o primeiro clique apaga-o** —
   `templates/manage/page.mustache:80` · conf. **~** · pequeno
 
   `managenotice.php:44` aceita `name` por URL de propósito ("uma lista filtrada pode ser ligada e
@@ -171,7 +172,7 @@ fase 1 já garante na gravação, e não quem está *dentro* dela.
   versão. *Verificação:* cenário Behat que abre a URL com o parâmetro, afirma o valor do campo, mexe
   no Status e afirma que a contagem se mantém.
 
-- [ ] **3.2 · registar uma estimativa re-exibe o aviso a toda a gente** —
+- [x] **3.2 · registar uma estimativa re-exibe o aviso a toda a gente** —
   `classes/audience/notice_audience.php:204` · conf. **~** · pequeno
 
   `record()` grava com `$notice->update()`, e `core\persistent::update()` põe `timemodified = time()`
@@ -180,21 +181,21 @@ fase 1 já garante na gravação, e não quem está *dentro* dela.
   público" re-exibe o aviso a todos os que já o tinham dispensado, e duplica linhas de
   reconhecimento.
 
-- [ ] **3.3 · `attach()` rouba um job de estimativa de outro aviso** —
+- [x] **3.3 · `attach()` rouba um job de estimativa de outro aviso** —
   `classes/audience/notice_audience.php:176` · conf. **~** · pequeno
 
   `refresh()` junta-se a um job em curso pelo hash de critérios e chama `attach()`, que sobrescreve
   o `noticeid` sem verificar se já aponta para outro aviso. Dois avisos site-wide sem filtros
   normalizam para `[]` e têm o mesmo hash. O primeiro aviso fica permanentemente por contar.
 
-- [ ] **3.4 · o filtro de tema nunca casa com temas de curso ou categoria** —
+- [x] **3.4 · o filtro de tema nunca casa com temas de curso ou categoria** —
   `classes/helper.php:1588` · conf. **~** · pequeno
 
   `check_filters()` lê `$PAGE->theme->name` dentro do pedido AJAX do web service, onde `$PAGE`
   nunca recebeu `set_course()` — logo `resolve_theme()` salta os ramos de curso e categoria e
   devolve o tema do site. Um aviso filtrado por um tema de curso não aparece nunca.
 
-- [ ] **3.5 · apagar um aviso nunca apaga os ficheiros enviados** — `classes/helper.php:360` ·
+- [x] **3.5 · apagar um aviso nunca apaga os ficheiros enviados** — `classes/helper.php:360` ·
   conf. **~** · pequeno
 
   `delete_notice()` com `cleanup_deleted_notice` ligado remove reconhecimentos, visualizações,
@@ -202,7 +203,7 @@ fase 1 já garante na gravação, e não quem está *dentro* dela.
   ficheiros ficam em `moodledata` e em `{files}` para sempre — e, como o gate do `pluginfile` recusa
   um aviso que já não existe, ficam inalcançáveis e por apagar ao mesmo tempo.
 
-- [ ] **3.6 · "Remover selecionados" não faz nada** — `classes/report_filter.php:113` · conf. **~** ·
+- [ ] **3.6 (adiado para depois do 4.6) · "Remover selecionados" não faz nada** — `classes/report_filter.php:113` · conf. **~** ·
   trivial
 
   O formulário desenha `removeselected` e `removeall` mais uma checkbox por filtro ativo;
@@ -211,7 +212,7 @@ fase 1 já garante na gravação, e não quem está *dentro* dela.
   *Nota:* estes filtros pertencem às páginas de relatório antigas — ver 4.6. Se elas saírem, este
   item sai junto.
 
-- [ ] **3.7 · a lista re-materializa a tabela de coortes por coorte por linha** —
+- [x] **3.7 · a lista re-materializa a tabela de coortes por coorte por linha** —
   `classes/helper.php:1045` · conf. **~** · pequeno
 
   `get_cohort_name()` chama `built_cohorts_options()` a cada invocação, sem memoização, e essa faz
@@ -219,7 +220,7 @@ fase 1 já garante na gravação, e não quem está *dentro* dela.
   `cohort_get_invisible_contexts()`. Uma página de 25 avisos com 3 coortes cada faz 75 leituras
   completas da tabela. `get_course_name()` tem a mesma forma.
 
-- [ ] **3.8 · `col_audience` faz a query por linha que o seu próprio comentário diz evitar** —
+- [x] **3.8 · `col_audience` faz a query por linha que o seu próprio comentário diz evitar** —
   `classes/table/all_notices.php:615` · conf. **~** · pequeno
 
   O comentário diz que a contagem é lida do aviso "em vez de resolver o último job por linha, o que
@@ -227,7 +228,21 @@ fase 1 já garante na gravação, e não quem está *dentro* dela.
   `notice_audience::state_of()`, que corre `audience_job::find_in_flight()` sempre que o hash
   gravado falta ou não bate — o que é o caso de todo aviso anterior ao upgrade `2026081501`.
 
-**Fecho da fase 3:** commit `______` · PR `#____` · data `______`
+**Fase 3 fechada** em 2026-08-16, versão `2026081515`, branch `fix/correctness-phase-3`.
+Sete dos oito corrigidos e mutation-testados. Os oito foram reconfirmados contra o código
+depois das fases 1 e 2 antes de se mexer em nada, e continuavam todos reais.
+
+**3.6 adiado, com razão.** Todo o seu alcance está dentro das duas páginas de relatório antigas
+que o item 4.6 propõe apagar. Corrigir um botão numa página que pode não sobreviver à fase
+seguinte é trabalho de vida curta — decidir o 4.6 primeiro torna este item ou trivial ou vazio.
+
+**Uma correção do próprio plano:** o 3.7 dizia que o `get_course_name()` tem a mesma forma que o
+`get_cohort_name()`. Não tem — não tem chamador nenhum no plugin, é código morto, e a coluna que
+o usava já não existe. Isso é um item da fase 4, não deste. E a receita da auditoria (memo
+`static` dentro do `built_cohorts_options()`) está errada: o `phpunit_util::reset_all_data()`
+repõe uma lista fixa de caches do core e não tem gancho para os de plugin, portanto um estático
+sobrevive ao `resetAfterTest()` e vaza entre métodos de teste — além de partir dois testes que já
+existem.
 
 ---
 

@@ -403,6 +403,18 @@ class helper {
         $event = \local_awareness\event\awareness_deleted::create($params);
         $event->trigger();
 
+        /*
+         * The files go with the notice, not with the optional cleanup. Once the row is gone the
+         * pluginfile gate refuses to serve them — it resolves the notice first — so every image and
+         * background ever uploaded to a deleted notice was unreachable and undeletable at the same
+         * time, sitting in moodledata and {files} for the life of the site. Nothing else can ever
+         * claim them: the item id IS the notice id, and that id is now free to be reused.
+         */
+        $fs = get_file_storage();
+        foreach (['content', 'bgimage'] as $filearea) {
+            $fs->delete_area_files(\context_system::instance()->id, 'local_awareness', $filearea, $oldid);
+        }
+
         if (!get_config('local_awareness', 'cleanup_deleted_notice')) {
             return;
         }
@@ -1109,14 +1121,17 @@ class helper {
      * Get audience name from the audience options.
      *
      * @param int $cohortid Cohort id
+     * @param array|null $options A cohort option list already in hand, to save resolving it again.
+     *                            Callers rendering many rows pass one; everyone else omits it and
+     *                            gets the ordinary lookup.
      * @return string
      */
-    public static function get_cohort_name(int $cohortid): string {
+    public static function get_cohort_name(int $cohortid, ?array $options = null): string {
         if ($cohortid == 0) {
             return get_string('notice:cohort:all', 'local_awareness');
         }
 
-        $cohorts = self::built_cohorts_options();
+        $cohorts = $options ?? self::built_cohorts_options();
 
         // A notice outlives the cohort it targets, and cohort_get_all_cohorts() only returns the
         // cohorts visible to the caller. Either way the id can be absent, and an unguarded lookup
@@ -1239,6 +1254,35 @@ class helper {
             || ($dismissed && (int) $notice->get('reqack') === 1)
             // They dismissed it, and it forces a logout — which admins are spared.
             || ($dismissed && (int) $notice->get('forcelogout') === 1 && !is_siteadmin());
+    }
+
+    /**
+     * The theme the reader is actually looking at, not the one this request happens to run under.
+     *
+     * The rule used to read $PAGE->theme->name from inside the get_notices web service, where $PAGE
+     * never had set_course() called — so moodle_page::resolve_theme() skipped its course and
+     * category branches and always answered the site or user theme. A notice filtered by a course
+     * theme therefore matched nowhere it was meant to.
+     *
+     * A throwaway page that does know the course puts those branches back without reimplementing
+     * $CFG->themeorder or the two override settings. It is built only when a theme filter exists and
+     * an override is switched on, so ordinary sites pay nothing; set_course() has to come before
+     * anything reads ->theme, which is why this is a fresh page rather than a mutation of $PAGE.
+     *
+     * @param \stdClass|null $course The course this request came from, or null when it came from none.
+     * @return string The resolved theme name.
+     */
+    private static function current_theme_name(?\stdClass $course): string {
+        global $CFG, $PAGE;
+
+        if ($course !== null && (!empty($CFG->allowcoursethemes) || !empty($CFG->allowcategorythemes))) {
+            $coursepage = new \moodle_page();
+            $coursepage->set_course($course);
+
+            return (string) $coursepage->theme->name;
+        }
+
+        return (string) $PAGE->theme->name;
     }
 
     /**
@@ -1698,8 +1742,8 @@ class helper {
         // 5. Theme Filter — check globally.
         if (!empty($filters['filter_theme'])) {
             try {
-                $currenttheme = $PAGE->theme->name;
-            } catch (\Exception $e) {
+                $currenttheme = self::current_theme_name($course);
+            } catch (\Throwable $e) {
                 $currenttheme = '';
             }
             if (!empty($currenttheme) && !in_array($currenttheme, $filters['filter_theme'])) {

@@ -6,6 +6,62 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — seven correctness and cost defects (version 2026081515)
+
+Phase 3 of `docs/PLANO-correcoes.md`. Every item was re-confirmed against the code as it stands
+after phases 1 and 2 before anything was changed; all eight were still real, and one was deferred
+rather than fixed.
+
+- **A linked-to filtered list rendered an empty search box, and the first click widened it.**
+  `managenotice.php` accepts the filter values as URL parameters on purpose, and the server honoured
+  them, but the value reached the template as `filters.namevalue` and no markup consumed it. The
+  reader saw a short list with nothing explaining why — then touching Status made the JavaScript
+  read the empty box and push a filterset without the name, silently restoring every row. The
+  "Clear filters" button had the matching half of the bug: it is revealed by the same function that
+  applies filters, which nothing calls until something is touched, so a deep link offered no way out.
+
+- **Recording an audience count re-showed the notice to everyone.** `record()` wrote through the
+  persistent, and `core\persistent::update()` is final and stamps `timemodified` unconditionally —
+  and in this plugin `timemodified` is not metadata, it is the "the author changed this" signal that
+  `must_reshow()` reads and that `reset_notice()` consists entirely of. So clicking Recalculate was
+  a silent Reset, and since nothing dedupes acknowledgements, people could write a second row. The
+  three measurement columns are written around the persistent now, which also stops `usermodified`
+  being falsified by whoever happened to queue a cron job.
+
+- **A second notice stole the first one's queued estimate.** `refresh()` joins an in-flight job by
+  criteria hash, and a hash names a set of filters rather than a notice — two site-wide notices with
+  no filters hash identically. `attach()` then overwrote the job's owner, leaving the notice that
+  raised it waiting for a result that would never be written to it. The fix refuses to *join* rather
+  than refusing to attach: a no-op attach would have moved the defect to the other notice.
+
+- **The theme rule never matched a course or category theme.** It read `$PAGE->theme->name` inside
+  the get_notices web service, where `$PAGE` never had `set_course()` called, so
+  `moodle_page::resolve_theme()` skipped exactly the branches the rule exists for and always
+  answered the site theme.
+
+- **Deleting a notice left its files behind for ever.** Nothing removed the `content` and `bgimage`
+  file areas, so every uploaded image survived in moodledata and `{files}` — and was unreachable at
+  the same time, because the pluginfile gate resolves the notice first and refuses one that is gone.
+  The files go with the notice now, not with the optional cleanup setting.
+
+- **The notice list re-scanned the cohort table once per cohort per row.** Measured: 40 reads for a
+  page of ten notices with two cohorts each, now 2. The memo lives on the table object, which exists
+  for one render — deliberately not the `static` the audit recommends, because
+  `phpunit_util::reset_all_data()` resets a hardcoded list of core caches with no hook for plugin
+  ones, so a plugin static survives `resetAfterTest()` and leaks across test methods.
+
+- **The audience column issued the per-row query its own comment claimed it avoided.**
+  `state_of()` falls through to the jobs table whenever the stored hash does not match, which is
+  every notice predating the audience upgrade. The in-flight hashes are resolved once per page now,
+  in the same place the clash titles already were. Measured: 10 reads, now 2.
+
+**Deferred, with a reason.** "Remove selected" on the report filter is wired to nothing — confirmed,
+but its entire blast radius is inside the two legacy report pages that plan item 4.6 proposes
+deleting. Fixing a button on a page that may not survive the next phase is work with a short life,
+so it moves behind 4.6 rather than being done here.
+
+Seven mutations, seven dead tests, each with the mutated line printed before the run.
+
 ### Fixed — five audit findings that were written down and never fixed (version 2026081514)
 
 Phase 2 of `docs/PLANO-correcoes.md`. Each has carried its own section in `docs/AUDIT-2026-08.md`

@@ -127,6 +127,19 @@ export const init = () => {
         return;
     }
 
+    /*
+     * A page can arrive already filtered — managenotice.php accepts the filter values as URL
+     * parameters so a filtered list can be linked to. The controls render their state server side,
+     * but the way out of the filter did not: the clear button is hidden in the template and was only
+     * ever revealed by applyFilters(), which nothing calls until the reader touches something.
+     *
+     * Deliberately not applyFilters() here. That would push a filterset at the table, and the key
+     * order of the one built here need not match PHP's, so core's string comparison could see a
+     * change and fire a pointless request on every page load. Reading the controls to decide the
+     * button's visibility is the whole job.
+     */
+    updateClearButton(root, readValues(root));
+
     let debounce = null;
     let debouncePending = null;
 

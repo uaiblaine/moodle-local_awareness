@@ -91,9 +91,11 @@ class notice_audience {
      * How the stored count relates to the notice as it stands now.
      *
      * @param awareness $notice
+     * @param array|null $inflight Criteria hashes with a job in flight, already resolved. A caller
+     *                             rendering many notices passes one; omit it for the single lookup.
      * @return string One of the STATE_* constants.
      */
-    public static function state_of(awareness $notice): string {
+    public static function state_of(awareness $notice, ?array $inflight = null): string {
         $stored = $notice->get('audiencehash');
         $current = self::hash_for($notice);
 
@@ -101,7 +103,17 @@ class notice_audience {
             return self::STATE_CURRENT;
         }
 
-        if (audience_job::find_in_flight($current)) {
+        /*
+         * A caller rendering many notices resolves the in-flight set once and passes it; everyone
+         * else omits it and pays the single lookup. Without that, a page of notices whose stored
+         * hash does not match — which is every notice predating the audience upgrade — issued one
+         * query per row for this one branch.
+         */
+        $pending = ($inflight === null)
+            ? (bool) audience_job::find_in_flight($current)
+            : isset($inflight[$current]);
+
+        if ($pending) {
             return self::STATE_PENDING;
         }
 
@@ -130,9 +142,28 @@ class notice_audience {
         }
 
         if (!$force && ($existing = audience_job::find_in_flight($hash))) {
-            // Someone is already computing exactly this; joining costs nothing and queues nothing.
-            self::attach($existing, (int) $notice->get('id'));
-            return self::STATE_PENDING;
+            /*
+             * Joinable only while nobody else is waiting on its answer. The hash names a set of
+             * filters, not a notice — two site-wide notices with no filters normalise identically
+             * and hash the same — and a job carries its answer back to exactly one notice. Joining
+             * regardless meant attach() overwrote the job's owner, so the notice that raised it was
+             * left waiting for a result that would never be written, permanently uncounted.
+             *
+             * A job the editor raised about an unsaved form has no notice yet and is free to claim,
+             * which is what attach() exists for; noticeid is nullable, so (int) null === 0 is that
+             * case. attach()'s own guard is left alone: it becomes an invariant rather than the only
+             * line of defence.
+             *
+             * Refusing to JOIN rather than refusing to attach is the point. A no-op attach() would
+             * leave this returning STATE_PENDING for a job that will never write here either, which
+             * moves the defect from one notice to the other instead of removing it.
+             */
+            $owner = (int) $existing->get('noticeid');
+            if ($owner === 0 || $owner === (int) $notice->get('id')) {
+                // Someone is already computing exactly this; joining costs nothing and queues nothing.
+                self::attach($existing, (int) $notice->get('id'));
+                return self::STATE_PENDING;
+            }
         }
 
         $job = new audience_job(0, (object) [
@@ -187,6 +218,8 @@ class notice_audience {
      * @return awareness|null The notice updated, or null when the job had none or it has since gone.
      */
     public static function record(audience_job $job): ?awareness {
+        global $DB;
+
         $noticeid = (int) $job->get('noticeid');
         if ($noticeid <= 0) {
             return null;
@@ -198,10 +231,34 @@ class notice_audience {
             return null;
         }
 
-        $notice->set('audiencecount', (int) $job->get('resultcount'));
-        $notice->set('audiencecomputed', (int) $job->get('timecompleted'));
-        $notice->set('audiencehash', $job->get('criteriahash'));
-        $notice->update();
+        $count = (int) $job->get('resultcount');
+        $computed = (int) $job->get('timecompleted');
+        $hash = $job->get('criteriahash');
+
+        /*
+         * Written around the persistent on purpose. core\persistent::update() is final and stamps
+         * timemodified unconditionally — and in this plugin timemodified is not metadata, it is the
+         * "the author changed this notice" signal: the first thing helper::must_reshow() reads, and
+         * the entire content of helper::reset_notice(). Counting an audience is not an authoring
+         * act, so putting it through update() made every recalculation a silent Reset: everyone who
+         * had already accepted or dismissed the notice got it back on their next page load, and
+         * could write a second acknowledgement row, which nothing dedupes.
+         *
+         * These three columns hold a measurement ABOUT the notice rather than part of it. Writing
+         * them directly also stops usermodified being falsified — a cron-resolved job used to stamp
+         * the notice as last modified by whoever happened to queue it.
+         */
+        $DB->update_record(awareness::TABLE, (object) [
+            'id' => $noticeid,
+            'audiencecount' => $count,
+            'audiencecomputed' => $computed,
+            'audiencehash' => $hash,
+        ]);
+
+        // Keep the object handed back in step with the row, without going through update().
+        $notice->set('audiencecount', $count);
+        $notice->set('audiencecomputed', $computed);
+        $notice->set('audiencehash', $hash);
 
         return $notice;
     }
