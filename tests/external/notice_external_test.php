@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
 
@@ -546,6 +547,112 @@ final class notice_external_test extends \advanced_testcase {
         $this->assertNotEmpty($roles);
         $this->assertArrayHasKey('id', $roles[0]);
         $this->assertArrayHasKey('name', $roles[0]);
+    }
+
+    /**
+     * Repeated dismissals of a reqack notice write ONE row, not one per refusal.
+     *
+     * A notice requiring acknowledgement is deliberately shown again to a user who dismissed it,
+     * so the dismissal path runs on every page load until they accept. Each run used to insert
+     * another acknowledgement row, and the dismissed report — headed "List of users who dismissed
+     * the notice" — listed the same person once per refusal. The compliance record it exists to
+     * provide counted page loads.
+     *
+     * The control is the second user: the dedupe is per person, not a global "one row per
+     * notice", and a guard keyed on the notice alone would pass the first assertion and fail the
+     * second.
+     */
+    public function test_repeated_dismissals_write_one_row_per_user(): void {
+        global $DB;
+
+        $notice = $this->create_notice(['reqack' => 1]);
+
+        $first = $this->getDataGenerator()->create_user();
+        $this->setUser($first);
+        helper::dismiss_notice($notice);
+        helper::dismiss_notice($notice);
+        helper::dismiss_notice($notice);
+
+        $this->assertSame(1, $DB->count_records('local_awareness_ack', [
+            'noticeid' => $notice->get('id'),
+            'userid' => $first->id,
+            'action' => acknowledgement::ACTION_DISMISSED,
+        ]));
+
+        // Control: a different reader still gets their own row.
+        $second = $this->getDataGenerator()->create_user();
+        $this->setUser($second);
+        helper::dismiss_notice($notice);
+
+        $this->assertSame(2, $DB->count_records('local_awareness_ack', [
+            'noticeid' => $notice->get('id'),
+            'action' => acknowledgement::ACTION_DISMISSED,
+        ]));
+    }
+
+    /**
+     * A standard role is findable by the label the picker actually shows.
+     *
+     * Standard roles ship with an EMPTY role.name and take their label from the language pack
+     * through role_get_name(), so the old LIKE over name and shortname could not reach it. Four of
+     * the eight standard roles were unfindable in English — "Non-editing teacher", "Course
+     * creator", "Authenticated user", "Authenticated user on site home" — and under a translated
+     * pack none of them was findable at all. The autocomplete does no client-side filtering: it
+     * sends the typed string and renders the answer verbatim, so what this misses cannot be
+     * selected.
+     */
+    public function test_search_roles_finds_a_standard_role_by_its_displayed_label(): void {
+        $this->setAdminUser();
+
+        $names = role_get_names(null, ROLENAME_ORIGINAL);
+        $teacher = null;
+        foreach ($names as $role) {
+            if ($role->shortname === 'teacher') {
+                $teacher = $role;
+                break;
+            }
+        }
+        $this->assertNotNull($teacher, 'the non-editing teacher role must exist for this test to mean anything');
+        $this->assertSame('', (string) $teacher->name, 'a standard role stores no name — that is the premise');
+
+        $found = json_decode(external::search_roles($teacher->localname, 0)['roles'], true);
+
+        $this->assertContains(
+            (int) $teacher->id,
+            array_map('intval', array_column($found, 'id')),
+            'searching a standard role by its displayed label must find it'
+        );
+    }
+
+    /**
+     * A custom role is findable by the text its author typed, ampersand included.
+     *
+     * role_get_name() runs the stored name through format_string(), which entity-escapes "&".
+     * Matching only the formatted label would make "R&D coordinator" reachable solely by typing
+     * the literal "R&amp;D", which nobody does — while the picker displays "R&D coordinator".
+     */
+    public function test_search_roles_finds_a_custom_role_by_its_unescaped_name(): void {
+        $this->setAdminUser();
+
+        $roleid = create_role('R&D coordinator', 'rdcoord', 'Coordinates R&D');
+
+        $found = json_decode(external::search_roles('R&D', 0)['roles'], true);
+
+        $this->assertContains((int) $roleid, array_map('intval', array_column($found, 'id')));
+    }
+
+    /**
+     * A query that matches nothing returns nothing.
+     *
+     * The control that stops the two tests above passing against a function that ignores its
+     * query and returns every role.
+     */
+    public function test_search_roles_returns_nothing_for_an_unmatched_query(): void {
+        $this->setAdminUser();
+
+        $found = json_decode(external::search_roles('zzzznosuchrolezzzz', 0)['roles'], true);
+
+        $this->assertSame([], $found);
     }
 
     /**

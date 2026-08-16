@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 25 | 4 | 4 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 37 | 7 | 7 | 45 | **96** |
-| Informativo | 11 | 5 | 4 | 32 | **52** |
-| **Total** | **88** | **17** | **16** | **77** | **198** |
+| Baixo | 49 | 7 | 5 | 35 | **96** |
+| Informativo | 13 | 5 | 4 | 30 | **52** |
+| **Total** | **102** | **17** | **14** | **65** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **105 dos 198 estão encerrados; 93 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **119 dos 198 estão encerrados; 79 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -62,6 +62,21 @@ parciais, com o que falta nomeado.
 > de cobertura), **M31**, **M32**, **M33** (os pontos cegos do `bootstrap_compat_test`) e
 > **SQL-04** (o convidado excluído por um id literal). Alargar o observador encontrou de imediato
 > dois defeitos reais que ninguém procurava — ver abaixo.
+>
+> **Atualizado pela fase 7** (versão `2026081606`, branch `fix/phase-7-functional`). Catorze
+> achados passaram a *corrigido*: **WS-03** (o seletor de papéis não encontrava papéis padrão pelo
+> rótulo que mostra), **BIZ-04** (uma linha de conformidade por recusa, não por pessoa),
+> **BIZ-07** (o padrão de caminho sem âncora inicial), **TEST-07**, e a infraestrutura do
+> repositório — **REPO-03**, **REPO-05**, **REPO-06**, **REPO-09**, **REPO-12**. Mais cinco que já
+> estavam fechados por fases anteriores e continuavam a ler-se como abertos por serem duplicados:
+> **TPL-04**, **TPL-07**, **RB-05**, **WS-11**, **DB-05**.
+>
+> **Deixados de propósito para uma fatia própria**, com razão registada e não por esquecimento:
+> **WS-08** (o interruptor geral não alcança os web services) muda o comportamento de muitos testes
+> que nunca definem essa configuração, e emendá-los em massa para ficarem verdes é exatamente como
+> se fabricam testes vazios; **PRIV-01** e **PRIV-04** (declaração de metadados de privacidade)
+> pedem doze a treze chaves de idioma novas nos dois packs; **JS-02** e **JS-03** exigem
+> reconstrução do AMD e formam naturalmente uma fatia só de JavaScript.
 
 ## O que sobrevive, e por quê
 
@@ -332,16 +347,15 @@ diz o que resta e onde.
   <br>tests/behat/behat_local_awareness.php:50 still opens the notice-insertion loop with `// Add the discussions to the relevant forum.` — byte-identical to the August line (git show 896dfc2:tests/behat/behat_local_awareness.php). The loop below it inserts rows into {local_awareness}; nothing in this file touches a forum.
   <br>*Falta:* tests/behat/behat_local_awareness.php:50 — the comment describes a forum generator it was copied from; delete or replace it.
 
-### Web services — 13 de 18 em aberto
+### Web services — 11 de 18 em aberto
 
 - **WS-01** · **parcial** — get_notices returns the entire notice DB record as a JSON blob in PARAM_RAW, defeating the execute_returns allowlist and leaking targeting…
   <br>The record-wide serialisation is gone: classes/external.php:253 copies a fixed 7-key allowlist out of to_record() (id, title, reqack, forcelogout, modal_width, modal_height, outsideclick) plus content/bgimageurl, and tests/external/notice_external_test.php:560-589 asserts the exact key set.
   <br>*Falta:* The targeting leak is closed; the mechanism the finding names is not. 'notices' remains a PARAM_RAW JSON string at classes/external.php:290 instead of an external_multiple_structure of external_single_structure, so clean_returnvalue() cannot enforce the allowlist — only the hand-written loop at :253 and the one PHPUnit assertion do. Smallest fix: declare the payload as a real multiple/single structure and drop the json_encode().
 - **WS-02** · corrigido — search_roles has no capability check — any authenticated user (or guest) can enumerate every role on the site
   <br>classes/external.php:389-391 — search_roles now does $syscontext = \context_system::instance(); self::validate_context($syscontext); require_capability('local/awareness:manage', $syscontext); with the comment "Without this any authenticated user could enumerate every role defined on the site".
-- **WS-03** · **aberto** — search_roles matches only role.name/role.shortname, so standard roles cannot be found by the localised name the picker displays
-  <br>classes/external.php:413-418 — the search predicate is still only $DB->sql_like('r.name', ':q1') OR $DB->sql_like('r.shortname', ':q2'). Diffing against `git show 896dfc2:classes/external.php` shows the whole body is byte-identical here; only the capability check was added. Standard roles ship with an empty role.name and get their displayed name from a lang string keyed on shortname — moodle-502/public/lib/accesslib.php:4575-4587 (`if (trim($role->name) !== '') { … } else { switch ($role->shortname) { case 'manager…
-  <br>*Falta:* classes/external.php:424-431 resolves role_get_names(null, ROLENAME_ORIGINAL)->localname for DISPLAY only, after the SQL has already filtered. So the picker shows "Non-editing teacher" but typing it matches nothing, and on a pt_br site typing "Professor" matches nothing at all. Smallest fix: drop the SQL LIKE filter, fetch the candidate set by contextlevel only, and filter in PHP against $allroles[$id]->localname (plus shortname), which is already built at :424.
+- **WS-03** · corrigido — search_roles matches only role.name/role.shortname, so standard roles cannot be found by the localised name the picker displays
+  <br>Fechado na fase 7 (2026-08-16): o filtro passou para PHP e compara o rótulo do `role_get_names()`, o `role.name` guardado e o `shortname`; o corte de 50 passou a ser aplicado DEPOIS de filtrar.
 - **WS-04** · corrigido — estimate_audience queues a duplicate job and a duplicate ad-hoc task on every call while a job is pending, and nothing ever deletes the rows
   <br>Duplicate queueing: classes/external.php:580-587 now joins an in-flight job — `if ($inflight = audience_job::find_in_flight($hash))` returns before any create()/queue_adhoc_task(), backed by classes/persistent/audience_job.php:142-153 (criteriahash + STATUS_PENDING + PENDING_WINDOW) and covered by t…
 - **WS-05** · corrigido — local_awareness_audience_jobs stores a userid but is invisible to the privacy provider
@@ -359,9 +373,8 @@ diz o que resta e onde.
 - **WS-10** · **aberto** — Two web services declared 'write' fire no event, and dismissals of non-reqack notices are unlogged
   <br>`ls classes/event/` lists only awareness_acknowledged/created/deleted/disabled/dismissed/enabled/reset/updated — there is no link-tracked or audience-estimate event class. classes/helper.php:1056-1085 (track_link) creates a linkhistory row and returns ['status' => true] with no ::create()/->trigger() anywhere; classes/external.php:589-618 (estimate_audience, type 'write' in db/services.php:95) creates the audience_job and queues the task with no event either.
   <br>*Falta:* All three halves stand. The two 'write' services with no event are local_awareness_tracklink (db/services.php:46-53) and local_awareness_estimate_audience (db/services.php:91-98). Smallest fix: add event classes and trigger them in helper::track_link() and external::estimate_audience(), and move the awareness_dismissed trigger in helper::dismiss_notice() outside the reqack branch (keeping the guest guard).
-- **WS-11** · **parcial** — Six of the eight external functions have no tests, and two capability gates are not mutation-covered
-  <br>Two new test files landed — tests/external/notice_external_test.php and tests/external/collision_external_test.php — covering dismiss_notice, acknowledge_notice, track_link, get_notices, search_roles and check_collision (the six the audit named minus search_courses, plus the function added since). `grep -rn "search_courses" tests/` returns nothing. `grep -rn "required_capability_exception" tests/` returns exactly three: collision_external_test.php:95, notice_external_test.php:533, audience_external_test.php:42.
-  <br>*Falta:* One of the nine registered functions still has zero tests: search_courses (classes/external.php:465-497, registered db/services.php:82-89) — its parameter validation, its capability gate at :470 and its returns structure are entirely unexercised. Two capability gates remain un-mutation-covered: search_courses (:470) and get_estimate (:653). Smallest fix: one round-trip test per function through call_external_function(), plus a required_capability_exception test for each of those two.
+- **WS-11** · corrigido — Six of the eight external functions have no tests, and two capability gates are not mutation-covered
+  <br>Sem objeto desde a fase 6: duplicado do M29, já corrigido.
 - **WS-12** · **aberto** — validate_context() is called before validate_parameters() in all eight external functions
   <br>classes/external.php — in all nine functions validate_context() precedes validate_parameters(): :62/:64 (dismiss_notice), :120/:122 (acknowledge_notice), :177/:179 (track_link), :218/:220 (get_notices), :330/:333 (check_collision), :390/:393 (search_roles), :469/:472 (search_courses), :541/:544 (estimate_audience), :652/:655 (get_estimate).
   <br>*Falta:* Unchanged from August in every function. The fleet checklist orders it validate_parameters() first, then require_login/validate_context/require_capability. Smallest fix: move the self::validate_parameters(...) assignment above the self::validate_context(...) line in each of the nine. Note that the context here is always \context_system::instance() and never derived from a parameter, so nothing currently depends on the order — this is a convention deviation, not a live hole.
@@ -384,7 +397,7 @@ diz o que resta e onde.
   <br>`grep -rn "capabilities" db/services.php` returns nothing (exit 1). Each of the nine entries at db/services.php:28-107 declares only classname, methodname, description, type, loginrequired and ajax. Five of them do require a capability at runtime: check_collision (classes/external.php:331), search_roles (:391), search_courses (:470), estimate_audience (:542) and get_estimate (:653) all call require_capability('local/awareness:manage', $syscontext).
   <br>*Falta:* No 'capabilities' key on any entry. The runtime gate holds, so this is not an access hole — but the missing declaration means the admin "Web service functions" screen and the service-authorisation UI cannot warn that a token's user lacks the capability. Smallest fix: add `'capabilities' => 'local/awareness:manage'` to those five entries in db/services.php, with a version.php bump (service definitions only install on upgrade).
 
-### Report Builder — 7 de 16 em aberto
+### Report Builder — 6 de 16 em aberto
 
 - **RB-01** · **aberto** — notice:content column dumps the raw stored notice HTML with no format_text() and no pluginfile rewriting
   <br>classes/reportbuilder/local/entities/notice.php:200-208 — the 'content' column is add_fields("{$alias}.content") + set_type(TYPE_LONGTEXT) with no add_callback() at all. Contrast helper::render_content() (classes/helper.php:1353-1367), which does file_rewrite_pluginfile_urls() then format_text(); `grep -rn 'PLUGINFILE\\|@@' classes/reportbuilder/` returns nothing.
@@ -397,9 +410,8 @@ diz o que resta e onde.
   <br>*Falta:* Still renders the raw second count. Smallest fix: ->add_callback(static fn($v): string => $v ? format_time((int) $v) : '') on that column.
 - **RB-04** · corrigido — Every in-scope file carries an @author tag and an undated @copyright, contrary to the fleet header standard
   <br>`grep -rn '@author' classes/reportbuilder classes/table report tests/reportbuilder tests/table` exits 1 with no output. Every in-scope file now carries the dated house tag, e.g.
-- **RB-05** · **aberto** — Neither system report has any PHPUnit coverage — the can_view() capability gate and both base conditions are untested
-  <br>`ls tests/reportbuilder/` returns only `datasource`; `grep -rln 'systemreports' tests/` exits 1 with no output. Nothing under tests/ instantiates local_awareness\reportbuilder\local\systemreports\acknowledged_notice or dismissed_notice, so can_view() (classes/reportbuilder/local/systemreports/acknowledged_notice.php:112-114 and dismissed_notice.php:112-114) and both base conditions (each file, lines 58-64) are untested.
-  <br>*Falta:* No PHPUnit coverage at all for either system report. Smallest fix: tests/reportbuilder/systemreports/{acknowledged,dismissed}_notice_test.php exercising the noticeid base condition, the action=ACTION_ACKNOWLEDGED/ACTION_DISMISSED condition, and a mutation-checked capability gate (a user without local/awareness:viewreports must be refused).
+- **RB-05** · corrigido — Neither system report has any PHPUnit coverage — the can_view() capability gate and both base conditions are untested
+  <br>Sem objeto desde a fase 6: duplicado do M11, já corrigido — `tests/reportbuilder/systemreports_test.php`.
 - **RB-06** · **aberto** — System report downloads are all named after the datasource, so files for different notices are indistinguishable
   <br>classes/reportbuilder/local/systemreports/acknowledged_notice.php:95 `$this->set_downloadable(true, get_string('datasource:acknowledgednotices', 'local_awareness'));` and dismissed_notice.php:95 with 'datasource:dismissednotices'. lang/en/local_awareness.php:74,76 define those as the fixed labels 'Acknowledged notices' / 'Dismissed notices' — no {$a}, so the notice identity never reaches the filename.
   <br>*Falta:* Downloads for different notices are still byte-indistinguishable by name. Smallest fix: pass a name built from the notice (title or noticeid), which the report already has via $this->get_parameter('noticeid', …) on line 58.
@@ -426,44 +438,39 @@ diz o que resta e onde.
   <br>tests/reportbuilder/datasource/all_notices_test.php:26 `use core_reportbuilder_testcase;` and :39 `final class all_notices_test extends core_reportbuilder_testcase {`, after requiring reportbuilder/tests/helpers.php at :24. The same two lines are present in all five datasource tests — acknowledged_notices_test.php:26/:40, dismissed_notices_test.php:26/:40, link_history_test.php:26/:39, notice_views_test.php:26/:40.
   <br>*Falta:* All five datasource tests still bind to the global \core_reportbuilder_testcase alias deprecated since Moodle 5.0. Smallest fix: `use core_reportbuilder\tests\core_reportbuilder_testcase;` and extend that — but check it resolves on the 4.05 leg before switching, since $plugin->supported still includes 405.
 
-### Repositório / CI / docs — 8 de 13 em aberto
+### Repositório / CI / docs — 3 de 13 em aberto
 
 - **REPO-01** · corrigido — mustache-continue-on-error disables the Mustache gate on all four CI legs, while only two lines in one template actually fail it
   <br>`grep -rn "mustache-continue-on-error" . --exclude-dir=.git` returns hits only in CHANGELOG.md:1172/1211 and docs/AUDIT-2026-08.md — no hit in .github/workflows/ci.yml.
 - **REPO-02** · corrigido — ci.yml lacks the workflow_dispatch trigger the fleet standard requires
   <br>.github/workflows/ci.yml:13 declares `workflow_dispatch:` (with the push/main + tags/v* and pull_request triggers at lines 6-12, and a comment at lines 3-5 explaining the escape hatch).
-- **REPO-03** · **aberto** — CHANGELOG claims .stylelintrc.json was added, but the file is absent and .gitignore actively prevents committing it
-  <br>`ls -la .stylelintrc.json` → "No such file or directory"; `git ls-files` shows no such path. .gitignore:12-13 still carries `# Linter config` / `.stylelintrc.json`, so committing it is still blocked. CHANGELOG.md:1185 still claims "Baseline repository files for quality tooling (`.gitignore`, `.stylelintrc.json`)."
-  <br>*Falta:* All three halves stand: the file is absent, .gitignore:13 prevents it being committed, and CHANGELOG.md:1185 claims it exists. Smallest fix: add the fleet .stylelintrc.json, delete .gitignore:12-13, and correct or footnote CHANGELOG.md:1185.
+- **REPO-03** · corrigido — CHANGELOG claims .stylelintrc.json was added, but the file is absent and .gitignore actively prevents committing it
+  <br>Fechado na fase 7 (2026-08-16): o `.gitignore` deixou de bloquear o `.stylelintrc.json`, que passou a existir.
 - **REPO-04** · corrigido — .gitignore is missing the entries that would have prevented the committed .claude gitlink
   <br>.gitignore:15-18 now carries `.claude/worktrees/` with a comment recording exactly the gitlink incident the finding describes ("One of these was once committed as a bare gitlink (mode 160000) with no .gitmodules entry").
-- **REPO-05** · **aberto** — README and CHANGELOG document Makefile targets that do not exist — there is no Makefile in the repo
-  <br>`ls -la Makefile GNUmakefile makefile` → all three "No such file or directory"; `git ls-files` has no Makefile. README.md:113-115 still reads "Local Makefile targets include datasource-focused validation:" followed by `make ci-awareness-datasource-tests` and `make ci-awareness-datasource-tests-quick`, and CHANGELOG.md:1191 still says "New Makefile targets to execute datasource tests in CI/local workflows".
-  <br>*Falta:* Both documents still promise a Makefile that has never existed in this repo. Smallest fix: delete README.md:113-115 (the fleet runner is `mdl phpunit`/`mdl ci`) and annotate CHANGELOG.md:1191 as never-shipped.
-- **REPO-06** · **aberto** — README documents audience targeting as cohort-only; the notice form also filters by role, role context, category, course, course format, theme and…
-  <br>README.md:25 still reads "- Audience targeting by cohort." and README.md:82 "- Cohort visibility."; `grep -n -i "role\|categor\|course format\|theme\|filter" README.md` returns nothing about the other axes. The current form declares far more: classes/form/notice_form.php:171-181 `filter_role_context`, :199 `filter_role`, :212 `cohorts`, :275-303 the competency rules, and in the filters section `filter_category` (~:338), `filter_course` (~:364), `filter_format` (~:379, string `filter_courseformat`) and `filter_theme…
-  <br>*Falta:* The README feature list still describes cohort as the only audience axis while the form ships eight. Smallest fix: rewrite README.md:25 to enumerate cohort, role (+ role context), competency, category, course, course format and theme.
+- **REPO-05** · corrigido — README and CHANGELOG document Makefile targets that do not exist — there is no Makefile in the repo
+  <br>Fechado na fase 7 (2026-08-16): os alvos de Makefile inexistentes saíram do README, substituídos pelos comandos `mdl ci` reais das duas pontas.
+- **REPO-06** · corrigido — README documents audience targeting as cohort-only; the notice form also filters by role, role context, category, course, course format, theme and…
+  <br>Fechado na fase 7 (2026-08-16): o README passou a nomear os sete critérios de público e a estimativa assíncrona.
 - **REPO-07** · corrigido — $plugin->release is stale — it still names 2026061600 while $plugin->version is 2026080700
   <br>version.php:30 now reads `$plugin->release = 'v1.0';` — it no longer mirrors a stale version stamp (at 896dfc2 `git show 896dfc2:version.php` had `$plugin->release = '2026061600';` against `$plugin->version = 2026080700`). The current version is 2026081603 (version.php:29).
 - **REPO-08** · **parcial** — Every file header carries a sole new copyright holder; no original Catalyst/upstream copyright notice survives in the derivative work
   <br>Commit da8e710 ("docs: restore upstream copyright and normalise every file header", 2026-08-12) added `@copyright Catalyst IT` to the fork-imported files: `grep -rh "@copyright" --include='*.php' .` counts 33 `@copyright Catalyst IT` lines beside 93 `@copyright 2026 Anderson Blaine`. At 896dfc2 the finding was exactly right — `git grep -l "Catalyst" 896dfc2 -- '*.php'` returned zero files.
   <br>*Falta:* lang/pt_br/local_awareness.php:21 carries only `@copyright 2026 Anderson Blaine`, while its sibling lang/en/local_awareness.php:21-22 carries both. Attribution was actively lost there: the pre-normalisation header (`git show d01175b:lang/pt_br/local_awareness.php`) named "Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (Catalyst IT)" in prose, and da8e710 removed that prose without adding the tag. Smallest fix: add `@copyright Catalyst IT` above line 21 of lang/pt_br/local_awareness.php.
-- **REPO-09** · **aberto** — .github/workflows/moodle-release.yml has no trailing newline
-  <br>`python3 -c "d=open('.github/workflows/moodle-release.yml','rb').read(); print(repr(d[-1:]))"` → `b'}'`. The file ends at line 17 with `MOODLE_ORG_TOKEN: ${{ secrets.MOODLE_ORG_TOKEN }}` and no LF; `wc -l` reports 16, one short of the visible line count, which is the same tell.
-  <br>*Falta:* Append a newline to the end of .github/workflows/moodle-release.yml.
+- **REPO-09** · corrigido — .github/workflows/moodle-release.yml has no trailing newline
+  <br>Fechado na fase 7 (2026-08-16): newline final no `moodle-release.yml`.
 - **REPO-10** · **aberto** — CHANGELOG has no released section while version.php declares MATURITY_STABLE, and no release tag exists
   <br>`grep -n "^## " CHANGELOG.md` returns exactly one heading: CHANGELOG.md:7 `## [Unreleased]`. `git tag -l \| wc -l` → 0, so no `v*` tag exists and the moodle-release workflow has never fired. version.php:33 still declares `$plugin->maturity = MATURITY_STABLE;` and version.php:30 now names a release `'v1.0'` that has no tag behind it.
   <br>*Falta:* Everything the finding described stands, and REPO-07's fix widened it: version.php:30 now claims release `v1.0` while no v1.0 tag and no released CHANGELOG section exist. Smallest fix: cut a `## [1.0.0]` section from the Unreleased body and tag `v1.0.0`, or drop the maturity to MATURITY_RC until a tag is cut.
 - **REPO-11** · corrigido — Five commits changed amd/src without the required version.php bump, so the AMD cache revision did not move
   <br>Every commit touching amd/src between 896dfc2 and HEAD also changed version.php — 13 of 13, checked by iterating `git log --format=%H 896dfc2..HEAD -- amd/src` and testing each commit's `--name-only` output for `^version.php$` (0181eae, 2c2e787, 79a7b15, d0cebfc, 22b9f05, 91a32ec, 98c47a4, a6862a7,…
-- **REPO-12** · **aberto** — Five fleet-template repo files are missing: phpcs.xml, .phpcsignore, .moodle-plugin-ci.yml, the PR template and a per-repo CLAUDE.md
-  <br>All five are still absent. `ls -la phpcs.xml .phpcsignore .moodle-plugin-ci.yml CLAUDE.md` → four "No such file or directory"; `git ls-files .github` lists only `.github/workflows/ci.yml` and `.github/workflows/moodle-release.yml`, so there is no `.github/PULL_REQUEST_TEMPLATE.md`. The root listing (`ls -a`) confirms no phpcs.xml, .phpcsignore, .moodle-plugin-ci.yml or CLAUDE.md.
-  <br>*Falta:* All five fleet-template files remain missing. Smallest fix: copy phpcs.xml, .phpcsignore, .moodle-plugin-ci.yml, the PR template and CLAUDE.plugin.md from ~/dev/moodle-dev/templates/. The missing per-repo CLAUDE.md is the costliest of the five for this repo, given the audit-reconciliation history.
+- **REPO-12** · corrigido — Five fleet-template repo files are missing: phpcs.xml, .phpcsignore, .moodle-plugin-ci.yml, the PR template and a per-repo CLAUDE.md
+  <br>Fechado na fase 7 (2026-08-16): `phpcs.xml`, `.phpcsignore`, `.moodle-plugin-ci.yml`, `.stylelintrc.json` e o template de PR instalados a partir de `~/dev/moodle-dev/templates/`, mais um `CLAUDE.md` próprio. Todos já estavam previstos no `.gitattributes`.
 - **REPO-13** · **parcial** — version.php header carries a banned @author tag, a copyright without a year, and prose wedged between tags
   <br>Two of the three sub-defects are gone. `grep -rn "@author" --include='*.php' .` returns nothing anywhere in the tree (at 896dfc2 version.php carried `@author Anderson Blaine <anderson@blaine.com.br>`), and the prose line "Forked and adapted by Anderson Blaine…" that sat between the tags is gone — the current header (version.php:17-24) is a clean @package/@copyright/@copyright/@license block, and version.php:22 now reads `@copyright 2026 Anderson Blaine` with the year the fleet standard requires.
   <br>*Falta:* A yearless copyright is still literally present: version.php:21 `@copyright Catalyst IT`. It is not the August line (that one named Blaine and was fixed at :22) — it is the upstream attribution added by da8e710 to close REPO-08, and the same yearless form appears in all 33 files carrying it. Smallest fix if the year is wanted: give the upstream line its span, e.g. `@copyright 2019 Catalyst IT`, after checking the upstream plugin's own header for the correct year.
 
-### Schema XMLDB / upgrade — 7 de 13 em aberto
+### Schema XMLDB / upgrade — 6 de 13 em aberto
 
 - **DB-01** · **parcial** — CHANGELOG.md carries no entry for the new DB table, upgrade step, or two new web service functions
   <br>`rg -n "local_awareness_estimate_audience\|local_awareness_get_estimate" CHANGELOG.md` returns nothing; `rg -n "audience_jobs" CHANGELOG.md` returns only CHANGELOG.md:1005-1006 (the purge-task entry) and :1163 (the privacy entry). The commit that created the table and its upgrade step (fd7907c, now db/upgrade.php:106-131, savepoint 2026051401) still has no CHANGELOG entry of its own and none was backfilled.
@@ -475,9 +482,8 @@ diz o que resta e onde.
 - **DB-04** · **aberto** — local_awareness_lastview.action is char(1333) while it stores the same 0/1 enum that local_awareness_ack.action stores as int(1)
   <br>db/install.xml:90 still declares `<FIELD NAME="action" TYPE="char" LENGTH="1333" NOTNULL="true" ... COMMENT="Action"/>` on local_awareness_lastview, while db/install.xml:48 stores the identical 0/1 enum on local_awareness_ack as `TYPE="int" LENGTH="1"`. The value written is an int: classes/helper.php:935 calls `noticeview::add_notice_view($id, $USER->id, $action)`, whose signature is `int $action` (classes/persistent/noticeview.php:123); the persistent types it `PARAM_RAW_TRIMMED` (classes/persistent/noticeview.php…
   <br>*Falta:* The column type is unchanged. Smallest fix: an upgrade step changing local_awareness_lastview.action to int(1) (with a cast of existing rows) plus the matching install.xml edit and PARAM_INT on the persistent property.
-- **DB-05** · **parcial** — local_awareness_audience_jobs grows without bound — no delete path anywhere, no cleanup task, and no index to support one
-  <br>The delete path and cleanup task now exist: classes/task/purge_audience_jobs.php:60-82 deletes `timecreated < :cutoff` with RETENTION = DAYSECS, registered nightly in db/tasks.php:28-36 and named by lang/en/local_awareness.php:302. The supporting index does not: db/install.xml:119-123 declares only jobid_uq, criteriahash_ix and noticeid_ix, and `rg -n "timecreated" db/upgrade.php` shows no index added since.
-  <br>*Falta:* No index on `local_awareness_audience_jobs.timecreated`, which is the sole predicate of both the `count_records_select` and `delete_records_select` in purge_audience_jobs::execute() — the nightly purge full-scans the table it exists to keep small. Smallest fix: add `<INDEX NAME="timecreated_ix" UNIQUE="false" FIELDS="timecreated"/>` to db/install.xml:119-123 plus an upgrade step.
+- **DB-05** · corrigido — local_awareness_audience_jobs grows without bound — no delete path anywhere, no cleanup task, and no index to support one
+  <br>Sem objeto desde a fase 5/6: existe `classes/task/purge_audience_jobs.php`, agendada em `db/tasks.php`, com teste.
 - **DB-06** · **aberto** — Four persistent-backed tables omit the timemodified/usermodified columns core\persistent always writes, so those values are silently discarded
   <br>core\persistent defines timecreated/timemodified/usermodified for every subclass (/Users/uaiblaine/dev/moodle-502/public/lib/classes/persistent.php:280-290) and writes all three on create and two on update (:506-508, :566-567); insert_record silently drops columns the table does not have.
   <br>*Falta:* Nothing was changed; the count has in fact grown from four to five since local_awareness_audience_jobs (classes/persistent/audience_job.php:28) is also persistent-backed. Smallest fix: add the missing columns via an upgrade step, or override `define_properties()`/stop extending persistent for the tables that genuinely do not want them.
@@ -499,7 +505,7 @@ diz o que resta e onde.
 - **DB-13** · corrigido — $plugin->release was left behind when $plugin->version was bumped
   <br>version.php:30 now reads `$plugin->release = 'v1.0';` against `$plugin->version = 2026081603` (version.php:29). At the audited commit it was `$plugin->release = '2026061600';` with version 2026080700 (`git show 896dfc2:version.php`) — a version number in the release field, dated before the version i…
 
-### Templates / Bootstrap 4-5 — 9 de 13 em aberto
+### Templates / Bootstrap 4-5 — 7 de 13 em aberto
 
 - **TPL-01** · **aberto** — html_writer used in plugin code in four places
   <br>html_writer is now used far more, not less: `grep -n "html_writer" classes report` returns 19 call sites in classes/table/all_notices.php (241, 503, 507, 520, 523, 528, 560, 568, 571, 585, 604-605, 627, 635, 642, 660, 710, 731, 738) plus report/acknowledged_systemreport.php:62-63 and report/dismissed_systemreport.php:62-63. At the audit commit the same grep returned 6 lines (`git grep -n 'html_writer::' 896dfc2`), so the count grew from 4 places to 23 lines. None of it renders through renderable/templatable.
@@ -508,18 +514,16 @@ diz o que resta e onde.
   <br>`grep -rn "styles.css\\|requires->css" classes report templates amd lib.php renderer.php editnotice.php managenotice.php settings.php tests` returns no $PAGE->requires->css() anywhere in the tree (only prose mentions in classes/local/bootstrap.php:35 and test code reading the file).
 - **TPL-03** · corrigido — audience_panel example context uses a key the template does not read, so the lint renders the loop empty
   <br>Fechado na fase 5 (2026-08-16): docblock e exemplo de contexto passaram a `{key, label, value}`; o lint do 4.05 e do 5.02 renderiza o laço.
-- **TPL-04** · **aberto** — The compat test scans only templates/, amd/src/ and classes/ — report/, renderer.php and the entry-point PHP files are outside every assertion
-  <br>tests/local/bootstrap_compat_test.php:165 still reads `$dirs = [$root . '/templates', $root . '/amd/src', $root . '/classes'];`, and markup_files() feeds every class-vocabulary assertion (test_every_bs5_utility_used_is_polyfilled:263, test_polyfill_carries_nothing_unused:288, test_badges_state_their_text_colour:333, test_data_api_attributes_are_paired:376, test_markup_carries_no_deprecated_bootstrap4_names:421). report/, renderer.php, editnotice.php and managenotice.php are outside all of them.
-  <br>*Falta:* Add $root.'/report' and the root-level PHP entry points to markup_files() at line 165. Nuance on the finding's wording: root entry points are inside one assertion (test_entry_points_mark_the_bootstrap_version globs $root.'/*.php' at line 490), just not the class-vocabulary ones. There is no live offender today — report/*_systemreport.php only emit `btn btn-secondary mt-3` (lines 62-63) and renderer.php (62 lines) contains no class strings — so the gap is coverage, not a current breakage.
+- **TPL-04** · corrigido — The compat test scans only templates/, amd/src/ and classes/ — report/, renderer.php and the entry-point PHP files are outside every assertion
+  <br>Sem objeto desde a fase 6: duplicado do M31, já corrigido — `markup_files()` percorre a raiz do plugin.
 - **TPL-05** · **aberto** — test_data_api_attributes_are_paired asserts over an empty set and has no non-vacuity guard
   <br>`grep -rn "data-toggle\\|data-bs-toggle\\|data-dismiss\\|data-bs-dismiss\\|data-parent\\|data-bs-parent\\|data-target\\|data-bs-target" templates amd/src classes` returns nothing, so the inner comparison in test_data_api_attributes_are_paired (tests/local/bootstrap_compat_test.php:368-407) never evaluates a real attribute; it asserts [] === [] over an empty set. The method has no non-vacuity guard, unlike its two siblings (assertGreaterThan at line 437 and line 506).
   <br>*Falta:* Add a counter of lines actually carrying one of the four attributes and assert it is greater than zero, or (since the plugin genuinely emits none) assert the count of files scanned plus a fixture line, so the test cannot stay green after markup_files() breaks.
 - **TPL-06** · **aberto** — The badge assertion accepts text-muted and text-body as a valid colour for saturated backgrounds
   <br>tests/local/bootstrap_compat_test.php:345 still reads `if (!preg_match('/\btext-(white\|dark\|body\|muted)\b/', $line))`, so `text-muted` or `text-body` on a `bg-success`/`bg-primary`/`bg-danger` line satisfies the assertion even though the required colour declared in badge_text_colours() (lines 134-144) is `text-white`.
   <br>*Falta:* The regex must require the specific `$required` colour for the matched background (e.g. preg_quote($required)), not any member of a four-name alternation. Until then a saturated badge labelled text-muted passes while failing the 4.5:1 floor the test exists to enforce.
-- **TPL-07** · **aberto** — test_entry_points_mark_the_bootstrap_version skips the four report/ pages, none of which marks the Bootstrap version
-  <br>tests/local/bootstrap_compat_test.php:490 still scans only `glob($root . '/*.php')`, so report/ is outside it. `grep -rn "mark_page" --include='*.php'` shows callers only in managenotice.php:58 and editnotice.php:38; report/acknowledged_systemreport.php and report/dismissed_systemreport.php both call $PAGE->set_url (line 42) and never call bootstrap::mark_page(), so they would be flagged if scanned.
-  <br>*Falta:* Extend the glob to $root.'/report/*.php' (the count is now two pages, not four — report/acknowledged_report.php and report/dismissed_report.php were deleted in 2c2e787). Practical impact today is nil: neither page nor the reportbuilder classes behind them emit any polyfilled class (grep for class= / la- / local-awareness- across classes/reportbuilder returns nothing), so this is an unguarded surface rather than a live rendering bug.
+- **TPL-07** · corrigido — test_entry_points_mark_the_bootstrap_version skips the four report/ pages, none of which marks the Bootstrap version
+  <br>Sem objeto desde a fase 6: duplicado do M31, já corrigido — a varredura de entry points reutiliza `markup_files()`.
 - **TPL-08** · **aberto** — styles.css header comment claims a scoping guarantee the file does not provide
   <br>styles.css:281-282 still claims "All selectors are scoped under .local-awareness-editor so the layout never leaks to the rest of the Moodle UI", but the block it introduces is full of unscoped global class selectors: .la-shell (styles.css:348), .la-shell-main (362), .la-pagehead (367), .la-status-badge (396), .la-req-banner (449), .la-navhelp (468), .la-btn (684), .la-audience (742), .la-chip (896), .la-spinner (920). Only the token/box-sizing/focus blocks at 304-345 carry the .local-awareness-editor prefix.
   <br>*Falta:* Either scope the .la-* rules under .local-awareness-editor (they are also used inside the preview dialogue attached to document.body, so a second root would have to be listed, exactly as the token block at line 304 does), or reword the comment to state what is actually guaranteed: a la- prefix, not a scoping ancestor.
@@ -573,7 +577,7 @@ diz o que resta e onde.
 - **JS-12** · corrigido — version.php was not bumped in the commits that shipped amd/src + amd/build changes
   <br>Every commit touching amd/src or amd/build since the audit also bumped $plugin->version: 83c8b60→2026081100, e9af3df→2026081200, 163ab38→2026081305, b52f8d4→2026081402, f1d5b1e→2026081501, a6862a7→2026081508, 98c47a4→2026081509, 91a32ec→2026081510, 22b9f05→2026081512, d0cebfc→2026081514, 79a7b15→202…
 
-### Lógica de negócio — 6 de 11 em aberto
+### Lógica de negócio — 4 de 11 em aberto
 
 - **BIZ-01** · corrigido — Audience-estimate jobs accumulate forever and one ad-hoc task is queued per typing pause
   <br>Both halves are closed. Accumulation: classes/task/purge_audience_jobs.php:42,60-84 deletes every job with timecreated older than DAYSECS, registered as a scheduled task in db/tasks.php:29-36 with lang key present (lang/en/local_awareness.php:302).
@@ -581,16 +585,14 @@ diz o que resta e onde.
   <br>classes/audience/estimator.php:237-251 (isolate_rule) now carries filter_role_context, filter_category and filter_course into the isolated criteria for filter_role, and classes/audience/estimator.php:189 passes [$rule] as the APPLIED set so those keys scope the role without counting as their own rul…
 - **BIZ-03** · corrigido — Notice scheduling is hard-capped at the year 2030 by the date selectors
   <br>classes/form/notice_form.php:149 computes $stopyear = (int) date('Y') + 10 and both selectors use it (:150 timestart, :155 timeend), with a comment at :145-148 explaining why a literal was wrong.
-- **BIZ-04** · **aberto** — Every dismissal writes another acknowledgement row for the same user and notice — no dedupe, no unique key
-  <br>classes/helper.php:978-980: dismiss_notice() calls create_new_acknowledge_record() unconditionally whenever reqack is set and the user is not a guest — no prior-row check. The dedupe guard check_if_already_acknowledged_by_user() exists but is only called from acknowledge_notice() (classes/helper.php:1024), never from the dismiss path.
-  <br>*Falta:* Rows still multiply: must_reshow() (classes/helper.php:1254) re-shows a dismissed reqack notice on the very next page load, so each redisplay-and-dismiss cycle writes another row. Smallest fix: have dismiss_notice() reuse the existing row (or skip the write) when an ACTION_DISMISSED row for this userid+noticeid already exists, and/or add a unique index — noting an index alone changes an accumulation bug into a dml_write_exception unless the write path is fixed first.
+- **BIZ-04** · corrigido — Every dismissal writes another acknowledgement row for the same user and notice — no dedupe, no unique key
+  <br>Fechado na fase 7 (2026-08-16): `dismiss_notice()` só insere se ainda não houver linha para (aviso, utilizador, ação). O evento continua a disparar em cada recusa — é a linha de conformidade que não pode duplicar.
 - **BIZ-05** · corrigido — track_link stores click history for any integer, with no check that the link exists or is reachable by the caller
   <br>classes/helper.php:1070-1078: track_link() now loads the noticelink by id and returns ['status' => false] when it does not exist, then loads the owning notice and returns false unless is_notice_available_to_user() accepts it (that gate is defined at classes/helper.php:859-895).
 - **BIZ-06** · corrigido — Deleting a notice never removes its uploaded files, even with cleanup enabled
   <br>classes/helper.php:413-416 deletes the 'content' and 'bgimage' file areas for the notice id via get_file_storage()->delete_area_files(), and it sits BEFORE the cleanup_deleted_notice early return at :418-420, so the files go regardless of the cleanup setting (comment at :406-412 states exactly that)…
-- **BIZ-07** · **aberto** — check_path_match compiles the pattern without a start anchor, so a path rule matches any URL that merely ends with it
-  <br>classes/helper.php:1622-1629 is byte-identical to August: preg_quote() then either '%' -> '.*' or a trailing '$', and preg_match("@{$pattern}@", $target) with no '^'. `git log --oneline -S'$pattern .= ' -- classes/helper.php` returns only the baseline commit d01175b, and `git show 896dfc2:classes/helper.php` lines 1081-1088 match the current text exactly. A grep of tests/ for check_path_match returns nothing, so no test constrains the behaviour either.
-  <br>*Falta:* A rule of '/course/view.php' compiles to '/course/view\.php$' and matches '/anything/course/view.php'; a '%' rule such as '/mod/quiz/%' compiles to '/mod/quiz/.*' and matches anywhere in the URL. Smallest fix: prefix the compiled pattern with '^' (both branches) at classes/helper.php:1622-1627, and add the missing unit tests for check_path_match.
+- **BIZ-07** · corrigido — check_path_match compiles the pattern without a start anchor, so a path rule matches any URL that merely ends with it
+  <br>Fechado na fase 7 (2026-08-16): o padrão passou a ser ancorado nas duas pontas, e o alvo é testado também sem o segmento de caminho do `wwwroot`, para não matar as regras em instalações em subdiretório.
 - **BIZ-08** · **aberto** — Notices with a required course ignore the recorded view entirely, so resetinterval has no effect on them
   <br>classes/persistent/noticeview.php:164 still reads `WHERE lv.userid = :userid AND sn.enabled = 1 AND sn.reqcourse = 0` — identical to August (`git show 896dfc2:classes/persistent/noticeview.php` line 151). That query is the sole source of $USER->viewednotices (classes/helper.php:694-703 load_viewed_notices), and resetinterval is only ever evaluated inside must_reshow() against an entry from that array (classes/helper.php:706 and :1252).
   <br>*Falta:* The lastview row IS written for such notices (classes/helper.php:935 add_notice_view), it is just filtered out on read. Smallest fix: drop `AND sn.reqcourse = 0` from classes/persistent/noticeview.php:164 and let must_reshow() plus the existing course-completion filter in collect_user_notices() (classes/helper.php:773-796) decide — or, if the perpetual nagging is intended, say so in the query's comment and close the finding as a decision.
@@ -604,7 +606,7 @@ diz o que resta e onde.
   <br>Both predicates are unchanged from August. classes/persistent/awareness.php:220 selects `enabled = ? AND ((timeend = 0 AND timestart = 0) OR (timeend <> 0 AND timestart <> 0 AND ? < timeend))` — identical to `git show 896dfc2:classes/persistent/awareness.php` line 203. classes/helper.php:825-831 (is_within_active_window) treats a notice as live when `timestart == 0 && timeend == 0` OR `now >= timestart && now < timeend` — the same test as `git show 896dfc2:classes/helper.php` lines 444-446.
   <br>*Falta:* Still latent, as the audit said — the form writes timestart and timeend together (classes/form/notice_form.php:151,156, both hidden behind the perpetual flag), so no form-authored row lands half-open; a row edited by hand, restored from another site, or written by a future code path would. Smallest fix: express one window predicate in one place and have both callers use it.
 
-### Testes — 8 de 10 em aberto
+### Testes — 7 de 10 em aberto
 
 - **TEST-01** · corrigido — No test asserts that any of the eight events fires, so the "every write fires an event" rule is unverified
   <br>Fechado na fase 5 (2026-08-16): `tests/event/events_test.php`, 8 testes, um por verbo mais a distinção entre eles.
@@ -623,9 +625,8 @@ diz o que resta e onde.
 - **TEST-06** · **aberto** — bootstrap_compat_test carries copy-paste leftovers from local_dimensions: a whitelisted class and an exception file that do not exist in this plugin
   <br>Both leftovers survive. tests/local/bootstrap_compat_test.php:297 still whitelists `'local-dimensions-central-page'` in the $structural array, and `grep -rn "local-dimensions" --exclude-dir=docs .` returns that one line only — styles.css defines no such class, so the entry protects nothing.
   <br>*Falta:* Delete line 297's 'local-dimensions-central-page' entry and line 331's 'hero_header.mustache' exception; both are dead and the second silently exempts a filename that would have to be re-checked if it ever appeared.
-- **TEST-07** · **aberto** — @covers claims coverage of \local_awareness\local\bootstrap but no test executes either of its methods
-  <br>tests/local/bootstrap_compat_test.php:40 still carries `@covers \local_awareness\local\bootstrap`. The class (classes/local/bootstrap.php) has exactly two methods, `is_bs4()` (line 54) and `mark_page()` (line 71); `grep -rn "is_bs4()" tests/` returns nothing (exit 1), and the only three references in the test file are `bootstrap::BODY_CLASS_BS4` as a constant (lines 218, 296) and the literal string `'bootstrap::mark_page()'` passed to `str_contains()` against file text (line 497) — a text search over source, not an…
-  <br>*Falta:* Either drop the @covers, or add a test that calls bootstrap::is_bs4() and bootstrap::mark_page() (the latter needs $CFG->branch manipulation and a $PAGE assertion).
+- **TEST-07** · corrigido — @covers claims coverage of \local_awareness\local\bootstrap but no test executes either of its methods
+  <br>Fechado na fase 7 (2026-08-16): dois testes que EXECUTAM `bootstrap::is_bs4()` e `mark_page()` através da fronteira 405/499/500/502, com `$PAGE` isolado e reposto.
 - **TEST-08** · **aberto** — No plugin data generator — five test files each hand-build local_awareness rows with 15 literal fields, bypassing the persistent
   <br>`ls tests/generator` → No such file or directory; the only lib.php in the repo is ./lib.php (`find . -name lib.php`), and no test calls `get_plugin_generator('local_awareness')` (every get_plugin_generator hit in tests/ names core_competency or core_reportbuilder). Five files still hand-build rows via `$DB->insert_record('local_awareness', …)`: tests/reportbuilder/datasource/acknowledged_notices_test.php:49 (14 literal fields, lines 49-64), all_notices_test.php (5 call sites), dismissed_notices_test.php (2), notice…
   <br>*Falta:* No tests/generator/lib.php exists. Smallest fix: a `local_awareness_generator extends component_generator_base` with `create_notice(array $record)` routed through the awareness persistent, replacing the five private create_notice() helpers.

@@ -22,7 +22,10 @@ This repository is currently maintained and evolved under the Awareness directio
 - Site-wide modal notices.
 - Optional mandatory acknowledgement before users can continue.
 - Optional force logout after dismissal or acknowledgement, depending on settings.
-- Audience targeting by cohort.
+- Audience targeting by cohort, role (optionally scoped to a course or category),
+  course category, course, course format, theme, and competency rules.
+- An audience estimate in the editor, computed asynchronously, showing the reach of the
+  rules as they are edited.
 - Optional requirement to complete a selected course before the notice stops appearing.
 - URL path matching to scope notices to specific pages.
 - Scheduling via start date and expiry date.
@@ -107,12 +110,17 @@ This enables custom report composition with filters, columns, export, and reuse 
 
 ## Development notes
 
-- PHPUnit and Behat tests are available under tests.
-- CI uses reusable Moodle plugin workflows.
+- PHPUnit and Behat tests live under `tests/`, and ship in the release zip as Moodle expects.
+- CI is the moodle-an-hochschulen reusable workflow, one job per supported Moodle branch.
+  Run it locally before pushing, at both ends of the supported range:
+
+  ```sh
+  mdl ci moodle-local_awareness --branch MOODLE_405_STABLE
+  mdl ci moodle-local_awareness --branch MOODLE_502_STABLE
+  ```
+
+- Targeted runs: `mdl phpunit m501 local_awareness`, `mdl behat m501 @local_awareness`.
 - For release automation, tags matching `v*` trigger the Moodle Plugin Release workflow.
-- Local Makefile targets include datasource-focused validation:
-	- `make ci-awareness-datasource-tests`
-	- `make ci-awareness-datasource-tests-quick`
 
 ## Contributing
 

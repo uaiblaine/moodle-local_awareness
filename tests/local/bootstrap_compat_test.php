@@ -539,4 +539,76 @@ final class bootstrap_compat_test extends \basic_testcase {
                 . 'Bootstrap 4 polyfill will not reach them: ' . implode(', ', $offenders)
         );
     }
+
+    /**
+     * The Bootstrap 4 verdict follows the core branch and flips at Moodle 5.0.
+     *
+     * Every rule above is a scan over source text; this one runs the class those scans name, so
+     * the coverage this file claims is coverage it actually has. The threshold is the whole
+     * behaviour: inverted, the polyfill would ship to 5.x and freeze 4.5's metrics onto it.
+     *
+     * @return void
+     */
+    public function test_is_bs4_flips_at_the_first_bootstrap5_branch(): void {
+        global $CFG;
+
+        $original = $CFG->branch;
+        try {
+            $CFG->branch = '405';
+            $this->assertTrue(bootstrap::is_bs4(), 'Moodle 4.5 ships Bootstrap 4.');
+            $CFG->branch = '499';
+            $this->assertTrue(bootstrap::is_bs4(), 'Anything below 5.0 still ships Bootstrap 4.');
+            $CFG->branch = '500';
+            $this->assertFalse(bootstrap::is_bs4(), 'Moodle 5.0 is the first branch shipping Bootstrap 5.');
+            $CFG->branch = '502';
+            $this->assertFalse(bootstrap::is_bs4(), 'Moodle 5.2 ships Bootstrap 5.');
+        } finally {
+            $CFG->branch = $original;
+        }
+    }
+
+    /**
+     * The marker reaches the page body on Bootstrap 4 sites, and only there.
+     *
+     * The negative half runs first and the positive half is its control. A mark_page() that added
+     * nothing at all - an empty body, or a marker spelt differently from the gate styles.css keys
+     * off - passes the first assertion and fails the second, so the first cannot stay green by the
+     * method never having run.
+     *
+     * @return void
+     */
+    public function test_mark_page_marks_only_bootstrap4_pages(): void {
+        global $CFG, $PAGE;
+
+        /*
+         * A fresh page, restored afterwards. mark_page() writes to the global $PAGE and this is a
+         * basic_testcase, which does not call reset_all_data() — so without this the body class
+         * added below would outlive the test, and the negative assertion would be reading a class
+         * left behind by an earlier run rather than by this one.
+         */
+        $originalpage = $PAGE;
+        $PAGE = new \moodle_page();
+
+        $original = $CFG->branch;
+        try {
+            $CFG->branch = '502';
+            bootstrap::mark_page();
+            $this->assertStringNotContainsString(
+                bootstrap::BODY_CLASS_BS4,
+                $PAGE->bodyclasses,
+                'The Bootstrap 4 polyfill gate must not reach a Bootstrap 5 site.'
+            );
+
+            $CFG->branch = '405';
+            bootstrap::mark_page();
+            $this->assertStringContainsString(
+                bootstrap::BODY_CLASS_BS4,
+                $PAGE->bodyclasses,
+                'Without this marker on the body, the Bootstrap 4 polyfill in styles.css never applies.'
+            );
+        } finally {
+            $CFG->branch = $original;
+            $PAGE = $originalpage;
+        }
+    }
 }

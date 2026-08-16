@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<ruleset name="local_awareness">
+    <description>PHPCS rules for local_awareness.</description>
+
+    <rule ref="moodle" />
+
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+</ruleset>
