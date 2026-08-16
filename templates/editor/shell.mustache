@@ -2,14 +2,12 @@
     @template local_awareness/editor/shell
 
     The notice editor: a page head, the moodleform rendered in place, and the audience panel
-    underneath it. The preview is a dialogue, opened from the page head by live_preview.js.
+    underneath it. The preview is a dialogue, opened from the form's own button bar by
+    editor_preview.js.
 
-    The preview markup is rendered here, once, inside a template element. Template content is inert
-    — not laid out, not focusable, not exposed to assistive technology — so the markup can wait in
-    the page without any of the costs the clipped container below had, and live_preview hands it to
-    core/modal as the dialogue body. core/modal is the whole point of the exercise: it traps focus,
-    closes on Escape and returns focus to the button that opened it, none of which a hand-made
-    dialogue gets for free.
+    The preview is not built here. editor_preview.js reads the title and the body straight out of
+    the form and hands them to a core/modal_cancel — the same shape the manage list uses — so what
+    the author sees is the content itself rather than a drawing of it that has to be kept in step.
 
     The form declares its own sections, so each one is a core collapsible fieldset — accordion
     behaviour, keyboard handling and the expand/collapse-all control all come from core. Its own
@@ -29,7 +27,6 @@
     * requirements (string) — a warning to show above the form, or empty
     * formhtml (raw) — the rendered moodleform, tag and all
     * helptitle (string), helpbody (raw — may include <b>)
-    * preview (object) — see preview_card.mustache
     * audience (object) — see audience_panel.mustache
 
     Example context (json):
@@ -45,7 +42,6 @@
         "formhtml": "<form id=\"mform1\"><input type=\"text\"></form>",
         "helptitle": "Como funciona",
         "helpbody": "Os filtros combinam por <b>interseção</b>.",
-        "preview": {"title": "Título do aviso", "contentpreview": "Texto do aviso."},
         "audience": {}
     }
 }}
@@ -67,9 +63,6 @@
                         <span class="la-pagehead-autosaved" data-region="la-savestate"
                               data-label-unsaved="{{unsavedlabel}}">{{savedlabel}}</span>
                     {{/savedlabel}}
-                    <button type="button" class="la-btn la-btn--soft" data-action="preview">
-                        <i class="fa fa-eye" aria-hidden="true"></i> {{#str}}editor:action:preview, local_awareness{{/str}}
-                    </button>
                 </div>
             </div>
 
@@ -92,7 +85,4 @@
         </main>
     </div>
 
-    <template data-region="la-preview-source">
-        {{> local_awareness/editor/preview_card }}
-    </template>
 </div>

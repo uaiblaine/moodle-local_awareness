@@ -123,6 +123,15 @@
    token block below.
    --------------------------------------------------------------------------- */
 
+/*
+ * The actions column is text-end, which aligns text and does nothing to a flex row: core renders
+ * the action menu as a .menubar with display:flex, so the icons stayed packed against the left of a
+ * right-aligned cell. The cell says where the column sits; this says where the menu sits inside it.
+ */
+.local-awareness-manage td.text-end .menubar {
+    justify-content: flex-end;
+}
+
 .local-awareness-manage .local-awareness-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -292,8 +301,7 @@
  * to nothing, which does not fall back to the literal: it makes the whole declaration invalid at
  * computed-value time, so the preview would render with no surface, no borders and no colour.
  */
-.local-awareness-editor,
-.la-preview {
+.local-awareness-editor {
     --la-brand: var(--bs-primary, var(--primary, #0f6cbf));
     --la-brand-strong: var(--bs-primary-text-emphasis, #0a4a84);
     --la-brand-soft: var(--bs-primary-bg-subtle, #e7f1fa);
@@ -316,10 +324,7 @@
 
 .local-awareness-editor *,
 .local-awareness-editor *::before,
-.local-awareness-editor *::after,
-.la-preview *,
-.la-preview *::before,
-.la-preview *::after {
+.local-awareness-editor *::after {
     box-sizing: border-box;
 }
 
@@ -334,9 +339,7 @@
 .local-awareness-editor a:focus-visible,
 .local-awareness-editor input:focus-visible,
 .local-awareness-editor select:focus-visible,
-.local-awareness-editor textarea:focus-visible,
-.la-preview button:focus-visible,
-.la-preview a:focus-visible {
+.local-awareness-editor textarea:focus-visible {
     outline: 3px solid var(--la-brand);
     outline-offset: 2px;
 }
@@ -358,8 +361,6 @@
 
 .la-shell-main {
     min-width: 0;
-    /* Clearance below the content so the sticky action bar has room. */
-    padding-bottom: 160px;
 }
 
 /* Page head */
@@ -499,7 +500,7 @@
    --------------------------------------------------------------------------- */
 
 .local-awareness-editor .mform > fieldset {
-    padding: 0 1.25rem 1rem;
+    padding: 0.75rem 1.25rem 1rem;
     margin-bottom: 0.75rem;
     background: var(--la-paper);
     border: 1px solid var(--la-line);
@@ -524,7 +525,17 @@
  * container queries. The width that matters is the card's, not the window's, so no media query
  * could express this anyway.
  */
-.local-awareness-editor .mform .fcontainer {
+/*
+ * Gated on the collapse state, and that gate is the whole point. .fcontainer IS the element
+ * Bootstrap collapses — core renders it as `fcontainer collapseable collapse show` — and an
+ * ungated `display: flex` here scores (0,3,0) against Bootstrap's `.collapse:not(.show)` at
+ * (0,2,0). It won, so removing .show changed nothing on screen: no section ever collapsed, and
+ * "Expand all" looked dead because everything was already expanded. A layout rule quietly
+ * overriding a behaviour rule, from the one selector that had to stay out of the way.
+ */
+.local-awareness-editor .mform .fcontainer:not(.collapse),
+.local-awareness-editor .mform .fcontainer.show,
+.local-awareness-editor .mform .fcontainer.collapsing {
     display: flex;
     flex-wrap: wrap;
     gap: 0 2rem;
@@ -535,6 +546,35 @@
     min-width: 19rem;
     padding: 0.5rem 0;
     margin: 0;
+}
+
+/*
+ * The section descriptions are prose about the section, not a caption for the first field. As an
+ * ordinary form row they inherited the label/element grid and read as if they belonged to Title.
+ * Listed by id, which is the rule this file learned the hard way: a guess at a widget's internal
+ * markup matches nothing and says nothing when it stops matching.
+ */
+.local-awareness-editor .mform #fitem_id_header_content_desc,
+.local-awareness-editor .mform #fitem_id_header_behavior_desc,
+.local-awareness-editor .mform #fitem_id_header_audience_desc,
+.local-awareness-editor .mform #fitem_id_header_filters_desc,
+.local-awareness-editor .mform #fitem_id_header_appearance_desc {
+    flex: 1 1 100%;
+    padding-top: 0;
+    padding-bottom: 0.25rem;
+}
+
+.local-awareness-editor .mform #fitem_id_header_content_desc > .col-md-3,
+.local-awareness-editor .mform #fitem_id_header_behavior_desc > .col-md-3,
+.local-awareness-editor .mform #fitem_id_header_audience_desc > .col-md-3,
+.local-awareness-editor .mform #fitem_id_header_filters_desc > .col-md-3,
+.local-awareness-editor .mform #fitem_id_header_appearance_desc > .col-md-3 {
+    display: none;
+}
+
+.local-awareness-editor .mform [id$="_desc"] .form-control-static {
+    color: var(--la-ink-muted);
+    font-size: .88rem;
 }
 
 /*
@@ -558,8 +598,7 @@
 .local-awareness-editor .mform #fitem_id_filter_course,
 .local-awareness-editor .mform #fitem_id_filter_format,
 .local-awareness-editor .mform #fitem_id_filter_theme,
-.local-awareness-editor .mform #fitem_id_filter_competency_label,
-.local-awareness-editor .mform #fgroup_id_buttonar {
+.local-awareness-editor .mform #fitem_id_filter_competency_label {
     flex: 1 1 100%;
 }
 
@@ -615,37 +654,30 @@
 }
 
 /*
- * The sticky action bar IS the moodleform's own button group. Buttons outside the form would need
- * a form="" attribute, which is valid HTML but which the mustache lint cannot validate in a partial
- * rendered on its own — and it would mean two submit paths where one will do. Cancel stays native,
- * so is_cancelled() keeps working.
+ * The buttons live in core's sticky footer now — notice_form calls closeHeaderBefore('buttonar')
+ * and then set_sticky_footer('buttonar'), which is what course/edit_form.php does. The
+ * closeHeaderBefore is not decoration: the renderer wraps the group IN PLACE, so without it the
+ * footer is emitted inside the last section's collapsible container and collapsing that section
+ * takes Save and Cancel with it.
+ *
+ * Centred without touching core's own alignment, because that cannot be touched: the bar carries
+ * Bootstrap's .justify-content-end, and Bootstrap 5 generates its utilities with !important, which
+ * Moodle's stylelint forbids this plugin from outbidding. Giving the group the full width instead
+ * leaves the parent's justify-content nothing to distribute, and the centring happens one level
+ * down, where no utility is competing. Measured on the rendered page: the group moved from x=763
+ * to x=425 in a bar centred at 579.
  */
-.local-awareness-editor .mform #fgroup_id_buttonar {
-    position: sticky;
-    bottom: 18px;
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
-    padding: 12px 16px;
-    margin-top: 24px;
-    background: var(--la-paper);
-    border: 1px solid var(--la-line);
-    border-radius: 14px;
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .18);
+.local-awareness-editor #sticky-footer .sticky-footer-content > .fitem {
+    width: 100%;
 }
 
-/*
- * The bar is the width of the buttons it holds, so there is no empty strip over the fields and
- * nothing to pass clicks through. The previous bar spanned the column and needed
- * pointer-events: none plus a re-enable on each button, which is also what made a headless Behat
- * click land on the autocomplete underneath it.
- */
-.local-awareness-editor .mform #fgroup_id_buttonar .felement {
-    display: flex;
-    gap: 12px;
-    margin: 0;
+.local-awareness-editor #sticky-footer .sticky-footer-content > .fitem > span > .d-flex {
+    justify-content: center;
+}
+
+/* Each button arrives as its own form row, and a form row carries a bottom margin. */
+.local-awareness-editor #sticky-footer .sticky-footer-content .fitem {
+    margin-bottom: 0;
 }
 
 /* Buttons */
@@ -704,195 +736,6 @@
     background: var(--la-surface);
     color: var(--la-ink);
     text-decoration: none;
-}
-
-/*
- * Preview dialogue. This markup is the body of a core/modal, so the surrounding chrome — the
- * surface, the border, the radius, the title — belongs to core and is not repeated here.
- */
-.la-preview-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.la-preview-pill {
-    font-size: .68rem;
-    background: var(--la-surface);
-    padding: 2px 8px;
-    border-radius: 999px;
-    color: var(--la-ink-muted);
-    text-transform: uppercase;
-    letter-spacing: .04em;
-}
-
-.la-preview-toggle {
-    display: flex;
-    gap: 4px;
-    padding: 4px;
-    border-radius: 8px;
-    background: var(--la-surface);
-}
-
-/*
- * Sized past the 24x24 CSS pixels WCAG 2.2 asks of a pointer target: at the font size these
- * carry, the padding alone left them 27x15.
- */
-.la-preview-tab {
-    border: none;
-    background: transparent;
-    font-size: .78rem;
-    color: var(--la-ink);
-    padding: 5px 12px;
-    min-height: 28px;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: .3rem;
-}
-
-.la-preview-tab.is-on {
-    background: var(--la-paper);
-    color: var(--la-ink);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
-}
-
-/*
- * A flat scrim, not a gradient. The stage stands for "a page behind a modal", and the theme's
- * own muted surface says that without inventing a second palette.
- */
-.la-preview-stage {
-    background: var(--la-surface);
-    border: 1px solid var(--la-line);
-    border-radius: 10px;
-    padding: 22px;
-    min-height: 220px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.la-mockmodal {
-    width: 100%;
-    max-width: 320px;
-    background: var(--la-paper);
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px -20px rgba(0, 0, 0, .5);
-    border: 1px solid var(--la-line);
-}
-
-.la-mockmodal-hero {
-    height: 100px;
-    background-color: var(--la-brand);
-    background-size: cover;
-    background-position: center;
-    position: relative;
-    color: #fff;
-}
-
-/*
- * A dark scrim, not a light one. Measured on the rendered dialogue: white on the previous
- * rgba(255,255,255,.18) over Boost's primary is 3.84:1, under the 4.5:1 AA floor for text this
- * size. Darkening instead of lightening also makes the chip independent of the site's own primary,
- * which is the point of reading the colour from the theme in the first place — at .55 white clears
- * 4.5:1 over every brand tried, down to a white one, and over a background image as well.
- */
-.la-mockmodal-tag {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(0, 0, 0, .55);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, .25);
-    border-radius: 999px;
-    padding: 3px 8px;
-    font-size: .65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    backdrop-filter: blur(4px);
-}
-
-.la-mockmodal-close {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, .55);
-    color: #fff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .85rem;
-}
-
-.la-mockmodal-body {
-    padding: 14px 16px;
-}
-
-/*
- * Not a heading. The mock notice's title is content of an illustration, not structure of the page
- * it sits on, and marking it up as one puts an h4 into the document outline underneath the h5 that
- * core's modal template uses for the dialogue's own title.
- */
-.la-mockmodal-title {
-    font-size: 1rem;
-    font-weight: 700;
-    margin: 0 0 6px;
-}
-
-.la-mockmodal-text {
-    font-size: .82rem;
-    color: var(--la-ink-muted);
-    margin: 0;
-    line-height: 1.45;
-}
-
-.la-mockmodal-actions {
-    display: flex;
-    gap: 8px;
-    padding: 0 16px 14px;
-}
-
-/* Pictures of the notice's buttons, not controls: nothing here is clickable. */
-.la-mockmodal-actions .la-btn {
-    flex: 1;
-    justify-content: center;
-    cursor: default;
-}
-
-.la-preview-meta {
-    padding: 14px 2px 0;
-    border-top: 1px solid var(--la-line);
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    font-size: .78rem;
-    margin: 16px 0 0;
-}
-
-.la-preview-meta-item {
-    display: flex;
-    flex-direction: column;
-}
-
-.la-preview-meta-item dt {
-    color: var(--la-ink-muted);
-    font-weight: 500;
-}
-
-.la-preview-meta-item dd {
-    color: var(--la-ink);
-    font-weight: 600;
-    margin: 0;
-    font-variant-numeric: tabular-nums;
 }
 
 /* Audience panel */

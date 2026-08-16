@@ -6,6 +6,50 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the editor, reviewed against the rendered page (version 2026081603)
+
+Five things the page showed that reading the code did not.
+
+- **No section ever collapsed, and the accordion was mine to break.** The two-column layout was
+  declared on `.fcontainer` — which is the element Bootstrap collapses. `display: flex` there scores
+  (0,3,0) against Bootstrap's `.collapse:not(.show)` at (0,2,0), so removing `.show` changed nothing
+  on screen. The layout rule is gated on the collapse state now.
+
+  Two reports followed from that one defect. "Expand all" looked wrong because the form collapses
+  its optional sections when they carry no values, and the CSS was showing them anyway: core's label
+  described the state honestly while the screen contradicted it. And a Behat scenario had come to
+  depend on reaching a field inside a collapsed section, which only worked while collapsing did not.
+
+- **The action buttons are in core's sticky footer**, through `set_sticky_footer('buttonar')` — with
+  `closeHeaderBefore('buttonar')` before it, which is not optional: the renderer wraps the group IN
+  PLACE, so without it the footer is emitted inside the last section's container and collapsing
+  "Modal appearance" took Save and Cancel with it.
+
+  Centring them took more than a `justify-content`. The bar carries Bootstrap's
+  `.justify-content-end`, and Bootstrap 5 generates its utilities with `!important`, which Moodle's
+  stylelint forbids this plugin from outbidding. Giving the group the full width leaves the parent
+  nothing to distribute and the centring happens a level below, where no utility competes.
+
+- **Preview is a real preview now, and it moved into the button bar.** It used to draw a mock of the
+  notice modal inside a core modal, showing truncated plain text with the formatting stripped — a
+  picture of a dialogue, inside a dialogue, that had to be kept in step with the real thing by hand.
+  It now puts the content itself into a `core/modal_cancel`, the same shape the manage list uses.
+  Gone with it: the mock template, its module, ~2.5 KB of CSS, two renderable helpers and seventeen
+  language strings in two packs.
+
+- **The section descriptions read as a caption for the Title field.** Added in the previous release
+  as `addElement('static')`, they inherited the label/element grid. They span the row now, under the
+  header they describe.
+
+- **The list's actions menu is right-aligned.** The column carried `text-end`, which aligns text and
+  does nothing to a flex row; core renders the menu as a `.menubar` with `display: flex`.
+
+The preview button shipped inert for one Behat round, for a reason worth recording: inside the
+sticky footer core renders the group from a different template, without the `#fgroup_id_buttonar` id
+the module was looking for. The CSS had already been corrected against the measured DOM and the
+selector in the JavaScript had not.
+
+
 ### Changed — the editor stops promising things it does not do (version 2026081517)
 
 Phase 4 of `docs/PLANO-correcoes.md`. Mostly removal, plus the one feature that was designed and

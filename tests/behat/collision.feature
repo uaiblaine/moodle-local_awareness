@@ -41,6 +41,9 @@ Feature: Repeating notices competing for the same pages are flagged to the autho
     When I navigate to "Awareness > Manage" in site administration
     And I click on "Create new notice" "link"
     And I wait until ".local-awareness-editor" "css_element" exists
+    # Apply to URL match lives in Display restrictions, which the form collapses when the notice does
+    # not use it — a control inside a collapsed section exists but cannot be clicked.
+    And I click on "Expand all" "link"
     # Targeted by id: "Reset every" is a duration element, so its label belongs to the group rather
     # than to the number input the check actually reads.
     And I set the field "id_resetinterval_number" to "1"

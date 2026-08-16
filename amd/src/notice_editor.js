@@ -18,7 +18,7 @@
  *
  * Responsibilities:
  *  - Boots the legacy notice_form/init() (course-completion + competency picker).
- *  - Boots the live_preview, audience_estimator and save_state AMD modules.
+ *  - Boots the editor_preview, audience_estimator and save_state AMD modules.
  *
  * @module     local_awareness/notice_editor
  * @copyright  Anderson Blaine <anderson@blaine.com.br>
@@ -26,11 +26,11 @@
  */
 define([
     'local_awareness/notice_form',
-    'local_awareness/live_preview',
+    'local_awareness/editor_preview',
     'local_awareness/audience_estimator',
     'local_awareness/collision_warning',
     'local_awareness/save_state'
-], function(NoticeForm, LivePreview, AudienceEstimator, CollisionWarning, SaveState) {
+], function(NoticeForm, EditorPreview, AudienceEstimator, CollisionWarning, SaveState) {
     'use strict';
 
     return {
@@ -49,7 +49,7 @@ define([
                 try {
                     NoticeForm.init();
                 } catch (e) { /* No-op. */ }
-                LivePreview.init();
+                EditorPreview.init();
                 AudienceEstimator.init();
                 CollisionWarning.init();
                 SaveState.init();

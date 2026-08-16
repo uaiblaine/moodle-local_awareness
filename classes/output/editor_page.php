@@ -89,20 +89,6 @@ class editor_page implements renderable, templatable {
          */
         $formhtml = $this->formhtml;
 
-        $preview = [
-            'title' => $isedit ? $this->awareness->get('title') : '',
-            'contentpreview' => $isedit ? self::truncate(strip_tags($this->awareness->get('content')), 200) : '',
-            'bgimageurl' => $isedit && (int) $this->awareness->get('bgimage') === 1
-                ? \local_awareness\helper::get_bgimage_url((int) $this->awareness->get('id'))
-                : '',
-            'modal_width' => $isedit ? (string) $this->awareness->get('modal_width') : '',
-            'reqack' => $isedit && (int) $this->awareness->get('reqack') === 1,
-            'outsideclick' => $isedit ? (int) $this->awareness->get('outsideclick') === 1 : true,
-            'forcelogout' => $isedit && (int) $this->awareness->get('forcelogout') === 1,
-            'frequency' => $isedit ? self::format_interval((int) $this->awareness->get('resetinterval')) : '0',
-            'statusislive' => $statusislive,
-        ];
-
         /*
          * On a site above the interactive limit the editor must not estimate on its own: each
          * auto-fire is a scan of every user row, and the author triggers one by typing. The panel
@@ -180,7 +166,6 @@ class editor_page implements renderable, templatable {
             'formhtml' => $formhtml,
             'helptitle' => get_string('editor:nav:howitworks', 'local_awareness'),
             'helpbody' => get_string('editor:nav:howitworks:body', 'local_awareness'),
-            'preview' => $preview,
             'audience' => $audience,
         ];
     }
@@ -262,33 +247,5 @@ class editor_page implements renderable, templatable {
             default:
                 return '';
         }
-    }
-
-    /**
-     * Truncate to N chars on a word boundary, appending an ellipsis.
-     *
-     * @param string $text The text to truncate.
-     * @param int $max Maximum length in characters.
-     * @return string The truncated text.
-     */
-    private static function truncate(string $text, int $max): string {
-        $text = trim(preg_replace('/\s+/', ' ', $text));
-        if (\core_text::strlen($text) <= $max) {
-            return $text;
-        }
-        return rtrim(\core_text::substr($text, 0, $max)) . '…';
-    }
-
-    /**
-     * Format a reset-interval (seconds) into a human-readable string.
-     *
-     * @param int $seconds The interval in seconds.
-     * @return string Human-readable duration, or '0'.
-     */
-    private static function format_interval(int $seconds): string {
-        if ($seconds <= 0) {
-            return '0';
-        }
-        return format_time($seconds);
     }
 }
