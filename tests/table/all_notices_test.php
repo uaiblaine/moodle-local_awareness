@@ -304,4 +304,97 @@ final class all_notices_test extends \advanced_testcase {
 
         return in_array($DB->get_dbfamily(), ['mysql', 'mariadb'], true);
     }
+
+    /**
+     * One page of rows resolves the cohort option list once, not once per cohort reference.
+     *
+     * built_cohorts_options() wraps cohort_get_all_cohorts(0, 0) — a COUNT plus an unbounded scan
+     * of {cohort} joined to {context}, plus a capability walk — and it was paid per cohort id per
+     * row, so the page cost scaled with the size of the site rather than with what is on screen.
+     * The list is a dynamic table, so the filter bar re-paid it on every keystroke.
+     *
+     * @covers \local_awareness\table\all_notices::cohort_line
+     */
+    public function test_cohort_names_are_resolved_once_per_page_of_rows(): void {
+        global $DB;
+
+        $this->setAdminUser();
+
+        $one = $this->getDataGenerator()->create_cohort(['name' => 'Alpha cohort']);
+        $two = $this->getDataGenerator()->create_cohort(['name' => 'Beta cohort']);
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->notice(['title' => 'Notice ' . $i, 'cohorts' => $one->id . ',' . $two->id]);
+        }
+
+        $table = new all_notices('probe', new \moodle_url('/local/awareness/managenotice.php'));
+        $table->set_filterset(new all_notices_filterset());
+        $table->query_db(all_notices::PER_PAGE, false);
+
+        $render = new \ReflectionMethod(all_notices::class, 'cohort_line');
+        $render->setAccessible(true);
+
+        $lines = [];
+        $before = $DB->perf_get_reads();
+        foreach ($table->rawdata as $notice) {
+            $lines[] = $render->invoke($table, $notice);
+        }
+        $reads = $DB->perf_get_reads() - $before;
+
+        /*
+         * Control. A flat read count means nothing unless the work that would have inflated it
+         * actually ran: every row has to have rendered both cohort NAMES, which only happens if the
+         * option list was consulted for all twenty references.
+         */
+        $this->assertCount(10, $lines);
+        foreach ($lines as $line) {
+            $this->assertStringContainsString('Alpha cohort', $line);
+            $this->assertStringContainsString('Beta cohort', $line);
+        }
+
+        // Twenty cohort references, one scan of {cohort}: a COUNT and a SELECT, with headroom.
+        $this->assertLessThanOrEqual(4, $reads);
+    }
+
+    /**
+     * The audience column resolves the in-flight jobs once for the page, not once per row.
+     *
+     * col_audience()'s own comment claimed it avoided a per-row query, and then called
+     * notice_audience::state_of(), which runs audience_job::find_in_flight() whenever the stored
+     * hash is missing — which is every notice that predates the audience upgrade.
+     *
+     * @covers \local_awareness\table\all_notices::col_audience
+     */
+    public function test_the_audience_column_resolves_in_flight_jobs_once_per_page(): void {
+        global $DB;
+
+        $this->setAdminUser();
+
+        // No stored hash, which is the state that sends state_of() to the jobs table.
+        for ($i = 0; $i < 10; $i++) {
+            $this->notice(['title' => 'Notice ' . $i]);
+        }
+
+        $table = new all_notices('probe', new \moodle_url('/local/awareness/managenotice.php'));
+        $table->set_filterset(new all_notices_filterset());
+        $table->query_db(all_notices::PER_PAGE, false);
+
+        $render = new \ReflectionMethod(all_notices::class, 'col_audience');
+        $render->setAccessible(true);
+
+        $cells = [];
+        $before = $DB->perf_get_reads();
+        foreach ($table->rawdata as $notice) {
+            $cells[] = $render->invoke($table, $notice);
+        }
+        $reads = $DB->perf_get_reads() - $before;
+
+        // Control: every row really rendered a cell, so the column was exercised for all ten.
+        $this->assertCount(10, $cells);
+        foreach ($cells as $cell) {
+            $this->assertNotSame('', $cell);
+        }
+
+        $this->assertLessThanOrEqual(2, $reads);
+    }
 }

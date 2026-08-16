@@ -153,6 +153,27 @@ class audience_job extends persistent {
     }
 
     /**
+     * The criteria hashes of every job still in flight, as a set.
+     *
+     * One query for a whole page of notices, where find_in_flight() is one per notice. The pending
+     * window is short, so the set stays small however many jobs the table has accumulated.
+     *
+     * @return array Criteria hash => true.
+     */
+    public static function in_flight_hashes(): array {
+        global $DB;
+
+        $hashes = $DB->get_fieldset_select(
+            self::TABLE,
+            'DISTINCT criteriahash',
+            'status = :status AND timecreated >= :mints',
+            ['status' => self::STATUS_PENDING, 'mints' => time() - self::PENDING_WINDOW]
+        );
+
+        return array_fill_keys($hashes, true);
+    }
+
+    /**
      * Generate a UUID v4 string suitable for jobid.
      *
      * @return string

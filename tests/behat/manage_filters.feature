@@ -42,6 +42,21 @@ Feature: Filtering the notice list
     Then I should see "Manutenção programada"
     And I should see "Notices found: 1"
 
+  Scenario: A name filter arriving in the URL survives the first touch of another control
+    # managenotice.php accepts the filter values as URL parameters so a filtered list can be linked
+    # to, and the server honoured them — but the search box rendered empty, because the value was
+    # exported to the template and no markup consumed it. The reader then saw a short list with no
+    # visible reason, and the first touch of Status made manage_list.js read the empty box and push
+    # a filterset without the name, silently widening the list back to everything.
+    When I visit "/local/awareness/managenotice.php?name=manutencao"
+    Then the field "Search by name" matches value "manutencao"
+    And I should see "Notices found: 1"
+    # The way out of a filter has to be offered on arrival, not only once something is touched.
+    And I should see "Clear filters"
+    When I set the field "Status" to "Active"
+    Then I should see "Notices found: 1"
+    And I should see "Manutenção programada"
+
   Scenario: A search that matches nothing offers a way back
     When I set the field "Search by name" to "zzzznothing"
     Then I should see "No notices match these filters."

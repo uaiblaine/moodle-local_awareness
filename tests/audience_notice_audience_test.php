@@ -272,4 +272,95 @@ final class audience_notice_audience_test extends \advanced_testcase {
         $resolved = audience_job::get_record(['jobid' => $job->get('jobid')]);
         $this->assertSame(audience_job::STATUS_READY, $resolved->get('status'));
     }
+
+    /**
+     * Counting an audience is not an authoring act, so it must not look like one.
+     *
+     * record() wrote through the persistent, and core\persistent::update() is final and stamps
+     * timemodified unconditionally. In this plugin timemodified IS the "the author changed this"
+     * signal — the first thing helper::must_reshow() reads, and the whole content of
+     * reset_notice() — so every recalculation was a silent Reset: everyone who had already dealt
+     * with the notice got it back.
+     *
+     * The timestamps are forced into the past deliberately. must_reshow() compares with a strict
+     * `<`, so a bump landing in the same second as the last view is forgiven, and without this the
+     * test is a coin flip that mostly passes.
+     *
+     * @covers \local_awareness\audience\notice_audience::record
+     */
+    public function test_recording_a_count_does_not_re_show_the_notice(): void {
+        global $DB, $USER;
+
+        set_config('audience_sync_limit', 100000, 'local_awareness');
+        helper::create_new_notice($this->form_data(['title' => 'Counted']));
+        $notice = awareness::get_record(['title' => 'Counted']);
+
+        // Push the notice and the user's view of it into the past, so the comparison is real.
+        $past = time() - 3600;
+        $DB->set_field(awareness::TABLE, 'timemodified', $past, ['id' => $notice->get('id')]);
+        $notice = awareness::get_record(['id' => $notice->get('id')]);
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+        helper::acknowledge_notice($notice);
+        $DB->set_field('local_awareness_lastview', 'timemodified', $past + 1, ['noticeid' => $notice->get('id')]);
+        unset($USER->viewednotices);
+
+        // Control: settled, so the notice is not on offer. Without this the assertion below is free.
+        $this->assertArrayNotHasKey($notice->get('id'), helper::retrieve_user_notices('/my/'));
+
+        $this->setAdminUser();
+        notice_audience::refresh($notice, true);
+
+        $this->setUser($user);
+        unset($USER->viewednotices);
+
+        $this->assertArrayNotHasKey(
+            $notice->get('id'),
+            helper::retrieve_user_notices('/my/'),
+            'Recalculating the audience must not put the notice back in front of somebody who settled it.'
+        );
+        // And the count really was written, or nothing was exercised.
+        $reread = awareness::get_record(['id' => $notice->get('id')]);
+        $this->assertNotNull($reread->get('audiencecount'));
+        $this->assertSame($past, (int) $reread->get('timemodified'));
+    }
+
+    /**
+     * A job already promised to one notice must not be taken over by another.
+     *
+     * refresh() joins an in-flight job by criteria hash, and the hash names a set of filters rather
+     * than a notice — two site-wide notices with no filters hash identically. attach() then
+     * overwrote the job's owner, so the notice that raised it waited for a result that would never
+     * be written to it, and stayed permanently uncounted.
+     *
+     * @covers \local_awareness\audience\notice_audience::refresh
+     */
+    public function test_a_second_notice_does_not_steal_an_in_flight_job(): void {
+        // Over the limit, so the work is queued rather than resolved during the request.
+        $this->getDataGenerator()->create_user();
+        set_config('audience_sync_limit', 1, 'local_awareness');
+        live_mode::reset_cache();
+
+        helper::create_new_notice($this->form_data(['title' => 'First']));
+        $first = awareness::get_record(['title' => 'First']);
+        $firstjob = audience_job::get_record(['noticeid' => $first->get('id')]);
+        $this->assertNotFalse($firstjob, 'The first notice must own a queued job for this to mean anything.');
+
+        // A second notice with identical criteria, so it hashes the same.
+        helper::create_new_notice($this->form_data(['title' => 'Second']));
+        $second = awareness::get_record(['title' => 'Second']);
+
+        $reread = audience_job::get_record(['jobid' => $firstjob->get('jobid')]);
+        $this->assertSame(
+            (int) $first->get('id'),
+            (int) $reread->get('noticeid'),
+            'The first notice\'s job must still belong to the first notice.'
+        );
+
+        // Control: the second notice is not left without one either.
+        $secondjob = audience_job::get_record(['noticeid' => $second->get('id')]);
+        $this->assertNotFalse($secondjob, 'The second notice needs a job of its own, not none at all.');
+        $this->assertNotSame($firstjob->get('jobid'), $secondjob->get('jobid'));
+    }
 }

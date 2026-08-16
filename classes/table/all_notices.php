@@ -23,6 +23,7 @@ use local_awareness\helper;
 use moodle_url;
 use local_awareness\local\collision;
 use local_awareness\audience\notice_audience;
+use local_awareness\persistent\audience_job;
 use html_writer;
 
 defined('MOODLE_INTERNAL') || die();
@@ -42,6 +43,12 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
     /** @var array Notice id to the titles of the repeating notices it competes with, for this page of rows. */
     protected $clashtitles = [];
+
+    /** @var array|null Cohort id to name, resolved once for the whole page of rows. */
+    protected $cohortnames = null;
+
+    /** @var array Criteria hashes with a job in flight, for this page of rows. */
+    protected $inflight = [];
 
     /**
      * all_notices constructor.
@@ -210,6 +217,8 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
          * notices starts.
          */
         $this->clashtitles = collision::clash_titles_for($this->rawdata ?? []);
+        // Same shape as the line above: one query for the page, not one per row in col_audience().
+        $this->inflight = audience_job::in_flight_hashes();
 
         // Set initial bars.
         if ($useinitialsbar) {
@@ -612,7 +621,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     protected function col_audience(awareness $awareness): string {
         $count = $awareness->get('audiencecount');
         $computed = (int) $awareness->get('audiencecomputed');
-        $state = notice_audience::state_of($awareness);
+        $state = notice_audience::state_of($awareness, $this->inflight);
 
         if ($state === notice_audience::STATE_PENDING) {
             return html_writer::tag(
@@ -673,8 +682,28 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             return '';
         }
 
-        $names = array_map(static function ($cohortid) {
-            return helper::get_cohort_name($cohortid);
+        /*
+         * Resolved once for the whole page. get_cohort_name() reaches built_cohorts_options(),
+         * which is a COUNT plus an unbounded scan of {cohort} joined to {context} plus a
+         * capability walk — and it was paid once per cohort id per row, so the page cost scaled
+         * with the size of the site rather than with what is on screen. Worse since the list became
+         * a dynamic table: the filter bar re-pays it on every keystroke.
+         *
+         * The memo lives on the table object, which exists for exactly one render, so it cannot go
+         * stale across requests, users or test methods. A static inside built_cohorts_options() —
+         * which is what the audit recommends — would survive resetAfterTest(), because
+         * phpunit_util::reset_all_data() resets a hardcoded list of core caches and has no hook for
+         * plugin ones; it would also break the two existing tests that create or delete a cohort
+         * between calls.
+         *
+         * Filled lazily rather than in query_db(): the early return above means a site that never
+         * targets cohorts pays nothing at all.
+         */
+        $this->cohortnames ??= helper::built_cohorts_options();
+        $options = $this->cohortnames;
+
+        $names = array_map(static function ($cohortid) use ($options) {
+            return helper::get_cohort_name((int) $cohortid, $options);
         }, $cohorts);
         $list = implode(', ', $names);
 

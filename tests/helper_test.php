@@ -644,4 +644,100 @@ final class helper_test extends \advanced_testcase {
             'Evaluating the rule must leave core\'s competency tables exactly as it found them.'
         );
     }
+
+    /**
+     * The theme rule must judge the theme the reader is looking at.
+     *
+     * It read $PAGE->theme->name from inside the get_notices web service, where $PAGE never had
+     * set_course() called — so moodle_page::resolve_theme() skipped its course and category
+     * branches and always answered the site theme. A notice filtered by a course theme matched
+     * nowhere it was meant to, and matched everywhere it was not.
+     *
+     * @covers \local_awareness\helper::check_filters
+     */
+    public function test_the_theme_rule_matches_the_theme_the_page_actually_renders(): void {
+        global $CFG, $PAGE;
+
+        $this->resetAfterTest();
+        $CFG->theme = 'boost';
+        $CFG->allowcoursethemes = 1;
+
+        $course = $this->getDataGenerator()->create_course(['theme' => 'classic']);
+        $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $this->setUser($user);
+        $courseid = (int) $course->id;
+
+        /*
+         * Control. The rule short-circuits whenever it resolves an empty theme name, and then EVERY
+         * theme filter admits — so a filter naming a theme nobody uses has to be refused, or the
+         * assertions below pass without the rule being switched on at all.
+         */
+        $this->assertFalse(helper::check_filters(json_encode(['filter_theme' => ['nosuchtheme']]), $courseid));
+
+        // Preconditions: this course renders classic while the service's own $PAGE says boost.
+        $coursepage = new \moodle_page();
+        $coursepage->set_course($course);
+        $this->assertSame('classic', $coursepage->theme->name);
+        $this->assertSame('boost', $PAGE->theme->name);
+
+        // A pair, deliberately: both can only pass if the resolved theme is exactly classic.
+        $this->assertTrue(helper::check_filters(json_encode(['filter_theme' => ['classic']]), $courseid));
+        $this->assertFalse(helper::check_filters(json_encode(['filter_theme' => ['boost']]), $courseid));
+    }
+
+    /**
+     * Deleting a notice must take its uploaded files with it.
+     *
+     * Nothing removed the content and bgimage file areas, so every image ever uploaded to a deleted
+     * notice stayed in moodledata and {files} for the life of the site — unreachable at the same
+     * time, because the pluginfile gate resolves the notice first and refuses one that is gone.
+     *
+     * @covers \local_awareness\helper::delete_notice
+     */
+    public function test_deleting_a_notice_deletes_its_files(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        set_config('allow_delete', 1, 'local_awareness');
+
+        $formdata = new \stdClass();
+        $formdata->title = 'With a file';
+        $formdata->content = '<p>Body</p>';
+        helper::create_new_notice($formdata);
+        $notice = awareness::get_record(['title' => 'With a file']);
+
+        $fs = get_file_storage();
+        $record = [
+            'contextid' => \context_system::instance()->id,
+            'component' => 'local_awareness',
+            'filearea' => 'content',
+            'itemid' => $notice->get('id'),
+            'filepath' => '/',
+            'filename' => 'diagram.png',
+        ];
+        $fs->create_file_from_string($record, 'not really a png');
+
+        // Control: the file is really there, so its absence below means something.
+        $this->assertTrue($fs->file_exists(
+            $record['contextid'],
+            'local_awareness',
+            'content',
+            $notice->get('id'),
+            '/',
+            'diagram.png'
+        ));
+
+        helper::delete_notice($notice);
+
+        $this->assertFalse(
+            $fs->file_exists(
+                $record['contextid'],
+                'local_awareness',
+                'content',
+                $record['itemid'],
+                '/',
+                'diagram.png'
+            ),
+            'A deleted notice must not leave files behind that nothing can reach and nothing can remove.'
+        );
+    }
 }
