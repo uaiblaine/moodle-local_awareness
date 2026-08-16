@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\local\page_probe;
 use local_awareness\persistent\awareness;
+use local_awareness\persistent\noticelink;
 
 /**
  * Test cases
@@ -388,5 +389,259 @@ final class helper_test extends \advanced_testcase {
         $this->assertNotContains((int) $hidden->id, $stored);
         // Control: the cohort this user CAN see has to survive, or nothing was proven.
         $this->assertContains((int) $visible->id, $stored);
+    }
+
+    /**
+     * A dismissed forced-logout notice must still be acknowledgeable. Audit finding M12.
+     *
+     * The display path re-shows a dismissed notice whose author asked for a forced logout; the
+     * acknowledge path did not carry that condition, so it reported the notice as already handled
+     * and acknowledge_notice() returned before writing the row, before the event and before the
+     * logout. The user got the modal back on every page load with an Accept button that did
+     * nothing, and Close — which logs them out — as the only control with an effect.
+     *
+     * @covers \local_awareness\helper::acknowledge_notice
+     */
+    public function test_a_dismissed_forced_logout_notice_can_still_be_acknowledged(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Forced logout',
+            'content' => '<p>Body</p>',
+            'enabled' => 1,
+            'reqack' => 0,
+            'forcelogout' => 1,
+        ]);
+        $notice->create();
+
+        // Close: the dismissal is recorded and dismiss_notice() logs them out, as it is meant to.
+        helper::dismiss_notice($notice);
+        $this->assertSame(0, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
+
+        // They log back in, and the notice is waiting for them again — which is the correct half.
+        $this->setUser($user);
+        $this->assertArrayHasKey($notice->get('id'), helper::retrieve_user_notices('/my/'));
+
+        $result = helper::acknowledge_notice($notice);
+
+        $this->assertSame(
+            1,
+            $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]),
+            'Accept after a dismissal must record the acknowledgement rather than silently do nothing.'
+        );
+        // The forced logout sits after the same early return, so it was skipped too.
+        $this->assertArrayHasKey('redirecturl', $result);
+    }
+
+    /**
+     * ...but a notice that asks for neither must still be left alone once it has been dismissed.
+     *
+     * The control for the test above. Without it, making must_reshow() return true unconditionally
+     * would satisfy that test while re-showing every dismissed notice on the site for ever.
+     *
+     * @covers \local_awareness\helper::acknowledge_notice
+     */
+    public function test_a_plainly_dismissed_notice_is_not_acknowledged_again(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setUser($this->getDataGenerator()->create_user());
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Ordinary',
+            'content' => '<p>Body</p>',
+            'enabled' => 1,
+            'reqack' => 0,
+            'forcelogout' => 0,
+        ]);
+        $notice->create();
+
+        helper::dismiss_notice($notice);
+        helper::acknowledge_notice($notice);
+
+        $this->assertSame(
+            0,
+            $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]),
+            'A dismissal settles a notice that asks for nothing; acknowledging it again writes no row.'
+        );
+    }
+
+    /**
+     * A hidden cohort is a normal way to model a staff-only audience. Audit finding M13.
+     *
+     * Three code paths disagreed about what membership meant: the form offered hidden cohorts as
+     * targets, the estimator counted their members, and the runtime used cohort_get_user_cohorts(),
+     * whose SQL demands `c.visible = 1`. So the author picked one, the panel confirmed a number,
+     * and nobody was ever shown the notice — with nothing logged anywhere.
+     *
+     * The outsider is the control: without them, a change that stopped filtering by cohort at all
+     * would satisfy the first assertion.
+     *
+     * @covers \local_awareness\helper::user_cohort_ids
+     */
+    public function test_a_notice_targeting_a_hidden_cohort_reaches_its_members(): void {
+        $this->resetAfterTest();
+
+        $hidden = $this->getDataGenerator()->create_cohort(['visible' => 0]);
+        $member = $this->getDataGenerator()->create_user();
+        $outsider = $this->getDataGenerator()->create_user();
+        cohort_add_member($hidden->id, $member->id);
+
+        /*
+         * Saved through the real path, so this also pins that a hidden cohort in a context the
+         * author can see is still a legal target — phase 1 filters submitted ids by context, not by
+         * the cohort's own visibility flag, and that distinction is what makes M13 fixable at all.
+         */
+        $this->setAdminUser();
+        $formdata = new \stdClass();
+        $formdata->title = 'Staff only';
+        $formdata->content = '<p>Body</p>';
+        $formdata->cohorts = [$hidden->id];
+        helper::create_new_notice($formdata);
+
+        $notice = awareness::get_record(['title' => 'Staff only']);
+        $this->assertSame([(string) $hidden->id], $notice->get('cohorts'), 'The hidden cohort must survive the save.');
+
+        $this->setUser($member);
+        $this->assertArrayHasKey(
+            $notice->get('id'),
+            helper::retrieve_user_notices('/my/'),
+            'A member of the targeted cohort must be shown the notice even when the cohort is hidden.'
+        );
+
+        // Control: the cohort still has to mean something.
+        $this->setUser($outsider);
+        $this->assertArrayNotHasKey($notice->get('id'), helper::retrieve_user_notices('/my/'));
+    }
+
+    /**
+     * Fixing a typo in a link's label must not throw away its click history. Audit finding M14.
+     *
+     * Link identity used to include the anchor text, so a renamed label minted a new id and retired
+     * the old one; the history rows were left behind an id nothing joins to any more, invisible to
+     * every report and impossible to clear by hand.
+     *
+     * @covers \local_awareness\persistent\noticelink::create_new_link
+     */
+    public function test_renaming_a_link_keeps_its_identity_and_its_history(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        set_config('allow_update', 1, 'local_awareness');
+
+        $formdata = new \stdClass();
+        $formdata->title = 'With a link';
+        $formdata->content = '<p><a href="https://example.com/policy">Raed the policy</a></p>';
+        helper::create_new_notice($formdata);
+
+        $notice = awareness::get_record(['title' => 'With a link']);
+        $links = noticelink::get_notice_link_records($notice->get('id'));
+        $this->assertCount(1, $links);
+        $linkid = (int) array_key_first($links);
+
+        // A click on it, which is the thing that must survive the edit.
+        helper::track_link($linkid);
+        $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $linkid]));
+
+        // The typo is fixed. Same destination, new label.
+        $formdata->content = '<p><a href="https://example.com/policy">Read the policy</a></p>';
+        helper::update_notice($notice, $formdata);
+
+        $after = noticelink::get_notice_link_records($notice->get('id'));
+        $this->assertCount(1, $after);
+        $this->assertSame($linkid, (int) array_key_first($after), 'The link keeps its id across a label edit.');
+        $this->assertSame('Read the policy', $after[$linkid]->text);
+        $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $linkid]));
+    }
+
+    /**
+     * ...and a link that really goes away takes its history with it, rather than orphaning it.
+     *
+     * The control for the test above: it proves the identity change did not simply stop retiring
+     * links. Orphan history rows are invisible to every report, because each one inner-joins the
+     * links table back.
+     *
+     * @covers \local_awareness\helper::update_notice
+     */
+    public function test_a_removed_link_leaves_no_orphan_history(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        set_config('allow_update', 1, 'local_awareness');
+
+        $formdata = new \stdClass();
+        $formdata->title = 'Link goes away';
+        $formdata->content = '<p><a href="https://example.com/old">Old</a></p>';
+        helper::create_new_notice($formdata);
+
+        $notice = awareness::get_record(['title' => 'Link goes away']);
+        $linkid = (int) array_key_first(noticelink::get_notice_link_records($notice->get('id')));
+        helper::track_link($linkid);
+        $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $linkid]));
+
+        // The link is replaced by one pointing somewhere else entirely.
+        $formdata->content = '<p><a href="https://example.com/new">New</a></p>';
+        helper::update_notice($notice, $formdata);
+
+        $this->assertSame(
+            0,
+            $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $linkid]),
+            'History belonging to a retired link must go with it, not linger behind a dangling id.'
+        );
+    }
+
+    /**
+     * Reading the competency rule must not write competency state. Audit finding M16.
+     *
+     * The rule used to be evaluated through core_competency\api::get_user_competency_in_course(),
+     * which is not a read: it creates the user_competency_course relation when none exists. It is
+     * reached from local_awareness_getnotices, which db/services.php declares 'type' => 'read', so
+     * merely opening a course page covered by a competency-filtered notice materialised competency
+     * state for a user nobody had assessed, and core's reports began listing them.
+     *
+     * @covers \local_awareness\helper::retrieve_user_notices
+     */
+    public function test_reading_a_competency_rule_creates_no_competency_state(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $competencygenerator = $generator->get_plugin_generator('core_competency');
+        $framework = $competencygenerator->create_framework();
+        $competency = $competencygenerator->create_competency(['competencyframeworkid' => $framework->get('id')]);
+        // Linked to the course, or the API this used to call would throw and create nothing anyway.
+        \core_competency\api::add_competency_to_course($course->id, $competency->get('id'));
+
+        $formdata = new \stdClass();
+        $formdata->title = 'For the proficient';
+        $formdata->content = '<p>Body</p>';
+        $formdata->filter_competency_rules = json_encode([
+            ['id' => (int) $competency->get('id'), 'proficient' => 1, 'name' => 'c'],
+        ]);
+        helper::create_new_notice($formdata);
+
+        $user = $generator->create_user();
+        $generator->enrol_user($user->id, $course->id);
+        $this->setUser($user);
+
+        $before = $DB->count_records('competency_usercompcourse', ['userid' => $user->id]);
+        $this->assertSame(0, $before, 'The user starts with no competency state, which is the whole point.');
+
+        helper::retrieve_user_notices('/course/view.php', (int) $course->id);
+
+        $this->assertSame(
+            0,
+            $DB->count_records('competency_usercompcourse', ['userid' => $user->id]),
+            'Evaluating the rule must leave core\'s competency tables exactly as it found them.'
+        );
     }
 }

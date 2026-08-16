@@ -6,6 +6,55 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — five audit findings that were written down and never fixed (version 2026081514)
+
+Phase 2 of `docs/PLANO-correcoes.md`. Each has carried its own section in `docs/AUDIT-2026-08.md`
+since August; each was still true in the code.
+
+- **M3 — the audience estimate answered a different question from the one the editor asked.**
+  `audience_criteria.js` never sent `filter_role_context`, so the server read 0, meaning "any
+  context": a rule scoped to one course was estimated across the whole site, and where the role was
+  the site's default the estimator took its `1 = 1` shortcut and reported the entire user base. The
+  runtime honoured the stored context all along, so the panel and the notice disagreed by orders of
+  magnitude. A new `criteria_contract_test` now asserts that the editor sends every field
+  `estimator::normalise()` reads, and nothing it does not — the field was *absent*, not wrong, and
+  nothing in the pipeline reads a JavaScript file looking for an absence.
+
+- **M12 — a dismissed forced-logout notice could never be cleared.** The display path re-shows one;
+  the acknowledge path did not carry that condition, so it reported the notice as already handled
+  and `acknowledge_notice()` returned before writing the row, before the event and before the
+  logout. The user got the modal back on every page load with an Accept button that did nothing,
+  and Close — which logs them out — as the only control with an effect. The two lists of conditions
+  are one predicate now, `must_reshow()`, because they drifted precisely by an absence that a
+  reader had to notice rather than see.
+
+- **M13 — a notice aimed at a hidden cohort reached nobody.** Three code paths disagreed about what
+  membership meant: the form offered hidden cohorts as targets, the estimator counted their members
+  with no visibility predicate, and the runtime used `cohort_get_user_cohorts()`, whose SQL demands
+  `c.visible = 1`. An author picked one — the ordinary way to model a staff-only audience — the
+  panel confirmed a number, and nothing was ever shown, with nothing logged. There is one resolver
+  now. Visibility governs who may *target* a cohort, which phase 1 already enforces at save time;
+  whether somebody is *in* one is not a question about who is looking.
+
+- **M14 — fixing a typo in a link's label threw away its click history.** Link identity included the
+  anchor text, so a renamed label minted a new id and retired the old one; the history rows stayed
+  behind an id nothing joins to any more, invisible to every report and impossible to clear by hand.
+  A link is identified by where it goes now, and a link that really is removed takes its history
+  with it. One consequence worth knowing: two anchors in the same notice pointing at the same URL
+  share one tracked link, so their clicks are counted together.
+
+- **M16 — a read-typed web service wrote into core's tables.** The competency rule was evaluated
+  through `core_competency\api::get_user_competency_in_course()`, which creates the
+  `user_competency_course` relation when none exists. Reached from `local_awareness_getnotices`,
+  declared `'type' => 'read'`, it meant that merely opening a course page covered by a
+  competency-filtered notice materialised competency state for a user nobody had assessed, and
+  core's competency reports began listing them. The row is read directly now; a missing one means
+  not proficient, which is what the absent relation meant anyway.
+
+Six mutations, six dead tests: the `filter_role_context` send, the `forcelogout` condition, the
+membership resolver, both halves of the link fix and the competency read were each reverted in turn
+with the mutated line printed, and the matching test failed every time.
+
 ### Security — phase 1 of `docs/PLANO-correcoes.md` (version 2026081513)
 
 Four items, none of them a privilege escalation: each needs `local/awareness:manage` already. They
