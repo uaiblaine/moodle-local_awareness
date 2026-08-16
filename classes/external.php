@@ -421,25 +421,48 @@ class external extends external_api {
             $sqlparams['contextlevel'] = $contextlevel;
         }
 
-        if ($query !== '') {
-            $sql .= " AND (" . $DB->sql_like('r.name', ':q1', false, false) .
-                    " OR " . $DB->sql_like('r.shortname', ':q2', false, false) . ")";
-            $sqlparams['q1'] = '%' . $DB->sql_like_escape($query) . '%';
-            $sqlparams['q2'] = '%' . $DB->sql_like_escape($query) . '%';
-        }
-
         $sql .= " ORDER BY r.sortorder ASC";
 
-        $records = $DB->get_records_sql($sql, $sqlparams, 0, 50);
-        $roles = [];
+        $records = $DB->get_records_sql($sql, $sqlparams);
         $allroles = role_get_names(null, ROLENAME_ORIGINAL);
+
+        /*
+         * The query is matched here rather than in SQL, because the label the picker shows is not
+         * in the database. A standard role ships with an EMPTY role.name and takes its label from
+         * the language pack through role_get_name(), so a LIKE over name and shortname finds
+         * nothing for "Non-editing teacher" or "Course creator" — and under a translated pack it
+         * finds nothing at all, for any standard role. The autocomplete does no client-side
+         * filtering either: it calls this function with the typed string and renders the answer
+         * verbatim, so what this misses the admin cannot select.
+         *
+         * The stored name stays in the comparison beside the label. role_get_name() runs it
+         * through format_string(), which entity-escapes an ampersand, so a custom role called
+         * "R&D coordinator" is findable by the text its author actually typed rather than only by
+         * "R&amp;D". Three separate comparisons rather than one concatenated haystack, so a query
+         * cannot match across a field boundary.
+         *
+         * Filter first, cap after: capping in SQL would have limited the rows CONSIDERED rather
+         * than the rows returned, hiding matches behind fifty non-matches.
+         */
+        $needle = \core_text::strtolower($query);
+        $roles = [];
 
         foreach ($records as $record) {
             $localname = isset($allroles[$record->id]) ? $allroles[$record->id]->localname : $record->name;
+            $matches = $needle === ''
+                || \core_text::strpos(\core_text::strtolower($localname), $needle) !== false
+                || \core_text::strpos(\core_text::strtolower((string) $record->name), $needle) !== false
+                || \core_text::strpos(\core_text::strtolower($record->shortname), $needle) !== false;
+            if (!$matches) {
+                continue;
+            }
             $roles[] = [
                 'id' => $record->id,
                 'name' => $localname,
             ];
+            if (count($roles) >= 50) {
+                break;
+            }
         }
 
         return ['roles' => json_encode($roles)];

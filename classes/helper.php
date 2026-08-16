@@ -940,6 +940,29 @@ class helper {
     }
 
     /**
+     * Whether this user already has a row of this kind for this notice.
+     *
+     * The acknowledgement table is the plugin's compliance record: it answers "who dismissed
+     * this" and "who accepted this", and both questions want one row per person. There is no
+     * unique key to lean on — adding one to a live table would fail the upgrade on any site that
+     * has already accumulated duplicates — so the check happens here, at the only two writers.
+     *
+     * @param awareness $notice Notice.
+     * @param int $userid User id.
+     * @param string $action acknowledgement::ACTION_DISMISSED or ACTION_ACKNOWLEDGED.
+     * @return bool True when a row already exists.
+     */
+    private static function has_acknowledgement_record(awareness $notice, int $userid, string $action): bool {
+        global $DB;
+
+        return $DB->record_exists('local_awareness_ack', [
+            'noticeid' => $notice->get('id'),
+            'userid' => $userid,
+            'action' => $action,
+        ]);
+    }
+
+    /**
      * Create new acknowledgement record.
      *
      * @param awareness $notice
@@ -979,8 +1002,18 @@ class helper {
         $result = [];
         // Check if require acknowledgement. Guests share one user id, so the row would be nobody's.
         if ($notice->get('reqack') && !$isguest) {
-            // Record dismiss action.
-            self::create_new_acknowledge_record($notice, acknowledgement::ACTION_DISMISSED);
+            /*
+             * One row per reader per notice. A reqack notice is deliberately put back in front of
+             * a user who dismissed it — that is the whole point of requiring acknowledgement — so
+             * an unguarded insert writes another row on every refusal, and the dismissed report,
+             * whose heading is "List of users who dismissed the notice", lists the same person
+             * once per page load. The event still fires each time: a repeated refusal is a real
+             * event, it is the compliance ROW that must not be duplicated.
+             */
+            if (!self::has_acknowledgement_record($notice, $userid, acknowledgement::ACTION_DISMISSED)) {
+                // Record dismiss action.
+                self::create_new_acknowledge_record($notice, acknowledgement::ACTION_DISMISSED);
+            }
 
             // Log dismissed event.
             $params = [
@@ -1622,14 +1655,37 @@ class helper {
             return true;
         }
 
+        /*
+         * The pattern is anchored at BOTH ends. It used to carry only a trailing '$', so a rule
+         * for '/mod/quiz/view.php' also matched '/anything/mod/quiz/view.php' — an author scoping
+         * a notice to one page silently scoped it to every path ending in that page. Anchoring the
+         * start is the fix, but it cannot be done against the raw target alone: a Moodle installed
+         * in a subdirectory reports '/moodle/mod/quiz/view.php', and the author writes the path
+         * they see in the URL bar. So the pattern is tried against the target and against the
+         * target with the wwwroot's own path segment removed, and either may match.
+         */
+        global $CFG;
+        $targets = [$target];
+        $wwwrootpath = rtrim((string) parse_url($CFG->wwwroot, PHP_URL_PATH), '/');
+        if ($wwwrootpath !== '' && strpos($target, $wwwrootpath) === 0) {
+            $targets[] = substr($target, strlen($wwwrootpath));
+        }
+
         $pattern = preg_quote($pathmatch, '@');
         if (strpos($pattern, '%') !== false) {
             $pattern = str_replace('%', '.*', $pattern);
         } else {
             $pattern .= '$';
         }
+        $pattern = '^' . $pattern;
 
-        return (bool) preg_match("@{$pattern}@", $target);
+        foreach ($targets as $candidate) {
+            if (preg_match("@{$pattern}@", $candidate)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

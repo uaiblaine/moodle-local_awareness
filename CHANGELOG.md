@@ -6,6 +6,80 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — three functional defects, and the repo files that were never there (version 2026081606)
+
+Fourteen more findings closed. Five of those were already fixed by earlier phases and had only
+been reading as open because the census listed the same defect under two ids (TPL-04, TPL-07,
+RB-05, WS-11, DB-05); the census now says so.
+
+- **The role picker could not find most standard roles (audit WS-03).** `search_roles()` filtered
+  in SQL over `role.name` and `role.shortname`, but a standard role ships with an **empty**
+  `role.name` and takes its label from the language pack through `role_get_name()`. So "Non-editing
+  teacher", "Course creator", "Authenticated user" and "Authenticated user on site home" matched
+  nothing in English — and under a translated pack, no standard role matched anything at all. The
+  autocomplete does no client-side filtering: it sends the typed string and renders the answer
+  verbatim, so what the query missed the admin could not select. The match moved to PHP and
+  compares the displayed label, the stored name and the shortname; the stored name stays in because
+  `format_string()` entity-escapes an ampersand, and a custom role called "R&D coordinator" has to
+  be findable by the text its author typed rather than only by "R&amp;D". The 50-row cap now
+  applies **after** filtering — capping in SQL limited the rows considered, hiding matches behind
+  fifty non-matches.
+
+- **The dismissed report counted page loads, not people (audit BIZ-04).** A notice requiring
+  acknowledgement is deliberately shown again to someone who dismissed it, so the dismissal path
+  runs on every page load until they accept — and each run inserted another acknowledgement row.
+  The report headed "List of users who dismissed the notice" therefore listed the same person once
+  per refusal. Now one row per reader per notice. The **event** still fires every time: a repeated
+  refusal is a real event, it is the compliance row that must not duplicate.
+
+- **A path rule matched any URL ending with it (audit BIZ-07).** `check_path_match()` appended a
+  trailing `$` and no leading anchor, so a notice scoped to `/mod/quiz/view.php` also fired on
+  `/anything/mod/quiz/view.php`. Anchoring the start is the fix, but not on its own: a Moodle
+  installed in a subdirectory reports `/moodle/mod/quiz/view.php` while the author writes the path
+  they see in the URL bar, so the pattern is tried against the target and against the target with
+  the wwwroot's own path segment removed. Anchoring without that would have traded one defect for a
+  quieter one — every path rule silently dead on subdirectory installs.
+
+### Added — the fleet-template files, and a per-repo CLAUDE.md (audit REPO-03, REPO-05, REPO-06, REPO-09, REPO-12)
+
+`phpcs.xml`, `.phpcsignore`, `.moodle-plugin-ci.yml`, `.stylelintrc.json` and the pull-request
+template were all missing. `.gitattributes` had listed every one of them since before they existed,
+so they are already kept out of the release zip — verified with `git archive`. `.gitignore` was
+also actively preventing `.stylelintrc.json` from ever being committed, which is why the CHANGELOG
+entry claiming it had been added stayed false.
+
+`CLAUDE.md` now exists and records what is true for this plugin and not derivable from the code:
+that `docs/RECONCILIACAO-2026-08.md` is the open-work list and the audit is not; that `page_probe`
+reimplements `check_filters()`' logic, so tests there guard a different copy of the rules; the
+`can_access_course($course, null, '', true)` enrolment trap that makes un-enrolled test users fail
+every branch for the wrong reason; why titles and `pathmatch` need `format_string()`/`s()`; why
+guests get a session marker rather than a rejection; and that `filter_role_context` is a modifier
+rather than a rule, which has been mis-filed as a defect once already.
+
+The README advertised `make ci-awareness-datasource-tests` against a repo with no Makefile, and
+described audience targeting as cohort-only when the form offers seven criteria plus an
+asynchronous reach estimate. Both corrected.
+
+### Added — coverage that executes the class it claims (audit TEST-07)
+
+`bootstrap_compat_test` declared `@covers \local_awareness\local\bootstrap` while every one of its
+rules was a scan over source **text**, so neither `is_bs4()` nor `mark_page()` had ever run. Two
+tests now cross the 405/499/500/502 boundary and assert the marker reaches the body on 4.5 and only
+there. They swap in a fresh `moodle_page` and restore it: this is a `basic_testcase`, which does
+not call `reset_all_data()`, so without that the body class would outlive the test and the negative
+assertion would be reading a class left by an earlier run.
+
+Mutation-tested: removing the start anchor kills 3 tests, removing the wwwroot allowance kills 1,
+removing the dismissal guard kills 1, keying that guard on the notice alone kills 1, dropping
+either the label or the stored name from the role match kills 1 each, inverting `is_bs4()` kills 2,
+and making `mark_page()` unconditional kills 1.
+
+**Deliberately left for their own slices**, with the reason recorded rather than forgotten: WS-08
+(the site switch does not reach the web services) changes behaviour for many tests that never set
+that config, and patching them en masse to stay green is precisely how vacuous tests get made;
+PRIV-01 and PRIV-04 need twelve to thirteen new language keys in both packs; JS-02 and JS-03
+require an AMD rebuild and form a natural JavaScript-only slice.
+
 ### Added — the coverage gaps the reconciliation named (version 2026081605)
 
 The census in `docs/RECONCILIACAO-2026-08.md` found that the remaining debt was not broken code

@@ -92,6 +92,54 @@ final class check_filters_test extends \advanced_testcase {
     }
 
     /**
+     * A pattern is anchored at the START, so it cannot match a path that merely contains it.
+     *
+     * Without the leading anchor a rule scoping a notice to /mod/quiz/view.php also fired on
+     * /anything/mod/quiz/view.php — the author scoped to one page and got every path ending in
+     * that page. The control is the same pattern against the path it was written for.
+     */
+    public function test_a_pattern_cannot_match_a_path_that_merely_ends_with_it(): void {
+        $this->resetAfterTest();
+
+        $this->assertTrue(helper::check_path_match('/mod/quiz/view.php', '/mod/quiz/view.php'));
+        $this->assertFalse(helper::check_path_match('/mod/quiz/view.php', '/evil/mod/quiz/view.php'));
+        $this->assertFalse(helper::check_path_match('/course/', '/local/awareness/course/'));
+    }
+
+    /**
+     * A wildcard pattern is anchored at the start too.
+     */
+    public function test_a_wildcard_pattern_is_anchored_at_the_start(): void {
+        $this->resetAfterTest();
+
+        $this->assertTrue(helper::check_path_match('/mod/%', '/mod/quiz/view.php'));
+        $this->assertFalse(helper::check_path_match('/mod/%', '/elsewhere/mod/quiz/view.php'));
+    }
+
+    /**
+     * A Moodle installed in a subdirectory still matches the path the author typed.
+     *
+     * The anchor is what makes this necessary: on such a site the target arrives as
+     * /moodle/mod/quiz/view.php while the author writes /mod/quiz/view.php, which is what they
+     * see in the URL bar. Anchoring without allowing for the wwwroot segment would have turned
+     * one defect into another — every path rule silently dead on subdirectory installs.
+     */
+    public function test_a_subdirectory_install_still_matches_the_authored_path(): void {
+        global $CFG;
+
+        $this->resetAfterTest();
+
+        $original = $CFG->wwwroot;
+        $CFG->wwwroot = 'https://example.com/moodle';
+
+        $this->assertTrue(helper::check_path_match('/mod/quiz/view.php', '/moodle/mod/quiz/view.php'));
+        // Still anchored: the wwwroot segment is stripped, not treated as a free prefix.
+        $this->assertFalse(helper::check_path_match('/mod/quiz/view.php', '/moodle/evil/mod/quiz/view.php'));
+
+        $CFG->wwwroot = $original;
+    }
+
+    /**
      * Encode filters the way the notice form stores them.
      *
      * @param array $filters Raw filter array.
