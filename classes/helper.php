@@ -940,6 +940,24 @@ class helper {
     }
 
     /**
+     * Whether the site-wide notice switch is on.
+     *
+     * Gates DELIVERY, not authoring. The editor, the manage page and the author-side web services
+     * keep working while it is off, which is what makes staging a notice before publishing
+     * possible; what stops is showing notices to readers and recording what they did with them.
+     *
+     * The setting defaults to 0, so a plain truthy read is right here — this is not one of the
+     * default-ON checkboxes where only a stored '0' counts as off. Same test the footer hook
+     * already applies, shared so the two cannot drift.
+     *
+     * @return bool True when notices may be delivered.
+     * @throws \dml_exception
+     */
+    public static function is_delivery_enabled(): bool {
+        return !empty(get_config('local_awareness', 'enabled'));
+    }
+
+    /**
      * Whether this user already has a row of this kind for this notice.
      *
      * The acknowledgement table is the plugin's compliance record: it answers "who dismissed

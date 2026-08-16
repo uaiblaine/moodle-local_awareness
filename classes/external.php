@@ -71,6 +71,17 @@ class external extends external_api {
             'redirecturl' => '',
         ];
 
+        /*
+         * The site switch is checked at each entry point, the way should_load_on() checks it for
+         * the footer hook, rather than inside the delivery helpers. Those helpers answer "what
+         * would this user be shown", which is a question worth being able to ask with the switch
+         * off; this is the boundary where the answer becomes an action. A silent no-op rather than
+         * an exception: a disabled plugin should look like a plugin with nothing to say.
+         */
+        if (!helper::is_delivery_enabled()) {
+            return $result;
+        }
+
         $notice = awareness::get_record(['id' => $params['noticeid']]);
 
         // The notice id comes from the client, so the audience test has to be repeated here —
@@ -129,6 +140,17 @@ class external extends external_api {
             'redirecturl' => '',
         ];
 
+        /*
+         * The site switch is checked at each entry point, the way should_load_on() checks it for
+         * the footer hook, rather than inside the delivery helpers. Those helpers answer "what
+         * would this user be shown", which is a question worth being able to ask with the switch
+         * off; this is the boundary where the answer becomes an action. A silent no-op rather than
+         * an exception: a disabled plugin should look like a plugin with nothing to say.
+         */
+        if (!helper::is_delivery_enabled()) {
+            return $result;
+        }
+
         $notice = awareness::get_record(['id' => $params['noticeid']]);
 
         // The notice id comes from the client, so the audience test has to be repeated here —
@@ -177,6 +199,12 @@ class external extends external_api {
         self::validate_context(\context_system::instance());
 
         $params = self::validate_parameters(self::track_link_parameters(), ['linkid' => $linkid]);
+
+        // See dismiss_notice(): the switch is enforced at the boundary, not in the helper.
+        if (!helper::is_delivery_enabled()) {
+            return ['status' => false, 'redirecturl' => ''];
+        }
+
         return helper::track_link($params['linkid']);
     }
 
@@ -232,6 +260,12 @@ class external extends external_api {
          */
         if (trim($params['pageurl']) === '') {
             throw new \invalid_parameter_exception('pageurl must not be empty');
+        }
+
+        // See dismiss_notice(): the switch is enforced at the boundary, not in the helper. An empty
+        // list rather than an error — the client renders nothing and says nothing.
+        if (!helper::is_delivery_enabled()) {
+            return ['status' => true, 'notices' => '[]'];
         }
 
         $result = [];

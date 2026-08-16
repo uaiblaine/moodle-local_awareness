@@ -44,6 +44,16 @@ final class notice_external_test extends \advanced_testcase {
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
+
+        /*
+         * Delivery requires the site switch, which defaults to off. Every case in this file
+         * exercises the reader-facing web services, so the switch being on is their precondition
+         * rather than part of what they assert — and it is stated once, here, instead of being
+         * scattered. That the switch really does gate these four functions is asserted separately,
+         * in test_the_site_switch_gates_every_delivery_web_service(), so turning it on for the rest
+         * of the file cannot hide the behaviour.
+         */
+        set_config('enabled', 1, 'local_awareness');
     }
 
     /**
@@ -694,5 +704,54 @@ final class notice_external_test extends \advanced_testcase {
         // What the modal reads is really there, so the trim cannot pass by shipping nothing.
         $this->assertSame('Policy update', $payload['title']);
         $this->assertStringContainsString('Read the policy.', $payload['content']);
+    }
+
+    /**
+     * With the site switch off, none of the four reader-facing services does anything.
+     *
+     * The switch is the only way an admin can stop this plugin talking to users, and it used to
+     * reach the footer hook alone: the JS was never injected, but every web service stayed
+     * answerable to a direct POST, so a notice could still be read, dismissed, acknowledged and
+     * click-tracked on a site whose administrator had switched the plugin off.
+     *
+     * Each half of the pair runs the same call — switch off, then switch on — so a failure to
+     * write cannot be mistaken for the fixture being wrong.
+     */
+    public function test_the_site_switch_gates_every_delivery_web_service(): void {
+        global $DB;
+
+        $notice = $this->create_notice();
+        $link = noticelink::create_new_link((object) [
+            'noticeid' => $notice->get('id'),
+            'text' => 'the policy',
+            'link' => 'https://example.com/policy',
+        ]);
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+
+        set_config('enabled', 0, 'local_awareness');
+
+        $off = external::get_notices('/my/', 0);
+        $this->assertSame([], json_decode($off['notices'], true), 'no notice may be served while off');
+
+        external::dismiss_notice((int) $notice->get('id'));
+        external::acknowledge_notice((int) $notice->get('id'));
+        external::track_link((int) $link->get('id'));
+
+        $this->assertSame(0, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
+        $this->assertSame(0, $DB->count_records('local_awareness_lastview', ['noticeid' => $notice->get('id')]));
+        $this->assertSame(0, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->get('id')]));
+
+        // Control: with the switch on, the same four calls all take effect.
+        set_config('enabled', 1, 'local_awareness');
+
+        $on = external::get_notices('/my/', 0);
+        $this->assertCount(1, json_decode($on['notices'], true), 'the fixture notice is deliverable');
+
+        external::acknowledge_notice((int) $notice->get('id'));
+        external::track_link((int) $link->get('id'));
+
+        $this->assertSame(1, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
+        $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->get('id')]));
     }
 }

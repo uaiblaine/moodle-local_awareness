@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 25 | 4 | 4 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 49 | 7 | 5 | 35 | **96** |
+| Baixo | 50 | 7 | 5 | 34 | **96** |
 | Informativo | 13 | 5 | 4 | 30 | **52** |
-| **Total** | **102** | **17** | **14** | **65** | **198** |
+| **Total** | **103** | **17** | **14** | **64** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **119 dos 198 estão encerrados; 79 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **120 dos 198 estão encerrados; 78 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -71,10 +71,15 @@ parciais, com o que falta nomeado.
 > estavam fechados por fases anteriores e continuavam a ler-se como abertos por serem duplicados:
 > **TPL-04**, **TPL-07**, **RB-05**, **WS-11**, **DB-05**.
 >
-> **Deixados de propósito para uma fatia própria**, com razão registada e não por esquecimento:
-> **WS-08** (o interruptor geral não alcança os web services) muda o comportamento de muitos testes
-> que nunca definem essa configuração, e emendá-los em massa para ficarem verdes é exatamente como
-> se fabricam testes vazios; **PRIV-01** e **PRIV-04** (declaração de metadados de privacidade)
+> **Atualizado pela fase 8** (versão `2026081607`, branch `fix/phase-8-killswitch`): **WS-08**
+> fechado. A primeira tentativa pôs a verificação dentro dos helpers de entrega e partiu 34 testes;
+> a lição não era emendar 34 testes, era que o sítio estava errado. O interruptor pertence a cada
+> **ponto de entrada** — que é onde o `should_load_on()` já o verifica para o gancho — e não à
+> lógica de domínio. No sítio certo o raio de ação caiu para 14 testes, todos no ficheiro que
+> testa exatamente essa fronteira.
+>
+> **Ainda deixados de propósito**, com razão registada e não por esquecimento:
+> **PRIV-01** e **PRIV-04** (declaração de metadados de privacidade)
 > pedem doze a treze chaves de idioma novas nos dois packs; **JS-02** e **JS-03** exigem
 > reconstrução do AMD e formam naturalmente uma fatia só de JavaScript.
 
@@ -347,7 +352,7 @@ diz o que resta e onde.
   <br>tests/behat/behat_local_awareness.php:50 still opens the notice-insertion loop with `// Add the discussions to the relevant forum.` — byte-identical to the August line (git show 896dfc2:tests/behat/behat_local_awareness.php). The loop below it inserts rows into {local_awareness}; nothing in this file touches a forum.
   <br>*Falta:* tests/behat/behat_local_awareness.php:50 — the comment describes a forum generator it was copied from; delete or replace it.
 
-### Web services — 11 de 18 em aberto
+### Web services — 10 de 18 em aberto
 
 - **WS-01** · **parcial** — get_notices returns the entire notice DB record as a JSON blob in PARAM_RAW, defeating the execute_returns allowlist and leaking targeting…
   <br>The record-wide serialisation is gone: classes/external.php:253 copies a fixed 7-key allowlist out of to_record() (id, title, reqack, forcelogout, modal_width, modal_height, outsideclick) plus content/bgimageurl, and tests/external/notice_external_test.php:560-589 asserts the exact key set.
@@ -365,9 +370,8 @@ diz o que resta e onde.
   <br>*Falta:* Still unformatted. Two live consequences: a multilang course fullname renders its {mlang} markup literally in the picker, and any markup a course editor put in a fullname reaches innerHTML in the notice author's browser. Smallest fix: `format_string($course->fullname, true, ['context' => \context_system::instance()])` at classes/external.php:492. (search_roles at :427 is already safe by accident — role_get_name() format_string()s the name, moodle-502/public/lib/accesslib.php:4577.)
 - **WS-07** · corrigido — get_notices ships notice content that was filtered once at save time, never at output
   <br>Save-time filtering removed: classes/helper.php:251-271 (update_hyperlinks) now loads the raw content into DOMDocument, with the comment at :256-263 stating the format_text()/file_rewrite_pluginfile_urls() pass was moved out because it froze multilang "into whichever language the author happened to…
-- **WS-08** · **aberto** — The web services stay live when the plugin's own 'enabled' kill switch is off
-  <br>`grep -rn "local_awareness/enabled\\|get_config('local_awareness', 'enabled')" --include='*.php' .` returns exactly two hits: the setting declaration at settings.php:38 and one consumer, classes/local/hook_callbacks.php:73 (`if (!isloggedin() \|\| !get_config('local_awareness', 'enabled'))`), which only decides whether to inject the AMD module.
-  <br>*Falta:* With the site setting off, a direct call to local_awareness_getnotices still returns rendered notice bodies, and local_awareness_dismiss / _acknowledge / _tracklink still write rows and fire events. The kill switch only stops the JS from being loaded. Smallest fix: an early guard on get_config('local_awareness', 'enabled') in the four user-facing functions in classes/external.php (empty list for get_notices, status=false for the writes).
+- **WS-08** · corrigido — The web services stay live when the plugin's own 'enabled' kill switch is off
+  <br>Fechado na fase 8 (2026-08-16): `helper::is_delivery_enabled()` partilhado, chamado nos quatro pontos de entrada de leitura do `external.php` — `get_notices`, `dismiss_notice`, `acknowledge_notice`, `track_link`.
 - **WS-09** · corrigido — local/awareness:manage lacks RISK_XSS although the web service pipes unfiltered notice HTML into jQuery .html() on every user's page
   <br>db/access.php:43 — `'riskbitmask' => RISK_CONFIG \| RISK_XSS,` for local/awareness:manage, with the comment at :29-39 explaining the exact chain the finding described (PARAM_RAW content, helper::render_content() with 'noclean' => true, and the result reaching core's Modal.setBody(), i.e. innerHTML).
 - **WS-10** · **aberto** — Two web services declared 'write' fire no event, and dismissals of non-reqack notices are unlogged
