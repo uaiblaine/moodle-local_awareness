@@ -343,13 +343,15 @@ class helper {
             $notice->set('enabled', 1);
             $notice->update();
 
-            // Log enabled event.
+            // Log enabled event. awareness_enabled, not awareness_updated: the dedicated class
+            // exists, carries maintained lang strings and appears in the admin event list, where
+            // an admin can build an event-monitor rule on it — one that would never have fired.
             $params = [
                 'context' => \context_system::instance(),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $notice->get('usermodified'),
             ];
-            $event = \local_awareness\event\awareness_updated::create($params);
+            $event = \local_awareness\event\awareness_enabled::create($params);
             $event->trigger();
         } catch (\Exception $e) {
             \core\notification::error($e->getMessage());
@@ -368,13 +370,14 @@ class helper {
             $notice->set('enabled', 0);
             $notice->update();
 
-            // Log disable event.
+            // Log disable event. See enable_notice() — awareness_disabled was dead for the same
+            // reason.
             $params = [
                 'context' => \context_system::instance(),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $notice->get('usermodified'),
             ];
-            $event = \local_awareness\event\awareness_updated::create($params);
+            $event = \local_awareness\event\awareness_disabled::create($params);
             $event->trigger();
         } catch (\Exception $e) {
             \core\notification::error($e->getMessage());

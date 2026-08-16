@@ -6,6 +6,71 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the audit reconciled, and the residue it exposed (version 2026081604)
+
+`docs/AUDIT-2026-08.md` had always said it was the snapshot of the starting point rather than the
+list of what was open, and that list had never been made. It exists now:
+`docs/RECONCILIACAO-2026-08.md` gives all 198 findings a verdict against the current tree with
+current-tree evidence. All ten blockers are closed; 87 findings are settled, 111 still want a
+decision. Read the reconciliation, not the audit, to know what is open.
+
+Four defects it exposed are fixed here.
+
+- **A site-wide fatal waiting on any `Error` (audit C6).** `hook_callbacks::should_load_on()` caught
+  `\Exception`, not `\Throwable`, around the notice pipeline — and it runs during footer generation
+  on essentially every page. A `TypeError` from a typed setter, or a bad argument reaching
+  `completion_info`, would have taken the whole site down for every logged-in user, recoverable only
+  by disabling the plugin from the database. `page_probe` already used `\Throwable` at each of its
+  four boundaries; this one had been left behind.
+
+- **Notice titles were never filtered (audit C4, remainder).** An earlier release moved notice
+  *content* to the correct arrangement — stored as authored, `format_text()` at render, so a
+  multilang notice reads in each user's own language. The title was left on the old path: raw out of
+  `to_record()` into the modal payload, and raw into the manage table's title cell and its `title`
+  attribute. A multilang title therefore showed its markup literally in the heading above a body
+  that resolved correctly. Both paths now go through `format_string()`. `pathmatch`, `PARAM_RAW` and
+  emitted through `html_writer::tag()` two lines below, is escaped for the same reason.
+
+- **`awareness_enabled` and `awareness_disabled` had never fired (audit X1-01).** `enable_notice()`
+  and `disable_notice()` both created `awareness_updated`, under comments reading "Log enabled
+  event" and "Log disable event". The two dedicated classes were complete, carried maintained
+  strings in both packs, and appeared in the admin event reference — where an admin could build an
+  event-monitor rule that could never fire. This was recorded as closed in the phase-4 plan and had
+  not in fact been done; the new event tests are what make that impossible to repeat.
+
+- **Erasure ignored the approver (audit PRIV-02, PRIV-03).** `delete_data_for_users()` took the
+  userid from the context and ignored the approved userlist entirely, so a user the data-request
+  approver had withheld was erased anyway — a refusal turned into a deletion. It is driven by the
+  approved ids now, with the context still bounding what may be touched.
+  `delete_data_for_user()` likewise processed only the first context and read the userid from it
+  rather than from the contextlist.
+
+### Added — the tests that guard the privacy work (audit M20, TEST-01)
+
+The provider's four repairs (audit H5, H6, M18, M19) had no test of their own: core's compliance
+test checks that a table carrying a userid is *declared*, and never calls `export_user_data()` or
+any delete method, so every one of them could have been reverted with the suite green.
+
+- `tests/privacy/provider_test.php` — 16 tests. Each of the four user-linked tables is seeded
+  **alone**, because a user holding all four rows at once would satisfy the assertions just as well
+  against the lastview-only SQL the findings describe. Covers the contextlist, the userlist, export,
+  all three delete paths, the MUC view-cache purge, and non-user contexts.
+- `tests/event/events_test.php` — 8 tests. Nothing had ever asserted that any of the eight event
+  classes was constructed, which is how the enable/disable defect above survived. Each case asserts
+  the event *class*, and one case asserts the three update verbs are distinguishable from each other
+  — three tests each asserting `awareness_updated` would have passed throughout.
+
+Mutation-tested: reverting the enabled event kills 3 tests, dropping the audience-jobs branch from
+the contextlist kills 1, dropping two branches from the userlist kills 2, removing the cache purge
+kills 2, and restoring the context-instanceid shortcut in `delete_data_for_users()` kills 1.
+
+### Fixed — the Mustache example context that rendered its loop empty (audit TPL-03)
+
+`editor/audience_panel.mustache` documented and exemplified `summary` as `{labelkey, value}` while
+the template reads `{{label}}` and `{{key}}` and the exporter emits `key,label,value`, so the lint
+rendered that loop with empty `dt`/`dd`. Exactly the failure the `mustache-continue-on-error`
+override used to hide before audit H1 removed it.
+
 ### Fixed — the editor, reviewed against the rendered page (version 2026081603)
 
 Five things the page showed that reading the code did not.

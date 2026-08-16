@@ -76,9 +76,18 @@ class hook_callbacks {
 
         try {
             return helper::has_candidate_notices(page_probe::from_page($page));
-        } catch (\Exception $exception) {
-            // Same treatment the navigation callback gave a pipeline failure: report, load nothing.
-            // Page-rule uncertainty never lands here — page_probe degrades to "admit" internally.
+        } catch (\Throwable $exception) {
+            /*
+             * Throwable, not Exception. This runs on essentially every page of the site, so an
+             * Error escaping here — a typed setter handed null, a bad argument reaching
+             * completion_info — is not a missing notice, it is a fatal on every page for every
+             * logged-in user, recoverable only by disabling the plugin from the database. There is
+             * no failure of this pipeline worth taking the site down for. page_probe already uses
+             * Throwable at each of its four boundaries; this one had been left behind.
+             *
+             * Same treatment the navigation callback gave a pipeline failure: report, load nothing.
+             * Page-rule uncertainty never lands here — page_probe degrades to "admit" internally.
+             */
             debugging($exception->getMessage());
             return false;
         }

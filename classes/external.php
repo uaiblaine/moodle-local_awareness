@@ -256,6 +256,17 @@ class external extends external_api {
                     // Storage holds the content as authored; filters and pluginfile URLs are
                     // resolved here so a multilang notice reads in each user's own language.
                     $payload->content = helper::render_content($notice);
+                    /*
+                     * The title gets the same treatment for the same reason. It is stored as the
+                     * author typed it, and the modal renders it through {{title}}, so without this
+                     * a multilang title shows its markup literally in the heading while the body
+                     * beneath it resolves correctly — the one place the two disagree.
+                     */
+                    $payload->title = format_string(
+                        $record->title,
+                        true,
+                        ['context' => \context_system::instance()]
+                    );
                     // Attach background image URL if one exists.
                     if (!empty($record->bgimage)) {
                         $payload->bgimageurl = helper::get_bgimage_url($record->id);
