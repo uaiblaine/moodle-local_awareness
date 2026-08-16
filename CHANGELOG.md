@@ -6,6 +6,51 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Security — phase 1 of `docs/PLANO-correcoes.md` (version 2026081513)
+
+Four items, none of them a privilege escalation: each needs `local/awareness:manage` already. They
+are controls that did not do what they said.
+
+- **`allow_update` did not protect the write.** `editnotice.php` consulted it only in
+  `case 'edit'`, which decides whether to *display* the form, and the save branch runs before that
+  switch is reached — so a POST updated a notice with the setting off. The asymmetry is what made it
+  easy to miss: `delete_notice()` has re-checked its own setting inside the helper all along.
+  `update_notice()` now does the same, and the page says so rather than redirecting in silence.
+
+- **A cohort id off the wire was a membership oracle.** The estimator's predicate is a bare
+  `cohortid IN (…)` with no visibility join, so any id a manager cared to type came back with a
+  population size — including cohorts in categories they cannot see. Ids are now dropped to the set
+  the caller may target, on the web service *and* on the save path, which was the same oracle by a
+  slower route: save the notice, read the audience column.
+
+  Not with `cohort_get_cohort()`, which the fleet note names. Measured on the running stack: it
+  tests `in_array($cohort->contextid, $currentcontext->get_parent_context_ids())`, and for the
+  system context that list is empty, so it returns false for **every** cohort — a visible
+  system-level one included, even for an admin — and a site-wide plugin has no narrower context to
+  give it. The check goes through the same call that builds the form's menu, so the two cannot drift.
+
+- **Audit M24: `idnumber` reached the acknowledged report unescaped.** `other_cols()` returned
+  `null` for every non-numeric column instead of deferring to `parent::other_cols()`, which exists
+  precisely to return `s($row->$column)` for `email` and `idnumber`. The table declares an
+  `idnumber` column and has no `col_idnumber()`, and users can set their own idnumber on most sites.
+
+- **The capabilities now declare their real risk.** `local/awareness:manage` carried only
+  `RISK_CONFIG` while letting its holder put arbitrary markup in front of every logged-in user —
+  content is `PARAM_RAW` throughout, `render_content()` passes `'noclean' => true`, and the result
+  reaches `Modal.setBody()`, which is innerHTML. That is `RISK_XSS`. `viewreports` declared no risk
+  at all and shows users' email and idnumber; it is `RISK_PERSONAL`. The `noclean` stays — notice
+  bodies legitimately carry embedded media — but trusting the author is a choice that has to be
+  declared, not left implicit.
+
+- **Audit M22 came along for the ride.** Neither table class declared the `$page` property they
+  assign in their constructors, so PHP 8.2+ raised a deprecation on every report load. It is fixed
+  here rather than in its own phase because the new table test cannot pass while it stands: CI runs
+  PHPUnit with `--fail-on-warning`.
+
+Every one of the four fixes was mutation-tested: the guard, the cohort filter on the save path, the
+cohort filter on the web service and the escaping were each reverted in turn, the mutated line
+printed, and the matching test confirmed to fail.
+
 ### Changed — the preview is a dialogue, and the button that opens it now does something (version 2026081512)
 
 - **The preview opens as a `core/modal`.** It was a panel below the form; the approved model asks

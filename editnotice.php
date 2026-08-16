@@ -79,6 +79,15 @@ $mform->set_data(['bgimage' => $bgdraftitemid]);
 
 // Proccess form data.
 if ($formdata = $mform->get_data()) {
+    /*
+     * Said out loud, not just refused. helper::update_notice() now returns early when the setting
+     * is off, which closes the hole but leaves the author staring at a list that did not change;
+     * this is the same message the delete path already gives for its own setting.
+     */
+    if ($awareness && !get_config('local_awareness', 'allow_update')) {
+        redirect($managenoticepage, get_string('notification:noupdateallowed', 'local_awareness'));
+    }
+
     if ($formdata->perpetual == 1) {
         $formdata->timestart = 0;
         $formdata->timeend = 0;

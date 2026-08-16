@@ -48,6 +48,18 @@ class acknowledged_notice extends table_sql implements renderable {
     protected $filters;
 
     /**
+     * Current page, used by query_db() as the offset multiplier.
+     *
+     * Declared rather than created on assignment. Neither flexible_table nor table_sql defines a
+     * $page property on either supported branch, and neither carries #[AllowDynamicProperties], so
+     * the constructor's `$this->page = $page` raised a deprecation on every load under PHP 8.2+.
+     * Audit finding M22.
+     *
+     * @var int
+     */
+    protected $page = 0;
+
+    /**
      * Table alias.
      */
     const TABLE_ALIAS = 'ack';
@@ -307,7 +319,14 @@ class acknowledged_notice extends table_sql implements renderable {
                 return '0';
             }
         } else {
-            return null;
+            /*
+             * Not null. flexible_table::other_cols() exists to return s($row->$column) for the email
+             * and idnumber columns, and returning null instead of deferring to it dropped that
+             * escaping — this table declares an idnumber column and has no col_idnumber(), so
+             * format_row() fell back to the raw value. A user can put markup in their own profile
+             * idnumber on most sites, and it landed unescaped in this report.
+             */
+            return parent::other_cols($column, $row);
         }
     }
 }
