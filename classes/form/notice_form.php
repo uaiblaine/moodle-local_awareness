@@ -68,6 +68,18 @@ class notice_form extends \core\form\persistent {
 
         // Content.
         $mform->addElement('header', 'header_content', get_string('editor:section:content', 'local_awareness'));
+        /*
+         * Each section says what it is for, in the author's language. The strings were written
+         * with the collapsible-fieldset rebuild and then never rendered, so five explanations
+         * sat in two language packs helping nobody. A static element is how a moodleform carries
+         * prose — no markup is injected and no row is relocated.
+         */
+        $mform->addElement(
+            'static',
+            'header_content_desc',
+            '',
+            get_string('editor:section:content:desc', 'local_awareness')
+        );
         $mform->setExpanded('header_content', true);
 
         $mform->addElement('text', 'title', get_string('notice:title', 'local_awareness'));
@@ -100,6 +112,12 @@ class notice_form extends \core\form\persistent {
 
         // Display.
         $mform->addElement('header', 'header_behavior', get_string('editor:section:behavior', 'local_awareness'));
+        $mform->addElement(
+            'static',
+            'header_behavior_desc',
+            '',
+            get_string('editor:section:behavior:desc', 'local_awareness')
+        );
         $mform->setExpanded('header_behavior', true);
 
         $mform->addElement('selectyesno', 'enabled', get_string('notice:enable', 'local_awareness'));
@@ -141,6 +159,12 @@ class notice_form extends \core\form\persistent {
 
         // Audience.
         $mform->addElement('header', 'header_audience', get_string('editor:section:audience', 'local_awareness'));
+        $mform->addElement(
+            'static',
+            'header_audience_desc',
+            '',
+            get_string('editor:section:audience:desc', 'local_awareness')
+        );
         $mform->setExpanded('header_audience', true);
 
         // Context / Filter fields.
@@ -294,6 +318,12 @@ class notice_form extends \core\form\persistent {
 
         // Display restrictions.
         $mform->addElement('header', 'header_filters', get_string('editor:section:filters', 'local_awareness'));
+        $mform->addElement(
+            'static',
+            'header_filters_desc',
+            '',
+            get_string('editor:section:filters:desc', 'local_awareness')
+        );
 
         // Path Match.
         $mform->addElement('text', 'pathmatch', get_string('pathmatch', 'local_awareness'));
@@ -369,6 +399,12 @@ class notice_form extends \core\form\persistent {
 
         // Modal appearance.
         $mform->addElement('header', 'header_appearance', get_string('editor:section:appearance', 'local_awareness'));
+        $mform->addElement(
+            'static',
+            'header_appearance_desc',
+            '',
+            get_string('editor:section:appearance:desc', 'local_awareness')
+        );
 
         $mform->addElement('text', 'modal_width', get_string('notice:modal_width', 'local_awareness'));
         $mform->setType('modal_width', PARAM_RAW);

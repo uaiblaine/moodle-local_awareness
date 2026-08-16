@@ -22,8 +22,8 @@ A coluna **conf.** diz como cada item chegou aqui, e é a diferença entre ler e
   corrigir.** Um verificador já errou nesta mesma sessão: refutou e confirmou o mesmo defeito do
   anel de foco em dois vereditos contraditórios, e só a medição no navegador resolveu.
 
-**Progresso:** fases 1 a 3 fechadas — 17 de 27 itens. Falta a fase 4, mais o 3.6 que ficou
-sequenciado atrás do 4.6.
+**Progresso:** as quatro fases fechadas — 27 de 27 itens. Dois achados novos ficaram
+registados no fecho da fase 4.
 
 ## Sobre o `docs/AUDIT-2026-08.md`
 
@@ -203,7 +203,7 @@ fase 1 já garante na gravação, e não quem está *dentro* dela.
   ficheiros ficam em `moodledata` e em `{files}` para sempre — e, como o gate do `pluginfile` recusa
   um aviso que já não existe, ficam inalcançáveis e por apagar ao mesmo tempo.
 
-- [ ] **3.6 (adiado para depois do 4.6) · "Remover selecionados" não faz nada** — `classes/report_filter.php:113` · conf. **~** ·
+- [x] **3.6 (resolvido por remoção no 4.6) · "Remover selecionados" não faz nada** — `classes/report_filter.php:113` · conf. **~** ·
   trivial
 
   O formulário desenha `removeselected` e `removeall` mais uma checkbox por filtro ativo;
@@ -255,7 +255,7 @@ Duas decisões de produto precisam de ser tomadas antes de codificar: **4.2** (o
 de obrigatórios existem em desenho — implementar ou remover?) e **4.4** (a altura do modal no
 preview — aplicar ou remover?). O resto é remoção pura.
 
-- [ ] **4.1 · cache `user_notices` fantasma** — `db/caches.php:35` · conf. **~** · trivial
+- [x] **4.1 · cache `user_notices` fantasma** — `db/caches.php:35` · conf. **~** · trivial
 
   Declarado `MODE_SESSION`, purgado em cada gravação da persistente, com string traduzida em duas
   línguas — e nunca lido nem escrito. O `docs/ACHADO1-decisao.md` **já decidiu removê-lo**, com a
@@ -263,7 +263,7 @@ preview — aplicar ou remover?). O resto é remoção pura.
   sobre o alcance de um purge entre sessões, e é uma armadilha armada para quem vier depois. A
   decisão foi escrita e não executada.
 
-- [ ] **4.2 · autosave e banner de obrigatórios** — `classes/output/editor_page.php:167-168` ·
+- [x] **4.2 · autosave e banner de obrigatórios** — `classes/output/editor_page.php:167-168` ·
   conf. **✔** · pequeno · *decisão de produto*
 
   `'autosaved' => ''` e `'requirements' => ''` são literais. O `requirements` alimenta o bloco
@@ -276,7 +276,7 @@ preview — aplicar ou remover?). O resto é remoção pura.
   autosave de rascunho que hoje não existe em nenhuma forma. Remover significa apagar dois literais,
   um bloco de template, uma regra de CSS e seis strings.
 
-- [ ] **4.3 · `$formid` e `$cancelurl` guardados e nunca exportados** —
+- [x] **4.3 · `$formid` e `$cancelurl` guardados e nunca exportados** —
   `classes/output/editor_page.php:47` · conf. **✔** · pequeno
 
   O construtor guarda ambos; o `export_for_template()` não devolve nenhum. Pior, `editnotice.php`
@@ -284,7 +284,7 @@ preview — aplicar ou remover?). O resto é remoção pura.
   renderizado, para preencher um valor que é deitado fora. É resíduo da barra de ações removida, que
   usava `form="{{actionbar.formid}}"`.
 
-- [ ] **4.4 · `preview.modal_height` exportado e nunca aplicado** —
+- [x] **4.4 · `preview.modal_height` exportado e nunca aplicado** —
   `classes/output/editor_page.php:93` · conf. **✔** · pequeno · *decisão de produto*
 
   O `preview_card.mustache` lista `preview.modal_height` como variável de contexto obrigatória e
@@ -293,14 +293,14 @@ preview — aplicar ou remover?). O resto é remoção pura.
   Pré-visualizar vê um diálogo idêntico ao anterior — o preview mente exatamente na definição que o
   autor está a testar.
 
-- [ ] **4.5 · eventos `awareness_enabled` e `awareness_disabled` nunca disparados** —
+- [x] **4.5 · eventos `awareness_enabled` e `awareness_disabled` nunca disparados** —
   `classes/helper.php:322` · conf. **~** · pequeno
 
   `enable_notice()` e `disable_notice()` disparam ambos `awareness_updated`. As duas classes de
   evento estão completas e têm strings mantidas, e aparecem na lista de eventos da administração —
   onde um admin pode construir uma regra que nunca dispara.
 
-- [ ] **4.6 · páginas de relatório antigas, inalcançáveis e com a capacidade errada** —
+- [x] **4.6 · páginas de relatório antigas, inalcançáveis e com a capacidade errada** —
   `report/acknowledged_report.php:33` e `report/dismissed_report.php` · conf. **~** · médio
 
   Os botões da lista encaminham para as páginas de report-builder. Nada liga a estas duas; só
@@ -310,7 +310,7 @@ preview — aplicar ou remover?). O resto é remoção pura.
 
   *Se forem removidas, marcar 2.6 e 3.6 como resolvidos por remoção.*
 
-- [ ] **4.7 · cinco strings `:desc` de seção nunca renderizadas** — `lang/en:110` e pares em
+- [x] **4.7 · cinco strings `:desc` de seção nunca renderizadas** — `lang/en:110` e pares em
   `lang/pt_br` · conf. **~** · trivial
 
   As cinco seções do formulário usam só a chave simples; as `:desc` — por exemplo "Who the notice
@@ -318,19 +318,38 @@ preview — aplicar ou remover?). O resto é remoção pura.
   Mustache ou JS. É exatamente o texto explicativo que a reconstrução em fieldsets colapsáveis
   deveria ter posto à frente do autor: considerar renderizá-las antes de as apagar.
 
-- [ ] **4.8 · três classes CSS órfãs** — `styles.css` · conf. **✔** · trivial
+- [x] **4.8 · três classes CSS órfãs** — `styles.css` · conf. **✔** · trivial
 
   `la-chip--muted`, `la-pagehead-autosaved` e `la-spinner` não são carregadas por markup nenhum.
   Confirmado que já eram órfãs antes da fase 3. A `la-pagehead-autosaved` sai junto com 4.2.
 
-- [ ] **4.9 · README com alvos de Makefile inexistentes** — `README.md:113` · conf. **~** · trivial
+- [x] **4.9 · README com alvos de Makefile inexistentes** — `README.md:113` · conf. **~** · trivial
 
   Manda correr `make ci-awareness-datasource-tests`; não há Makefile no repositório. E a linha 26
   descreve o alvo de público como só coortes, quando o formulário oferece papel, contexto de papel,
   categoria, curso, formato, tema e regras de competência — que é aquilo para que metade da base de
   código existe.
 
-**Fecho da fase 4:** commit `______` · PR `#____` · data `______`
+**Fase 4 fechada** em 2026-08-16, versão `2026081517`, branch `feat/phase-4-cleanup-and-autosave`.
+
+**O 4.2 foi implementado medindo primeiro, e a medição mudou o que implementar significa.** O
+autosave já existia no core: `MoodleQuickForm_editor` declara `'autosave' => true` nos dois ramos,
+o `get_file_editor_options()` não o sobrepõe, e o `tiny_autosave` traz a sua própria arbitragem
+entre separadores e o seu próprio privacy provider. O corpo do aviso — o único campo onde perder
+trabalho dói — estava gravado desde sempre. Um armazém próprio duplicaria o campo maior e mais
+sensível e teria de escrever dentro de um moodleform para o restaurar. Ficou uma linha de estado
+honesta, e o banner passou a nomear as três janelas que nenhum instante satisfaz.
+
+**O 3.6 caiu por remoção.** As páginas que continham o botão "Remover selecionados" foram
+apagadas no 4.6, portanto o item deixou de ter objeto.
+
+**Dois itens novos, consequência desta fase e não do plano:**
+- `linkhistory::count_clicked_links()` ficou sem chamador de produção. O report-builder cobre o
+  histórico de cliques com linhas individuais, mas o método guarda os testes escritos para o
+  achado M17 da auditoria — decidir apagar ou manter é escolha, não limpeza.
+- `rule_describer::describe()` trata apenas `pathmatch`, categoria, curso, formato e tema. Agora
+  que a fase 2 tornou o `filter_role_context` um critério real, o painel de público não o sabe
+  nomear. Achado pequeno, encontrado ao caçar strings órfãs.
 
 ---
 

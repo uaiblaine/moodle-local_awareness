@@ -418,6 +418,22 @@
 }
 
 /*
+ * Published and reaching nobody: its display window has closed, or cannot be satisfied at all. Not
+ * green, because it is not live, and not the plain draft grey either, because the author did
+ * publish it and the difference is the thing worth seeing. The banner under the head says which.
+ */
+.la-status-badge--blocked .la-status-badge-ping {
+    background: var(--la-warn);
+    box-shadow: 0 0 0 3px rgba(240, 173, 78, .25);
+}
+
+/* The line stops reporting a time once it stops being true about one. */
+.la-pagehead-autosaved--dirty {
+    color: var(--la-ink);
+    font-weight: 600;
+}
+
+/*
  * Digits line up through font-variant-numeric, not through a monospace family. Swapping the
  * family here was the visible half of the "different typography" the admin pages carried: the
  * theme's own face reads as part of Moodle, a second family reads as a different product.

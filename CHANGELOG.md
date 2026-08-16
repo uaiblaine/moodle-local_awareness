@@ -6,6 +6,58 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the editor stops promising things it does not do (version 2026081517)
+
+Phase 4 of `docs/PLANO-correcoes.md`. Mostly removal, plus the one feature that was designed and
+never built.
+
+**The autosave was already there, in core.** The owner asked for it to be implemented; measuring
+first changed what implementing means. `MoodleQuickForm_editor` declares `'autosave' => true` among
+its defaults on both supported branches, `helper::get_file_editor_options()` never overrides it, and
+`tiny_autosave` ships in `lib/editor/tiny/plugins/autosave` with its own tab arbitration and its own
+privacy provider — so the notice body, the one field where losing work hurts, has been autosaved all
+along. `formslib` already wires `core_form/changechecker`, so the tab-close warning is here too. A
+plugin draft store would have duplicated the largest and most sensitive field, and would have had to
+write into a moodleform to restore it — the pattern the fleet standards ban and the one that
+produced this page's last two shipped defects. What ships instead is a save-state line that says
+something true: when the notice was last saved, becoming "Unsaved changes" the moment the form is
+touched.
+
+**The required-fields banner became a will-not-display banner.** The string it was built for
+promised a completeness check the form already enforces — `HTML_QuickForm::validate()` applies
+`required` rules regardless of the `client` marker, so an empty title or content is refused server
+side and that banner could never fire. What the form genuinely cannot express is a relationship
+*between* fields, so the banner now names the three windows no instant can satisfy: expired,
+inverted, and a start date with no expiry. The last is the one worth naming — it reads to an author
+as "from March onwards" and behaves as "never", because the window check compares `now < 0`.
+
+**The status badge gained a third state.** It read "Live · being shown" from the `enabled` flag
+alone, which is true about the flag and can be false about the world. A published notice nobody can
+reach now says so, from the same predicate the banner uses, so the chip and the sentence under it
+cannot disagree.
+
+**Removed:** the two legacy report pages and everything only they used — both table classes, the
+report filter, its two forms and the renderer's two methods, about 1030 lines. Nothing linked to
+them; they were reachable only by typing the URL, and they checked the wrong capability, so a
+holder of `viewreports` could not open them anyway. The `user_notices` cache, declared, purged and
+translated but never read or written, which `docs/ACHADO1-decisao.md` had already decided to delete
+and never did. `preview.modal_height`, exported and documented and applied by nothing. The `$formid`
+and `$cancelurl` the editor renderable stored without exporting, and the regular expression in
+`editnotice.php` that existed to compute the first of them. Sixteen orphaned language strings from
+both packs.
+
+**Rendered rather than removed:** the five per-section descriptions, which existed in two languages
+and never reached an author. `addElement('static')` is how a moodleform carries prose — no markup
+injected, no row relocated.
+
+Two consequences of the deletion, recorded rather than quietly absorbed. The M24 escaping fix from
+phase 1 went with the class it lived in; deletion is the stronger fix, and the plugin no longer has
+a table that renders `idnumber` at all. And `linkhistory::count_clicked_links()` now has no
+production caller — report-builder covers click history with individual rows — but it keeps the
+tests written for audit finding M17, so it is flagged in the plan rather than deleted in the same
+breath as something it was not part of.
+
+
 ### Fixed — seven correctness and cost defects (version 2026081515)
 
 Phase 3 of `docs/PLANO-correcoes.md`. Every item was re-confirmed against the code as it stands
