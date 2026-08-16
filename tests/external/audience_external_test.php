@@ -316,4 +316,47 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertContains('pathmatch', $keys);
         $this->assertContains('filter_theme', $keys);
     }
+
+    /**
+     * The estimate must not answer "how many people are in this cohort?" for a cohort nobody offered.
+     *
+     * The predicate is a bare `cohortid IN (…)` with no visibility join, so an id typed into a
+     * hand-made request used to come back with a population size — a membership oracle for any
+     * cohort on the site, including ones in categories the caller cannot see.
+     *
+     * Both cohorts carry a member, and the visible one is the control: a change that simply dropped
+     * every cohort would satisfy the first assertion alone while breaking the feature.
+     */
+    public function test_estimate_audience_ignores_a_cohort_the_caller_may_not_see(): void {
+        $visible = $this->getDataGenerator()->create_cohort(['contextid' => \context_system::instance()->id]);
+        $category = $this->getDataGenerator()->create_category();
+        $hidden = $this->getDataGenerator()->create_cohort([
+            'contextid' => \context_coursecat::instance($category->id)->id,
+        ]);
+        cohort_add_member($visible->id, $this->getDataGenerator()->create_user()->id);
+        cohort_add_member($hidden->id, $this->getDataGenerator()->create_user()->id);
+
+        // Holds the plugin's capability site-wide, but may not view cohorts in that category.
+        $manager = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:manage', CAP_ALLOW, $roleid, \context_system::instance()->id);
+        assign_capability('moodle/cohort:view', CAP_PROHIBIT, $roleid, \context_system::instance()->id);
+        role_assign($roleid, $manager->id, \context_system::instance()->id);
+        $this->setUser($manager);
+
+        $hiddenonly = external::estimate_audience(json_encode(['cohorts' => [$hidden->id]]));
+        $result = external::get_estimate($hiddenonly['jobid']);
+
+        /*
+         * With the cohort dropped there is no audience rule left, so the estimate falls back to the
+         * whole site rather than reporting the hidden cohort's single member.
+         */
+        $this->assertFalse($result['has_audience_rules']);
+
+        // Control: the cohort this caller CAN see still narrows the estimate to its one member.
+        $visibleonly = external::estimate_audience(json_encode(['cohorts' => [$visible->id]]));
+        $control = external::get_estimate($visibleonly['jobid']);
+        $this->assertTrue($control['has_audience_rules']);
+        $this->assertSame(1, (int) $control['count']);
+    }
 }

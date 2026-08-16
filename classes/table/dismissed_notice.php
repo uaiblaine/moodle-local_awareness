@@ -46,6 +46,16 @@ class dismissed_notice extends table_sql implements renderable
     protected $filters;
 
     /**
+     * Current page, used by query_db() as the offset multiplier.
+     *
+     * Declared rather than created on assignment — see the twin note on acknowledged_notice.
+     * Audit finding M22.
+     *
+     * @var int
+     */
+    protected $page = 0;
+
+    /**
      * Table alias.
      */
     const TABLE_ALIAS = 'dis';

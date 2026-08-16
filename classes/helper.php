@@ -152,6 +152,17 @@ class helper {
     public static function update_notice(awareness $awareness, \stdClass $data): string {
         self::check_manage_capability();
 
+        /*
+         * The setting, enforced where the write happens. It used to be consulted only in
+         * editnotice.php's `case 'edit'`, which decides whether to DISPLAY the form — and the save
+         * branch runs before that switch reaches it, so a POST updated the notice with the setting
+         * off. delete_notice() has re-checked its own setting here all along; this is the same
+         * guard on the other verb, and the asymmetry is what made the gap easy to miss.
+         */
+        if (!get_config('local_awareness', 'allow_update')) {
+            return \local_awareness\audience\notice_audience::STATE_NONE;
+        }
+
         // Pack filter values.
         $filters = [];
         $filterfields = [
@@ -216,6 +227,17 @@ class helper {
             if (!key_exists($key, awareness::properties_definition())) {
                 unset($data->$key);
             }
+        }
+
+        /*
+         * Cohorts are dropped to the set this user may target. The estimator counts members with a
+         * bare `cohortid IN (…)`, so an id that reached the POST without ever being offered still
+         * yields a population size — on the save path just as much as through the web service, only
+         * slower: save the notice, then read the audience column on the manage list.
+         */
+        if (isset($data->cohorts)) {
+            $submitted = is_string($data->cohorts) ? explode(',', $data->cohorts) : (array) $data->cohorts;
+            $data->cohorts = self::allowed_cohorts($submitted);
         }
     }
 
@@ -397,6 +419,34 @@ class helper {
             $options[$cohort->id] = $cohort->name;
         }
         return $options;
+    }
+
+    /**
+     * The cohort ids from a submitted list that the current user is actually allowed to target.
+     *
+     * A cohort id arriving by POST is a membership oracle unless it is checked: the estimator counts
+     * members with a bare `cohortid IN (…)`, so an id nobody offered still returns a population size.
+     *
+     * Checked against built_cohorts_options(), NOT against cohort_get_cohort(). The fleet note names
+     * that helper, and measured on the running stack it is the wrong one here: it tests
+     * `in_array($cohort->contextid, $currentcontext->get_parent_context_ids())`, and for the system
+     * context that list is empty — `/1` with its own id popped off — so it returns false for every
+     * cohort, a visible system-level one included, even for an admin. A site-wide plugin has no
+     * narrower context to pass it. built_cohorts_options() wraps cohort_get_all_cohorts(), which
+     * excludes cohort_get_invisible_contexts(), and is the same call that builds the form's menu, so
+     * validation and menu cannot drift apart.
+     *
+     * @param array $cohortids Raw cohort ids as submitted.
+     * @return array The subset the user may target, as ints, reindexed.
+     */
+    public static function allowed_cohorts(array $cohortids): array {
+        if (empty($cohortids)) {
+            return [];
+        }
+
+        $allowed = array_map('intval', array_keys(self::built_cohorts_options()));
+
+        return array_values(array_intersect(array_map('intval', $cohortids), $allowed));
     }
 
     /**

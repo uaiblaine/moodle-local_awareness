@@ -305,4 +305,88 @@ final class helper_test extends \advanced_testcase {
         $this->assertCount(1, helper::retrieve_user_notices('/my/'));
         $this->assertSame([], helper::retrieve_user_notices('/'));
     }
+
+    /**
+     * The allow_update setting must gate the write, not merely the form that leads to it.
+     *
+     * editnotice.php consulted it only in `case 'edit'`, which decides whether to DISPLAY the form,
+     * and its save branch runs before that switch — so a POST updated the notice with the setting
+     * off. The control below is what makes this test non-vacuous: an identical update WITH the
+     * setting on has to land, or the refusal above would prove nothing about the setting.
+     *
+     * @covers \local_awareness\helper::update_notice
+     */
+    public function test_update_notice_obeys_the_allow_update_setting(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $formdata = new \stdClass();
+        $formdata->title = 'Original title';
+        $formdata->content = '<p>Body</p>';
+        helper::create_new_notice($formdata);
+
+        $notice = awareness::get_record(['title' => 'Original title']);
+        $this->assertNotFalse($notice, 'The notice must exist before the update can be judged.');
+
+        // Setting off — which is the shipped default, asserted rather than assumed.
+        $this->assertEmpty(get_config('local_awareness', 'allow_update'));
+
+        $formdata->title = 'Renamed with the setting off';
+        helper::update_notice($notice, $formdata);
+
+        $reread = awareness::get_record(['id' => $notice->get('id')]);
+        $this->assertSame('Original title', $reread->get('title'));
+
+        // Control: the same update, with the setting on, must go through.
+        set_config('allow_update', 1, 'local_awareness');
+        $formdata->title = 'Renamed with the setting on';
+        helper::update_notice($reread, $formdata);
+
+        $reread = awareness::get_record(['id' => $notice->get('id')]);
+        $this->assertSame('Renamed with the setting on', $reread->get('title'));
+    }
+
+    /**
+     * A cohort the author may not see must not survive the save.
+     *
+     * The estimator counts members with a bare `cohortid IN (…)`, so an id that reached the POST
+     * without being offered still yields a population size — a membership oracle for any cohort on
+     * the site. The visible cohort in the same call is the control: without it, a change that
+     * dropped every cohort would pass this test.
+     *
+     * @covers \local_awareness\helper::allowed_cohorts
+     */
+    public function test_a_cohort_the_user_cannot_see_is_dropped_on_save(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $visible = $this->getDataGenerator()->create_cohort(['contextid' => \context_system::instance()->id]);
+        $category = $this->getDataGenerator()->create_category();
+        $hidden = $this->getDataGenerator()->create_cohort([
+            'contextid' => \context_coursecat::instance($category->id)->id,
+        ]);
+
+        /*
+         * A manager who holds the plugin's capability at system level but cannot view cohorts in
+         * that category — which is what makes the id unofferable to them, and the request forgeable.
+         */
+        $manager = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:manage', CAP_ALLOW, $roleid, \context_system::instance()->id);
+        assign_capability('moodle/cohort:view', CAP_PROHIBIT, $roleid, \context_system::instance()->id);
+        role_assign($roleid, $manager->id, \context_system::instance()->id);
+        $this->setUser($manager);
+
+        $formdata = new \stdClass();
+        $formdata->title = 'Targeted notice';
+        $formdata->content = '<p>Body</p>';
+        $formdata->cohorts = [$visible->id, $hidden->id];
+        helper::create_new_notice($formdata);
+
+        $stored = array_map('intval', awareness::get_record(['title' => 'Targeted notice'])->get('cohorts'));
+
+        $this->assertNotContains((int) $hidden->id, $stored);
+        // Control: the cohort this user CAN see has to survive, or nothing was proven.
+        $this->assertContains((int) $visible->id, $stored);
+    }
 }

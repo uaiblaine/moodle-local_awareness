@@ -113,6 +113,8 @@ final class audience_notice_audience_test extends \advanced_testcase {
      */
     public function test_changing_filters_marks_the_count_stale_and_leaving_them_does_not(): void {
         set_config('audience_sync_limit', 100000, 'local_awareness');
+        // Updates are refused outright without this: allow_update defaults to 0 and gates the save.
+        set_config('allow_update', 1, 'local_awareness');
         $cohort = $this->getDataGenerator()->create_cohort();
         cohort_add_member($cohort->id, $this->getDataGenerator()->create_user()->id);
 

@@ -551,6 +551,20 @@ class external extends external_api {
             $raw = [];
         }
 
+        /*
+         * Cohort ids come off the wire, so they are dropped to the set this user may target before
+         * anything counts members with them. Without this the panel answers "how many people are in
+         * cohort N?" for any N a manager cares to type, including cohorts in categories they cannot
+         * see — the estimator's predicate is a bare `cohortid IN (…)` with no visibility join.
+         *
+         * Filtered rather than rejected, matching what the save path does with the same ids: the
+         * editor's own menu only ever offers allowed cohorts, so a disallowed id means a hand-made
+         * request, and excluding it from the count reveals nothing about it either way.
+         */
+        if (isset($raw['cohorts'])) {
+            $raw['cohorts'] = helper::allowed_cohorts((array) $raw['cohorts']);
+        }
+
         $normalised = estimator::normalise($raw);
         $hash = estimator::hash($normalised);
 
