@@ -302,6 +302,8 @@ class estimator {
      * @return array [$whereparts, $params]
      */
     private static function base_predicate(): array {
+        global $CFG;
+
         return [
             [
                 'u.deleted = 0',
@@ -309,10 +311,17 @@ class estimator {
                 'u.confirmed = 1',
                 'u.id <> :guestid',
                 // Guest is excluded by username too, to be robust on sites imported from elsewhere
-                // where it does not hold id 1.
+                // where it does not hold the id $CFG->siteguest names.
                 'u.username <> :guestname',
             ],
-            ['guestid' => 1, 'guestname' => 'guest'],
+            /*
+             * Bound from $CFG->siteguest, not from a literal 1. The guest account only holds id 1
+             * on a site Moodle installed itself; after a migration it is whatever it is, and the
+             * literal put the real guest back into every audience count while excluding whichever
+             * innocent user inherited the id. The username predicate beside it is a second net,
+             * not a substitute — a site can rename the account.
+             */
+            ['guestid' => (int) ($CFG->siteguest ?? 1), 'guestname' => 'guest'],
         ];
     }
 

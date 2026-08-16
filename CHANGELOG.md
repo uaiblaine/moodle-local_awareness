@@ -6,6 +6,75 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added — the coverage gaps the reconciliation named (version 2026081605)
+
+The census in `docs/RECONCILIACAO-2026-08.md` found that the remaining debt was not broken code
+but missing tests: nine of the thirteen Medium findings still open were coverage holes or blind
+spots in `bootstrap_compat_test` itself. This closes them, and — as in the previous release — the
+tests found defects that reading had not.
+
+**Two live defects, both found by widening an existing observer (audit M31, M32, M33).**
+
+- `report/acknowledged_systemreport.php` and `report/dismissed_systemreport.php` never called
+  `bootstrap::mark_page()`, so the Bootstrap 4 polyfill in `styles.css` — which is gated on the
+  body class that call adds — never reached either page. They rendered unstyled on Moodle 4.5
+  while every static gate stayed green. `test_entry_points_mark_the_bootstrap_version()` could not
+  see them because it globbed `*.php` in the plugin root only.
+- `markup_files()` scanned three named directories, so `report/`, `renderer.php` and every
+  root entry point were outside *every* assertion in that file. It now walks the plugin root with
+  an exclusion list, which also means a directory added later is covered by default rather than
+  invisible by default.
+
+The BS5-only family map gained `ratio*`, `vr`, `fst-normal`, positional `top-*`/`bottom-*`, and
+the missing siblings `form-select-lg`, `gap-{breakpoint}-*` and `translate-middle-x/-y`. The
+positional pattern needs a `(?<!border-)` lookbehind: `\bbottom-0\b` matches inside
+`border-bottom-0`, which is a border utility present on both branches, and without the lookbehind
+the widened test reported two false positives in `modal_notice.mustache`.
+
+**The guest account was excluded by a hard-coded id of 1 (audit SQL-04).** `estimator`'s base
+predicate bound `guestid => 1`, which is only the guest on a site Moodle installed itself. After a
+migration the literal put the real guest back into every audience count while excluding whichever
+innocent user inherited the id. It reads `$CFG->siteguest` now; the username predicate beside it
+stays, as a second net rather than a substitute.
+
+**New tests (58), each mutation-tested:**
+
+- `tests/helper_capability_test.php` — the plugin's only write gate, `check_manage_capability()`,
+  had no negative test at any of its six call sites (audit M28). Each entry point is now run twice:
+  refused for a plain user, accepted for a holder of `local/awareness:manage` granted through
+  `assign_capability()` rather than `setAdminUser()`, which is what shows *which* capability the
+  gate reads.
+- `tests/lib_test.php` — `local_awareness_pluginfile()` had no test at all (audit M26), including
+  the gate standing between a direct file URL and the attachments of a disabled notice. Removing
+  that gate makes the callback **serve the file**, which is what the new case catches.
+- `tests/reportbuilder/systemreports_test.php` — `local/awareness:viewreports` had **zero**
+  coverage anywhere in the plugin (audit M11). Both reports get the same triple: refused for a
+  plain user, refused for a holder of `manage` alone, granted for `viewreports` alone. The middle
+  case is the one that matters — it is what would fail if `can_view()` ever read the wrong
+  capability.
+- `tests/external/search_courses_external_test.php` — `search_courses()` had no test of any kind
+  (audit M11, M29) despite carrying a capability check and reaching every course on the site by
+  name. Calls go through `call_external_function()`, so `execute_returns()` is applied.
+- `tests/check_filters_test.php` — `check_path_match()` had no direct test (audit M30); its only
+  coverage ran through `page_probe`, which *reimplements* the category/course/format logic, so
+  those tests guarded a different copy of the rules. Four `check_filters()` branches had no case
+  asserting false. Note the trap the controls exist to avoid: `check_filters()` resolves the course
+  through `can_access_course($course, null, '', true)`, so an un-enrolled user gets `$course = null`
+  and every branch returns false for the wrong reason.
+- `tests/audience_estimator_test.php` — `test_estimate_excludes_deleted_and_suspended_users` was
+  vacuous (audit M27): the deleted user was created already deleted, could not be added to the
+  cohort at all, and the assertion was satisfied by the membership clause. Members are now added
+  first and flagged afterwards, which is what puts the row in front of the predicate. Removing
+  `u.deleted = 0`, `u.suspended = 0`, `u.confirmed = 1`, or both guest predicates now turns it red.
+- `tests/external/audience_external_test.php` — a negative test for `get_estimate()`, and the
+  first round trip of either audience function through the web-service layer, so
+  `estimate_audience_returns()` and `get_estimate_returns()` are applied to a real payload. Those
+  declarations are allowlists and `clean_returnvalue()` strips unnamed keys silently.
+
+One mutation survived and is recorded as an equivalent mutant rather than a gap: deleting the
+`!$course` guard from the category branch changes nothing, because `null->category` yields null and
+the `in_array()` below it returns false anyway. Removing the branch entirely does turn the test red.
+
 ### Fixed — the audit reconciled, and the residue it exposed (version 2026081604)
 
 `docs/AUDIT-2026-08.md` had always said it was the snapshot of the starting point rather than the

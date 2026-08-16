@@ -217,19 +217,73 @@ final class audience_estimator_test extends \advanced_testcase {
         $this->assertSame(1, $result['count']);
     }
 
-    public function test_estimate_excludes_deleted_and_suspended_users(): void {
+    /**
+     * The user-state flags the base predicate excludes, one per case.
+     *
+     * @return array
+     */
+    public static function excluded_user_state_provider(): array {
+        return [
+            'deleted' => ['deleted', 1],
+            'suspended' => ['suspended', 1],
+            'unconfirmed' => ['confirmed', 0],
+        ];
+    }
+
+    /**
+     * A cohort member in an excluded state is not counted.
+     *
+     * The member is added to the cohort FIRST and flagged AFTERWARDS. The previous version of this
+     * test created the deleted user already deleted, could not add them to the cohort at all
+     * (cohort_add_member refuses), and then asserted a count that the cohort-membership clause
+     * alone produced — so `u.deleted = 0` could be deleted from the estimator with the test still
+     * green. Flagging after joining is what puts the row in front of the predicate.
+     *
+     * @dataProvider excluded_user_state_provider
+     * @param string $field The user field to flag.
+     * @param int $value The value that should exclude them.
+     */
+    public function test_estimate_excludes_users_by_state(string $field, int $value): void {
+        global $DB;
+
         $generator = $this->getDataGenerator();
         $cohort = $generator->create_cohort();
-        $u1 = $generator->create_user();
-        $u2 = $generator->create_user(['suspended' => 1]);
-        $u3 = $generator->create_user(['deleted' => 1]);
-        cohort_add_member($cohort->id, $u1->id);
-        // Cannot add deleted user — skip; suspended user is added.
-        cohort_add_member($cohort->id, $u2->id);
-        $u3->id; // Appease phpcs.
+        $counted = $generator->create_user();
+        $excluded = $generator->create_user();
+        cohort_add_member($cohort->id, $counted->id);
+        cohort_add_member($cohort->id, $excluded->id);
+
+        // Control: while both are ordinary users, both count. If this is ever 1, the assertion
+        // below is being satisfied by the membership and not by the state predicate.
+        $this->assertSame(2, (new estimator())->estimate(['cohorts' => [$cohort->id]])['count']);
+
+        $DB->set_field('user', $field, $value, ['id' => $excluded->id]);
 
         $result = (new estimator())->estimate(['cohorts' => [$cohort->id]]);
-        $this->assertSame(1, $result['count']);
+        $this->assertSame(1, $result['count'], "a {$field} member must not be counted");
+    }
+
+    /**
+     * The guest account is never counted, even as a cohort member.
+     *
+     * Guest is excluded twice over — by id and by username — because the id is only 1 on a site
+     * Moodle installed itself. This asserts the behaviour rather than either mechanism, so the
+     * pair can be rearranged without rewriting the test.
+     */
+    public function test_estimate_excludes_the_guest_account(): void {
+        global $CFG;
+
+        $generator = $this->getDataGenerator();
+        $cohort = $generator->create_cohort();
+        $counted = $generator->create_user();
+        cohort_add_member($cohort->id, $counted->id);
+
+        $this->assertSame(1, (new estimator())->estimate(['cohorts' => [$cohort->id]])['count']);
+
+        cohort_add_member($cohort->id, $CFG->siteguest);
+
+        $result = (new estimator())->estimate(['cohorts' => [$cohort->id]]);
+        $this->assertSame(1, $result['count'], 'the guest account must not be counted');
     }
 
     /**

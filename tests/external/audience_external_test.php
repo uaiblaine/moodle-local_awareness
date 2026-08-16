@@ -44,6 +44,27 @@ final class audience_external_test extends \advanced_testcase {
     }
 
     /**
+     * Polling a job is gated too, and on the same capability.
+     *
+     * The read side is the one worth stating: estimate_audience() only queues work, while
+     * get_estimate() hands back the resulting head count for a set of criteria. Gating the write
+     * and leaving the read open would make the poller an audience oracle for anyone who can guess
+     * a job id — and the job id is the ONLY parameter, so guessing is the whole attack.
+     */
+    public function test_get_estimate_requires_capability(): void {
+        $this->setAdminUser();
+        $cohort = $this->getDataGenerator()->create_cohort();
+        $queued = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+
+        // Control: the job really is readable by someone who holds the capability.
+        $this->assertSame($queued['jobid'], external::get_estimate($queued['jobid'])['jobid']);
+
+        $this->setUser($this->getDataGenerator()->create_user());
+        $this->expectException(\required_capability_exception::class);
+        external::get_estimate($queued['jobid']);
+    }
+
+    /**
      * Above the inline limit the estimate still goes to cron.
      *
      * The limit is set to 0 rather than relying on the site being large, which no test site is.
@@ -358,5 +379,50 @@ final class audience_external_test extends \advanced_testcase {
         $control = external::get_estimate($visibleonly['jobid']);
         $this->assertTrue($control['has_audience_rules']);
         $this->assertSame(1, (int) $control['count']);
+    }
+
+    /**
+     * Both audience functions survive a real web-service round trip.
+     *
+     * Every other case in this file calls the statics bare, which never applies
+     * estimate_audience_returns() or get_estimate_returns() to a payload. That matters because
+     * clean_returnvalue() SILENTLY STRIPS any key the returns declaration does not name: a field
+     * added to the shared builder reaches the bare call and vanishes on the way to the browser,
+     * and the whole suite stays green while the editor loses a value. This is the only place the
+     * declarations are exercised at all.
+     */
+    public function test_the_audience_functions_round_trip_through_the_web_service_layer(): void {
+        $this->setAdminUser();
+        $_POST['sesskey'] = sesskey();
+        $cohort = $this->getDataGenerator()->create_cohort();
+        $this->getDataGenerator()->create_user();
+
+        $queued = \core_external\external_api::call_external_function(
+            'local_awareness_estimate_audience',
+            ['criteria' => json_encode(['cohorts' => [$cohort->id]])],
+            false
+        );
+        $this->assertFalse($queued['error'], 'estimate_audience returned an error through the WS layer');
+
+        // Every key the JS reads must survive clean_returnvalue().
+        foreach (['jobid', 'status', 'reused'] as $key) {
+            $this->assertArrayHasKey($key, $queued['data'], "estimate_audience dropped '{$key}'");
+        }
+
+        $polled = \core_external\external_api::call_external_function(
+            'local_awareness_get_estimate',
+            ['jobid' => $queued['data']['jobid']],
+            false
+        );
+        $this->assertFalse($polled['error'], 'get_estimate returned an error through the WS layer');
+
+        $pollkeys = ['jobid', 'status', 'count', 'breakdown', 'context_only_filters', 'has_audience_rules'];
+        foreach ($pollkeys as $key) {
+            $this->assertArrayHasKey($key, $polled['data'], "get_estimate dropped '{$key}'");
+        }
+
+        // The two JSON-carrying keys must decode, not merely be present.
+        $this->assertIsArray(json_decode($polled['data']['breakdown'], true));
+        $this->assertIsArray(json_decode($polled['data']['context_only_filters'], true));
     }
 }

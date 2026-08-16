@@ -43,6 +43,9 @@ $PAGE->set_url(new moodle_url('/local/awareness/report/acknowledged_systemreport
 $PAGE->set_title(get_string('report:acknowledged', 'local_awareness', $notice->title));
 $PAGE->set_heading(get_string('report:acknowledged', 'local_awareness', $notice->title));
 $PAGE->set_pagelayout('report');
+// The Bootstrap 4 polyfill in styles.css is gated on the body class this adds, so a page that
+// omits it renders unstyled on 4.5 while every static gate stays green.
+\local_awareness\local\bootstrap::mark_page();
 
 echo $OUTPUT->header();
 

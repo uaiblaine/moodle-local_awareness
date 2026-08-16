@@ -10,9 +10,13 @@ findings plus 7 from a completeness critic. Its own header warns that it is the 
 starting point, **not** a list of what is still open.
 
 [`RECONCILIACAO-2026-08.md`](RECONCILIACAO-2026-08.md) is that missing list: a verdict per finding
-against `main` at `9e3bc72`, with current-tree evidence for each. All ten blockers are closed;
-87 of the 198 are settled, 111 still want a decision. Read the reconciliation, not the audit, to
-know what is open.
+with current-tree evidence for each. **No High or Medium finding is open** — 105 of the 198 are
+settled and the four Medium survivors are partials with the remainder named. Read the
+reconciliation, not the audit, to know what is open.
+
+What is left is almost entirely Low and Informational: file-header and docblock drift, the
+`html_writer` usage that grew rather than shrank, the missing fleet-template repo files, and
+Mustache docblocks that drift from the variables their templates read.
 
 [`PLANO-correcoes.md`](PLANO-correcoes.md) is the four-phase work list that closed 27 items across
 PRs #26–#29; it is finished.
