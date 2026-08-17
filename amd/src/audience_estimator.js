@@ -48,6 +48,9 @@ define([
         pollAttempts: 0,
         debounceTimer: null,
         lastCriteriaJson: '',
+        // Monotonic request counter. Same name and shape as collision_warning.js, which already
+        // ships this guard — one spelling for one pattern.
+        sequence: 0,
         strings: null,
         root: null,
         slots: {}
@@ -313,10 +316,22 @@ define([
         }
         state.pollAttempts += 1;
 
+        /*
+         * The job id is captured at send time and the answer is only applied if this request is
+         * still the current one. Without it, a poll for a superseded job can land after a newer
+         * estimate has started and overwrite a fresher count with a stale one — and the author is
+         * given no sign that the number on screen answers a question they have already changed.
+         */
+        var mine = state.sequence;
+        var jobid = state.currentJobId;
+
         Ajax.call([{
             methodname: 'local_awareness_get_estimate',
-            args: {jobid: state.currentJobId}
+            args: {jobid: jobid}
         }])[0].then(function(response) {
+            if (mine !== state.sequence) {
+                return null;
+            }
             if (!response) {
                 return null;
             }
@@ -333,6 +348,9 @@ define([
             }
             return null;
         }).catch(function(err) {
+            if (mine !== state.sequence) {
+                return;
+            }
             handleError((err && err.message) ? err.message : 'AJAX error');
         });
     }
@@ -428,6 +446,14 @@ define([
 
     /** Trigger a fresh estimate based on the current criteria. */
     function trigger() {
+        /*
+         * A new estimate supersedes whatever was in flight. stopPolling() cancels the pending
+         * timer; bumping the sequence is what discards an answer already on the wire, which the
+         * timer cannot reach.
+         */
+        stopPolling();
+        var mine = ++state.sequence;
+
         var criteria = criteriaReader.read();
         var json = JSON.stringify(criteria);
         state.lastCriteriaJson = json;
@@ -448,6 +474,9 @@ define([
             methodname: 'local_awareness_estimate_audience',
             args: {criteria: json}
         }])[0].then(function(response) {
+            if (mine !== state.sequence) {
+                return null;
+            }
             if (!response || !response.jobid) {
                 handleError('No job id returned.');
                 return null;
@@ -465,6 +494,9 @@ define([
             }
             return null;
         }).catch(function(err) {
+            if (mine !== state.sequence) {
+                return;
+            }
             handleError((err && err.message) ? err.message : 'AJAX error');
         });
     }

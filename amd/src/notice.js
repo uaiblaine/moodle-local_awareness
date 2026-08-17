@@ -14,6 +14,10 @@ define(
         var notices = {};
         var modal;
         var viewednotices = [];
+        // True while a dismiss or acknowledge request is in flight. The modal used to be hidden
+        // synchronously on click, which made a second click impossible; now that it stays up until
+        // the server answers, this is what stops one notice being dismissed twice.
+        var inflight = false;
 
         var Awareness = {};
 
@@ -38,6 +42,12 @@ define(
         var nextNotice = function() {
             var nextnotice = getNotice();
             if (nextnotice == false) {
+                if (typeof modal !== 'undefined') {
+                    // Nothing left to show. This is the ONLY place the modal is hidden, so a
+                    // dismissal that never reached the server leaves the notice on screen instead
+                    // of closing it and silently losing the record.
+                    modal.hide();
+                }
                 return;
             }
             if (typeof modal === 'undefined') {
@@ -60,12 +70,10 @@ define(
                         // Event listener for close button.
                         modal.getModal().on('click', modal.getCloseButtonID(), function() {
                             dismissNotice();
-                            modal.hide();
                         });
                         // Event listener for accept button.
                         modal.getModal().on('click', modal.getAcceptButtonID(), function() {
                             acknowledgeNotice();
-                            modal.hide();
                         });
                         // Event listener for link tracking.
                         modal.getModal().on('click', 'a', function() {
@@ -101,6 +109,11 @@ define(
          * Dismiss Notice.
          */
         var dismissNotice = function() {
+            if (inflight) {
+                return;
+            }
+            inflight = true;
+
             var noticeid = modal.getNoticeId();
             var promises = ajax.call([
                 {methodname: 'local_awareness_dismiss', args: {noticeid: noticeid}}
@@ -112,13 +125,20 @@ define(
                 } else {
                     nextNotice();
                 }
-            }).fail(Notification.exception);
+            }).fail(Notification.exception).always(function() {
+                inflight = false;
+            });
         };
 
         /**
          * Acknowledge notice.
          */
         var acknowledgeNotice = function() {
+            if (inflight) {
+                return;
+            }
+            inflight = true;
+
             var noticeid = modal.getNoticeId();
             var promises = ajax.call([
                 {methodname: 'local_awareness_acknowledge', args: {noticeid: noticeid}}
@@ -130,7 +150,9 @@ define(
                 } else {
                     nextNotice();
                 }
-            }).fail(Notification.exception);
+            }).fail(Notification.exception).always(function() {
+                inflight = false;
+            });
         };
 
         /**

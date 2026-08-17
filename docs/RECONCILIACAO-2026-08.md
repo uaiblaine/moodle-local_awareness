@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 25 | 4 | 4 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 50 | 7 | 5 | 34 | **96** |
+| Baixo | 52 | 7 | 4 | 33 | **96** |
 | Informativo | 13 | 5 | 4 | 30 | **52** |
-| **Total** | **103** | **17** | **14** | **64** | **198** |
+| **Total** | **105** | **17** | **13** | **63** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **120 dos 198 estão encerrados; 78 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **122 dos 198 estão encerrados; 76 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -77,6 +77,13 @@ parciais, com o que falta nomeado.
 > **ponto de entrada** — que é onde o `should_load_on()` já o verifica para o gancho — e não à
 > lógica de domínio. No sítio certo o raio de ação caiu para 14 testes, todos no ficheiro que
 > testa exatamente essa fronteira.
+>
+> **Atualizado pela fase 9** (versão `2026081608`, branch `fix/phase-9-javascript`): **JS-02** e
+> **JS-03** fechados, com o `amd/build` reconstruído no mesmo commit. Nenhum dos dois é alcançável
+> pelos testes que esta frota corre — o PHPUnit não carrega JavaScript e o Behat não reproduz uma
+> resposta que chega fora de ordem — por isso o observador é um contrato sobre a fonte, como o
+> `criteria_contract_test` e o `bootstrap_compat_test` ao lado. Uma das asserções passou com a
+> guarda apagada até o teste de mutação a apanhar; a correção está escrita no próprio ficheiro.
 >
 > **Ainda deixados de propósito**, com razão registada e não por esquecimento:
 > **PRIV-01** e **PRIV-04** (declaração de metadados de privacidade)
@@ -545,16 +552,14 @@ diz o que resta e onde.
   <br>tests/local/bootstrap_compat_test.php:297 still lists `'local-dimensions-central-page'` in $structural, and line 331 still reads `$exceptions = ['hero_header.mustache'];`. Neither exists here: `grep -rn "local-dimensions" templates amd classes styles.css report renderer.php` returns nothing and there is no templates/*hero* file.
   <br>*Falta:* Delete the nine dead $structural entries (lines 297-305, keeping only bootstrap::BODY_CLASS_BS4) and the hero_header.mustache exception at line 331. Three prose references to the source plugin are stale in the same file and should go with them: amd/src/central/context.js (line 190), template_import_verdict.php (line 328) and the sidenav data-target hook (line 384) — none of those files or hooks exist in this plugin.
 
-### AMD JavaScript — 9 de 12 em aberto
+### AMD JavaScript — 7 de 12 em aberto
 
 - **JS-01** · corrigido — Context-rule chips request their language strings with `param: ''`, which deletes the {$a} placeholder and makes the value-substitution branch dead…
   <br>`grep -rn "param:" amd/src/` returns nothing (exit 1). At 896dfc2 the list carried `param: ''` on pathmatch/filter_category/filter_course/filter_format/filter_theme and `param: '{$a}'` on cached/error/reach:value; the current list at amd/src/audience_estimator.js:100-121 has no `param` key at all, a…
-- **JS-02** · **aberto** — Poll responses are applied without checking they belong to the current job, and trigger() leaves the previous poll running — a late response can…
-  <br>amd/src/audience_estimator.js:316-337 — `pollOnce()` sends `args: {jobid: state.currentJobId}` and the `.then` handler calls `handleReady(response)` / `handleError(...)` without ever comparing `response.jobid` to `state.currentJobId`, even though the web service does return it (classes/external.php:715 `'jobid' => new external_value(PARAM_ALPHANUMEXT, ...)`).
-  <br>*Falta:* Two things: (a) guard the poll handler with `if (response.jobid !== state.currentJobId) { return null; }` before applying it; (b) call `stopPolling()` as the first statement of `trigger()` so the superseded job's timer and late response cannot land.
-- **JS-03** · **parcial** — Dismiss/acknowledge web-service failures are swallowed to the browser console and the modal is hidden before the result is known
-  <br>Console-swallowing half is fixed: at 896dfc2 both handlers ended `.fail(function(ex) { this.console.log(ex); })`; today amd/src/notice.js:115 and amd/src/notice.js:133 both read `.fail(Notification.exception)`. The hide-before-result half is untouched: amd/src/notice.js:61-69 still runs `dismissNotice(); modal.hide();` and `acknowledgeNotice(); modal.hide();` synchronously — byte-identical to 896dfc2:60-69 — so the modal disappears before the WS promise settles.
-  <br>*Falta:* The modal is still hidden optimistically. `modal.hide()` must move into the promise resolution of `dismissNotice()`/`acknowledgeNotice()` (amd/src/notice.js:103-134), leaving the modal up on failure so the user can retry; today a dismiss that fails server-side still closes the notice on screen.
+- **JS-02** · corrigido — Poll responses are applied without checking they belong to the current job, and trigger() leaves the previous poll running — a late response can…
+  <br>Fechado na fase 9 (2026-08-16): contador monotónico `state.sequence`, capturado no envio e comparado nos dois ramos (`.then` e `.catch`) do `pollOnce()` e do `trigger()`, mais `stopPolling()` no início do `trigger()`. Mesma grafia do `collision_warning.js`, que já trazia o padrão.
+- **JS-03** · corrigido — Dismiss/acknowledge web-service failures are swallowed to the browser console and the modal is hidden before the result is known
+  <br>Fechado na fase 9 (2026-08-16): o `modal.hide()` saiu dos dois handlers de clique e passou a existir num único sítio — o ramo de fila vazia do `nextNotice()`. Guarda `inflight` nos dois caminhos de escrita, libertada no `.always()`, porque era o `hide()` que tornava um segundo clique impossível.
 - **JS-04** · **aberto** — Four AMD modules miss the GPL header and @module tag and carry a forbidden @author line
   <br>Per-file check over amd/src (`head -5 \| grep 'This file is part of Moodle'`, `grep -c '@module'`, `grep -c '@author'`) gives exactly four modules with no GPL block, no @module tag and an @author line: amd/src/notice.js:1-8, amd/src/modal_notice.js:1-8, amd/src/notice_form.js:1-8, amd/src/preview.js:1-8 — each has the banned `@author Anderson Blaine <anderson@blaine.com.br>` on line 5. The identical scan at 896dfc2 names the same four files, so nothing moved.
   <br>*Falta:* Add the 14-line GPL header and an `@module local_awareness/<name>` tag to notice.js, modal_notice.js, notice_form.js and preview.js, and delete the `@author` line from all four (plus course_search.js:5 while there).
