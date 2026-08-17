@@ -127,6 +127,12 @@ parciais, com o que falta nomeado.
 > E outra vez a mesma lição, agora ao contrário: eu tinha descrito os 42 restantes como
 > "apresentação ou higiene" na mensagem anterior. Sete não eram, e um deles era isto.
 >
+> **Decisão sobre o REPO-10 (2026-08-17): continua aberto de propósito.** O `version.php` declara
+> `MATURITY_STABLE` e o repositório não tem nenhuma tag; o dono do produto optou por continuar assim
+> por agora. Fica registado porque o PR #40 corrige uma divulgação de ficheiros e, sem tag, não há
+> versão publicada para onde apontar quem corra o plugin a partir de um zip. Reavaliar quando
+> houver utilizadores externos — não é dívida de papelada enquanto não houver.
+>
 > *Texto original da decisão, mantido por registo:*
 >
 > ~~**Continua aberto e é decisão de produto: BIZ-08.**~~ Um aviso com curso obrigatório ignora a
