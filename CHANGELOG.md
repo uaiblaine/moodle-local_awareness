@@ -6,6 +6,65 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — five behavioural defects the previous summary had written off (version 2026081610)
+
+This release exists because of a mistake in the last one's summary. It said no substantive work
+remained and that the open findings were cosmetic. That was wrong: the census never said it, and
+the error was collapsing *Low severity* — a label inherited from the August audit — with
+*cosmetic*. A re-reading of the open set found eight candidates with behaviour at stake. Six were
+real; two were refuted (WS-13, BIZ-09).
+
+- **The "Is perpetual" help never reached a single author (audit LANG-01).** The help string was
+  defined in both language packs and maintained — and `addHelpButton()` was never called, so the
+  sentence explaining what the field does existed and was invisible. Nothing in the pipeline can
+  see that: a help string with no button is not an unused string, and not a broken one. The test
+  now walks the language pack and requires every rendered field with a `_help` string to show it.
+
+- **The reqcourse report column summed course ids (audit RB-02).** The column declares
+  `TYPE_BOOLEAN` while the stored value is a course id, and Report Builder aggregates such a column
+  arithmetically — so a percent aggregation produced a seven-digit percentage and an average
+  produced the mean course id. The display callback hid it, because it only asked whether the value
+  was empty. Normalised in SQL with a searched `CASE`, which keeps the declared type, stays plain
+  ANSI for MariaDB, and leaves stored aggregations valid.
+
+- **Typing a title re-queued an ad-hoc task (audit M4).** Auto mode fires on every change to the
+  form, including the title and the body, and `trigger()` never compared the criteria it had just
+  read against the previous ones. So each pause in typing blanked the reach figure, queued a job
+  row that nothing deletes, and spent a round trip restoring the number already on screen. The
+  comparison happens **before** any side effect — bumping the sequence or cancelling the poll first
+  would abandon an estimate the author is still waiting for — and the buttons pass `force`, because
+  pressing Calculate is the author asking for a recount and a dead Calculate button is a defect
+  this panel has already shipped once.
+
+- **Criteria lists reached the database unbounded (audit WS-14).** They arrive as client JSON and
+  reach `get_in_or_equal()` with one bound parameter per id, against a PostgreSQL ceiling of 65535
+  and a planner being handed something nobody intended long before that. Capped at 500 at the web
+  service boundary, and deliberately **not** inside `estimator::normalise()` — that also runs over
+  an already-stored notice, so capping there would let the estimate and the hash describe the first
+  500 ids while `check_filters()` kept honouring all of them, which is the panel quietly ceasing to
+  describe the notice.
+
+- **A failed estimate looked like a measured zero, and stuck (audit TEST-09).** `resultcount` is 0
+  on an errored job, and `record()` wrote that 0 with a fresh criteria hash — so the editor showed
+  "0 people" as though counted, and the stored hash then matched the criteria, which stopped the
+  next unforced refresh from retrying. `record()` now refuses a job that is not `ready`.
+
+Mutation-tested: removing the cap call kills a test, trimming everything to one kills a test,
+removing the status guard kills a test, reverting the reqcourse `CASE` kills a test, removing the
+help button kills a test, and removing the unchanged-criteria short-circuit kills two.
+
+The 4.05 leg again caught what the others did not — the form render reaches TinyMCE's autosave
+plugin, which reads `$PAGE->url`, and an unasserted `debugging()` fails PHPUnit only on 4.5.
+
+**Still open, and a product decision rather than a defect to fix quietly: audit BIZ-08.** A notice
+with a required course ignores the recorded view, so `resetinterval` has no effect on it and the
+notice returns every session. In the combination `reqcourse > 0` + `reqack = 1` +
+`resetinterval = 0`, pressing Accept records **nothing**. The two available fixes are not
+equivalent — adding `OR resetinterval > 0` to the predicate is the minimal change and closes half;
+dropping the `reqcourse = 0` clause entirely makes `reqcourse` the pure audience rule that the
+other six call sites already assume and closes both halves, at the cost of rewording a shipped help
+string. That choice belongs to whoever owns the product behaviour.
+
 ### Fixed — the privacy declaration now matches what is actually exported (version 2026081609, audit PRIV-01, PRIV-04)
 
 - **The declaration named a subset of what the export ships.** `export_user_data()` selects

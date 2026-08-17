@@ -425,4 +425,111 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertIsArray(json_decode($polled['data']['breakdown'], true));
         $this->assertIsArray(json_decode($polled['data']['context_only_filters'], true));
     }
+
+    /**
+     * A criteria list longer than the cap is trimmed rather than sent whole to the database.
+     *
+     * The criteria arrive as client JSON and reach get_in_or_equal() unbounded — one bound
+     * parameter per id, against a PostgreSQL ceiling of 65535 and a query planner that is being
+     * asked to do something nobody intended long before that. The editor's pickers cannot produce
+     * a list this long, so a request that does is hand-made.
+     */
+    public function test_an_oversized_criteria_list_is_capped(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
+
+        $courses = range(1, \local_awareness\helper::CRITERIA_LIST_MAX + 250);
+        $response = external::estimate_audience(json_encode(['filter_course' => $courses]));
+
+        $stored = json_decode(
+            $DB->get_field('local_awareness_audience_jobs', 'criteria', ['jobid' => $response['jobid']]),
+            true
+        );
+
+        $this->assertCount(
+            \local_awareness\helper::CRITERIA_LIST_MAX,
+            $stored['filter_course'],
+            'an oversized list must be trimmed to the cap'
+        );
+    }
+
+    /**
+     * A list within the cap is passed through untouched.
+     *
+     * The control. Without it the assertion above is satisfied by any implementation that
+     * truncates everything, including one that discards criteria the author really did choose.
+     */
+    public function test_a_criteria_list_within_the_cap_is_untouched(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
+
+        $courses = range(1, 12);
+        $response = external::estimate_audience(json_encode(['filter_course' => $courses]));
+
+        $stored = json_decode(
+            $DB->get_field('local_awareness_audience_jobs', 'criteria', ['jobid' => $response['jobid']]),
+            true
+        );
+
+        $this->assertCount(12, $stored['filter_course']);
+    }
+
+    /**
+     * A failed job records no audience count, and does not look current afterwards.
+     *
+     * resultcount is 0 on an errored job. Recording that 0 with a fresh criteria hash told the
+     * editor the answer was measured — "0 people" — and the stored hash then matched the criteria,
+     * so the next unforced refresh saw nothing to do. The failure became sticky AND looked like a
+     * result, which is the worse half.
+     */
+    public function test_a_failed_job_records_no_count(): void {
+        $this->setAdminUser();
+        $notice = new \local_awareness\persistent\awareness(0, (object) [
+            'title' => 'Policy update',
+            'content' => '<p>Read the policy.</p>',
+        ]);
+        $notice->create();
+
+        $failed = new \local_awareness\persistent\audience_job(0, (object) [
+            'jobid' => 'failedjob1',
+            'userid' => 2,
+            'noticeid' => $notice->get('id'),
+            'criteriahash' => str_repeat('b', 64),
+            'criteria' => '[]',
+            'status' => \local_awareness\persistent\audience_job::STATUS_ERROR,
+            'resultcount' => 0,
+            'errormsg' => 'boom',
+        ]);
+        $failed->create();
+
+        $this->assertNull(\local_awareness\audience\notice_audience::record($failed));
+
+        $stored = new \local_awareness\persistent\awareness($notice->get('id'));
+        $this->assertNull($stored->get('audiencehash'), 'a failed job must not stamp the criteria hash');
+
+        /*
+         * Control: the same call with a READY job does record. Without it, a record() that always
+         * returned null — or threw — would satisfy the assertions above.
+         */
+        $ready = new \local_awareness\persistent\audience_job(0, (object) [
+            'jobid' => 'readyjob1',
+            'userid' => 2,
+            'noticeid' => $notice->get('id'),
+            'criteriahash' => str_repeat('c', 64),
+            'criteria' => '[]',
+            'status' => \local_awareness\persistent\audience_job::STATUS_READY,
+            'resultcount' => 7,
+            'timecompleted' => time(),
+        ]);
+        $ready->create();
+
+        $this->assertNotNull(\local_awareness\audience\notice_audience::record($ready));
+
+        $after = new \local_awareness\persistent\awareness($notice->get('id'));
+        $this->assertSame(7, (int) $after->get('audiencecount'));
+    }
 }

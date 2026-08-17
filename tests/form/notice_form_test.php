@@ -137,4 +137,79 @@ final class notice_form_test extends \advanced_testcase {
 
         $this->assertEmpty($draftfiles);
     }
+
+    /**
+     * Every field with a help string actually offers the help button.
+     *
+     * "Is perpetual" had `notice:perpetual_help` defined in both language packs and no
+     * addHelpButton() call, so the sentence explaining what the field does existed, was
+     * translated, was maintained — and never reached a single author. Nothing in the pipeline can
+     * see that: a help string with no button is not an unused string (the sniff cannot tell) and
+     * not a broken one.
+     *
+     * Driven from the language pack rather than a hand-kept list, so a field whose help string is
+     * added later without its button turns this red on its own.
+     */
+    public function test_every_field_with_a_help_string_has_its_help_button(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        /*
+         * Rendering the form reaches MoodleQuickForm_editor, which asks TinyMCE for its plugin
+         * configuration, and tiny_autosave reads $PAGE->url. Without a URL that emits a
+         * debugging() call — harmless on 5.x, but an unasserted debugging() FAILS PHPUnit on 4.5,
+         * so this line is what makes the test run on the lower half of the supported range.
+         */
+        $PAGE->set_url(new \moodle_url('/local/awareness/editnotice.php'));
+
+        $form = new notice_form(null, ['persistent' => null, 'id' => 0]);
+        $html = $form->render();
+
+        $strings = get_string_manager()->load_component_strings('local_awareness', 'en');
+
+        $missing = [];
+        $checked = [];
+        foreach (array_keys($strings) as $key) {
+            if (!str_starts_with($key, 'notice:') || !str_ends_with($key, '_help')) {
+                continue;
+            }
+            $element = substr($key, strlen('notice:'), -strlen('_help'));
+
+            /*
+             * Both halves read from the rendered page, which is the only place that can answer
+             * "did the author see this". A help string whose field the form does not render is
+             * not this test's business; a field that IS rendered and shows no help is.
+             *
+             * The help TEXT is the anchor, because core's help_icon template carries no field
+             * identifier — it puts the string itself into data-bs-content. Matching the text is
+             * therefore also the stronger check: it proves the right help reached the right field.
+             */
+            if (!str_contains($html, 'name="' . $element . '"')) {
+                continue;
+            }
+            $checked[] = $element;
+
+            $needle = s(shorten_text(strip_tags($strings[$key]), 40, true, ''));
+            if ($needle !== '' && !str_contains($html, $needle)) {
+                $missing[] = $element;
+            }
+        }
+
+        $this->assertSame([], $missing, 'these fields define a help string but never show it: '
+            . implode(', ', $missing));
+
+        /*
+         * Non-vacuity, both ways. The loop has to have examined some fields, and the specific one
+         * this test was written for has to be among them — otherwise a rename would leave the
+         * assertion above passing over an empty set.
+         */
+        $this->assertNotEmpty($checked, 'no rendered field carried a help string — the scan is broken');
+        $this->assertContains(
+            'perpetual',
+            $checked,
+            'the field this test was written for must be among those examined'
+        );
+    }
 }

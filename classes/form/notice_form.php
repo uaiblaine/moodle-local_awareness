@@ -140,6 +140,7 @@ class notice_form extends \core\form\persistent {
         $mform->setDefault('forcelogout', 0);
 
         $mform->addElement('selectyesno', 'perpetual', get_string('notice:perpetual', 'local_awareness'));
+        $mform->addHelpButton('perpetual', 'notice:perpetual', 'local_awareness');
         $mform->setDefault('perpetual', 1);
 
         /*

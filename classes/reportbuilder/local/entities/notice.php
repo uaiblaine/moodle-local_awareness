@@ -123,7 +123,15 @@ class notice extends base {
             $this->get_entity_name()
         ))
             ->add_joins($this->get_joins())
-            ->add_fields("{$alias}.reqcourse")
+            /*
+             * Normalised in SQL rather than shipped raw. The stored value is a COURSE ID, while
+             * the column type promises zero or one and Report Builder aggregates the field
+             * arithmetically — so the percent aggregation over a course id reported a seven-digit
+             * percentage. A searched CASE keeps the boolean contract the type declares, is plain
+             * ANSI so it holds on both PostgreSQL and MariaDB, and leaves every stored
+             * aggregation on this column still valid.
+             */
+            ->add_field("CASE WHEN {$alias}.reqcourse > 0 THEN 1 ELSE 0 END", 'reqcourse')
             ->set_type(column::TYPE_BOOLEAN)
             ->set_is_sortable(true)
             ->add_callback(static function ($value): string {
