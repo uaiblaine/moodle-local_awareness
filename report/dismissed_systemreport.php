@@ -62,9 +62,6 @@ $report = system_report_factory::create(
 echo $report->output();
 
 $backurl = new moodle_url('/local/awareness/managenotice.php');
-echo html_writer::div(
-    html_writer::link($backurl, get_string('back'), ['class' => 'btn btn-secondary mt-3']),
-    'mt-3'
-);
+echo $OUTPUT->render_from_template('local_awareness/manage/backlink', ['url' => $backurl->out(false)]);
 
 echo $OUTPUT->footer();

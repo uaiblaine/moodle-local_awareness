@@ -1,0 +1,40 @@
+{{!
+    @template local_awareness/manage/cell_status
+
+    The Status cell of the notice table: a live/draft badge, plus a conflict badge when this
+    notice competes with another repeating one for the same pages.
+
+    Every background states its text colour. Bootstrap 4 gives .badge no colour at all and
+    Bootstrap 5 defaults it to white, so the two branches fail on disjoint sets of fills;
+    tests/local/bootstrap_compat_test.php enforces the pairing.
+
+    The conflict badge explains itself twice: a title attribute for the pointer, and a
+    visually-hidden sibling for assistive technology. An aria-label on a bare span has no role to
+    attach to and is not announced reliably.
+
+    Context variables required:
+    * enabled (bool) — true for a live notice, false for a draft
+    * hasclash (bool) — whether a conflict badge is shown
+    * clashlabel (string) — the conflict badge text
+    * clashexplanation (string) — which notices it competes with
+
+    Example context (json):
+    {
+        "enabled": false,
+        "hasclash": true,
+        "clashlabel": "Conflict",
+        "clashexplanation": "Competes with: Maintenance window"
+    }
+}}
+<div class="local-awareness-statuscell">
+    {{#enabled}}
+        <span class="badge bg-success text-white">{{#str}}notice:status:live, local_awareness{{/str}}</span>
+    {{/enabled}}
+    {{^enabled}}
+        <span class="badge bg-secondary text-dark">{{#str}}notice:status:draft, local_awareness{{/str}}</span>
+    {{/enabled}}
+    {{#hasclash}}
+        <span class="badge bg-warning text-dark" title="{{clashexplanation}}">{{clashlabel}}<span
+            class="visually-hidden"> — {{clashexplanation}}</span></span>
+    {{/hasclash}}
+</div>

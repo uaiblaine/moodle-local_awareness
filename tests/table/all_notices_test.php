@@ -348,8 +348,13 @@ final class all_notices_test extends \advanced_testcase {
          */
         $this->assertCount(10, $lines);
         foreach ($lines as $line) {
-            $this->assertStringContainsString('Alpha cohort', $line);
-            $this->assertStringContainsString('Beta cohort', $line);
+            /*
+             * The method returns [sentence, plain list] now: the cell is a Mustache template, so
+             * the markup is assembled there and this hands back the two values it needs.
+             */
+            $this->assertStringContainsString('Alpha cohort', $line[0]);
+            $this->assertStringContainsString('Beta cohort', $line[0]);
+            $this->assertStringContainsString('Alpha cohort', $line[1]);
         }
 
         // Twenty cohort references, one scan of {cohort}: a COUNT and a SELECT, with headroom.
@@ -381,6 +386,16 @@ final class all_notices_test extends \advanced_testcase {
 
         $render = new \ReflectionMethod(all_notices::class, 'col_audience');
         $render->setAccessible(true);
+
+        /*
+         * One render before the counter starts. The cell is built from a Mustache template now,
+         * and the FIRST render_from_template() of a request pays a one-off setup cost — measured
+         * at nine reads here, then zero for every row after it. Counting from cold would attribute
+         * core's theme and template initialisation to this column and make the assertion below
+         * about the wrong thing. Measured, not assumed: with this warm-up the ten rows below cost
+         * zero reads, so the batching really is per page and not per row.
+         */
+        $render->invoke($table, reset($table->rawdata));
 
         $cells = [];
         $before = $DB->perf_get_reads();

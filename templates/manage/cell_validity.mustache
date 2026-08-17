@@ -1,0 +1,26 @@
+{{!
+    @template local_awareness/manage/cell_validity
+
+    The Validity cell: the scheduled window with a word for its state, or a muted sentence when
+    the notice has no window at all.
+
+    Context variables required:
+    * haswindow (bool) — whether the notice is scheduled
+    * window (string) — the formatted start and end, already localised
+    * state (string) — expired, scheduled or current, already localised
+    * permanentlabel (string) — the sentence shown when there is no window
+
+    Example context (json):
+    {
+        "haswindow": true,
+        "window": "1/03/26 → 31/03/26",
+        "state": "Currently showing",
+        "permanentlabel": "Permanent"
+    }
+}}
+{{#haswindow}}
+    <span>{{window}}</span><span class="local-awareness-subline">{{state}}</span>
+{{/haswindow}}
+{{^haswindow}}
+    <span class="text-muted">{{permanentlabel}}</span>
+{{/haswindow}}

@@ -1,0 +1,55 @@
+{{!
+    @template local_awareness/manage/cell_audience
+
+    The Audience cell: the reach count with a statement of what it is a count OF.
+
+    The number is never shown on its own. A count computed before the filters changed is not
+    merely old — it describes a different notice — so it is labelled "filters changed since"
+    rather than being silently presented as current.
+
+    bg-warning takes text-dark and bg-info takes text-white explicitly: Bootstrap 4 gives .badge no
+    colour and Bootstrap 5 defaults it to white, so the two branches fail on disjoint fills.
+    tests/local/bootstrap_compat_test.php enforces the pairing.
+
+    Context variables required:
+    * pending (bool) — an estimate is queued, so there is no number yet
+    * pendinglabel (string) — the queued sentence
+    * never (bool) — no estimate has ever been computed
+    * neverlabel (string) — the never-computed sentence
+    * value (string) — the formatted reach sentence
+    * when (string) — when it was computed, or that the filters changed since
+    * stale (bool) — whether "when" is a warning rather than a note
+    * hascohorts (bool) — whether a cohort restriction line is shown
+    * cohortline (string) — that line
+    * cohortlist (string) — the plain list, used as the title attribute
+
+    Example context (json):
+    {
+        "pending": false,
+        "pendinglabel": "Calculating",
+        "never": false,
+        "neverlabel": "Not calculated",
+        "value": "Reaches 1,240 people",
+        "when": "Filters changed since 3/03/26, 09:14",
+        "stale": true,
+        "hascohorts": true,
+        "cohortline": "Cohorts: First years",
+        "cohortlist": "First years"
+    }
+}}
+{{#pending}}
+    <span class="badge bg-info text-white">{{pendinglabel}}</span>
+{{/pending}}
+{{^pending}}
+    {{#never}}
+        <span class="text-muted">{{neverlabel}}</span>
+    {{/never}}
+    {{^never}}
+        <span class="d-block">{{value}}</span>
+        {{#stale}}<span class="badge bg-warning text-dark">{{when}}</span>{{/stale}}
+        {{^stale}}<span class="text-muted small">{{when}}</span>{{/stale}}
+        {{#hascohorts}}
+            <span class="local-awareness-subline" title="{{cohortlist}}">{{cohortline}}</span>
+        {{/hascohorts}}
+    {{/never}}
+{{/pending}}

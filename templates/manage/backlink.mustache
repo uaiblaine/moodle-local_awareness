@@ -1,0 +1,16 @@
+{{!
+    @template local_awareness/manage/backlink
+
+    The link back to the notice list, shown under a report.
+
+    Context variables required:
+    * url (string) — the manage-notices URL
+
+    Example context (json):
+    {
+        "url": "https://example.com/local/awareness/managenotice.php"
+    }
+}}
+<div class="mt-3">
+    <a href="{{url}}" class="btn btn-secondary mt-3">{{#str}}back{{/str}}</a>
+</div>

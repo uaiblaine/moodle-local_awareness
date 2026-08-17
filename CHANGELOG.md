@@ -6,6 +6,33 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — the manage table renders through templates (version 2026081612, audit TPL-01, LANG-06, X3-01)
+
+**Zero `html_writer` in plugin code.** The fleet rule is that markup goes through
+`renderable` + `render_from_template()`, and this was the last and largest cluster breaking it —
+25 call sites, 21 of them building the notice table's cells by string concatenation.
+
+Seven templates now: `manage/cell_status`, `cell_chips`, `cell_validity`, `cell_audience`,
+`cell_title`, plus `manage/resultcount` and `manage/backlink` for the two report pages. Each carries
+the reasoning that used to live in the PHP — why every badge states its text colour, why the
+conflict badge explains itself twice, why the audience count is never shown without a statement of
+what it counts.
+
+Two escaping details moved with the markup and are worth stating, because Mustache's defaults are
+the opposite of `html_writer`'s. The title arrives already through `format_string()` — filters
+resolved, core's cleaning applied — so it is emitted with a triple stash; escaping it again would
+show a multilang or emphasised title as literal markup. The path pattern is the opposite case and
+is now passed **raw**, for the template to escape, rather than pre-escaped with `s()`, which would
+have double-escaped it.
+
+**A query-count test failed during this work, and the measurement is the interesting part.** It
+guards that the audience column resolves in-flight jobs once per page rather than once per row, and
+it went from 2 reads to 9. That looked like the refactor introducing an N+1. It was not: the first
+`render_from_template()` of a request pays a one-off setup cost, and rendering one cell before
+starting the count brings the ten rows to **zero** reads. The test was attributing core's theme and
+template initialisation to this column. It warms the renderer before counting now, with the
+measurement written down — and the per-row behaviour is better than before, not worse.
+
 ### Changed — a notice requiring a course now behaves like every other notice (version 2026081611, audit BIZ-08)
 
 **This changes behaviour on live sites.** A notice with a required course had its recorded view

@@ -1,0 +1,30 @@
+{{!
+    @template local_awareness/manage/cell_chips
+
+    A list of chips, or a muted sentence when there are none.
+
+    Used by the Behaviour column, which draws one chip per setting that is switched ON and nothing
+    for the rest: an on/off pair told apart by colour is invisible to a reader with a colour vision
+    deficiency, and absence carries "off" perfectly well while every chip present says what it is
+    in words.
+
+    Context variables required:
+    * chips (array of {label}) — one entry per setting that is on
+    * haschips (bool) — whether the list has anything in it
+    * emptylabel (string) — the sentence shown when it does not
+
+    Example context (json):
+    {
+        "haschips": true,
+        "emptylabel": "Nothing set",
+        "chips": [{"label": "Repeats every 1 day"}, {"label": "Requires acknowledgement"}]
+    }
+}}
+{{#haschips}}
+    <div class="local-awareness-chips">
+        {{#chips}}<span class="local-awareness-chip">{{label}}</span>{{/chips}}
+    </div>
+{{/haschips}}
+{{^haschips}}
+    <span class="text-muted">{{emptylabel}}</span>
+{{/haschips}}

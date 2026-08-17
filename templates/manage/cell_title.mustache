@@ -1,0 +1,28 @@
+{{!
+    @template local_awareness/manage/cell_title
+
+    The Title cell: the notice title, with the pages it applies to underneath.
+
+    A notice title has no length cap in the database, so the cell clamps it to two lines in CSS and
+    carries the whole string in the title attribute. The full text stays in the node — clipped for
+    the eye, intact for a screen reader.
+
+    The title arrives already through format_string(), which resolves the text filters and applies
+    core's HTML cleaning, so it is emitted with a triple stash: escaping it again would show a
+    multilang or emphasised title as literal markup. The path is the opposite case — a URL pattern
+    rather than prose — so it arrives RAW and is escaped here by Mustache.
+
+    Context variables required:
+    * title (string) — the filtered notice title, safe HTML
+    * titleplain (string) — the same title for the tooltip attribute
+    * where (string) — the raw path pattern, or the "anywhere" sentence
+
+    Example context (json):
+    {
+        "title": "Scheduled maintenance",
+        "titleplain": "Scheduled maintenance",
+        "where": "/course/view.php%"
+    }
+}}
+<span class="local-awareness-celltitle" title="{{titleplain}}">{{{title}}}</span>
+<span class="local-awareness-subline" title="{{where}}">{{where}}</span>

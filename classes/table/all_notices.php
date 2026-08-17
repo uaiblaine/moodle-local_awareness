@@ -24,7 +24,6 @@ use moodle_url;
 use local_awareness\local\collision;
 use local_awareness\audience\notice_audience;
 use local_awareness\persistent\audience_job;
-use html_writer;
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/tablelib.php');
@@ -238,11 +237,11 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @return void
      */
     public function wrap_html_start() {
-        echo \html_writer::tag(
-            'p',
-            get_string('manage:resultcount', 'local_awareness', number_format($this->get_total_rows())),
-            ['class' => 'local-awareness-resultcount', 'aria-live' => 'polite']
-        );
+        global $OUTPUT;
+
+        echo $OUTPUT->render_from_template('local_awareness/manage/resultcount', [
+            'count' => number_format($this->get_total_rows()),
+        ]);
     }
 
     /**
@@ -494,38 +493,19 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @return string
      */
     protected function col_status(awareness $awareness): string {
-        /*
-         * Every background states its text colour. Bootstrap 4 gives .badge no colour at all and
-         * Bootstrap 5 defaults it to white, so the two branches fail on disjoint sets of fills;
-         * tests/local/bootstrap_compat_test.php enforces the pairing.
-         */
-        if ($awareness->get('enabled')) {
-            $status = html_writer::tag('span', get_string('notice:status:live', 'local_awareness'), [
-                'class' => 'badge bg-success text-white',
-            ]);
-        } else {
-            $status = html_writer::tag('span', get_string('notice:status:draft', 'local_awareness'), [
-                'class' => 'badge bg-secondary text-dark',
-            ]);
-        }
+        global $OUTPUT;
 
         $clashes = $this->clashtitles[(int) $awareness->get('id')] ?? [];
-        if (!empty($clashes)) {
-            $explanation = get_string('collision:badgetooltip', 'local_awareness', implode(', ', $clashes));
-            /*
-             * The badge explains itself twice: title for the pointer, and a visually-hidden sibling
-             * for assistive technology. aria-label on a bare span has no role to attach to and is
-             * not announced reliably, which is what the previous version relied on.
-             */
-            $status .= html_writer::tag(
-                'span',
-                get_string('collision:badge', 'local_awareness')
-                    . html_writer::tag('span', ' — ' . $explanation, ['class' => 'visually-hidden']),
-                ['class' => 'badge bg-warning text-dark', 'title' => $explanation]
-            );
-        }
+        $explanation = empty($clashes)
+            ? ''
+            : get_string('collision:badgetooltip', 'local_awareness', implode(', ', $clashes));
 
-        return html_writer::div($status, 'local-awareness-statuscell');
+        return $OUTPUT->render_from_template('local_awareness/manage/cell_status', [
+            'enabled' => (bool) $awareness->get('enabled'),
+            'hasclash' => !empty($clashes),
+            'clashlabel' => get_string('collision:badge', 'local_awareness'),
+            'clashexplanation' => $explanation,
+        ]);
     }
 
     /**
@@ -556,19 +536,13 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             $chips[] = get_string('notice:reqcourse', 'local_awareness');
         }
 
-        if (empty($chips)) {
-            return html_writer::tag(
-                'span',
-                get_string('notice:behaviour:none', 'local_awareness'),
-                ['class' => 'text-muted']
-            );
-        }
+        global $OUTPUT;
 
-        $rendered = array_map(static function (string $chip): string {
-            return html_writer::tag('span', $chip, ['class' => 'local-awareness-chip']);
-        }, $chips);
-
-        return html_writer::div(implode('', $rendered), 'local-awareness-chips');
+        return $OUTPUT->render_from_template('local_awareness/manage/cell_chips', [
+            'haschips' => !empty($chips),
+            'emptylabel' => get_string('notice:behaviour:none', 'local_awareness'),
+            'chips' => array_map(static fn(string $chip): array => ['label' => $chip], $chips),
+        ]);
     }
 
     /**
@@ -581,28 +555,30 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         $start = (int) $awareness->get('timestart');
         $end = (int) $awareness->get('timeend');
 
-        if (!$start && !$end) {
-            return html_writer::tag(
-                'span',
-                get_string('notice:validity:permanent', 'local_awareness'),
-                ['class' => 'text-muted']
-            );
+        global $OUTPUT;
+
+        $window = '';
+        $statekey = '';
+        if ($start || $end) {
+            $format = get_string('strftimedatefullshort');
+            $window = ($start ? userdate($start, $format) : '…') . ' → ' . ($end ? userdate($end, $format) : '…');
+
+            $now = time();
+            if ($end && $end < $now) {
+                $statekey = 'notice:validity:expired';
+            } else if ($start && $start > $now) {
+                $statekey = 'notice:validity:scheduled';
+            } else {
+                $statekey = 'notice:validity:current';
+            }
         }
 
-        $format = get_string('strftimedatefullshort');
-        $window = ($start ? userdate($start, $format) : '…') . ' → ' . ($end ? userdate($end, $format) : '…');
-
-        $now = time();
-        if ($end && $end < $now) {
-            $statekey = 'notice:validity:expired';
-        } else if ($start && $start > $now) {
-            $statekey = 'notice:validity:scheduled';
-        } else {
-            $statekey = 'notice:validity:current';
-        }
-
-        return html_writer::span($window)
-            . html_writer::tag('span', get_string($statekey, 'local_awareness'), ['class' => 'local-awareness-subline']);
+        return $OUTPUT->render_from_template('local_awareness/manage/cell_validity', [
+            'haswindow' => (bool) ($start || $end),
+            'window' => $window,
+            'state' => $statekey ? get_string($statekey, 'local_awareness') : '',
+            'permanentlabel' => get_string('notice:validity:permanent', 'local_awareness'),
+        ]);
     }
 
     /**
@@ -619,51 +595,37 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @return string
      */
     protected function col_audience(awareness $awareness): string {
+        global $OUTPUT;
+
         $count = $awareness->get('audiencecount');
         $computed = (int) $awareness->get('audiencecomputed');
         $state = notice_audience::state_of($awareness, $this->inflight);
+        $stale = ($state === notice_audience::STATE_STALE);
 
-        if ($state === notice_audience::STATE_PENDING) {
-            return html_writer::tag(
-                'span',
-                get_string('notice:audience:pending', 'local_awareness'),
-                ['class' => 'badge bg-info text-white']
+        $when = '';
+        if ($count !== null) {
+            $whenkey = $stale ? 'notice:audience:stale' : 'notice:audience:computed';
+            $when = get_string(
+                $whenkey,
+                'local_awareness',
+                userdate($computed, get_string('strftimedatetimeshort'))
             );
         }
 
-        if ($count === null) {
-            return html_writer::tag(
-                'span',
-                get_string('notice:audience:never', 'local_awareness'),
-                ['class' => 'text-muted']
-            );
-        }
+        [$cohortline, $cohortlist] = $this->cohort_line($awareness);
 
-        $value = html_writer::tag(
-            'span',
-            get_string('notice:audience:value', 'local_awareness', number_format((int) $count)),
-            ['class' => 'd-block']
-        );
-
-        $whenkey = ($state === notice_audience::STATE_STALE)
-            ? 'notice:audience:stale'
-            : 'notice:audience:computed';
-        /*
-         * bg-warning takes text-dark explicitly: Bootstrap 4 gives .badge no colour and Bootstrap 5
-         * defaults it to white, so a light fill renders white on near-white on 5.x. Enforced by
-         * tests/local/bootstrap_compat_test.php.
-         */
-        $whenclass = ($state === notice_audience::STATE_STALE)
-            ? 'badge bg-warning text-dark'
-            : 'text-muted small';
-
-        $when = html_writer::tag(
-            'span',
-            get_string($whenkey, 'local_awareness', userdate($computed, get_string('strftimedatetimeshort'))),
-            ['class' => $whenclass]
-        );
-
-        return $value . $when . $this->cohort_line($awareness);
+        return $OUTPUT->render_from_template('local_awareness/manage/cell_audience', [
+            'pending' => ($state === notice_audience::STATE_PENDING),
+            'pendinglabel' => get_string('notice:audience:pending', 'local_awareness'),
+            'never' => ($count === null),
+            'neverlabel' => get_string('notice:audience:never', 'local_awareness'),
+            'value' => get_string('notice:audience:value', 'local_awareness', number_format((int) $count)),
+            'when' => $when,
+            'stale' => $stale,
+            'hascohorts' => ($cohortlist !== ''),
+            'cohortline' => $cohortline,
+            'cohortlist' => $cohortlist,
+        ]);
     }
 
     /**
@@ -674,12 +636,12 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * the common case, now says nothing instead of spending a column to say "All users".
      *
      * @param awareness $awareness a notice record.
-     * @return string Empty string when the notice targets everyone.
+     * @return array The sentence and the plain list, both empty when the notice targets everyone.
      */
-    protected function cohort_line(awareness $awareness): string {
+    protected function cohort_line(awareness $awareness): array {
         $cohorts = $awareness->get('cohorts');
         if (empty($cohorts)) {
-            return '';
+            return ['', ''];
         }
 
         /*
@@ -707,11 +669,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         }, $cohorts);
         $list = implode(', ', $names);
 
-        return html_writer::tag(
-            'span',
-            get_string('notice:audience:cohorts', 'local_awareness', $list),
-            ['class' => 'local-awareness-subline', 'title' => $list]
-        );
+        return [get_string('notice:audience:cohorts', 'local_awareness', $list), $list];
     }
 
     /**
@@ -721,12 +679,14 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @return string
      */
     protected function col_title(awareness $awareness): string {
+        global $OUTPUT;
+
         /*
          * format_string(), not the raw value: `title` is PARAM_RAW_TRIMMED all the way from the
-         * form to the persistent, and html_writer::tag() does not escape its contents — so the
-         * stored string reached this page as markup. It is also the same treatment the modal now
-         * gives the title, which is the point: a multilang title that resolves in the modal and
-         * shows its markup here is worse than either behaviour alone.
+         * form to the persistent, so the stored string would otherwise reach this page as markup.
+         * It is also the same treatment the modal gives the title, which is the point: a multilang
+         * title that resolves in the modal and shows its markup here is worse than either
+         * behaviour alone.
          */
         $title = format_string(
             $awareness->get('title'),
@@ -735,24 +695,16 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         );
 
         /*
-         * A notice title has no length cap in the database, so the cell clamps it to two lines in
-         * CSS and carries the whole string in the title attribute. The full text stays in the node
-         * — clipped for the eye, intact for a screen reader.
+         * The path is PARAM_RAW as well, and it is a URL pattern rather than prose — so it is
+         * passed RAW and escaped by the template. Pre-escaping it here would double-escape it,
+         * because Mustache escapes {{ }} on its own.
          */
-        $cell = html_writer::tag('span', $title, [
-            'class' => 'local-awareness-celltitle',
-            'title' => $title,
-        ]);
-
-        // The path is PARAM_RAW as well, and it is a URL pattern rather than prose, so it wants
-        // escaping rather than filtering.
         $path = trim((string) $awareness->get('pathmatch'));
-        $where = $path !== '' ? s($path) : get_string('notice:pathmatch:anywhere', 'local_awareness');
-        $cell .= html_writer::tag('span', $where, [
-            'class' => 'local-awareness-subline',
-            'title' => $where,
-        ]);
 
-        return $cell;
+        return $OUTPUT->render_from_template('local_awareness/manage/cell_title', [
+            'title' => $title,
+            'titleplain' => $title,
+            'where' => $path !== '' ? $path : get_string('notice:pathmatch:anywhere', 'local_awareness'),
+        ]);
     }
 }
