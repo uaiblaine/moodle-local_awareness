@@ -209,7 +209,7 @@ $string['notice:reqack'] = 'Requer reconhecimento';
 $string['notice:reqack_help'] = 'Se habilitado, o usuário precisará aceitar o alerta antes de continuar a usar o site.
 Se o usuário não aceitar o alerta, ele será desconectado do site.';
 $string['notice:reqcourse'] = 'Requer conclusão do curso';
-$string['notice:reqcourse_help'] = 'Se selecionado, o usuário verá o alerta até que o curso seja concluído.';
+$string['notice:reqcourse_help'] = 'Mostra o alerta apenas a quem ainda não concluiu o curso selecionado. É uma regra de público, não uma frequência de exibição: com que frequência o alerta reaparece é definido pelo intervalo de reexibição, e quem conclui o curso deixa de o ver.';
 $string['notice:reset'] = 'Redefinir alerta';
 $string['notice:resetinterval'] = 'Redefinir a cada';
 $string['notice:resetinterval_help'] = 'O alerta será exibido ao usuário novamente após o período especificado.';
@@ -312,5 +312,6 @@ $string['setting:enabled'] = 'Habilitado';
 $string['setting:enableddesc'] = 'Habilitar alertas do site';
 $string['setting:managenotice'] = 'Gerenciar alerta';
 $string['setting:settings'] = 'Configurações';
+$string['task_estimate_audience'] = 'Estimar o público de um alerta';
 $string['task_purge_audience_jobs'] = 'Expurgar trabalhos de estimativa de público já consumidos';
 $string['timeformat:resetinterval'] = '%a dia(s), %h hora(s), %i minuto(s) e %s segundo(s)';

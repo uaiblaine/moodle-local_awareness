@@ -210,7 +210,7 @@ $string['notice:reqack'] = 'Requires acknowledgement';
 $string['notice:reqack_help'] = 'If enabled, the user will need to accept the notice before they can continue to use the LMS site.
 If the user does not accept the notice, he/she will be logged out of the site.';
 $string['notice:reqcourse'] = 'Requires course completion';
-$string['notice:reqcourse_help'] = 'If selected, the user will see the notice till the course is completed.';
+$string['notice:reqcourse_help'] = 'Show the notice only to users who have not yet completed the selected course. It is an audience rule, not a display frequency: how often the notice reappears is set by the reset interval, and someone who completes the course stops seeing it.';
 $string['notice:reset'] = 'Reset notice';
 $string['notice:resetinterval'] = 'Reset every';
 $string['notice:resetinterval_help'] = 'The notice will be displayed to user again once the specified period elapses.';
@@ -313,5 +313,6 @@ $string['setting:enabled'] = 'Enabled';
 $string['setting:enableddesc'] = 'Enable site notice';
 $string['setting:managenotice'] = 'Manage notice';
 $string['setting:settings'] = 'Settings';
+$string['task_estimate_audience'] = 'Estimate a notice audience';
 $string['task_purge_audience_jobs'] = 'Purge spent audience estimate jobs';
 $string['timeformat:resetinterval'] = '%a day(s), %h hour(s), %i minute(s) and %s second(s)';

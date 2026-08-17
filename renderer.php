@@ -14,6 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * Renderer for the plugin's admin surfaces.
+ *
+ * @package    local_awareness
+ * @copyright  2026 Anderson Blaine
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 use local_awareness\table\all_notices;
 use local_awareness\output\editor_page;
 use local_awareness\output\manage_page;

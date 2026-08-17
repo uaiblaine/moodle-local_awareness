@@ -47,7 +47,7 @@ class behat_local_awareness extends behat_base {
     public function the_following_site_notices_exist(TableNode $noticedata) {
         global $DB;
 
-        // Add the discussions to the relevant forum.
+        // Create each notice from the table row.
         foreach ($noticedata->getHash() as $noticeinfo) {
             $now = time();
             $noticeinfo['cohorts'] = $noticeinfo['cohorts'] ?? 0;
