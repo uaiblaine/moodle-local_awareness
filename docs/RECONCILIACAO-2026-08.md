@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 26 | 4 | 3 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 65 | 8 | 3 | 20 | **96** |
+| Baixo | 68 | 8 | 3 | 17 | **96** |
 | Informativo | 28 | 6 | 0 | 18 | **52** |
-| **Total** | **134** | **19** | **7** | **38** | **198** |
+| **Total** | **137** | **19** | **7** | **35** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **153 dos 198 estão encerrados; 45 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **156 dos 198 estão encerrados; 42 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -106,6 +106,14 @@ parciais, com o que falta nomeado.
 > deixa de voltar. A string de ajuda foi reescrita nos dois packs. Mais onze itens fechados nesta
 > primeira vaga de limpeza e onze confirmados como já corrigidos por fases anteriores, que só se
 > liam como abertos por o censo ter sido escrito antes delas.
+>
+> **Atualizado pela fase 13** (versão `2026081612`, branch `fix/phase-13-htmlwriter`): **zero
+> `html_writer` em código de plugin** — TPL-01, LANG-06 e X3-01 fechados. As células da tabela de
+> gestão passaram a seis templates Mustache. Um teste de contagem de queries reprovou no processo e
+> a medição mostrou porquê: o primeiro `render_from_template()` de um pedido custa nove leituras de
+> uma vez, e zero por linha depois disso — o teste media a inicialização do core e atribuía-a a esta
+> coluna. Aquecido antes de contar, as dez linhas custam **zero**, portanto o comportamento por
+> linha melhorou em vez de piorar.
 >
 > *Texto original da decisão, mantido por registo:*
 >
@@ -332,7 +340,7 @@ diz o que resta e onde.
 - **C7** · sem objeto — Report filter state is stored under an unprefixed global session key
   <br>classes/report_filter.php was deleted in commit 2c2e787 (`git log --oneline --diff-filter=D -- classes/report_filter.php` returns that commit), together with report/acknowledged_report.php and report/dismissed_report.php. No replacement carries the defect: `grep -rn 'SESSION' .
 
-### Padrões de código / lang — 5 de 19 em aberto
+### Padrões de código / lang — 4 de 19 em aberto
 
 - **LANG-01** · corrigido — The 'Is perpetual' form field has a help string but no addHelpButton call, so the help text never reaches the user
   <br>Fechado na fase 11 (2026-08-17): `addHelpButton('perpetual', …)` no `notice_form.php`, com um teste que percorre o pack de idioma e exige que todo campo renderizado com `_help` mostre o texto na página.
@@ -346,9 +354,8 @@ diz o que resta e onde.
 - **LANG-05** · **aberto** — Event get_name() returns lowercase verbs instead of readable event names
   <br>lang/en/local_awareness.php:112-120 still holds the lowercase verbs — `event:acknowledge` = 'acknowledge', `event:create` = 'create', `event:delete` = 'delete', `event:disable` = 'disable', `event:dismiss` = 'dismiss', `event:enable` = 'enable', `event:reset` = 'reset', `event:update` = 'update' — and each is what get_name() returns: classes/event/awareness_acknowledged.php:50, awareness_created.php:50, awareness_deleted.php:50, awareness_disabled.php:50, awareness_dismissed.php:50, awareness_enabled.php:50, awaren…
   <br>*Falta:* Eight strings at lang/en/local_awareness.php:112-120 and their pt_br mirrors need readable event names (e.g. 'Notice acknowledged'); these are what the log report and the events list display.
-- **LANG-06** · **aberto** — html_writer used in plugin code, against the zero-html_writer rule
-  <br>report/acknowledged_systemreport.php:62-63 still ends the page with `echo html_writer::div(html_writer::link($backurl, get_string('back'), ['class' => 'btn btn-secondary mt-3']), 'mt-3');` — byte-identical to the August code (git show 896dfc2:report/acknowledged_systemreport.php). report/dismissed_systemreport.php:62-63 is the same.
-  <br>*Falta:* Four call sites across the two report pages, plus ~20 in classes/table/all_notices.php, must move to renderable + templatable + render_from_template.
+- **LANG-06** · corrigido — html_writer used in plugin code, against the zero-html_writer rule
+  <br>Fechado na fase 13 (2026-08-17): zero `html_writer` em código de plugin. As células da tabela de gestão passaram a seis templates Mustache (`manage/cell_status`, `cell_chips`, `cell_validity`, `cell_audience`, `cell_title`, mais `resultcount` e `backlink`), e o `use html_writer` saiu do ficheiro.
 - **LANG-07** · corrigido — tests/local/bootstrap_compat_test.php carries copied local_dimensions references to files, classes and a commit that do not exist in this repository
   <br>Sem objeto: os artefactos copiados do local_dimensions saíram; resta uma menção em prosa num comentário.
 - **LANG-08** · corrigido — File header violates the fleet standard in 66 of 68 PHP files: forbidden @author, yearless @copyright, and untagged "Forked and adapted by" prose…
@@ -527,11 +534,10 @@ diz o que resta e onde.
 - **DB-13** · corrigido — $plugin->release was left behind when $plugin->version was bumped
   <br>version.php:30 now reads `$plugin->release = 'v1.0';` against `$plugin->version = 2026081603` (version.php:29). At the audited commit it was `$plugin->release = '2026061600';` with version 2026080700 (`git show 896dfc2:version.php`) — a version number in the release field, dated before the version i…
 
-### Templates / Bootstrap 4-5 — 5 de 13 em aberto
+### Templates / Bootstrap 4-5 — 4 de 13 em aberto
 
-- **TPL-01** · **aberto** — html_writer used in plugin code in four places
-  <br>html_writer is now used far more, not less: `grep -n "html_writer" classes report` returns 19 call sites in classes/table/all_notices.php (241, 503, 507, 520, 523, 528, 560, 568, 571, 585, 604-605, 627, 635, 642, 660, 710, 731, 738) plus report/acknowledged_systemreport.php:62-63 and report/dismissed_systemreport.php:62-63. At the audit commit the same grep returned 6 lines (`git grep -n 'html_writer::' 896dfc2`), so the count grew from 4 places to 23 lines. None of it renders through renderable/templatable.
-  <br>*Falta:* classes/table/all_notices.php builds its status cell, chips, window, dates and title cells entirely with html_writer (lines 503-738), and both report/*_systemreport.php pages build the back link with html_writer::div/link at lines 62-63. The fleet rule (zero html_writer, render via renderable+templatable) is unmet; the smallest fix is a Mustache template per cell type plus one for the back link.
+- **TPL-01** · corrigido — html_writer used in plugin code in four places
+  <br>Fechado na fase 13 (2026-08-17): zero `html_writer` em código de plugin. As células da tabela de gestão passaram a seis templates Mustache (`manage/cell_status`, `cell_chips`, `cell_validity`, `cell_audience`, `cell_title`, mais `resultcount` e `backlink`), e o `use html_writer` saiu do ficheiro.
 - **TPL-02** · corrigido — Two report pages re-require styles.css, which Moodle already aggregates
   <br>`grep -rn "styles.css\\|requires->css" classes report templates amd lib.php renderer.php editnotice.php managenotice.php settings.php tests` returns no $PAGE->requires->css() anywhere in the tree (only prose mentions in classes/local/bootstrap.php:35 and test code reading the file).
 - **TPL-03** · corrigido — audience_panel example context uses a key the template does not read, so the lint renders the loop empty
@@ -708,8 +714,7 @@ diz o que resta e onde.
 - **X2-01** · corrigido — The user_notices cache definition is dead — it is purged but never read or written
   <br>db/caches.php now defines exactly three caches — 'enabled_notices' (line 29), 'notice_view' (line 32), 'site_user_count' (line 38); the 'user_notices' => MODE_SESSION definition present in August (git show 896dfc2:db/caches.php) is gone, removed in commit 2c2e787.
 
-### Report Builder / aba legada — 1 de 1 em aberto
+### Report Builder / aba legada — 0 de 1 em aberto
 
-- **X3-01** · **aberto** — html_writer used in the system report pages and the manage table, against the fleet's zero-html_writer rule
-  <br>report/acknowledged_systemreport.php:62-63 and report/dismissed_systemreport.php:62-63 still build the back link with `html_writer::div(html_writer::link(...))`; classes/table/all_notices.php imports html_writer at line 27 and uses it 19 times (lines 241, 503, 507, 520, 523, 528, 560, 568, 571, 585, 604, 605, 627, 635, 642, 660, 710, 731, 738). Full repo count outside tests: `grep -rn "html_writer" --include="*.php" .` = 24 hits, all in those three files.
-  <br>*Falta:* Nothing was migrated. Smallest fix: the two report pages are one-line back buttons that can move to a small Mustache template; the manage table's col_* methods need renderable/templatable cells (note flexible_table's own contract expects HTML strings back, so render_from_template() output is the substitution, not a structural rewrite).
+- **X3-01** · corrigido — html_writer used in the system report pages and the manage table, against the fleet's zero-html_writer rule
+  <br>Fechado na fase 13 (2026-08-17): zero `html_writer` em código de plugin. As células da tabela de gestão passaram a seis templates Mustache (`manage/cell_status`, `cell_chips`, `cell_validity`, `cell_audience`, `cell_title`, mais `resultcount` e `backlink`), e o `use html_writer` saiu do ficheiro.

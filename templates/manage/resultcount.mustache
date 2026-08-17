@@ -1,0 +1,19 @@
+{{!
+    @template local_awareness/manage/resultcount
+
+    The row count printed above the notice table.
+
+    Rendered server-side rather than assembled in JavaScript from a data attribute: the count and
+    its sentence are decided in one place, so there is no window in which the two disagree.
+
+    Context variables required:
+    * count (string) — the already-formatted number of matching notices
+
+    Example context (json):
+    {
+        "count": "25"
+    }
+}}
+<p class="local-awareness-resultcount" aria-live="polite">
+    {{#str}}manage:resultcount, local_awareness, {{count}}{{/str}}
+</p>
