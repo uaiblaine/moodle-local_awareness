@@ -248,4 +248,77 @@ final class lib_test extends \advanced_testcase {
             false
         ));
     }
+
+    /**
+     * A user outside the notice's audience cannot fetch its attachments.
+     *
+     * The file URL carries a notice id and nothing else, so before this gate existed the
+     * attachments of a cohort-targeted notice were readable by any authenticated user who guessed
+     * the id — while the notice body itself was correctly withheld from them by get_notices(). The
+     * plugin's own security model treats audience targeting as a confidentiality boundary; the
+     * file callback did not.
+     *
+     * Reproduced rather than reasoned about: with the gate removed this case does not return
+     * false, it reaches send_stored_file() and writes the attachment.
+     */
+    public function test_a_user_outside_the_audience_cannot_fetch_the_files(): void {
+        $this->resetAfterTest();
+
+        $notice = $this->seed_notice_with_file(1);
+        $cohort = $this->getDataGenerator()->create_cohort();
+        $notice->set('cohorts', [(int) $cohort->id]);
+        $notice->update();
+
+        // In no cohort, holding nothing.
+        $this->setUser($this->getDataGenerator()->create_user());
+
+        $this->assertFalse(local_awareness_pluginfile(
+            null,
+            null,
+            \context_system::instance(),
+            'content',
+            [$notice->get('id'), 'policy.txt'],
+            false
+        ));
+    }
+
+    /**
+     * A member of the targeted cohort gets past the gate.
+     *
+     * The control, and it has to be built sideways for the same reason as the enabled case: a
+     * successful serve ends in send_stored_file(), which terminates the process. The file is
+     * deleted first, so a user who IS in the audience falls out at the callback's own get_file()
+     * miss — a line BELOW the gate. The pair is what carries the meaning: same notice, same file
+     * name, differing only in whether the reader is in the cohort.
+     */
+    public function test_a_member_of_the_targeted_cohort_passes_the_gate(): void {
+        $this->resetAfterTest();
+
+        $notice = $this->seed_notice_with_file(1);
+        $cohort = $this->getDataGenerator()->create_cohort();
+        $notice->set('cohorts', [(int) $cohort->id]);
+        $notice->update();
+
+        $user = $this->getDataGenerator()->create_user();
+        cohort_add_member($cohort->id, $user->id);
+        $this->setUser($user);
+
+        get_file_storage()->get_file(
+            \context_system::instance()->id,
+            'local_awareness',
+            'content',
+            $notice->get('id'),
+            '/',
+            'policy.txt'
+        )->delete();
+
+        $this->assertFalse(local_awareness_pluginfile(
+            null,
+            null,
+            \context_system::instance(),
+            'content',
+            [$notice->get('id'), 'policy.txt'],
+            false
+        ));
+    }
 }

@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 26 | 4 | 3 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 68 | 8 | 3 | 17 | **96** |
+| Baixo | 69 | 8 | 3 | 16 | **96** |
 | Informativo | 28 | 6 | 0 | 18 | **52** |
-| **Total** | **137** | **19** | **7** | **35** | **198** |
+| **Total** | **138** | **19** | **7** | **34** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **156 dos 198 estão encerrados; 42 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **157 dos 198 estão encerrados; 41 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -114,6 +114,18 @@ parciais, com o que falta nomeado.
 > uma vez, e zero por linha depois disso — o teste media a inicialização do core e atribuía-a a esta
 > coluna. Aquecido antes de contar, as dez linhas custam **zero**, portanto o comportamento por
 > linha melhorou em vez de piorar.
+>
+> **Atualizado pela fase 14** (versão `2026081613`, branch `fix/phase-14-pluginfile-audience`), e
+> esta é a correção mais séria de toda a sessão. O **SEC-05** era real e é de **segurança**: o
+> `local_awareness_pluginfile()` verificava apenas o flag `enabled`, portanto o anexo de um aviso
+> dirigido a uma coorte era servido a qualquer utilizador autenticado que adivinhasse o id — ao
+> mesmo tempo que o corpo do próprio aviso lhe era corretamente negado pelo `get_notices()`. O
+> modelo de segurança do plugin trata o público como fronteira de confidencialidade; o callback de
+> ficheiros não tratava. **Exploit reproduzido, não deduzido**: com o portão antigo o teste imprime
+> o conteúdo do anexo e o processo termina dentro do `send_stored_file()`.
+>
+> E outra vez a mesma lição, agora ao contrário: eu tinha descrito os 42 restantes como
+> "apresentação ou higiene" na mensagem anterior. Sete não eram, e um deles era isto.
 >
 > *Texto original da decisão, mantido por registo:*
 >
@@ -652,7 +664,7 @@ diz o que resta e onde.
 - **TEST-10** · corrigido — test_execute_with_unknown_jobid_does_not_throw asserts assertTrue(true)
   <br>tests/task/estimate_audience_test.php:105-118 now reads: `$this->assertFalse(audience_job::get_record(['jobid' => $jobid]));` as a stated precondition, then captures mtrace output and asserts `assertStringContainsString('not found', $output)` against classes/task/estimate_audience.php:45.
 
-### Segurança (entry points) — 1 de 9 em aberto
+### Segurança (entry points) — 0 de 9 em aberto
 
 - **SEC-01** · sem objeto — "Remove selected" on the report filter never removes anything
   <br>`classes/report_filter.php`, `classes/form/active_filter_form.php` and `classes/form/add_filter_form.php` were all deleted in 2c2e787 (`git log --diff-filter=D --name-only`).
@@ -662,9 +674,8 @@ diz o que resta e onde.
   <br>db/access.php:54 now reads `'riskbitmask' => RISK_PERSONAL` for `local/awareness:viewreports`, preceded by the comment at db/access.php:47-50 ("reports name users and carry their email and idnumber"). In August the capability declared no riskbitmask at all.
 - **SEC-04** · corrigido — allow_update is enforced only on the form-display branch, so a crafted POST updates notices with the setting off
   <br>The gate moved to the write path: classes/helper.php:162 `if (!get_config('local_awareness', 'allow_update')) { return ...STATE_NONE; }` sits inside `update_notice()` before any DB write, so a crafted POST cannot update.
-- **SEC-05** · **aberto** — Notice files are served to any user regardless of the notice's audience, and to auto-logged-in guests
-  <br>`git diff 896dfc2 HEAD -- lib.php` shows `local_awareness_pluginfile()` byte-identical to the audited version — only the header and the deleted navigation callback changed. lib.php:52 is still `require_login($course, true, $cm)`, i.e. `$autologinguest = true`, so an auto-logged-in guest is admitted. The only access gate is lib.php:61, which checks `local/awareness:manage` OR `$notice->get('enabled')` — nothing consults the notice's audience. `grep -n audience lib.php` returns nothing.
-  <br>*Falta:* Any logged-in user (and any auto-logged-in guest) can fetch `content`/`bgimage` files of any *enabled* notice by guessing the pluginfile URL (itemid is the notice id), regardless of whether that notice's audience rules include them. Smallest fix: drop the explicit `true` for `$autologinguest` in the `require_login()` call at lib.php:52, and gate on the same audience resolution the delivery path uses (`\local_awareness\audience\notice_audience`) before `send_stored_file()` at lib.php:78, exempting holders of `local/awareness:manage`.
+- **SEC-05** · corrigido — Notice files are served to any user regardless of the notice's audience, and to auto-logged-in guests
+  <br>Fechado na fase 14 (2026-08-17): o `local_awareness_pluginfile()` passou a resolver o público com `helper::is_notice_available_to_user()`, o mesmo portão que as escritas do web service usam.
 - **SEC-06** · corrigido — Notice title echoed into HTML with neither format_string() nor escaping
   <br>The raw echo is gone: the August code was `echo $output->heading($notice->title);` at report/acknowledged_report.php:80 (`git show 896dfc2:report/acknowledged_report.php`), and `core_renderer::heading()` wraps via `html_writer::tag()`, which does not escape.
 - **SEC-07** · corrigido — The two table-based report pages set neither page title nor heading
