@@ -267,11 +267,14 @@ class helper {
          */
         $dom = new \DOMDocument();
         $encoded = mb_encode_numericentity($content, [0x80, 0x10FFFF, 0, ~0], 'UTF-8');
-        libxml_use_internal_errors(true);
+        // Restored below rather than left on: this runs inside a page request, and switching
+        // internal error handling on globally silences XML warnings for everything after it.
+        $libxmlprevious = libxml_use_internal_errors(true);
         // NOIMPLIED + NODEFDTD keep this a fragment: without them saveHTML() returns a whole
         // document, and the notice body ends up nested inside another <html> when it renders.
         $dom->loadHTML($encoded, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
+        libxml_use_internal_errors($libxmlprevious);
         // Current links in the notice.
         $currentlinks = noticelink::get_notice_link_records($notice->get('id'));
         $newlinks = [];
@@ -999,10 +1002,10 @@ class helper {
      *
      * @param awareness $notice Notice.
      * @param int $userid User id.
-     * @param string $action acknowledgement::ACTION_DISMISSED or ACTION_ACKNOWLEDGED.
+     * @param int $action acknowledgement::ACTION_DISMISSED or ACTION_ACKNOWLEDGED.
      * @return bool True when a row already exists.
      */
-    private static function has_acknowledgement_record(awareness $notice, int $userid, string $action): bool {
+    private static function has_acknowledgement_record(awareness $notice, int $userid, int $action): bool {
         global $DB;
 
         return $DB->record_exists('local_awareness_ack', [
@@ -1016,11 +1019,11 @@ class helper {
      * Create new acknowledgement record.
      *
      * @param awareness $notice
-     * @param string $action dismissed or acknowledged
+     * @param int $action acknowledgement::ACTION_DISMISSED or ACTION_ACKNOWLEDGED.
      *
      * @return \core\persistent
      */
-    private static function create_new_acknowledge_record(awareness $notice, string $action) {
+    private static function create_new_acknowledge_record(awareness $notice, int $action) {
         global $USER;
 
         // New record.

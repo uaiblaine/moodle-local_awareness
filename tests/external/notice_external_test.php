@@ -754,4 +754,105 @@ final class notice_external_test extends \advanced_testcase {
         $this->assertSame(1, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
         $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->get('id')]));
     }
+
+    /**
+     * A notice requiring a course obeys its reset interval like any other.
+     *
+     * reqcourse is an AUDIENCE rule — six places in this plugin already treat it as one. A single
+     * SQL clause read it as "re-show for ever" instead, discarding the recorded view of any such
+     * notice, so resetinterval had no effect on it and it came back at the start of every session
+     * however the author had configured it.
+     *
+     * The control is the second half: with the interval elapsed the notice DOES return, so the
+     * suppression asserted first is the interval doing its job rather than the notice having
+     * quietly stopped being deliverable.
+     */
+    public function test_a_reqcourse_notice_obeys_its_reset_interval(): void {
+        global $DB, $USER;
+
+        $course = $this->getDataGenerator()->create_course();
+        $notice = $this->create_notice(['reqack' => 0, 'reqcourse' => $course->id, 'resetinterval' => WEEKSECS]);
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+
+        $this->assertCount(1, json_decode(external::get_notices('/my/', 0)['notices'], true));
+
+        external::dismiss_notice((int) $notice->get('id'));
+
+        // A fresh session: the in-request memo is gone, so the answer comes from the database.
+        unset($USER->viewednotices);
+        \local_awareness\persistent\noticeview::purge_user_cache((int) $user->id);
+
+        $this->assertSame(
+            [],
+            json_decode(external::get_notices('/my/', 0)['notices'], true),
+            'within the reset interval the notice must stay dismissed'
+        );
+
+        // Control: push the recorded view back beyond the interval and it returns.
+        $DB->set_field(
+            'local_awareness_lastview',
+            'timemodified',
+            time() - WEEKSECS - HOURSECS,
+            ['noticeid' => $notice->get('id'), 'userid' => $user->id]
+        );
+        unset($USER->viewednotices);
+        \local_awareness\persistent\noticeview::purge_user_cache((int) $user->id);
+
+        $this->assertCount(
+            1,
+            json_decode(external::get_notices('/my/', 0)['notices'], true),
+            'past the reset interval the notice must return'
+        );
+    }
+
+    /**
+     * An acknowledged reqcourse notice is not put back in front of the user.
+     *
+     * The second half of the same defect, and the sharper one. Because the recorded view was
+     * discarded, the notice was re-shown after it had been accepted — and pressing Accept the
+     * second time recorded NOTHING, because check_if_already_acknowledged_by_user() reads the
+     * lastview table directly, found the row this query had thrown away, and returned early. The
+     * user was shown a notice they had already accepted, by a button that could not clear it.
+     *
+     * The assertion is on being re-shown rather than on the second Accept, because that is the
+     * observable half: dropping the clause stops the situation arising rather than changing what
+     * acknowledge_notice() does once it has. The control is the first count, which proves the
+     * acknowledgement really was recorded — without it an empty second list would be satisfied by
+     * a notice that had simply stopped being deliverable.
+     */
+    public function test_an_acknowledged_reqcourse_notice_is_not_shown_again(): void {
+        global $DB, $USER;
+
+        $course = $this->getDataGenerator()->create_course();
+        $notice = $this->create_notice(['reqack' => 1, 'reqcourse' => $course->id, 'resetinterval' => 0]);
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+
+        $this->assertCount(1, json_decode(external::get_notices('/my/', 0)['notices'], true));
+
+        external::acknowledge_notice((int) $notice->get('id'));
+
+        $this->assertSame(
+            1,
+            $DB->count_records('local_awareness_ack', [
+                'noticeid' => $notice->get('id'),
+                'userid' => $user->id,
+                'action' => acknowledgement::ACTION_ACKNOWLEDGED,
+            ]),
+            'the acknowledgement must be recorded — the control for the assertion below'
+        );
+
+        // A fresh session: the answer now comes from the database rather than the request memo.
+        unset($USER->viewednotices);
+        \local_awareness\persistent\noticeview::purge_user_cache((int) $user->id);
+
+        $this->assertSame(
+            [],
+            json_decode(external::get_notices('/my/', 0)['notices'], true),
+            'an accepted notice must not come back at the next session'
+        );
+    }
 }

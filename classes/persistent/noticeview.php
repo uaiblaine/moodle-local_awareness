@@ -158,10 +158,26 @@ class noticeview extends persistent {
         // has never acted on a notice has an empty history, and a falsy test re-reads it every time.
         if (($result = self::get_cache()->get($USER->id)) === false) {
             $result = [];
+            /*
+             * No reqcourse predicate. It used to read `AND sn.reqcourse = 0`, which discarded the
+             * recorded view of every notice tied to a required course — so resetinterval had no
+             * effect on those notices and they returned at the start of every session, however
+             * the author had configured them. The Accept button was worse than useless in the
+             * process: check_if_already_acknowledged_by_user() reads {local_awareness_lastview}
+             * directly, found the row this query had thrown away, and returned early, so pressing
+             * Accept recorded nothing at all.
+             *
+             * reqcourse is an AUDIENCE rule. Six other places already treat it as one — the form
+             * puts it under the audience header, the estimator counts it as an audience rule
+             * labelled "Has not completed required course", is_notice_available_to_user() and
+             * collect_user_notices() use it as an availability gate, and the manage table chips it
+             * as targeting. This clause was the only site reading it as "re-show for ever", and it
+             * carried no comment saying so.
+             */
             $sql = "SELECT sn.id, lv.timecreated, lv.action, lv.timemodified
                       FROM {local_awareness} sn
                       JOIN {local_awareness_lastview} lv ON sn.id = lv.noticeid
-                     WHERE lv.userid = :userid AND sn.enabled = 1 AND sn.reqcourse = 0";
+                     WHERE lv.userid = :userid AND sn.enabled = 1";
             $params = ['userid' => $USER->id];
             $records = $DB->get_records_sql($sql, $params);
 

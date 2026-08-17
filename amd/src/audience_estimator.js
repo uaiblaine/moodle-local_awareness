@@ -431,16 +431,20 @@ define([
     /**
      * Toggle visibility of an action button.
      *
+     * The calculate button is the exception and always stays on screen: it is the author's manual
+     * recalculate control, and hiding it whenever an estimate is queued would take away the one
+     * thing they can do about a slow or failed count. Only the retry button follows the requested
+     * state. Documented rather than "fixed", because the asymmetry is the intended behaviour and
+     * it was the JSDoc that was wrong.
+     *
      * @param {string} name Either "calculate" or "retry".
-     * @param {boolean} visible Whether the button should be shown.
+     * @param {boolean} visible Whether the button should be shown. Ignored for "calculate".
      */
     function showAction(name, visible) {
         var el = (name === 'calculate') ? state.slots.calcBtn : state.slots.retryBtn;
         if (!el) {
             return;
         }
-        // The calculate button stays available as a manual recalculate control even
-        // in auto-mode; only the retry button follows the requested visible state.
         el.hidden = (name === 'calculate') ? false : !visible;
     }
 

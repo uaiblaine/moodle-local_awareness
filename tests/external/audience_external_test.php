@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace local_awareness;
+namespace local_awareness\external;
 
 use local_awareness\audience\live_mode;
+use local_awareness\external;
 use local_awareness\persistent\audience_job;
 use local_awareness\task\estimate_audience as estimate_audience_task;
 

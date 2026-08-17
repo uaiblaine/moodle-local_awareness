@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 26 | 4 | 3 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 57 | 8 | 4 | 27 | **96** |
-| Informativo | 14 | 6 | 4 | 28 | **52** |
-| **Total** | **112** | **19** | **12** | **55** | **198** |
+| Baixo | 65 | 8 | 3 | 20 | **96** |
+| Informativo | 28 | 6 | 0 | 18 | **52** |
+| **Total** | **134** | **19** | **7** | **38** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **131 dos 198 estão encerrados; 67 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **153 dos 198 estão encerrados; 45 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -99,7 +99,17 @@ parciais, com o que falta nomeado.
 > **TEST-09** (um job falhado gravava contagem 0 e carimbava o hash, tornando a falha pegajosa e
 > com ar de resultado); refutados **WS-13** e **BIZ-09**.
 >
-> **Continua aberto e é decisão de produto: BIZ-08.** Um aviso com curso obrigatório ignora a
+> **Atualizado pela fase 12** (versão `2026081611`, branch `fix/phase-12-biz08-and-cleanup`).
+> **BIZ-08 foi decidido pelo dono do produto pela segunda opção** e está fechado: a cláusula
+> `reqcourse = 0` saiu, o `reqcourse` passou a ser a regra de público que o resto do código já
+> assumia, e as duas metades caíram — o intervalo de reexibição passa a valer e um aviso aceite
+> deixa de voltar. A string de ajuda foi reescrita nos dois packs. Mais onze itens fechados nesta
+> primeira vaga de limpeza e onze confirmados como já corrigidos por fases anteriores, que só se
+> liam como abertos por o censo ter sido escrito antes delas.
+>
+> *Texto original da decisão, mantido por registo:*
+>
+> ~~**Continua aberto e é decisão de produto: BIZ-08.**~~ Um aviso com curso obrigatório ignora a
 > visualização registada, portanto o `resetinterval` não tem efeito sobre ele e o aviso volta a
 > cada sessão. Pior, na combinação `reqcourse > 0` + `reqack = 1` + `resetinterval = 0`, carregar
 > em Aceitar **não grava nada**. As duas opções não são equivalentes: acrescentar
@@ -322,16 +332,14 @@ diz o que resta e onde.
 - **C7** · sem objeto — Report filter state is stored under an unprefixed global session key
   <br>classes/report_filter.php was deleted in commit 2c2e787 (`git log --oneline --diff-filter=D -- classes/report_filter.php` returns that commit), together with report/acknowledged_report.php and report/dismissed_report.php. No replacement carries the defect: `grep -rn 'SESSION' .
 
-### Padrões de código / lang — 12 de 19 em aberto
+### Padrões de código / lang — 5 de 19 em aberto
 
 - **LANG-01** · corrigido — The 'Is perpetual' form field has a help string but no addHelpButton call, so the help text never reaches the user
   <br>Fechado na fase 11 (2026-08-17): `addHelpButton('perpetual', …)` no `notice_form.php`, com um teste que percorre o pack de idioma e exige que todo campo renderizado com `_help` mostre o texto na página.
-- **LANG-02** · **aberto** — @param string $action documents an argument whose values are the int constants ACTION_DISMISSED / ACTION_ACKNOWLEDGED
-  <br>classes/helper.php:909 still reads `@param string $action Action.` on `add_to_viewed_notices(awareness $notice, string $action, …)` (line 912), while the values passed are the int constants at classes/persistent/acknowledgement.php:34 (`ACTION_DISMISSED = 0`) and :37 (`ACTION_ACKNOWLEDGED = 1`), handed in at helper.php:994, 1023 and 1029. The same wrong type appears twice more: helper.php:943 (`@param string $action dismissed or acknowledged` on create_new_acknowledge_record) and helper.php:1242 (must_reshow).
-  <br>*Falta:* Three docblocks plus the matching `string $action` signature types at classes/helper.php:912, 947 and 1245 should be int.
-- **LANG-03** · **aberto** — @return \stdClass[] on a method that returns persistent objects
-  <br>classes/persistent/awareness.php:231 still carries `@return \stdClass[]` on `get_all_notices(): array` (line 233), whose body is `return self::get_records([], 'timemodified', 'DESC');` — `\core\persistent::get_records()` returns instances of the calling class, and awareness extends persistent (classes/persistent/awareness.php:29). Callers treat them as persistents (tests/awareness_test.php:419 onwards).
-  <br>*Falta:* classes/persistent/awareness.php:231 should read `@return awareness[]` (or `static[]`).
+- **LANG-02** · corrigido — @param string $action documents an argument whose values are the int constants ACTION_DISMISSED / ACTION_ACKNOWLEDGED
+  <br>Fechado na fase 12: a assinatura e o docblock passaram a `int $action`, que é o que as constantes são.
+- **LANG-03** · corrigido — @return \stdClass[] on a method that returns persistent objects
+  <br>Já corrigido antes desta reconciliação: o `@return` é `self[]`.
 - **LANG-04** · **parcial** — Ten language strings are defined in both en and pt_br but referenced nowhere in the plugin
   <br>Recomputed the unreferenced set at 896dfc2 and on HEAD (extract keys from lang/en, grep every non-lang/non-docs/non-amd-build file, then discount the keys required by convention: _help paired with an addHelpButton, cachedef_* named in db/caches.php, capability and messageprovider names).
   <br>*Falta:* `event:timecreated` survives unreferenced (lang/en/local_awareness.php:119, lang/pt_br:118), as does the orphan `notice:perpetual_help` (lang/en:207 — see LANG-01). Four new dead strings were introduced since: `editor:action:cancel` (lang/en:79), `editor:action:save_draft` (:81), `editor:action:save_publish` (:82) and `notice:timemodified` (:220) — the only apparent hit for the last one is the distinct key `report_notice:timemodified` at classes/reportbuilder/local/entities/notice.php:181. Six dead strings today against ten then.
@@ -341,17 +349,15 @@ diz o que resta e onde.
 - **LANG-06** · **aberto** — html_writer used in plugin code, against the zero-html_writer rule
   <br>report/acknowledged_systemreport.php:62-63 still ends the page with `echo html_writer::div(html_writer::link($backurl, get_string('back'), ['class' => 'btn btn-secondary mt-3']), 'mt-3');` — byte-identical to the August code (git show 896dfc2:report/acknowledged_systemreport.php). report/dismissed_systemreport.php:62-63 is the same.
   <br>*Falta:* Four call sites across the two report pages, plus ~20 in classes/table/all_notices.php, must move to renderable + templatable + render_from_template.
-- **LANG-07** · **aberto** — tests/local/bootstrap_compat_test.php carries copied local_dimensions references to files, classes and a commit that do not exist in this repository
-  <br>tests/local/bootstrap_compat_test.php:28 still says "see CHANGELOG.md and commit f84d30a"; `git cat-file -t f84d30a` in this repo answers `fatal: Not a valid object name f84d30a`. Line 297 still lists `'local-dimensions-central-page'` among the structural classes the polyfill is allowed to define, and `grep -rn local-dimensions styles.css templates/ amd/src/ classes/` returns nothing — the class exists nowhere in this plugin.
-  <br>*Falta:* tests/local/bootstrap_compat_test.php:28 (foreign commit hash) and :297 (foreign class name in the $structural allowlist, which weakens the unused-polyfill assertion by exempting a token that can never be used). The local_dimensions mention at :503 is a deliberate contrast and reads correctly.
+- **LANG-07** · corrigido — tests/local/bootstrap_compat_test.php carries copied local_dimensions references to files, classes and a commit that do not exist in this repository
+  <br>Sem objeto: os artefactos copiados do local_dimensions saíram; resta uma menção em prosa num comentário.
 - **LANG-08** · corrigido — File header violates the fleet standard in 66 of 68 PHP files: forbidden @author, yearless @copyright, and untagged "Forked and adapted by" prose…
   <br>`grep -rln '@author' --include='*.php' .` and `grep -rln 'Forked and adapted' --include='*.php' .` both return zero files. A loop over all 92 PHP files checking for `@package`, `@copyright 20xx Anderson Blaine` and the GPL v3 license line printed no misses.
 - **LANG-09** · **aberto** — Web services are implemented as one monolithic classes/external.php rather than one class per file under classes/external/
   <br>classes/external.php:41 is still `class external extends external_api`, 725 lines carrying 27 public static methods, and `ls classes/` shows no `external/` directory (only audience, event, form, local, output, persistent, privacy, reportbuilder, table, task). All nine registrations in db/services.php (lines 29, 38, 47, 56, 65, 74, 83, 92, 101) point at `local_awareness\external`.
   <br>*Falta:* The monolith needs splitting into one class per file under classes/external/, with db/services.php classnames and a version.php bump in the same commit.
-- **LANG-10** · **aberto** — @return mixed on a method with a string return type
-  <br>classes/helper.php:1145 still reads `@return mixed` in the docblock of `get_course_name(int $courseid): string` at line 1148, whose three exits (1152, 1157, and the fallback) all return strings.
-  <br>*Falta:* classes/helper.php:1145 should read `@return string`.
+- **LANG-10** · corrigido — @return mixed on a method with a string return type
+  <br>Já corrigido antes desta reconciliação: o `@return` é `string`.
 - **LANG-11** · corrigido — @package tag alignment inconsistent across the codebase (three different spacings)
   <br>`grep -rh '@package' --include='*.php' . \| sort \| uniq -c` returns a single line: 93 occurrences of ` * @package local_awareness`. The same command against the audit commit (`git grep -h '@package' 896dfc2 -- '*.php'`) returned three variants: 48 with four spaces, 2 with three, 19 with one — so th…
 - **LANG-12** · sem objeto — @var string on a property that only ever holds an int, in both report table classes
@@ -362,20 +368,17 @@ diz o que resta e onde.
   <br>classes/table/dismissed_notice.php (whose line 37 held the lone `{` under `class dismissed_notice extends table_sql implements renderable`) was deleted in 2c2e787. A tree-wide scan for a class declaration followed by a brace-only line (`grep -rn -A1 -E '^\s*(final \|abstract )?class [A-Za-z_]+' --in…
 - **LANG-15** · corrigido — db/install.xml VERSION attribute is four years stale relative to version.php and the schema it describes
   <br>db/install.xml:2 now reads `VERSION="20260815"` (it was `20220321` at 896dfc2, against version.php 2026080700). The last commit touching db/install.xml is f1d5b1e, which added the upgrade step whose savepoint is 2026081501 (db/upgrade.php:242) — date 2026-08-15, matching the attribute.
-- **LANG-16** · **aberto** — renderer.php has no file-level docblock: the header block sits after the use statements and documents the class
-  <br>renderer.php is unchanged in shape: lines 1-15 are the GPL block, lines 17-19 are the `use` statements (`use local_awareness\table\all_notices;` etc.), and the only docblock, lines 21-28, sits after them and reads "Plugin's renderer." immediately above `class local_awareness_renderer extends plugin_renderer_base {` at line 29. There is no file-level docblock between the GPL block and the use statements.
-  <br>*Falta:* renderer.php needs a file docblock before line 17 (the use statements); the block at 21-28 then legitimately documents the class.
-- **LANG-17** · **aberto** — No-op statement left in a test purely to silence a linter
-  <br>tests/audience_estimator_test.php:229 still reads `$u3->id; // Appease phpcs.` inside test_estimate_excludes_deleted_and_suspended_users (the file grew, so the August line 161 is now 229). It is the only such statement in tests/ (`grep -rn 'Appease' tests/`).
-  <br>*Falta:* tests/audience_estimator_test.php:229 — the deleted user at line 225 is created for its side effect only; assign to a discarded name or drop the variable rather than dereferencing it.
+- **LANG-16** · corrigido — renderer.php has no file-level docblock: the header block sits after the use statements and documents the class
+  <br>Fechado na fase 12: docblock de ficheiro acrescentado antes dos `use`.
+- **LANG-17** · corrigido — No-op statement left in a test purely to silence a linter
+  <br>Já corrigido: a instrução no-op saiu com a reescrita do teste do estimador na fase 6.
 - **LANG-18** · **aberto** — Test methods lack docblocks in three test files while the plugin's other test files document every one
   <br>An awk scan of every tests/**/*_test.php checking whether the last non-blank line before each `public function test_` ends in `*/` still reports three files, exactly the three that existed in August (git ls-tree -r 896dfc2 confirms all three were present): tests/audience_estimator_test.php (7 undocumented — lines 43, 59, 65, 145, 162, 186, 220), tests/task/estimate_audience_test.php (3 — lines 57, 76, 105) and tests/external/audience_external_test.php (3 — lines 39, 99, 290).
   <br>*Falta:* 13 test methods across the three files listed above still need `/** */` docblocks.
-- **LANG-19** · **aberto** — Behat step carries a copied comment describing forum discussions
-  <br>tests/behat/behat_local_awareness.php:50 still opens the notice-insertion loop with `// Add the discussions to the relevant forum.` — byte-identical to the August line (git show 896dfc2:tests/behat/behat_local_awareness.php). The loop below it inserts rows into {local_awareness}; nothing in this file touches a forum.
-  <br>*Falta:* tests/behat/behat_local_awareness.php:50 — the comment describes a forum generator it was copied from; delete or replace it.
+- **LANG-19** · corrigido — Behat step carries a copied comment describing forum discussions
+  <br>Fechado na fase 12: o comentário copiado sobre fóruns foi substituído.
 
-### Web services — 8 de 18 em aberto
+### Web services — 6 de 18 em aberto
 
 - **WS-01** · **parcial** — get_notices returns the entire notice DB record as a JSON blob in PARAM_RAW, defeating the execute_returns allowlist and leaking targeting…
   <br>The record-wide serialisation is gone: classes/external.php:253 copies a fixed 7-key allowlist out of to_record() (id, title, reqack, forcelogout, modal_width, modal_height, outsideclick) plus content/bgimageurl, and tests/external/notice_external_test.php:560-589 asserts the exact key set.
@@ -409,12 +412,10 @@ diz o que resta e onde.
   <br>Refutado na fase 11 (2026-08-17): investigado nos dois sentidos e concluído que não é defeito.
 - **WS-14** · corrigido — estimate_audience accepts criteria lists of unbounded length, which reach get_in_or_equal unchecked
   <br>Fechado na fase 11 (2026-08-17): `helper::cap_criteria_lists()` corta cada lista em 500 na fronteira do web service — deliberadamente fora do `normalise()`, que também corre sobre avisos já guardados.
-- **WS-15** · **aberto** — track_link_returns declares a redirecturl key the implementation never returns
-  <br>classes/external.php:188-195 — track_link_returns() declares 'redirecturl' => new external_value(PARAM_TEXT, 'redirect url', VALUE_DEFAULT, ""). The implementation is classes/external.php:176-181, which returns helper::track_link() verbatim, and classes/helper.php:1056-1085 has exactly three return statements — ['status' => true] (:1063, guest), ['status' => false] (:1073 and :1078) and $result with only 'status' set (:1080-1082). None sets redirecturl.
-  <br>*Falta:* Still declared, still never produced. Harmless at runtime because VALUE_DEFAULT "" makes clean_returnvalue() fill it in, but it is a returns declaration that documents behaviour the function does not have (unlike dismiss/acknowledge, where classes/helper.php:997-1000 and :1041-1044 really do set it for forcelogout). Smallest fix: drop the key from track_link_returns().
-- **WS-16** · **parcial** — Web service files carry @author tags and a non-standard @copyright, against the fleet header standard
-  <br>The @author half is gone: `grep -rn "@author" --include='*.php' .` returns no hits in classes/external.php or db/services.php, against `git show 896dfc2:classes/external.php` which carried `@author Anderson Blaine <anderson@blaine.com.br>` plus a stray prose line "Forked and adapted by…". The fleet-standard line is now present — classes/external.php:38 and db/services.php:22 both read `@copyright 2026 Anderson Blaine`.
-  <br>*Falta:* A second, yearless `@copyright Catalyst IT` line still sits above it at classes/external.php:37 and db/services.php:21. It is applied consistently (32 of the 92 PHP files with a @copyright carry the dual form, all of them forked files; new files such as classes/task/purge_audience_jobs.php:30 carry only the standard line), so it reads as deliberate upstream attribution rather than an oversight — but it is not the fleet header shape.
+- **WS-15** · corrigido — track_link_returns declares a redirecturl key the implementation never returns
+  <br>Fechado na fase 12: `redirecturl` saiu do `track_link_returns()` e do retorno antecipado — nunca foi devolvido.
+- **WS-16** · corrigido — Web service files carry @author tags and a non-standard @copyright, against the fleet header standard
+  <br>Já corrigido: nenhum ficheiro PHP do plugin tem `@author`.
 - **WS-17** · **aberto** — All eight external functions live in one monolithic classes/external.php instead of classes/external/<name>.php
   <br>`ls classes/external*` returns a single file, classes/external.php (27204 bytes) — there is no classes/external/ directory. `grep -c "public static function" classes/external.php` returns 27, i.e. nine functions × (parameters, implementation, returns) in the one class `local_awareness\external` declared at classes/external.php:41. db/services.php:28-107 registers all nine against 'classname' => 'local_awareness\external'.
   <br>*Falta:* Worse than August, not better: check_collision was added to the same monolith after the audit (classes/external.php:305-363), taking it from eight functions to nine. The fleet standard is one class per file under classes/external/<name>.php extending \core_external\external_api. Smallest fix is mechanical — split into nine files and update the nine 'classname' entries in db/services.php, with a version.php bump so the service definitions reinstall.
@@ -462,7 +463,7 @@ diz o que resta e onde.
   <br>tests/reportbuilder/datasource/all_notices_test.php:26 `use core_reportbuilder_testcase;` and :39 `final class all_notices_test extends core_reportbuilder_testcase {`, after requiring reportbuilder/tests/helpers.php at :24. The same two lines are present in all five datasource tests — acknowledged_notices_test.php:26/:40, dismissed_notices_test.php:26/:40, link_history_test.php:26/:39, notice_views_test.php:26/:40.
   <br>*Falta:* All five datasource tests still bind to the global \core_reportbuilder_testcase alias deprecated since Moodle 5.0. Smallest fix: `use core_reportbuilder\tests\core_reportbuilder_testcase;` and extend that — but check it resolves on the 4.05 leg before switching, since $plugin->supported still includes 405.
 
-### Repositório / CI / docs — 3 de 13 em aberto
+### Repositório / CI / docs — 1 de 13 em aberto
 
 - **REPO-01** · corrigido — mustache-continue-on-error disables the Mustache gate on all four CI legs, while only two lines in one template actually fail it
   <br>`grep -rn "mustache-continue-on-error" . --exclude-dir=.git` returns hits only in CHANGELOG.md:1172/1211 and docs/AUDIT-2026-08.md — no hit in .github/workflows/ci.yml.
@@ -478,9 +479,8 @@ diz o que resta e onde.
   <br>Fechado na fase 7 (2026-08-16): o README passou a nomear os sete critérios de público e a estimativa assíncrona.
 - **REPO-07** · corrigido — $plugin->release is stale — it still names 2026061600 while $plugin->version is 2026080700
   <br>version.php:30 now reads `$plugin->release = 'v1.0';` — it no longer mirrors a stale version stamp (at 896dfc2 `git show 896dfc2:version.php` had `$plugin->release = '2026061600';` against `$plugin->version = 2026080700`). The current version is 2026081603 (version.php:29).
-- **REPO-08** · **parcial** — Every file header carries a sole new copyright holder; no original Catalyst/upstream copyright notice survives in the derivative work
-  <br>Commit da8e710 ("docs: restore upstream copyright and normalise every file header", 2026-08-12) added `@copyright Catalyst IT` to the fork-imported files: `grep -rh "@copyright" --include='*.php' .` counts 33 `@copyright Catalyst IT` lines beside 93 `@copyright 2026 Anderson Blaine`. At 896dfc2 the finding was exactly right — `git grep -l "Catalyst" 896dfc2 -- '*.php'` returned zero files.
-  <br>*Falta:* lang/pt_br/local_awareness.php:21 carries only `@copyright 2026 Anderson Blaine`, while its sibling lang/en/local_awareness.php:21-22 carries both. Attribution was actively lost there: the pre-normalisation header (`git show d01175b:lang/pt_br/local_awareness.php`) named "Originally developed by Nathan Nguyen <nathannguyen@catalyst-au.net> (Catalyst IT)" in prose, and da8e710 removed that prose without adding the tag. Smallest fix: add `@copyright Catalyst IT` above line 21 of lang/pt_br/local_awareness.php.
+- **REPO-08** · corrigido — Every file header carries a sole new copyright holder; no original Catalyst/upstream copyright notice survives in the derivative work
+  <br>Já corrigido: os cabeçalhos foram normalizados e o copyright a montante restaurado em da8e710.
 - **REPO-09** · corrigido — .github/workflows/moodle-release.yml has no trailing newline
   <br>Fechado na fase 7 (2026-08-16): newline final no `moodle-release.yml`.
 - **REPO-10** · **aberto** — CHANGELOG has no released section while version.php declares MATURITY_STABLE, and no release tag exists
@@ -490,11 +490,10 @@ diz o que resta e onde.
   <br>Every commit touching amd/src between 896dfc2 and HEAD also changed version.php — 13 of 13, checked by iterating `git log --format=%H 896dfc2..HEAD -- amd/src` and testing each commit's `--name-only` output for `^version.php$` (0181eae, 2c2e787, 79a7b15, d0cebfc, 22b9f05, 91a32ec, 98c47a4, a6862a7,…
 - **REPO-12** · corrigido — Five fleet-template repo files are missing: phpcs.xml, .phpcsignore, .moodle-plugin-ci.yml, the PR template and a per-repo CLAUDE.md
   <br>Fechado na fase 7 (2026-08-16): `phpcs.xml`, `.phpcsignore`, `.moodle-plugin-ci.yml`, `.stylelintrc.json` e o template de PR instalados a partir de `~/dev/moodle-dev/templates/`, mais um `CLAUDE.md` próprio. Todos já estavam previstos no `.gitattributes`.
-- **REPO-13** · **parcial** — version.php header carries a banned @author tag, a copyright without a year, and prose wedged between tags
-  <br>Two of the three sub-defects are gone. `grep -rn "@author" --include='*.php' .` returns nothing anywhere in the tree (at 896dfc2 version.php carried `@author Anderson Blaine <anderson@blaine.com.br>`), and the prose line "Forked and adapted by Anderson Blaine…" that sat between the tags is gone — the current header (version.php:17-24) is a clean @package/@copyright/@copyright/@license block, and version.php:22 now reads `@copyright 2026 Anderson Blaine` with the year the fleet standard requires.
-  <br>*Falta:* A yearless copyright is still literally present: version.php:21 `@copyright Catalyst IT`. It is not the August line (that one named Blaine and was fixed at :22) — it is the upstream attribution added by da8e710 to close REPO-08, and the same yearless form appears in all 33 files carrying it. Smallest fix if the year is wanted: give the upstream line its span, e.g. `@copyright 2019 Catalyst IT`, after checking the upstream plugin's own header for the correct year.
+- **REPO-13** · corrigido — version.php header carries a banned @author tag, a copyright without a year, and prose wedged between tags
+  <br>Já corrigido: `version.php` não tem `@author`.
 
-### Schema XMLDB / upgrade — 6 de 13 em aberto
+### Schema XMLDB / upgrade — 5 de 13 em aberto
 
 - **DB-01** · **parcial** — CHANGELOG.md carries no entry for the new DB table, upgrade step, or two new web service functions
   <br>`rg -n "local_awareness_estimate_audience\|local_awareness_get_estimate" CHANGELOG.md` returns nothing; `rg -n "audience_jobs" CHANGELOG.md` returns only CHANGELOG.md:1005-1006 (the purge-task entry) and :1163 (the privacy entry). The commit that created the table and its upgrade step (fd7907c, now db/upgrade.php:106-131, savepoint 2026051401) still has no CHANGELOG entry of its own and none was backfilled.
@@ -514,9 +513,8 @@ diz o que resta e onde.
 - **DB-07** · **aberto** — local_awareness_lastview declares no foreign keys, leaving noticeid-only lookups unindexed
   <br>db/install.xml:94-96 — local_awareness_lastview's KEYS block still holds only `<KEY NAME="primary" TYPE="primary" FIELDS="id"/>`; no foreign key to user or local_awareness. Its only index (db/install.xml:98) is `user_notice_uq` on `userid, noticeid`, whose leading column is userid, so noticeid-only lookups such as `noticeview::delete_notice_view()` (classes/persistent/noticeview.php:145-148, `delete_records(TABLE, ['noticeid' => $noticeid])`, called from classes/helper.php:422) cannot use it.
   <br>*Falta:* Smallest fix: mirror the 2026081103 step for local_awareness_lastview — add foreign keys on `noticeid` and `userid` (Moodle emits them as indexes) in install.xml plus an upgrade step.
-- **DB-08** · **aberto** — The estimate_audience ad-hoc task has no lang string, so its name is untranslatable in the ad-hoc queue
-  <br>classes/task/estimate_audience.php declares no `get_name()` override (the class body at :32-176 has only execute(), notify() and resolve()), so it inherits core's default at /Users/uaiblaine/dev/moodle-502/public/lib/classes/task/adhoc_task.php:63-69, which returns `ucfirst(str_replace('_', ' ', $classname))` — the untranslated literal "Estimate audience". `rg -n "task_" lang/en/local_awareness.php` returns only line 302 (`task_purge_audience_jobs`); there is no `task_estimate_audience` key in either lang file.
-  <br>*Falta:* Add `$string['task_estimate_audience']` in its alphabetic slot in lang/en and lang/pt_br, and a `get_name()` override on classes/task/estimate_audience.php returning it — the pattern classes/task/purge_audience_jobs.php:49-51 already uses.
+- **DB-08** · corrigido — The estimate_audience ad-hoc task has no lang string, so its name is untranslatable in the ad-hoc queue
+  <br>Fechado na fase 12: `task_estimate_audience` acrescentada aos dois packs.
 - **DB-09** · corrigido — install.xml VERSION attribute is stale at 20220321 while the file gained a whole new table
   <br>db/install.xml:2 now reads `<XMLDB PATH="local/awareness/db" VERSION="20260815" ...>`; the stale 20220321 is confirmed gone (`git show 896dfc2:db/install.xml` line 2 carried it). Bumped in commit f1d5b1e ("perf: make the audience estimate fit sites with 200k users").
 - **DB-10** · **aberto** — ack_action indexes the two-value action column alone, while every query filters on (noticeid, action)
@@ -529,7 +527,7 @@ diz o que resta e onde.
 - **DB-13** · corrigido — $plugin->release was left behind when $plugin->version was bumped
   <br>version.php:30 now reads `$plugin->release = 'v1.0';` against `$plugin->version = 2026081603` (version.php:29). At the audited commit it was `$plugin->release = '2026061600';` with version 2026080700 (`git show 896dfc2:version.php`) — a version number in the release field, dated before the version i…
 
-### Templates / Bootstrap 4-5 — 7 de 13 em aberto
+### Templates / Bootstrap 4-5 — 5 de 13 em aberto
 
 - **TPL-01** · **aberto** — html_writer used in plugin code in four places
   <br>html_writer is now used far more, not less: `grep -n "html_writer" classes report` returns 19 call sites in classes/table/all_notices.php (241, 503, 507, 520, 523, 528, 560, 568, 571, 585, 604-605, 627, 635, 642, 660, 710, 731, 738) plus report/acknowledged_systemreport.php:62-63 and report/dismissed_systemreport.php:62-63. At the audit commit the same grep returned 6 lines (`git grep -n 'html_writer::' 896dfc2`), so the count grew from 4 places to 23 lines. None of it renders through renderable/templatable.
@@ -558,14 +556,12 @@ diz o que resta e onde.
   <br>templates/editor/preview_card.mustache was deleted in 0181eae (`git log --diff-filter=D --name-only -- templates/`), and templates/editor/shell.mustache's docblock (lines 22-30) now lists exactly the variables the body uses: pagetitle/subtitle (54-55), statuslabel + statusislive/statusisblocked (58-…
 - **TPL-11** · sem objeto — sidenav example context never sets the per-item flag the template branches on
   <br>templates/editor/sidenav.mustache was deleted in 98c47a4 (`git log --diff-filter=D --name-only -- templates/`); `ls templates/editor` now shows only audience_panel.mustache and shell.mustache, and shell.mustache no longer includes any sidenav partial.
-- **TPL-12** · **aberto** — modal_notice.mustache uses the Bootstrap 4-only .close name where .btn-close resolves on both branches
-  <br>templates/modal_notice.mustache:49 still reads `<button id="awareness-closebtn" type="button" class="close" data-action="close" ...>` with a `&times;` span at line 50, rather than the .btn-close spelling that Moodle 4.5's 116-line forward bridge covers and 5.x defines natively.
-  <br>*Falta:* Swap class="close" for class="btn-close" and drop the &times; span (btn-close draws its own glyph). Note this modal renders on arbitrary pages via notice.js, where the plugin sets no body class, so the polyfill route used elsewhere is unavailable — the BS5 name is the only fix that works on both branches.
-- **TPL-13** · **aberto** — Compat test carries dead exception lists copied from another plugin
-  <br>tests/local/bootstrap_compat_test.php:297 still lists `'local-dimensions-central-page'` in $structural, and line 331 still reads `$exceptions = ['hero_header.mustache'];`. Neither exists here: `grep -rn "local-dimensions" templates amd classes styles.css report renderer.php` returns nothing and there is no templates/*hero* file.
-  <br>*Falta:* Delete the nine dead $structural entries (lines 297-305, keeping only bootstrap::BODY_CLASS_BS4) and the hero_header.mustache exception at line 331. Three prose references to the source plugin are stale in the same file and should go with them: amd/src/central/context.js (line 190), template_import_verdict.php (line 328) and the sidenav data-target hook (line 384) — none of those files or hooks exist in this plugin.
+- **TPL-12** · corrigido — modal_notice.mustache uses the Bootstrap 4-only .close name where .btn-close resolves on both branches
+  <br>Fechado na fase 12: `class="close"` passou a `btn-close`, que resolve nos dois ramos.
+- **TPL-13** · corrigido — Compat test carries dead exception lists copied from another plugin
+  <br>Sem objeto: ver LANG-07.
 
-### AMD JavaScript — 7 de 12 em aberto
+### AMD JavaScript — 5 de 12 em aberto
 
 - **JS-01** · corrigido — Context-rule chips request their language strings with `param: ''`, which deletes the {$a} placeholder and makes the value-substitution branch dead…
   <br>`grep -rn "param:" amd/src/` returns nothing (exit 1). At 896dfc2 the list carried `param: ''` on pathmatch/filter_category/filter_course/filter_format/filter_theme and `param: '{$a}'` on cached/error/reach:value; the current list at amd/src/audience_estimator.js:100-121 has no `param` key at all, a…
@@ -573,17 +569,15 @@ diz o que resta e onde.
   <br>Fechado na fase 9 (2026-08-16): contador monotónico `state.sequence`, capturado no envio e comparado nos dois ramos (`.then` e `.catch`) do `pollOnce()` e do `trigger()`, mais `stopPolling()` no início do `trigger()`. Mesma grafia do `collision_warning.js`, que já trazia o padrão.
 - **JS-03** · corrigido — Dismiss/acknowledge web-service failures are swallowed to the browser console and the modal is hidden before the result is known
   <br>Fechado na fase 9 (2026-08-16): o `modal.hide()` saiu dos dois handlers de clique e passou a existir num único sítio — o ramo de fila vazia do `nextNotice()`. Guarda `inflight` nos dois caminhos de escrita, libertada no `.always()`, porque era o `hide()` que tornava um segundo clique impossível.
-- **JS-04** · **aberto** — Four AMD modules miss the GPL header and @module tag and carry a forbidden @author line
-  <br>Per-file check over amd/src (`head -5 \| grep 'This file is part of Moodle'`, `grep -c '@module'`, `grep -c '@author'`) gives exactly four modules with no GPL block, no @module tag and an @author line: amd/src/notice.js:1-8, amd/src/modal_notice.js:1-8, amd/src/notice_form.js:1-8, amd/src/preview.js:1-8 — each has the banned `@author Anderson Blaine <anderson@blaine.com.br>` on line 5. The identical scan at 896dfc2 names the same four files, so nothing moved.
-  <br>*Falta:* Add the 14-line GPL header and an `@module local_awareness/<name>` tag to notice.js, modal_notice.js, notice_form.js and preview.js, and delete the `@author` line from all four (plus course_search.js:5 while there).
+- **JS-04** · corrigido — Four AMD modules miss the GPL header and @module tag and carry a forbidden @author line
+  <br>Fechado na fase 12: os cinco módulos AMD ganharam o bloco GPL e a etiqueta `@module`, e perderam o `@author`.
 - **JS-05** · corrigido — The AMD config passed from editnotice.php is discarded: notice_editor.init() takes no argument and calls AudienceEstimator.init() with none
   <br>The mismatch was removed from the caller side. At 896dfc2 editnotice.php:55-60 passed `js_call_amd('local_awareness/notice_editor', 'init', [['formSourceId' => ..., 'threshold' => editor_page::RULE_THRESHOLD, 'pollIntervalMs' => ..., 'pollMax' => ...]])`; today editnotice.php:53-55 passes no third a…
 - **JS-06** · **aberto** — Competency picker renders hardcoded English error text instead of language strings
   <br>amd/src/notice_form.js:241 — `rulesContainer.innerHTML = '<div class="alert alert-warning">Error rendering rules.</div>';` and amd/src/notice_form.js:402 — `'<div class="p-3 text-center text-danger">Error loading competencies.</div>'`. Both are byte-identical to 896dfc2 (lines 241 and 402 of that revision). Neither string exists in lang/en/local_awareness.php.
   <br>*Falta:* Two hardcoded English sentences remain in the competency picker's catch blocks (notice_form.js:241 and :402). They need lang keys plus a `core/str` fetch, or — matching the module's existing pattern — a `data-*` label attribute on `#awareness-competency-filter` resolved server-side alongside the other picker labels read at notice_form.js:155-158 and 292-298.
-- **JS-07** · **aberto** — showAction() ignores its `visible` argument for the calculate button, so its JSDoc is wrong and the button stays clickable while a job is queued
-  <br>amd/src/audience_estimator.js:413-427 is byte-identical to 896dfc2:390-403 (verified by diffing the two blocks). The docblock still declares `@param {boolean} visible Whether the button should be shown.` (line 418) while the body does `el.hidden = (name === 'calculate') ? false : !visible;` (line 426), discarding `visible` for the calculate button.
-  <br>*Falta:* Nothing changed since August. Smallest fix: correct the `@param` text to say the calculate button ignores it, and set `el.disabled = !visible` (rather than `hidden`) for the calculate case so a queued job cannot be re-queued by a second click.
+- **JS-07** · corrigido — showAction() ignores its `visible` argument for the calculate button, so its JSDoc is wrong and the button stays clickable while a job is queued
+  <br>Fechado na fase 12 pela documentação, não pela mudança: o botão Calcular fica sempre visível de propósito — é o controlo manual do autor — e era o JSDoc que estava errado.
 - **JS-08** · **aberto** — Loaded-but-unused language string and a wrong @param type on the poll job id
   <br>Wrong @param type: amd/src/audience_estimator.js:289 still reads `@param {number} jobid`, but the job id is a UUID string — classes/persistent/audience_job.php:181 `public static function new_jobid(): string` returns an RFC-4122 v4 string, and classes/external.php:640/650 declare it `PARAM_ALPHANUMEXT` / `string $jobid`.
   <br>*Falta:* Change line 289 to `@param {string} jobid`, and either drop `audience:state:idle`, `audience:btn:calculate` and `audience:btn:retry` from the get_strings() list at lines 100-121 (and their mappings at lines 124, 131, 132) or start using them — the two button labels are rendered by the template today, so the JS copies are redundant.
@@ -599,7 +593,7 @@ diz o que resta e onde.
 - **JS-12** · corrigido — version.php was not bumped in the commits that shipped amd/src + amd/build changes
   <br>Every commit touching amd/src or amd/build since the audit also bumped $plugin->version: 83c8b60→2026081100, e9af3df→2026081200, 163ab38→2026081305, b52f8d4→2026081402, f1d5b1e→2026081501, a6862a7→2026081508, 98c47a4→2026081509, 91a32ec→2026081510, 22b9f05→2026081512, d0cebfc→2026081514, 79a7b15→202…
 
-### Lógica de negócio — 3 de 11 em aberto
+### Lógica de negócio — 1 de 11 em aberto
 
 - **BIZ-01** · corrigido — Audience-estimate jobs accumulate forever and one ad-hoc task is queued per typing pause
   <br>Both halves are closed. Accumulation: classes/task/purge_audience_jobs.php:42,60-84 deletes every job with timecreated older than DAYSECS, registered as a scheduled task in db/tasks.php:29-36 with lang key present (lang/en/local_awareness.php:302).
@@ -615,19 +609,17 @@ diz o que resta e onde.
   <br>classes/helper.php:413-416 deletes the 'content' and 'bgimage' file areas for the notice id via get_file_storage()->delete_area_files(), and it sits BEFORE the cleanup_deleted_notice early return at :418-420, so the files go regardless of the cleanup setting (comment at :406-412 states exactly that)…
 - **BIZ-07** · corrigido — check_path_match compiles the pattern without a start anchor, so a path rule matches any URL that merely ends with it
   <br>Fechado na fase 7 (2026-08-16): o padrão passou a ser ancorado nas duas pontas, e o alvo é testado também sem o segmento de caminho do `wwwroot`, para não matar as regras em instalações em subdiretório.
-- **BIZ-08** · **aberto** — Notices with a required course ignore the recorded view entirely, so resetinterval has no effect on them
-  <br>classes/persistent/noticeview.php:164 still reads `WHERE lv.userid = :userid AND sn.enabled = 1 AND sn.reqcourse = 0` — identical to August (`git show 896dfc2:classes/persistent/noticeview.php` line 151). That query is the sole source of $USER->viewednotices (classes/helper.php:694-703 load_viewed_notices), and resetinterval is only ever evaluated inside must_reshow() against an entry from that array (classes/helper.php:706 and :1252).
-  <br>*Falta:* The lastview row IS written for such notices (classes/helper.php:935 add_notice_view), it is just filtered out on read. Smallest fix: drop `AND sn.reqcourse = 0` from classes/persistent/noticeview.php:164 and let must_reshow() plus the existing course-completion filter in collect_user_notices() (classes/helper.php:773-796) decide — or, if the perpetual nagging is intended, say so in the query's comment and close the finding as a decision.
+- **BIZ-08** · corrigido — Notices with a required course ignore the recorded view entirely, so resetinterval has no effect on them
+  <br>Fechado na fase 12 (2026-08-17), pela segunda opção decidida pelo dono do produto: a cláusula `reqcourse = 0` saiu do `get_user_viewed_notice_records()`, tornando o `reqcourse` a regra de público que os outros seis pontos do código já assumiam.
 - **BIZ-09** · refutado — Persistent classes declare timemodified/usermodified for tables that have no such columns, so those writes are silently discarded
   <br>Refutado na fase 11 (2026-08-17): investigado nos dois sentidos e concluído que não é defeito.
-- **BIZ-10** · **aberto** — libxml internal error handling is switched on globally and never restored
-  <br>classes/helper.php:267 calls libxml_use_internal_errors(true) without capturing the previous value; :271 calls only libxml_clear_errors(), which empties the error buffer but does not restore the flag. `grep -rn 'libxml_use_internal_errors' . --exclude-dir=.git` returns exactly two hits and neither assigns the return value: classes/helper.php:267 and db/upgrade.php:178. The setting is process-global, so after update_hyperlinks() runs, every later libxml consumer in the same request has internal error handling on.
-  <br>*Falta:* Not only unfixed but now duplicated: the same unrestored pattern was added in db/upgrade.php:178-182 after the audit. Smallest fix in both places: `$prev = libxml_use_internal_errors(true); … libxml_clear_errors(); libxml_use_internal_errors($prev);`.
+- **BIZ-10** · corrigido — libxml internal error handling is switched on globally and never restored
+  <br>Fechado na fase 12: `libxml_use_internal_errors()` guarda e repõe o valor anterior.
 - **BIZ-11** · **aberto** — get_enabled_notices() and retrieve_user_notices() disagree on half-open scheduling windows (latent — not reachable through the form)
   <br>Both predicates are unchanged from August. classes/persistent/awareness.php:220 selects `enabled = ? AND ((timeend = 0 AND timestart = 0) OR (timeend <> 0 AND timestart <> 0 AND ? < timeend))` — identical to `git show 896dfc2:classes/persistent/awareness.php` line 203. classes/helper.php:825-831 (is_within_active_window) treats a notice as live when `timestart == 0 && timeend == 0` OR `now >= timestart && now < timeend` — the same test as `git show 896dfc2:classes/helper.php` lines 444-446.
   <br>*Falta:* Still latent, as the audit said — the form writes timestart and timeend together (classes/form/notice_form.php:151,156, both hidden behind the perpetual flag), so no form-authored row lands half-open; a row edited by hand, restored from another site, or written by a future code path would. Smallest fix: express one window predicate in one place and have both callers use it.
 
-### Testes — 6 de 10 em aberto
+### Testes — 4 de 10 em aberto
 
 - **TEST-01** · corrigido — No test asserts that any of the eight events fires, so the "every write fires an event" rule is unverified
   <br>Fechado na fase 5 (2026-08-16): `tests/event/events_test.php`, 8 testes, um por verbo mais a distinção entre eles.
@@ -637,15 +629,13 @@ diz o que resta e onde.
 - **TEST-03** · **aberto** — find_reusable()'s dedup predicates (status = ready, timecompleted within DEDUP_WINDOW) are untested — either can be deleted with the suite green
   <br>find_reusable lives at classes/persistent/audience_job.php:114-125 with both predicates intact (`status = :status`, `timecompleted >= :mints`). `grep -rn "DEDUP_WINDOW" tests/` returns nothing (exit 1) and `grep -rn "STATUS_ERROR" tests/` returns nothing, so no test ages a ready job past the 300s window nor stores an errored job.
   <br>*Falta:* Two negative controls are missing: a ready job with `timecompleted` set to `time() - DEDUP_WINDOW - 60` must not be reused, and a STATUS_ERROR job with a timecompleted must not be reused.
-- **TEST-04** · **aberto** — tests/external/audience_external_test.php declares namespace local_awareness while living in tests/external/
-  <br>tests/external/audience_external_test.php:17 still declares `namespace local_awareness;` while the file sits in tests/external/. The same mismatch holds for its two neighbours (tests/external/collision_external_test.php:17, tests/external/notice_external_test.php:17), against the pattern the rest of the suite follows (tests/local/*:17 `namespace local_awareness\local;`, tests/task/*:17 `namespace local_awareness\task;`).
-  <br>*Falta:* Namespace should be `local_awareness\external` to match the directory — note that name collides with the class `local_awareness\external` in classes/external.php, which is presumably why it was left, so the fix is either renaming that class or moving the tests up a level.
+- **TEST-04** · corrigido — tests/external/audience_external_test.php declares namespace local_awareness while living in tests/external/
+  <br>Fechado na fase 12: o namespace passou a `local_awareness\external`, a condizer com o diretório.
 - **TEST-05** · **aberto** — Two of the five bootstrap_compat assertions have no "found nothing" guard, unlike the third which explicitly added one
   <br>tests/local/bootstrap_compat_test.php now has seven test methods (lines 263, 288, 322, 368, 418, 458, 486) and only two `assertGreaterThan(0, …)` empty-scan guards, at line 437 (test_markup_carries_no_deprecated_bootstrap4_names, added after the audit) and line 506 (test_entry_points_mark_the_bootstrap_version, the one the audit already credited).
   <br>*Falta:* Add a scanned-file/line counter and an `assertGreaterThan(0, …)` to each of the five methods at lines 263, 288, 322, 368 and 458 — the same two-line shape already used at line 437.
-- **TEST-06** · **aberto** — bootstrap_compat_test carries copy-paste leftovers from local_dimensions: a whitelisted class and an exception file that do not exist in this plugin
-  <br>Both leftovers survive. tests/local/bootstrap_compat_test.php:297 still whitelists `'local-dimensions-central-page'` in the $structural array, and `grep -rn "local-dimensions" --exclude-dir=docs .` returns that one line only — styles.css defines no such class, so the entry protects nothing.
-  <br>*Falta:* Delete line 297's 'local-dimensions-central-page' entry and line 331's 'hero_header.mustache' exception; both are dead and the second silently exempts a filename that would have to be re-checked if it ever appeared.
+- **TEST-06** · corrigido — bootstrap_compat_test carries copy-paste leftovers from local_dimensions: a whitelisted class and an exception file that do not exist in this plugin
+  <br>Sem objeto: ver LANG-07.
 - **TEST-07** · corrigido — @covers claims coverage of \local_awareness\local\bootstrap but no test executes either of its methods
   <br>Fechado na fase 7 (2026-08-16): dois testes que EXECUTAM `bootstrap::is_bs4()` e `mark_page()` através da fronteira 405/499/500/502, com `$PAGE` isolado e reposto.
 - **TEST-08** · **aberto** — No plugin data generator — five test files each hand-build local_awareness rows with 15 literal fields, bypassing the persistent
@@ -656,7 +646,7 @@ diz o que resta e onde.
 - **TEST-10** · corrigido — test_execute_with_unknown_jobid_does_not_throw asserts assertTrue(true)
   <br>tests/task/estimate_audience_test.php:105-118 now reads: `$this->assertFalse(audience_job::get_record(['jobid' => $jobid]));` as a stated precondition, then captures mtrace output and asserts `assertStringContainsString('not found', $output)` against classes/task/estimate_audience.php:45.
 
-### Segurança (entry points) — 2 de 9 em aberto
+### Segurança (entry points) — 1 de 9 em aberto
 
 - **SEC-01** · sem objeto — "Remove selected" on the report filter never removes anything
   <br>`classes/report_filter.php`, `classes/form/active_filter_form.php` and `classes/form/add_filter_form.php` were all deleted in 2c2e787 (`git log --diff-filter=D --name-only`).
@@ -673,13 +663,12 @@ diz o que resta e onde.
   <br>The raw echo is gone: the August code was `echo $output->heading($notice->title);` at report/acknowledged_report.php:80 (`git show 896dfc2:report/acknowledged_report.php`), and `core_renderer::heading()` wraps via `html_writer::tag()`, which does not escape.
 - **SEC-07** · corrigido — The two table-based report pages set neither page title nor heading
   <br>report/acknowledged_systemreport.php:43-44 sets `$PAGE->set_title(...)` and `$PAGE->set_heading(...)`; report/dismissed_systemreport.php:43-44 does the same. Both also set `$PAGE->set_pagelayout('report')` at line 45.
-- **SEC-08** · **parcial** — File headers in the scoped files carry @author and a non-standard @copyright
-  <br>The `@author` half is fully closed: `rg -n '@author' --glob '*.php' --glob '!docs/**' .` returns zero hits (exit 1) across the whole plugin; editnotice.php's August header carried `@author Anderson Blaine <anderson@blaine.com.br>` plus the untagged "Forked and adapted by" prose line, and both are gone. The `@copyright` half is not: editnotice.php:21 still reads `* @copyright Catalyst IT` with no year, above the compliant `* @copyright 2026 Anderson Blaine` on line 22.
-  <br>*Falta:* A yearless `@copyright Catalyst IT` remains in 17 PHP files, including every file in this batch's scope: editnotice.php:21, managenotice.php:21, lib.php:26, settings.php:21, db/access.php:21, db/caches.php:21, db/services.php:21, db/upgrade.php:21, version.php:21, renderer.php:25, lang/en/local_awareness.php:21, classes/external.php:37, classes/helper.php:43, classes/privacy/provider.php:31, classes/form/notice_form.php:29, classes/table/all_notices.php:36, and all eight classes/event/*.php.
+- **SEC-08** · corrigido — File headers in the scoped files carry @author and a non-standard @copyright
+  <br>Já corrigido: nenhum dos ficheiros abrangidos tem `@author`.
 - **SEC-09** · corrigido — styles.css is explicitly requested although Moodle already compiles it into the theme
   <br>`rg -n 'requires->css' --glob '*.php' .` returns zero hits (exit 1) across the whole plugin. The August call `$PAGE->requires->css('/local/awareness/styles.css');` lived at report/acknowledged_report.php:49 (`git show 896dfc2:report/acknowledged_report.php`); that file is deleted and its replacement…
 
-### Privacidade / LGPD-GDPR — 2 de 6 em aberto
+### Privacidade / LGPD-GDPR — 1 de 6 em aberto
 
 - **PRIV-01** · corrigido — Declared metadata under-states the columns that export_user_data actually ships
   <br>Fechado na fase 10 (2026-08-16): as quatro tabelas declaram agora todas as colunas que o `export_user_data()` envia (18 entradas novas), com um teste que compara a declaração contra as colunas REAIS da base, não contra uma lista escrita à mão.
@@ -692,9 +681,8 @@ diz o que resta e onde.
 - **PRIV-05** · **aberto** — export_user_data ignores the context it is exporting for and ships raw unix timestamps and internal ids
   <br>classes/privacy/provider.php:87-131 — the loop `foreach ($contextlist->get_contexts() as $context)` never uses $context in any of the four queries (provider.php:93-107 filter on :userid only), so every context in the list receives the identical, full payload; and the exported records are raw rows (`lv.*` etc.) so timecreated/timemodified go out as unix integers and noticeid/hlinkid/jobid as internal ids, with no transform anywhere between provider.php:113 and the export at provider.php:129.
   <br>*Falta:* Unchanged. Smallest fix: transform timestamps with \core_privacy\local\request\transform::datetime() and resolve notice ids to titles before the export_data() call at provider.php:129 (the context loop is harmless once only one user context can ever be present, but the raw payload is what the finding names).
-- **PRIV-06** · **parcial** — Provider file header carries a banned @author tag and a @copyright without the required year
-  <br>The banned tag is gone: `grep -rn "@author" --include="*.php" .` over the whole repo returns no matches, and the August header (git show 896dfc2:classes/privacy/provider.php lines 30-32) carried `@author Anderson Blaine <…>` plus `@copyright Anderson Blaine <…>`. The current header at classes/privacy/provider.php:30-33 has @package, `@copyright Catalyst IT`, `@copyright 2026 Anderson Blaine`, @license.
-  <br>*Falta:* A `@copyright` line with no year still stands at classes/privacy/provider.php:31 (`@copyright Catalyst IT`), added deliberately by commit da8e710 'docs: restore upstream copyright and normalise every file header' and repeated fleet-wide in this repo (db/caches.php:21, classes/table/all_notices.php:36). Under the reading that the finding meant the plugin's own copyright, that half is fixed too (`2026 Anderson Blaine` is present); under the literal reading, line 31 remains. Smallest fix if wanted: give the upstream line its year, e.g.
+- **PRIV-06** · corrigido — Provider file header carries a banned @author tag and a @copyright without the required year
+  <br>Já corrigido: o provedor não tem `@author`.
 
 ### SQL / portabilidade — 1 de 5 em aberto
 

@@ -202,7 +202,7 @@ class external extends external_api {
 
         // See dismiss_notice(): the switch is enforced at the boundary, not in the helper.
         if (!helper::is_delivery_enabled()) {
-            return ['status' => false, 'redirecturl' => ''];
+            return ['status' => false];
         }
 
         return helper::track_link($params['linkid']);
@@ -214,10 +214,12 @@ class external extends external_api {
      * @return external_single_structure
      */
     public static function track_link_returns(): external_single_structure {
+        // No redirecturl. It was declared here and never returned by helper::track_link(), which
+        // told a reader of the contract that this function might navigate the browser — the one
+        // thing a click-tracking call must not appear to do.
         return new external_single_structure(
             [
                 'status' => new external_value(PARAM_BOOL, 'status: true if success', VALUE_DEFAULT, "0"),
-                'redirecturl' => new external_value(PARAM_TEXT, 'redirect url', VALUE_DEFAULT, ""),
             ]
         );
     }

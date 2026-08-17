@@ -6,6 +6,61 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — a notice requiring a course now behaves like every other notice (version 2026081611, audit BIZ-08)
+
+**This changes behaviour on live sites.** A notice with a required course had its recorded view
+discarded by one SQL clause, so `resetinterval` had no effect on it and the notice returned at the
+start of every session however the author had configured it. Worse, with `reqcourse > 0` +
+`reqack = 1` + `resetinterval = 0`, pressing **Accept recorded nothing at all** — the reader was
+shown a notice they had already accepted, by a button that could not clear it.
+
+`reqcourse` is an **audience rule**, and six other places in the plugin already treat it as one: the
+form puts it under the audience header, the estimator counts it as an audience rule labelled "Has
+not completed required course", `is_notice_available_to_user()` and `collect_user_notices()` use it
+as an availability gate, and the manage table chips it as targeting. This clause was the only site
+reading it as "re-show for ever", and it carried no comment saying so.
+
+The clause is gone. A reqcourse notice now obeys its reset interval, an accepted one stays
+accepted, and someone who completes the course leaves the audience. `notice:reqcourse_help` is
+reworded in both packs to say what the field actually does — that it targets, and that display
+frequency belongs to the reset interval.
+
+Administrators should know that a reqcourse notice configured with no reset interval and no
+required acknowledgement now shows **once** rather than on every login. That was the intended
+reading of an audience rule; it was not the previous behaviour.
+
+Mutation-tested: restoring the clause turns both new tests red.
+
+### Fixed — the first wave of standards cleanup
+
+Eleven more findings, and eleven others confirmed as already fixed by earlier phases — they only
+read as open because the census was written before those phases ran (LANG-03, LANG-07, LANG-10,
+LANG-17, TEST-06, TPL-13, WS-16, REPO-08, REPO-13, PRIV-06, SEC-08).
+
+- **The five oldest AMD modules had no GPL header, no `@module` tag and a forbidden `@author`**
+  (audit JS-04). `notice.js`, `modal_notice.js`, `preview.js`, `notice_form.js` and
+  `course_search.js` now carry the fleet header, and each docblock says what the module is for
+  rather than who wrote it.
+- **`modal_notice.mustache` used `class="close"`** (audit TPL-12), a Bootstrap 4-only name.
+  `btn-close` is inside Moodle 4.5's own forward bridge, so it resolves on both branches.
+- **The estimate task had no language string** (audit DB-08), so its name was untranslatable in the
+  ad-hoc queue while the purge task beside it had one.
+- **`track_link_returns()` declared a `redirecturl` the implementation never returns** (audit
+  WS-15) — a contract telling its reader that a click-tracking call might navigate the browser.
+- **`create_new_acknowledge_record()` typed its action as a string** (audit LANG-02) while the
+  values are the int constants `ACTION_DISMISSED` / `ACTION_ACKNOWLEDGED`.
+- **`renderer.php` had no file-level docblock** (audit LANG-16) — the block after the `use`
+  statements documents the class.
+- **`libxml_use_internal_errors(true)` was never restored** (audit BIZ-10), silencing XML warnings
+  for everything later in the request.
+- **A Behat step carried a copied comment about forum discussions** (audit LANG-19).
+- **`tests/external/audience_external_test.php` declared the wrong namespace** for its directory
+  (audit TEST-04).
+- **`showAction()`'s JSDoc was wrong** (audit JS-07) — and the fix is the docblock, not the code.
+  The calculate button stays visible on purpose: it is the author's manual recalculate control, and
+  hiding it whenever an estimate is queued would remove the one thing they can do about a slow
+  count. Changing the code would have been a regression dressed as a cleanup.
+
 ### Fixed — five behavioural defects the previous summary had written off (version 2026081610)
 
 This release exists because of a mistake in the last one's summary. It said no substantive work
