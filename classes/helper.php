@@ -45,6 +45,9 @@ require_once($CFG->libdir . '/filelib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class helper {
+    /** @var int Longest criteria list a single estimate statement will carry. */
+    public const CRITERIA_LIST_MAX = 500;
+
     /**
      * Perform all required manipulations with content.
      *
@@ -937,6 +940,35 @@ class helper {
         // Add to viewed notices.
         $noticeview = noticeview::add_notice_view($notice->get('id'), $USER->id, $action);
         $USER->viewednotices[$notice->get('id')] = ['timeviewed' => $noticeview->get('timemodified'), 'action' => $action];
+    }
+
+    /**
+     * Trim every criteria list to a length a single statement can carry.
+     *
+     * The criteria arrive as client JSON and reach get_in_or_equal() unbounded. A list of tens of
+     * thousands of ids builds a statement with one placeholder per id: PostgreSQL refuses past
+     * 65535 bound parameters outright, and long before that the estimator's conditional-column
+     * query is being parsed and planned at a size nobody intended. The editor's own pickers cannot
+     * produce a list this long, so a request that does is hand-made.
+     *
+     * Trimmed rather than rejected, which is what the surrounding code already does with a
+     * disallowed cohort id — and deliberately NOT applied inside estimator::normalise(). That
+     * function also runs over an ALREADY-STORED notice, so capping there would let the estimate
+     * and the hash describe the first {@see self::CRITERIA_LIST_MAX} ids while check_filters()
+     * kept honouring all of them: the panel would quietly stop describing the notice, which is the
+     * exact failure this plugin has been bitten by before.
+     *
+     * @param array $raw Raw criteria, as decoded from the request.
+     * @return array The same criteria with every list trimmed.
+     */
+    public static function cap_criteria_lists(array $raw): array {
+        foreach ($raw as $key => $value) {
+            if (is_array($value) && count($value) > self::CRITERIA_LIST_MAX) {
+                $raw[$key] = array_slice($value, 0, self::CRITERIA_LIST_MAX);
+            }
+        }
+
+        return $raw;
     }
 
     /**

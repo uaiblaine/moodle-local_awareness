@@ -115,7 +115,7 @@ final class async_contract_test extends \basic_testcase {
          * capture line and the .catch guard still mentioned it. Mutation testing is the only
          * reason that is not still true.
          */
-        foreach (['function pollOnce()', 'function trigger()'] as $needle) {
+        foreach (['function pollOnce()', 'function trigger(force)'] as $needle) {
             $body = $this->body_after($source, $needle);
             $this->assertGreaterThanOrEqual(
                 2,
@@ -131,7 +131,7 @@ final class async_contract_test extends \basic_testcase {
          */
         $this->assertStringContainsString(
             'stopPolling();',
-            $this->body_after($source, 'function trigger()'),
+            $this->body_after($source, 'function trigger(force)'),
             'trigger() must cancel the in-flight poll as well as supersede it.'
         );
     }
@@ -215,6 +215,46 @@ final class async_contract_test extends \basic_testcase {
             'inflight',
             $notice,
             'amd/build/notice.min.js predates the in-flight guard — run mdl grunt and commit the bundle.'
+        );
+    }
+
+    /**
+     * An automatic estimate is skipped when the criteria have not changed, and a click never is.
+     *
+     * Auto mode fires on every change to the form — including the title and the body — so typing a
+     * headline used to blank the reach figure, queue an ad-hoc task and spend a round trip
+     * restoring the number that was already on screen, once per pause in typing. Each of those
+     * queued a job row that nothing deletes.
+     *
+     * The two halves have to be asserted together. Comparing at the debounce instead of inside
+     * trigger() would also have stopped the button working, and a dead Calculate button is a
+     * defect this panel has already shipped once.
+     */
+    public function test_an_unchanged_estimate_is_not_re_queued_but_a_click_still_asks(): void {
+        $source = $this->amd_source('audience_estimator.js');
+        $body = $this->body_after($source, 'function trigger(force)');
+
+        $this->assertStringContainsString(
+            'json === state.lastCriteriaJson',
+            $body,
+            'trigger() must compare the criteria it just read against the previous ones.'
+        );
+
+        /*
+         * The comparison has to come BEFORE the side effects. Superseding the sequence or
+         * cancelling the poll first would abandon an estimate the author is still waiting for, so
+         * the order is part of the fix rather than an accident of layout.
+         */
+        $this->assertLessThan(
+            strpos($body, 'stopPolling();'),
+            strpos($body, 'json === state.lastCriteriaJson'),
+            'the unchanged-criteria check must run before trigger() cancels anything.'
+        );
+
+        $this->assertSame(
+            2,
+            substr_count($source, 'trigger(true)'),
+            'both the calculate and the retry button must force a recount; a click always asks.'
         );
     }
 }

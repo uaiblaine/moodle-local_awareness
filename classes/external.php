@@ -633,6 +633,8 @@ class external extends external_api {
             $raw['cohorts'] = helper::allowed_cohorts((array) $raw['cohorts']);
         }
 
+        $raw = helper::cap_criteria_lists($raw);
+
         $normalised = estimator::normalise($raw);
         $hash = estimator::hash($normalised);
 

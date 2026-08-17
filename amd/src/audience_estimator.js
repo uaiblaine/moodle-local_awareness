@@ -444,8 +444,37 @@ define([
         el.hidden = (name === 'calculate') ? false : !visible;
     }
 
-    /** Trigger a fresh estimate based on the current criteria. */
-    function trigger() {
+    /**
+     * Trigger a fresh estimate based on the current criteria.
+     *
+     * @param {boolean} [force] Ask again even when the criteria are unchanged. True for a button
+     *     press, which is the author explicitly requesting a recount; false or omitted for the
+     *     automatic path, where unchanged criteria can only produce the number already on screen.
+     */
+    function trigger(force) {
+        var criteria = criteriaReader.read();
+        var json = JSON.stringify(criteria);
+        updateSummary(criteria);
+
+        /*
+         * The estimate answers a question about the CRITERIA, so re-asking with the same ones can
+         * only repaint the same number. Auto mode fires on every change to the form, including the
+         * title and the body — so typing a headline used to blank the reach figure, queue an
+         * ad-hoc task and spend a round trip restoring the answer that was already on screen, once
+         * per pause in typing. Every one of those queued a row nothing deletes.
+         *
+         * A click always asks: pressing Calculate or Retry is the author's way of saying "count it
+         * again", and refusing that would be the dead button this panel already had once. Hence
+         * force, rather than comparing at the debounce.
+         *
+         * The comparison happens BEFORE any side effect. Bumping the sequence or calling
+         * stopPolling() first would cancel an in-flight estimate the author is still waiting for.
+         */
+        if (!force && json === state.lastCriteriaJson) {
+            return;
+        }
+        state.lastCriteriaJson = json;
+
         /*
          * A new estimate supersedes whatever was in flight. stopPolling() cancels the pending
          * timer; bumping the sequence is what discards an answer already on the wire, which the
@@ -453,11 +482,6 @@ define([
          */
         stopPolling();
         var mine = ++state.sequence;
-
-        var criteria = criteriaReader.read();
-        var json = JSON.stringify(criteria);
-        state.lastCriteriaJson = json;
-        updateSummary(criteria);
 
         /*
          * No early return on an empty criteria set. It used to stop here and reprint the idle
@@ -597,12 +621,12 @@ define([
                 state.autoMode = recomputeMode();
                 if (state.slots.calcBtn) {
                     state.slots.calcBtn.addEventListener('click', function() {
-                        trigger();
+                        trigger(true);
                     });
                 }
                 if (state.slots.retryBtn) {
                     state.slots.retryBtn.addEventListener('click', function() {
-                        trigger();
+                        trigger(true);
                     });
                 }
                 bindFormChanges();

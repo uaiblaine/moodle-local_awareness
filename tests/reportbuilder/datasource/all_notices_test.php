@@ -220,4 +220,68 @@ final class all_notices_test extends core_reportbuilder_testcase {
         $this->datasource_stress_test_columns_aggregation(all_notices::class);
         $this->datasource_stress_test_conditions(all_notices::class, 'notice:title');
     }
+
+    /**
+     * The reqcourse column reports a boolean, not the course id it stores.
+     *
+     * The column declares TYPE_BOOLEAN while the stored value is a COURSE ID, and Report Builder
+     * aggregates a boolean column arithmetically — so a percent aggregation over a course id
+     * produced a seven-digit percentage, and an average produced the mean course id. The display
+     * callback hid it, because it only ever asked whether the value was empty.
+     *
+     * The aggregation is what the assertion goes through, since that is the path the raw value
+     * reaches. The control is the second notice, which requires no course: without it a
+     * normalisation that returned 0 for everything would pass.
+     */
+    public function test_the_reqcourse_column_aggregates_as_a_boolean(): void {
+        $this->resetAfterTest();
+
+        global $DB, $USER;
+        $this->setAdminUser();
+
+        $course = $this->getDataGenerator()->create_course();
+        $this->assertGreaterThan(1, (int) $course->id, 'the course id must be large enough to tell from a boolean');
+
+        $now = time();
+        foreach ([(int) $course->id, 0] as $i => $reqcourse) {
+            $DB->insert_record('local_awareness', (object) [
+                'title'         => 'Notice ' . $i,
+                'content'       => 'Content',
+                'contentformat' => FORMAT_HTML,
+                'cohorts'       => '',
+                'reqack'        => 0,
+                'reqcourse'     => $reqcourse,
+                'enabled'       => 1,
+                'resetinterval' => 0,
+                'usermodified'  => $USER->id,
+                'timecreated'   => $now,
+                'timemodified'  => $now,
+                'timestart'     => 0,
+                'timeend'       => 0,
+                'forcelogout'   => 0,
+            ]);
+        }
+
+        /** @var core_reportbuilder_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_reportbuilder');
+        $report = $generator->create_report([
+            'name'    => 'Reqcourse aggregation',
+            'source'  => all_notices::class,
+            'default' => 0,
+        ]);
+        $generator->create_column([
+            'reportid' => $report->get('id'),
+            'uniqueidentifier' => 'notice:reqcourse',
+            'aggregation' => 'sum',
+        ]);
+
+        $content = $this->get_custom_report_content($report->get('id'));
+        $row = array_values(reset($content));
+
+        $this->assertSame(
+            '1',
+            (string) $row[0],
+            'summing the column must count the notices that require a course, not add up course ids'
+        );
+    }
 }

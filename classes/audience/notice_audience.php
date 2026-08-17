@@ -220,6 +220,17 @@ class notice_audience {
     public static function record(audience_job $job): ?awareness {
         global $DB;
 
+        /*
+         * A job that failed has no count to record. resultcount is 0 on an errored job, and
+         * writing that 0 alongside a fresh audiencehash told the editor the answer was CURRENT —
+         * so a failed estimate displayed "0 people" as though it were measured, and the stored
+         * hash then matched the criteria, which stopped the next unforced refresh from retrying.
+         * The failure became sticky and looked like a result.
+         */
+        if ($job->get('status') !== audience_job::STATUS_READY) {
+            return null;
+        }
+
         $noticeid = (int) $job->get('noticeid');
         if ($noticeid <= 0) {
             return null;
