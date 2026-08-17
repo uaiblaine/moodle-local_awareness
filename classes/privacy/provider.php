@@ -256,6 +256,13 @@ class provider implements
      * @return \core_privacy\local\metadata\collection
      */
     public static function get_metadata(collection $collection): collection {
+        /*
+         * Every column export_user_data() actually ships. It selects lv.*, ack.*, his.* and job.*,
+         * so the whole row reaches the export file — while this declaration named a subset, which
+         * is the half of the privacy contract a data subject reads BEFORE deciding whether to ask.
+         * A narrower declaration than the export is not a smaller disclosure; it is an inaccurate
+         * one.
+         */
         $collection->add_database_table(
             'local_awareness_ack',
             [
@@ -264,6 +271,10 @@ class provider implements
                 'firstname' => 'privacy:metadata:firstname',
                 'lastname' => 'privacy:metadata:lastname',
                 'idnumber' => 'privacy:metadata:idnumber',
+                'noticeid' => 'privacy:metadata:noticeid',
+                'noticetitle' => 'privacy:metadata:noticetitle',
+                'action' => 'privacy:metadata:action',
+                'timecreated' => 'privacy:metadata:timecreated',
             ],
             'privacy:metadata:local_awareness_ack'
         );
@@ -272,6 +283,8 @@ class provider implements
             'local_awareness_hlinks_his',
             [
                 'userid' => 'privacy:metadata:userid',
+                'hlinkid' => 'privacy:metadata:hlinkid',
+                'timecreated' => 'privacy:metadata:timecreated',
             ],
             'privacy:metadata:local_awareness_hlinks_his'
         );
@@ -280,6 +293,10 @@ class provider implements
             'local_awareness_lastview',
             [
                 'userid' => 'privacy:metadata:userid',
+                'noticeid' => 'privacy:metadata:noticeid',
+                'action' => 'privacy:metadata:action',
+                'timecreated' => 'privacy:metadata:timecreated',
+                'timemodified' => 'privacy:metadata:timemodified',
             ],
             'privacy:metadata:local_awareness_lastview'
         );
@@ -288,10 +305,36 @@ class provider implements
             'local_awareness_audience_jobs',
             [
                 'userid' => 'privacy:metadata:userid',
+                'jobid' => 'privacy:metadata:jobid',
+                'noticeid' => 'privacy:metadata:noticeid',
+                'criteriahash' => 'privacy:metadata:criteriahash',
                 'criteria' => 'privacy:metadata:criteria',
+                'status' => 'privacy:metadata:status',
+                'resultcount' => 'privacy:metadata:resultcount',
+                'breakdown' => 'privacy:metadata:breakdown',
+                'errormsg' => 'privacy:metadata:errormsg',
                 'timecreated' => 'privacy:metadata:timecreated',
+                'timecompleted' => 'privacy:metadata:timecompleted',
             ],
             'privacy:metadata:local_awareness_audience_jobs'
+        );
+
+        /*
+         * A notice is site configuration rather than one person's data, but core\persistent stamps
+         * the author into local_awareness.usermodified on every create and update, so a user id is
+         * stored here and has to be declared. Core declares exactly this shape for admin-authored
+         * configuration and then declines to act on it — analytics_models, analytics_models_log
+         * and the oauth2_* tables each carry a usermodified-only entry with no export and no
+         * erasure. Blanking this column would rewrite the record of who published a site-wide
+         * notice, so it is declared and deliberately left out of the contextlist, the export and
+         * every delete path.
+         */
+        $collection->add_database_table(
+            'local_awareness',
+            [
+                'usermodified' => 'privacy:metadata:usermodified',
+            ],
+            'privacy:metadata:local_awareness'
         );
 
         return $collection;

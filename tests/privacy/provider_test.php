@@ -16,6 +16,7 @@
 
 namespace local_awareness\privacy;
 
+use core_privacy\local\metadata\collection;
 use core_privacy\local\request\approved_contextlist;
 use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\userlist;
@@ -373,5 +374,95 @@ final class provider_test extends \advanced_testcase {
         provider::delete_data_for_all_users_in_context(\context_user::instance($user->id));
 
         $this->assertFalse($cache->get((string) $USER->id));
+    }
+
+    /**
+     * The declaration names every column the export actually ships.
+     *
+     * These are two halves of one promise and they had drifted. export_user_data() selects
+     * `lv.*`, `ack.*`, `his.*` and `job.*` — whole rows — while get_metadata() named a subset, and
+     * the declaration is the half a data subject reads BEFORE deciding whether to ask. A narrower
+     * declaration than the export is not a smaller disclosure, it is an inaccurate one.
+     *
+     * The comparison is made against the real table columns rather than a list written here, so
+     * adding a column to any of the four tables without declaring it turns this red — which is the
+     * drift that produced the finding in the first place.
+     */
+    public function test_the_declaration_names_every_exported_column(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $declared = [];
+        foreach (provider::get_metadata(new collection('local_awareness'))->get_collection() as $item) {
+            if (method_exists($item, 'get_privacy_fields') && $item->get_privacy_fields() !== null) {
+                $declared[$item->get_name()] = array_keys($item->get_privacy_fields());
+            }
+        }
+
+        foreach (array_column(self::table_provider(), 0) as $table) {
+            $this->assertArrayHasKey($table, $declared, "{$table} is exported but not declared at all");
+
+            // Every column of the row the export ships, minus the surrogate key.
+            $columns = array_keys($DB->get_columns($table));
+            $columns = array_values(array_diff($columns, ['id']));
+            $this->assertNotEmpty($columns, "no columns read for {$table} — the check would pass blind");
+
+            $missing = array_values(array_diff($columns, $declared[$table]));
+            $this->assertSame(
+                [],
+                $missing,
+                "{$table}: export ships these columns and get_metadata() does not declare them: "
+                    . implode(', ', $missing)
+            );
+        }
+    }
+
+    /**
+     * The notice table is declared for its author column, and deliberately never acted on.
+     *
+     * core\persistent stamps local_awareness.usermodified on every create and update, so a user id
+     * is stored there and has to be declared. It is NOT exported or erased, and that is the
+     * decision rather than an omission: a notice is site configuration, and blanking the column
+     * would rewrite the record of who published a site-wide announcement. Core treats its own
+     * admin-authored configuration the same way — analytics_models and the oauth2_* tables each
+     * carry a usermodified-only entry with no export and no erasure.
+     *
+     * Asserting the second half is what stops a future reader "completing" the provider by wiring
+     * this table into the delete paths.
+     */
+    public function test_the_notice_table_is_declared_but_never_erased(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $declared = [];
+        foreach (provider::get_metadata(new collection('local_awareness'))->get_collection() as $item) {
+            if (method_exists($item, 'get_privacy_fields') && $item->get_privacy_fields() !== null) {
+                $declared[$item->get_name()] = array_keys($item->get_privacy_fields());
+            }
+        }
+
+        $this->assertArrayHasKey('local_awareness', $declared);
+        $this->assertSame(['usermodified'], $declared['local_awareness']);
+
+        // The author's notice survives erasure of the author.
+        $author = $this->getDataGenerator()->create_user();
+        $noticeid = $DB->insert_record('local_awareness', (object) [
+            'title' => 'Policy update',
+            'content' => '<p>Read the policy.</p>',
+            'contentformat' => FORMAT_HTML,
+            'usermodified' => $author->id,
+            'timecreated' => time(),
+            'timemodified' => time(),
+        ]);
+
+        provider::delete_data_for_all_users_in_context(\context_user::instance($author->id));
+
+        $this->assertSame(
+            (int) $author->id,
+            (int) $DB->get_field('local_awareness', 'usermodified', ['id' => $noticeid]),
+            'erasing the author must not rewrite who published the notice'
+        );
     }
 }

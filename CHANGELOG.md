@@ -6,6 +6,39 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the privacy declaration now matches what is actually exported (version 2026081609, audit PRIV-01, PRIV-04)
+
+- **The declaration named a subset of what the export ships.** `export_user_data()` selects
+  `lv.*`, `ack.*`, `his.*` and `job.*` — whole rows — while `get_metadata()` declared between one
+  and five columns per table. Eighteen columns therefore reached a data-subject's export file
+  without appearing in the plugin's privacy declaration, which is the half of the contract a person
+  reads *before* deciding whether to ask. A narrower declaration than the export is not a smaller
+  disclosure; it is an inaccurate one. All four tables now declare every column they ship.
+
+- **`local_awareness.usermodified` was not declared at all.** `core\persistent` stamps the author
+  into it on every create and update, so a user id is stored in that table and has to appear in the
+  declaration. It is declared and **deliberately** not exported or erased: a notice is site
+  configuration, and blanking the column would rewrite the record of who published a site-wide
+  announcement. Core treats its own admin-authored configuration identically — `analytics_models`,
+  `analytics_models_log` and the `oauth2_*` tables each carry a `usermodified`-only entry with no
+  export and no erasure. The test asserts both halves, so a later reader cannot "complete" the
+  provider by wiring the table into the delete paths.
+
+Fourteen new language keys in both packs, in alphabetical lockstep (273 keys each).
+
+The first test compares the declaration against the **real columns of each table**, read from the
+database, rather than against a list written in the test. A hand-written list would have to be kept
+in step with the schema by the same discipline that failed here in the first place; reading
+`get_columns()` means adding a column without declaring it turns the test red on its own.
+
+Mutation-tested: dropping `noticetitle` from the acknowledgement declaration kills a test, reverting
+the whole audience-jobs widening kills a test, removing the notice-table declaration kills a test,
+and erasing `usermodified` along with the user kills a test.
+
+**With this the census has no substantive item left.** The 74 findings still open are cosmetic —
+header and docblock drift, the `html_writer` usage that grew from 4 sites to 24, and Mustache
+docblocks that no longer describe what their templates read. None of them changes behaviour.
+
 ### Fixed — two asynchronous defects in the JavaScript (version 2026081608, audit JS-02, JS-03)
 
 - **A stale estimate could overwrite a fresher one.** `pollOnce()` read the job id at send time and

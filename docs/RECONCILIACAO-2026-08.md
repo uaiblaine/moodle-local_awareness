@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 25 | 4 | 4 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 52 | 7 | 4 | 33 | **96** |
+| Baixo | 54 | 7 | 4 | 31 | **96** |
 | Informativo | 13 | 5 | 4 | 30 | **52** |
-| **Total** | **105** | **17** | **13** | **63** | **198** |
+| **Total** | **107** | **17** | **13** | **61** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **122 dos 198 estão encerrados; 76 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **124 dos 198 estão encerrados; 74 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -85,10 +85,11 @@ parciais, com o que falta nomeado.
 > `criteria_contract_test` e o `bootstrap_compat_test` ao lado. Uma das asserções passou com a
 > guarda apagada até o teste de mutação a apanhar; a correção está escrita no próprio ficheiro.
 >
-> **Ainda deixados de propósito**, com razão registada e não por esquecimento:
-> **PRIV-01** e **PRIV-04** (declaração de metadados de privacidade)
-> pedem doze a treze chaves de idioma novas nos dois packs; **JS-02** e **JS-03** exigem
-> reconstrução do AMD e formam naturalmente uma fatia só de JavaScript.
+> **Atualizado pela fase 10** (versão `2026081609`, branch `fix/phase-10-privacy`): **PRIV-01** e
+> **PRIV-04** fechados, com catorze chaves novas nos dois packs. **Não resta nenhum item
+> substantivo**: os 74 que continuam por decidir são cosméticos — cabeçalhos e docblocks que
+> derivaram, o `html_writer` que cresceu de 4 para 24 usos, e docblocks de Mustache que já não
+> descrevem o que os templates leem. Nenhum deles muda comportamento.
 
 ## O que sobrevive, e por quê
 
@@ -668,18 +669,16 @@ diz o que resta e onde.
 - **SEC-09** · corrigido — styles.css is explicitly requested although Moodle already compiles it into the theme
   <br>`rg -n 'requires->css' --glob '*.php' .` returns zero hits (exit 1) across the whole plugin. The August call `$PAGE->requires->css('/local/awareness/styles.css');` lived at report/acknowledged_report.php:49 (`git show 896dfc2:report/acknowledged_report.php`); that file is deleted and its replacement…
 
-### Privacidade / LGPD-GDPR — 4 de 6 em aberto
+### Privacidade / LGPD-GDPR — 2 de 6 em aberto
 
-- **PRIV-01** · **aberto** — Declared metadata under-states the columns that export_user_data actually ships
-  <br>classes/privacy/provider.php:93-116 still exports `lv.*`, `ack.*`, `his.*`, `job.*` (whole rows), while get_metadata() at classes/privacy/provider.php:245-285 declares only a subset per table. Against db/install.xml, undeclared-but-exported columns are: local_awareness_ack noticeid/noticetitle/action/timecreated; local_awareness_lastview noticeid/action/timecreated/timemodified; local_awareness_hlinks_his hlinkid/timecreated; local_awareness_audience_jobs jobid/noticeid/criteriahash/status/resultcount/breakdown/err…
-  <br>*Falta:* Metadata still under-states the export. Smallest fix: add the missing field keys (with their privacy:metadata:* lang strings, which exist only for criteria/timecreated/userid/username/firstname/lastname/idnumber today) to the four add_database_table() calls at classes/privacy/provider.php:246-282, or narrow the four SELECTs to the declared columns.
+- **PRIV-01** · corrigido — Declared metadata under-states the columns that export_user_data actually ships
+  <br>Fechado na fase 10 (2026-08-16): as quatro tabelas declaram agora todas as colunas que o `export_user_data()` envia (18 entradas novas), com um teste que compara a declaração contra as colunas REAIS da base, não contra uma lista escrita à mão.
 - **PRIV-02** · corrigido — delete_data_for_users ignores the approved userlist and deletes by context instanceid instead
   <br>Fechado na fase 5 (2026-08-16): `delete_data_for_users()` passou a iterar os ids aprovados, com o contexto a limitar o alcance.
 - **PRIV-03** · corrigido — delete_data_for_user processes only the first context and derives the userid from the context rather than the contextlist's user
   <br>Fechado na fase 5 (2026-08-16): `delete_data_for_user()` percorre todos os contextos aprovados e tira o userid do contextlist.
-- **PRIV-04** · **aberto** — local_awareness.usermodified (the notice author) is user-linked but is not declared, exported or considered anywhere in the provider
-  <br>db/install.xml:18 still declares `<FIELD NAME="usermodified" …>` on the local_awareness table, and it is live data (classes/helper.php:131, 212, 325, 350, 375, 401, 1034 all read $notice->get('usermodified')). classes/privacy/provider.php contains no reference to the `local_awareness` table at all: get_metadata() (provider.php:245-285) declares only local_awareness_ack, _hlinks_his, _lastview and _audience_jobs, and get_contexts_for_userid() (provider.php:55-70) queries the same four tables.
-  <br>*Falta:* The notice author is still undeclared, unexported and outside every contextlist. Smallest fix: add a local_awareness table entry (usermodified) to get_metadata(); a notice is site-level content, so export/erasure can legitimately be declined, but the declaration is mandatory.
+- **PRIV-04** · corrigido — local_awareness.usermodified (the notice author) is user-linked but is not declared, exported or considered anywhere in the provider
+  <br>Fechado na fase 10 (2026-08-16): a tabela `local_awareness` é declarada pelo seu `usermodified` e deliberadamente nunca exportada nem apagada — um aviso é configuração do site, e apagar a coluna reescreveria quem o publicou. O teste afirma as duas metades.
 - **PRIV-05** · **aberto** — export_user_data ignores the context it is exporting for and ships raw unix timestamps and internal ids
   <br>classes/privacy/provider.php:87-131 — the loop `foreach ($contextlist->get_contexts() as $context)` never uses $context in any of the four queries (provider.php:93-107 filter on :userid only), so every context in the list receives the identical, full payload; and the exported records are raw rows (`lv.*` etc.) so timecreated/timemodified go out as unix integers and noticeid/hlinkid/jobid as internal ids, with no transform anywhere between provider.php:113 and the export at provider.php:129.
   <br>*Falta:* Unchanged. Smallest fix: transform timestamps with \core_privacy\local\request\transform::datetime() and resolve notice ids to titles before the export_data() call at provider.php:129 (the context loop is harmless once only one user context can ever be present, but the raw payload is what the finding names).
