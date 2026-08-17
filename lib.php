@@ -53,12 +53,29 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
 
     $itemid = (int) array_shift($args);
 
-    // Prevent non-managers from accessing files tied to disabled notices via direct URLs.
     $notice = \local_awareness\persistent\awareness::get_record(['id' => $itemid]);
     if (!$notice) {
         return false;
     }
-    if (!has_capability('local/awareness:manage', \context_system::instance()) && !$notice->get('enabled')) {
+
+    /*
+     * A file URL carries a notice id and nothing about where the reader came from, so the audience
+     * is resolved the same way the web-service writes resolve it. That covers the enabled flag,
+     * the start of the scheduling window, the cohort list and the role rule — the legs that used
+     * to be missing here, which meant the attachments of a cohort-targeted notice were readable by
+     * any authenticated user who guessed the id.
+     *
+     * It deliberately does NOT cover the page-dependent rules in check_filters() — category,
+     * course, format, theme, competency — because those need a page URL this request has not got,
+     * exactly as documented on is_notice_available_to_user(). This gate is therefore PARTIAL by
+     * construction, and saying so here is the point: a later reader must not "simplify" it against
+     * a guarantee it never made.
+     *
+     * Managers bypass it so the editor and the manage table can still render an unpublished
+     * notice, which is the case the old enabled-only test existed for.
+     */
+    $ismanager = has_capability('local/awareness:manage', \context_system::instance());
+    if (!$ismanager && !\local_awareness\helper::is_notice_available_to_user($notice)) {
         return false;
     }
 

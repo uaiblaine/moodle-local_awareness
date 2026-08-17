@@ -6,6 +6,35 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Security — notice attachments were readable outside the notice's audience (version 2026081613, audit SEC-05)
+
+`local_awareness_pluginfile()` checked only the `enabled` flag. A file URL carries a notice id and
+nothing about where the reader came from, so **the attachments of a cohort-targeted notice were
+served to any authenticated user who guessed the id** — while the notice body itself was correctly
+withheld from the same user by `get_notices()`. The plugin's security model treats audience
+targeting as a confidentiality boundary; the file callback did not.
+
+Who is affected: any site publishing a notice that carries an attachment and targets a subset of
+users by cohort or by role. No capability is needed to exploit it — only a session and the notice
+id, which is a small integer.
+
+The callback now resolves the audience through `helper::is_notice_available_to_user()`, the same
+gate the web-service writes use. That closes the enabled, not-yet-started, cohort and role legs.
+
+**It is partial by construction, and the code says so.** The page-dependent rules in
+`check_filters()` — category, course, format, theme, competency — cannot be answered without a page
+URL, which this request does not have. Notices targeted only by those rules still serve their
+attachments to any authenticated user. That limit is written into the comment so a later reader
+does not "simplify" the gate against a guarantee it never made.
+
+Managers keep their bypass, so the editor and the manage table can still render an unpublished
+notice — the case the old enabled-only test existed for.
+
+**Reproduced, not reasoned about.** With the old gate in place the new test does not return false:
+it reaches `send_stored_file()`, writes the attachment to the output, and terminates the process.
+That is the mutation result, and it is why this went into its own release rather than behind the
+cleanup work.
+
 ### Changed — the manage table renders through templates (version 2026081612, audit TPL-01, LANG-06, X3-01)
 
 **Zero `html_writer` in plugin code.** The fleet rule is that markup goes through
