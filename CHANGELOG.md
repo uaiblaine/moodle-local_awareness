@@ -6,6 +6,31 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed — one web service per file (version 2026082305, audit WS-17)
+
+`classes/external.php` was 822 lines holding all nine external functions and their twenty-seven
+methods. It is now nine files under `classes/external/`, each a class carrying `execute()`,
+`execute_parameters()` and `execute_returns()` over `core_external\external_api` — the fleet
+standard, and the shape core's own plugins use.
+
+**This was deferred once as churn, and that judgement was wrong — reversed by measuring rather than
+re-reading.** The nine functions shared **no** private method and **no** static state, so there was
+nothing to apportion and no logic to split down the middle; the whole cost was the ninety-three call
+sites in the tests, which is volume, not risk.
+
+`tests/external/services_contract_test.php` pins it in both directions: every class in the directory
+is registered, and every registration resolves to a class with the three methods core will call. Both
+halves matter for a different reason — a class nobody registers is dead code that reads as live, and
+a `db/services.php` entry with a typo installs cleanly, appears in the admin list, and throws only
+when a client calls it, which here means in the browser of whoever is editing a notice.
+
+**WS-01 is unchanged and still partial.** Moving `get_notices`'s payload from a `PARAM_RAW` JSON blob
+to a real `external_multiple_structure` changes the wire format the AMD modules consume, breaks
+twenty call sites, and introduces a silent-drop mode — `clean_returnvalue()` discards undeclared keys
+without a word. Putting each `execute_returns()` in its own file makes that change easier to review;
+it answers none of the three objections.
+
+
 ### Fixed — the schema said one thing and the queries wanted another (version 2026082304, audit DB-04, DB-07, DB-10)
 
 Three schema changes, each measured against every query in the plugin rather than guessed.

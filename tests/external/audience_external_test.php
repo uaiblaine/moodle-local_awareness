@@ -17,7 +17,8 @@
 namespace local_awareness\external;
 
 use local_awareness\audience\live_mode;
-use local_awareness\external;
+use local_awareness\external\estimate_audience;
+use local_awareness\external\get_estimate;
 use local_awareness\persistent\audience_job;
 use local_awareness\task\estimate_audience as estimate_audience_task;
 
@@ -28,8 +29,8 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers \local_awareness\external::estimate_audience
- * @covers \local_awareness\external::get_estimate
+ * @covers \local_awareness\external\estimate_audience
+ * @covers \local_awareness\external\get_estimate
  */
 final class audience_external_test extends \advanced_testcase {
     protected function setUp(): void {
@@ -49,7 +50,7 @@ final class audience_external_test extends \advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
         $this->expectException(\required_capability_exception::class);
-        external::estimate_audience(json_encode(['cohorts' => [1]]));
+        estimate_audience::execute(json_encode(['cohorts' => [1]]));
     }
 
     /**
@@ -63,14 +64,14 @@ final class audience_external_test extends \advanced_testcase {
     public function test_get_estimate_requires_capability(): void {
         $this->setAdminUser();
         $cohort = $this->getDataGenerator()->create_cohort();
-        $queued = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $queued = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
 
         // Control: the job really is readable by someone who holds the capability.
-        $this->assertSame($queued['jobid'], external::get_estimate($queued['jobid'])['jobid']);
+        $this->assertSame($queued['jobid'], get_estimate::execute($queued['jobid'])['jobid']);
 
         $this->setUser($this->getDataGenerator()->create_user());
         $this->expectException(\required_capability_exception::class);
-        external::get_estimate($queued['jobid']);
+        get_estimate::execute($queued['jobid']);
     }
 
     /**
@@ -84,7 +85,7 @@ final class audience_external_test extends \advanced_testcase {
         set_config('audience_sync_limit', 0, 'local_awareness');
         $cohort = $this->getDataGenerator()->create_cohort();
 
-        $response = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $response = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
         $this->assertNotEmpty($response['jobid']);
         $this->assertSame('pending', $response['status']);
         $this->assertFalse($response['reused']);
@@ -111,7 +112,7 @@ final class audience_external_test extends \advanced_testcase {
         $cohort = $this->getDataGenerator()->create_cohort();
         cohort_add_member($cohort->id, $this->getDataGenerator()->create_user()->id);
 
-        $first = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $first = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
 
         // Run the queued task to mark the first job ready.
         $job = audience_job::get_record(['jobid' => $first['jobid']]);
@@ -120,7 +121,7 @@ final class audience_external_test extends \advanced_testcase {
         $task->execute();
 
         // Second call within the dedup window should reuse.
-        $second = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $second = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
         $this->assertSame($first['jobid'], $second['jobid']);
         $this->assertTrue($second['reused']);
         $this->assertSame('ready', $second['status']);
@@ -141,8 +142,8 @@ final class audience_external_test extends \advanced_testcase {
         $cohort = $this->getDataGenerator()->create_cohort();
         cohort_add_member($cohort->id, $this->getDataGenerator()->create_user()->id);
 
-        $req = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
-        $pending = external::get_estimate($req['jobid']);
+        $req = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
+        $pending = get_estimate::execute($req['jobid']);
         $this->assertSame('pending', $pending['status']);
         $this->assertNull($pending['count']);
 
@@ -150,7 +151,7 @@ final class audience_external_test extends \advanced_testcase {
         $task->set_custom_data(['jobid' => $req['jobid']]);
         $task->execute();
 
-        $ready = external::get_estimate($req['jobid']);
+        $ready = get_estimate::execute($req['jobid']);
         $this->assertSame('ready', $ready['status']);
         $this->assertSame(1, (int) $ready['count']);
         $this->assertNotEmpty($ready['breakdown']);
@@ -170,7 +171,7 @@ final class audience_external_test extends \advanced_testcase {
         $cohort = $this->getDataGenerator()->create_cohort();
         cohort_add_member($cohort->id, $this->getDataGenerator()->create_user()->id);
 
-        $response = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $response = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
 
         $this->assertSame('ready', $response['status']);
         $this->assertFalse($response['reused']);
@@ -179,7 +180,7 @@ final class audience_external_test extends \advanced_testcase {
             ['classname' => '\\local_awareness\\task\\estimate_audience']
         ));
 
-        $ready = external::get_estimate($response['jobid']);
+        $ready = get_estimate::execute($response['jobid']);
         $this->assertSame(1, (int) $ready['count']);
     }
 
@@ -201,7 +202,7 @@ final class audience_external_test extends \advanced_testcase {
         live_mode::reset_cache();
         $this->assertGreaterThan(1, $DB->count_records_select('user', 'deleted = 0'));
 
-        $response = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $response = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
 
         $this->assertSame('pending', $response['status']);
         $this->assertSame(1, $DB->count_records(
@@ -213,7 +214,7 @@ final class audience_external_test extends \advanced_testcase {
         // the limit and not something else about this fixture.
         set_config('audience_sync_limit', 100000, 'local_awareness');
         live_mode::reset_cache();
-        $other = external::estimate_audience(json_encode(['cohorts' => [$cohort->id], 'pathmatch' => '/my/']));
+        $other = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id], 'pathmatch' => '/my/']));
         $this->assertSame('ready', $other['status']);
     }
 
@@ -231,8 +232,8 @@ final class audience_external_test extends \advanced_testcase {
         set_config('audience_sync_limit', 0, 'local_awareness');
         $cohort = $this->getDataGenerator()->create_cohort();
 
-        $first = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
-        $second = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $first = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
+        $second = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
 
         $this->assertSame($first['jobid'], $second['jobid']);
         $this->assertTrue($second['reused']);
@@ -245,7 +246,7 @@ final class audience_external_test extends \advanced_testcase {
 
         // Control: different criteria are not merged into it, so the dedup is by criteria and not
         // simply "one job at a time".
-        $other = external::estimate_audience(json_encode(['cohorts' => [$cohort->id], 'pathmatch' => '/my/']));
+        $other = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id], 'pathmatch' => '/my/']));
         $this->assertNotSame($first['jobid'], $other['jobid']);
         $this->assertSame(2, $DB->count_records('local_awareness_audience_jobs'));
     }
@@ -260,7 +261,7 @@ final class audience_external_test extends \advanced_testcase {
         set_config('audience_sync_limit', 0, 'local_awareness');
         $cohort = $this->getDataGenerator()->create_cohort();
 
-        $first = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $first = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
 
         // Age it past the window the client would still be polling within.
         $DB->set_field(
@@ -270,7 +271,7 @@ final class audience_external_test extends \advanced_testcase {
             ['jobid' => $first['jobid']]
         );
 
-        $second = external::estimate_audience(json_encode(['cohorts' => [$cohort->id]]));
+        $second = estimate_audience::execute(json_encode(['cohorts' => [$cohort->id]]));
 
         $this->assertNotSame($first['jobid'], $second['jobid']);
         $this->assertFalse($second['reused']);
@@ -287,12 +288,12 @@ final class audience_external_test extends \advanced_testcase {
             'fullname' => 'Thermodynamics 101',
         ]);
 
-        $response = external::estimate_audience(json_encode([
+        $response = estimate_audience::execute(json_encode([
             'filter_category' => [$category->id],
             'filter_course' => [$course->id],
             'pathmatch' => '/my/',
         ]));
-        $ready = external::get_estimate($response['jobid']);
+        $ready = get_estimate::execute($response['jobid']);
 
         $breakdown = json_decode($ready['breakdown'], true);
         $display = array_column($breakdown, 'display', 'key');
@@ -314,7 +315,7 @@ final class audience_external_test extends \advanced_testcase {
         $this->setAdminUser();
         $category = $this->getDataGenerator()->create_category(['name' => 'Engineering school']);
 
-        $response = external::estimate_audience(json_encode(['filter_category' => [$category->id]]));
+        $response = estimate_audience::execute(json_encode(['filter_category' => [$category->id]]));
 
         $stored = audience_job::get_record(['jobid' => $response['jobid']])->get('breakdown');
         $this->assertStringNotContainsString('Engineering school', (string) $stored);
@@ -322,7 +323,7 @@ final class audience_external_test extends \advanced_testcase {
 
         // Control: the name does reach the caller, so its absence above is about storage and not
         // about the rule having been dropped.
-        $ready = external::get_estimate($response['jobid']);
+        $ready = get_estimate::execute($response['jobid']);
         $this->assertStringContainsString('Engineering school', $ready['breakdown']);
     }
 
@@ -336,7 +337,7 @@ final class audience_external_test extends \advanced_testcase {
      */
     public function test_get_estimate_with_unknown_jobid_returns_error(): void {
         $this->setAdminUser();
-        $response = external::get_estimate('00000000-0000-4000-8000-000000000000');
+        $response = get_estimate::execute('00000000-0000-4000-8000-000000000000');
         $this->assertSame('error', $response['status']);
     }
 
@@ -351,9 +352,9 @@ final class audience_external_test extends \advanced_testcase {
         $this->setAdminUser();
         $this->getDataGenerator()->create_user();
 
-        $req = external::estimate_audience(json_encode(['pathmatch' => 'my/?', 'filter_theme' => ['boost']]));
+        $req = estimate_audience::execute(json_encode(['pathmatch' => 'my/?', 'filter_theme' => ['boost']]));
 
-        $ready = external::get_estimate($req['jobid']);
+        $ready = get_estimate::execute($req['jobid']);
         $this->assertSame('ready', $ready['status']);
         $this->assertFalse($ready['has_audience_rules']);
         $this->assertGreaterThan(0, (int) $ready['count']);
@@ -391,8 +392,8 @@ final class audience_external_test extends \advanced_testcase {
         role_assign($roleid, $manager->id, \context_system::instance()->id);
         $this->setUser($manager);
 
-        $hiddenonly = external::estimate_audience(json_encode(['cohorts' => [$hidden->id]]));
-        $result = external::get_estimate($hiddenonly['jobid']);
+        $hiddenonly = estimate_audience::execute(json_encode(['cohorts' => [$hidden->id]]));
+        $result = get_estimate::execute($hiddenonly['jobid']);
 
         /*
          * With the cohort dropped there is no audience rule left, so the estimate falls back to the
@@ -401,8 +402,8 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertFalse($result['has_audience_rules']);
 
         // Control: the cohort this caller CAN see still narrows the estimate to its one member.
-        $visibleonly = external::estimate_audience(json_encode(['cohorts' => [$visible->id]]));
-        $control = external::get_estimate($visibleonly['jobid']);
+        $visibleonly = estimate_audience::execute(json_encode(['cohorts' => [$visible->id]]));
+        $control = get_estimate::execute($visibleonly['jobid']);
         $this->assertTrue($control['has_audience_rules']);
         $this->assertSame(1, (int) $control['count']);
     }
@@ -467,7 +468,7 @@ final class audience_external_test extends \advanced_testcase {
         set_config('audience_sync_limit', 0, 'local_awareness');
 
         $courses = range(1, \local_awareness\helper::CRITERIA_LIST_MAX + 250);
-        $response = external::estimate_audience(json_encode(['filter_course' => $courses]));
+        $response = estimate_audience::execute(json_encode(['filter_course' => $courses]));
 
         $stored = json_decode(
             $DB->get_field('local_awareness_audience_jobs', 'criteria', ['jobid' => $response['jobid']]),
@@ -494,7 +495,7 @@ final class audience_external_test extends \advanced_testcase {
         set_config('audience_sync_limit', 0, 'local_awareness');
 
         $courses = range(1, 12);
-        $response = external::estimate_audience(json_encode(['filter_course' => $courses]));
+        $response = estimate_audience::execute(json_encode(['filter_course' => $courses]));
 
         $stored = json_decode(
             $DB->get_field('local_awareness_audience_jobs', 'criteria', ['jobid' => $response['jobid']]),

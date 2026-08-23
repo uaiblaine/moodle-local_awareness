@@ -16,6 +16,8 @@
 
 namespace local_awareness;
 
+use local_awareness\external\search_courses;
+
 /**
  * Tests for the course-picker web service.
  *
@@ -33,7 +35,7 @@ namespace local_awareness;
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers \local_awareness\external::search_courses
+ * @covers \local_awareness\external\search_courses
  */
 final class search_courses_external_test extends \advanced_testcase {
     /**
@@ -84,7 +86,7 @@ final class search_courses_external_test extends \advanced_testcase {
         $this->setUser($this->getDataGenerator()->create_user());
 
         $this->expectException(\required_capability_exception::class);
-        external::search_courses('Astronomy');
+        search_courses::execute('Astronomy');
     }
 
     /**
@@ -97,7 +99,7 @@ final class search_courses_external_test extends \advanced_testcase {
         $this->setGuestUser();
 
         $this->expectException(\required_capability_exception::class);
-        external::search_courses('Astronomy');
+        search_courses::execute('Astronomy');
     }
 
     /**

@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\external\check_collision;
 use local_awareness\persistent\awareness;
 
 /**
@@ -25,7 +26,7 @@ use local_awareness\persistent\awareness;
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers \local_awareness\external::check_collision
+ * @covers \local_awareness\external\check_collision
  */
 final class collision_external_test extends \advanced_testcase {
     /**
@@ -64,7 +65,7 @@ final class collision_external_test extends \advanced_testcase {
         $this->repeating('Dashboard rival', '/my/%');
         $this->repeating('Somewhere else', '/user/profile.php');
 
-        $result = external::check_collision(0, '/my/%', true);
+        $result = check_collision::execute(0, '/my/%', true);
 
         $this->assertSame(['Dashboard rival'], $result['titles']);
     }
@@ -78,9 +79,9 @@ final class collision_external_test extends \advanced_testcase {
 
         // Control: the same page reach with repeats on does report, so the empty result below
         // comes from the repeat flag and not from an empty site.
-        $this->assertSame(['Dashboard rival'], external::check_collision(0, '/my/%', true)['titles']);
+        $this->assertSame(['Dashboard rival'], check_collision::execute(0, '/my/%', true)['titles']);
 
-        $this->assertSame([], external::check_collision(0, '/my/%', false)['titles']);
+        $this->assertSame([], check_collision::execute(0, '/my/%', false)['titles']);
     }
 
     /**
@@ -93,7 +94,7 @@ final class collision_external_test extends \advanced_testcase {
         $this->setUser($this->getDataGenerator()->create_user());
 
         $this->expectException(\required_capability_exception::class);
-        external::check_collision(0, '/my/%', true);
+        check_collision::execute(0, '/my/%', true);
     }
 
     /**

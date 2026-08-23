@@ -16,6 +16,11 @@
 
 namespace local_awareness;
 
+use local_awareness\external\acknowledge_notice;
+use local_awareness\external\dismiss_notice;
+use local_awareness\external\get_notices;
+use local_awareness\external\search_roles;
+use local_awareness\external\track_link;
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
@@ -30,11 +35,11 @@ use local_awareness\persistent\noticelink;
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers \local_awareness\external::dismiss_notice
- * @covers \local_awareness\external::acknowledge_notice
- * @covers \local_awareness\external::track_link
- * @covers \local_awareness\external::get_notices
- * @covers \local_awareness\external::search_roles
+ * @covers \local_awareness\external\dismiss_notice
+ * @covers \local_awareness\external\acknowledge_notice
+ * @covers \local_awareness\external\track_link
+ * @covers \local_awareness\external\get_notices
+ * @covers \local_awareness\external\search_roles
  * @covers \local_awareness\helper::is_notice_available_to_user
  */
 final class notice_external_test extends \advanced_testcase {
@@ -94,7 +99,7 @@ final class notice_external_test extends \advanced_testcase {
         $this->setUser($this->getDataGenerator()->create_user());
         $notice = $this->create_notice();
 
-        $result = external::dismiss_notice((int) $notice->get('id'));
+        $result = dismiss_notice::execute((int) $notice->get('id'));
 
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(1, $this->count_acks($notice));
@@ -107,7 +112,7 @@ final class notice_external_test extends \advanced_testcase {
         $this->setUser($this->getDataGenerator()->create_user());
         $notice = $this->create_notice(['enabled' => 0]);
 
-        $result = external::dismiss_notice((int) $notice->get('id'));
+        $result = dismiss_notice::execute((int) $notice->get('id'));
 
         $this->assertFalse((bool) $result['status']);
         $this->assertSame(0, $this->count_acks($notice));
@@ -125,13 +130,13 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice(['cohorts' => (string) $cohort->id]);
 
         $this->setUser($outsider);
-        $result = external::acknowledge_notice((int) $notice->get('id'));
+        $result = acknowledge_notice::execute((int) $notice->get('id'));
         $this->assertFalse((bool) $result['status']);
         $this->assertSame(0, $this->count_acks($notice));
 
         // Control: the cohort member is recorded, so the gate is what rejected the outsider.
         $this->setUser($member);
-        $result = external::acknowledge_notice((int) $notice->get('id'));
+        $result = acknowledge_notice::execute((int) $notice->get('id'));
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(1, $this->count_acks($notice));
     }
@@ -153,7 +158,7 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice(['reqack' => 0]);
 
         $this->setGuestUser();
-        $result = external::dismiss_notice((int) $notice->get('id'));
+        $result = dismiss_notice::execute((int) $notice->get('id'));
 
         $this->assertTrue((bool) $result['status']);
 
@@ -176,7 +181,7 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice(['reqack' => 0]);
 
         $this->setGuestUser();
-        external::dismiss_notice((int) $notice->get('id'));
+        dismiss_notice::execute((int) $notice->get('id'));
         $this->assertSame([], helper::retrieve_user_notices('/my/'));
 
         // A new guest arrives: same user id, new session.
@@ -196,7 +201,7 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice();
 
         $this->setGuestUser();
-        $result = external::acknowledge_notice((int) $notice->get('id'));
+        $result = acknowledge_notice::execute((int) $notice->get('id'));
 
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(0, $this->count_acks($notice));
@@ -217,7 +222,7 @@ final class notice_external_test extends \advanced_testcase {
             'timeend' => time() - HOURSECS,
         ]);
 
-        $result = external::acknowledge_notice((int) $notice->get('id'));
+        $result = acknowledge_notice::execute((int) $notice->get('id'));
 
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(1, $this->count_acks($notice));
@@ -236,7 +241,7 @@ final class notice_external_test extends \advanced_testcase {
             'timeend' => time() + (2 * DAYSECS),
         ]);
 
-        $result = external::dismiss_notice((int) $notice->get('id'));
+        $result = dismiss_notice::execute((int) $notice->get('id'));
 
         $this->assertFalse((bool) $result['status']);
         $this->assertSame(0, $this->count_acks($notice));
@@ -257,11 +262,11 @@ final class notice_external_test extends \advanced_testcase {
         ]);
 
         // Control: a real link is recorded.
-        $result = external::track_link((int) $link->get('id'));
+        $result = track_link::execute((int) $link->get('id'));
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his'));
 
-        $result = external::track_link((int) $link->get('id') + 1000);
+        $result = track_link::execute((int) $link->get('id') + 1000);
         $this->assertFalse((bool) $result['status']);
         $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his'));
     }
@@ -280,7 +285,7 @@ final class notice_external_test extends \advanced_testcase {
             'link' => 'https://example.com/policy',
         ]);
 
-        $result = external::track_link((int) $link->get('id'));
+        $result = track_link::execute((int) $link->get('id'));
 
         $this->assertFalse((bool) $result['status']);
         $this->assertSame(0, $DB->count_records('local_awareness_hlinks_his'));
@@ -309,12 +314,12 @@ final class notice_external_test extends \advanced_testcase {
         $url = '/course/view.php?id=' . $course->id;
 
         $this->setUser($outsider);
-        $result = external::get_notices($url, (int) $course->id);
+        $result = get_notices::execute($url, (int) $course->id);
         $this->assertSame([], json_decode($result['notices'], true));
 
         // Control: the enrolled user does receive it, so the filter itself still works.
         $this->setUser($student);
-        $result = external::get_notices($url, (int) $course->id);
+        $result = get_notices::execute($url, (int) $course->id);
         $this->assertCount(1, json_decode($result['notices'], true));
     }
 
@@ -349,11 +354,11 @@ final class notice_external_test extends \advanced_testcase {
         $url = '/course/view.php?id=' . $course->id;
 
         $this->setUser($suspended);
-        $this->assertSame([], json_decode(external::get_notices($url, (int) $course->id)['notices'], true));
+        $this->assertSame([], json_decode(get_notices::execute($url, (int) $course->id)['notices'], true));
 
         // Control: the actively enrolled user still receives it.
         $this->setUser($active);
-        $this->assertCount(1, json_decode(external::get_notices($url, (int) $course->id)['notices'], true));
+        $this->assertCount(1, json_decode(get_notices::execute($url, (int) $course->id)['notices'], true));
     }
 
     /**
@@ -384,14 +389,14 @@ final class notice_external_test extends \advanced_testcase {
         // Control: the role holder does receive it, so the role rule is what rejects the outsider
         // below rather than the notice being invisible to everyone.
         $this->setUser($teacher);
-        $this->assertCount(1, json_decode(external::get_notices('/my/')['notices'], true));
+        $this->assertCount(1, json_decode(get_notices::execute('/my/')['notices'], true));
 
         $this->setUser($outsider);
-        $this->assertSame([], json_decode(external::get_notices('/my/')['notices'], true));
+        $this->assertSame([], json_decode(get_notices::execute('/my/')['notices'], true));
 
         // And the outsider cannot get a different answer by declining to say where they are.
         $this->expectException(\invalid_parameter_exception::class);
-        external::get_notices('');
+        get_notices::execute('');
     }
 
     /**
@@ -446,7 +451,7 @@ final class notice_external_test extends \advanced_testcase {
         $this->expectException(\invalid_parameter_exception::class);
 
         \core_external\external_api::validate_parameters(
-            external::get_notices_parameters(),
+            get_notices::execute_parameters(),
             ['courseid' => 0]
         );
     }
@@ -478,14 +483,14 @@ final class notice_external_test extends \advanced_testcase {
         $notice = awareness::get_record(['title' => 'Teachers only']);
 
         $this->setUser($outsider);
-        $result = external::acknowledge_notice((int) $notice->get('id'));
+        $result = acknowledge_notice::execute((int) $notice->get('id'));
         $this->assertFalse((bool) $result['status']);
         $this->assertSame(0, $this->count_acks($notice));
 
         // Control: the role holder is recorded, so the role rule is what rejected the outsider and
         // the write path has not simply been switched off.
         $this->setUser($teacher);
-        $result = external::acknowledge_notice((int) $notice->get('id'));
+        $result = acknowledge_notice::execute((int) $notice->get('id'));
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(1, $this->count_acks($notice));
     }
@@ -524,13 +529,13 @@ final class notice_external_test extends \advanced_testcase {
 
         // Holds the role, but in a course the rule does not name.
         $this->setUser($elsewhere);
-        $result = external::dismiss_notice((int) $notice->get('id'));
+        $result = dismiss_notice::execute((int) $notice->get('id'));
         $this->assertFalse((bool) $result['status']);
         $this->assertSame(0, $DB->count_records('local_awareness_lastview'));
 
         // Control: the same role in the named course is accepted.
         $this->setUser($inlisted);
-        $result = external::dismiss_notice((int) $notice->get('id'));
+        $result = dismiss_notice::execute((int) $notice->get('id'));
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(1, $DB->count_records('local_awareness_lastview'));
     }
@@ -542,7 +547,7 @@ final class notice_external_test extends \advanced_testcase {
         $this->setUser($this->getDataGenerator()->create_user());
 
         $this->expectException(\required_capability_exception::class);
-        external::search_roles('', 0);
+        search_roles::execute('', 0);
     }
 
     /**
@@ -551,7 +556,7 @@ final class notice_external_test extends \advanced_testcase {
     public function test_search_roles_returns_roles_for_a_manager(): void {
         $this->setAdminUser();
 
-        $result = external::search_roles('', 0);
+        $result = search_roles::execute('', 0);
         $roles = json_decode($result['roles'], true);
 
         $this->assertNotEmpty($roles);
@@ -625,7 +630,7 @@ final class notice_external_test extends \advanced_testcase {
         $this->assertNotNull($teacher, 'the non-editing teacher role must exist for this test to mean anything');
         $this->assertSame('', (string) $teacher->name, 'a standard role stores no name — that is the premise');
 
-        $found = json_decode(external::search_roles($teacher->localname, 0)['roles'], true);
+        $found = json_decode(search_roles::execute($teacher->localname, 0)['roles'], true);
 
         $this->assertContains(
             (int) $teacher->id,
@@ -646,7 +651,7 @@ final class notice_external_test extends \advanced_testcase {
 
         $roleid = create_role('R&D coordinator', 'rdcoord', 'Coordinates R&D');
 
-        $found = json_decode(external::search_roles('R&D', 0)['roles'], true);
+        $found = json_decode(search_roles::execute('R&D', 0)['roles'], true);
 
         $this->assertContains((int) $roleid, array_map('intval', array_column($found, 'id')));
     }
@@ -660,7 +665,7 @@ final class notice_external_test extends \advanced_testcase {
     public function test_search_roles_returns_nothing_for_an_unmatched_query(): void {
         $this->setAdminUser();
 
-        $found = json_decode(external::search_roles('zzzznosuchrolezzzz', 0)['roles'], true);
+        $found = json_decode(search_roles::execute('zzzznosuchrolezzzz', 0)['roles'], true);
 
         $this->assertSame([], $found);
     }
@@ -682,7 +687,7 @@ final class notice_external_test extends \advanced_testcase {
             'resetinterval' => 3600,
         ]);
 
-        $notices = json_decode(external::get_notices('/my/')['notices'], true);
+        $notices = json_decode(get_notices::execute('/my/')['notices'], true);
         $this->assertCount(1, $notices);
         $payload = reset($notices);
 
@@ -731,12 +736,12 @@ final class notice_external_test extends \advanced_testcase {
 
         set_config('enabled', 0, 'local_awareness');
 
-        $off = external::get_notices('/my/', 0);
+        $off = get_notices::execute('/my/', 0);
         $this->assertSame([], json_decode($off['notices'], true), 'no notice may be served while off');
 
-        external::dismiss_notice((int) $notice->get('id'));
-        external::acknowledge_notice((int) $notice->get('id'));
-        external::track_link((int) $link->get('id'));
+        dismiss_notice::execute((int) $notice->get('id'));
+        acknowledge_notice::execute((int) $notice->get('id'));
+        track_link::execute((int) $link->get('id'));
 
         $this->assertSame(0, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
         $this->assertSame(0, $DB->count_records('local_awareness_lastview', ['noticeid' => $notice->get('id')]));
@@ -745,11 +750,11 @@ final class notice_external_test extends \advanced_testcase {
         // Control: with the switch on, the same four calls all take effect.
         set_config('enabled', 1, 'local_awareness');
 
-        $on = external::get_notices('/my/', 0);
+        $on = get_notices::execute('/my/', 0);
         $this->assertCount(1, json_decode($on['notices'], true), 'the fixture notice is deliverable');
 
-        external::acknowledge_notice((int) $notice->get('id'));
-        external::track_link((int) $link->get('id'));
+        acknowledge_notice::execute((int) $notice->get('id'));
+        track_link::execute((int) $link->get('id'));
 
         $this->assertSame(1, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
         $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->get('id')]));
@@ -776,9 +781,9 @@ final class notice_external_test extends \advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $this->assertCount(1, json_decode(external::get_notices('/my/', 0)['notices'], true));
+        $this->assertCount(1, json_decode(get_notices::execute('/my/', 0)['notices'], true));
 
-        external::dismiss_notice((int) $notice->get('id'));
+        dismiss_notice::execute((int) $notice->get('id'));
 
         // A fresh session: the in-request memo is gone, so the answer comes from the database.
         unset($USER->viewednotices);
@@ -786,7 +791,7 @@ final class notice_external_test extends \advanced_testcase {
 
         $this->assertSame(
             [],
-            json_decode(external::get_notices('/my/', 0)['notices'], true),
+            json_decode(get_notices::execute('/my/', 0)['notices'], true),
             'within the reset interval the notice must stay dismissed'
         );
 
@@ -802,7 +807,7 @@ final class notice_external_test extends \advanced_testcase {
 
         $this->assertCount(
             1,
-            json_decode(external::get_notices('/my/', 0)['notices'], true),
+            json_decode(get_notices::execute('/my/', 0)['notices'], true),
             'past the reset interval the notice must return'
         );
     }
@@ -831,9 +836,9 @@ final class notice_external_test extends \advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $this->assertCount(1, json_decode(external::get_notices('/my/', 0)['notices'], true));
+        $this->assertCount(1, json_decode(get_notices::execute('/my/', 0)['notices'], true));
 
-        external::acknowledge_notice((int) $notice->get('id'));
+        acknowledge_notice::execute((int) $notice->get('id'));
 
         $this->assertSame(
             1,
@@ -851,7 +856,7 @@ final class notice_external_test extends \advanced_testcase {
 
         $this->assertSame(
             [],
-            json_decode(external::get_notices('/my/', 0)['notices'], true),
+            json_decode(get_notices::execute('/my/', 0)['notices'], true),
             'an accepted notice must not come back at the next session'
         );
     }

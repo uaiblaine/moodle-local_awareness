@@ -17,8 +17,8 @@
 namespace local_awareness;
 
 use local_awareness\persistent\awareness;
-use local_awareness\persistent\noticelink;
 use local_awareness\persistent\linkhistory;
+use local_awareness\persistent\noticelink;
 
 /**
  * Test cases
