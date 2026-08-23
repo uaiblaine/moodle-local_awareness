@@ -16,8 +16,10 @@
 
 namespace local_awareness\event;
 
+use local_awareness\audience\notice_audience;
 use local_awareness\helper;
 use local_awareness\persistent\awareness;
+use local_awareness\persistent\noticelink;
 
 /**
  * Tests that each write path fires the event it claims to fire.
@@ -42,6 +44,9 @@ use local_awareness\persistent\awareness;
  * @covers \local_awareness\event\awareness_disabled
  * @covers \local_awareness\event\awareness_reset
  * @covers \local_awareness\event\awareness_deleted
+ * @covers \local_awareness\event\awareness_dismissed
+ * @covers \local_awareness\event\awareness_link_clicked
+ * @covers \local_awareness\event\awareness_audience_estimated
  */
 final class events_test extends \advanced_testcase {
     /**
@@ -77,6 +82,12 @@ final class events_test extends \advanced_testcase {
 
     /**
      * Creating a notice fires awareness_created, carrying the notice as its object.
+     *
+     * It also fires awareness_audience_estimated, and that is asserted here rather than filtered
+     * out: create_new_notice() ends in notice_audience::refresh(), which creates an audience-job
+     * row, and a save really does raise an estimate. Asserting the ordered pair keeps the file's
+     * rule — assert the CLASS, never a count — while recording the coupling, so a later change
+     * that stops estimating on save shows up here instead of passing quietly.
      */
     public function test_create_fires_created(): void {
         $this->resetAfterTest();
@@ -91,7 +102,10 @@ final class events_test extends \advanced_testcase {
         $events = $sink->get_events();
         $sink->close();
 
-        $this->assertCount(1, $events);
+        $this->assertSame(
+            [awareness_created::class, awareness_audience_estimated::class],
+            array_map(static fn($event): string => get_class($event), $events)
+        );
         $event = reset($events);
         $this->assertInstanceOf(awareness_created::class, $event);
         $this->assertSame('local_awareness', $event->objecttable);
@@ -121,6 +135,12 @@ final class events_test extends \advanced_testcase {
             ]);
         });
 
+        /*
+         * One event, not two: update_notice() also ends in notice_audience::refresh(), but the
+         * criteria are unchanged from make_notice(), so the job raised moments ago is reused and
+         * no row is created. That is the dedup working, and it is why the estimate event belongs
+         * to job CREATION rather than to the web-service call.
+         */
         $this->assertSame([awareness_updated::class], $fired);
     }
 
@@ -219,27 +239,247 @@ final class events_test extends \advanced_testcase {
     }
 
     /**
+     * Dismissing a notice that does NOT require acknowledgement still fires awareness_dismissed.
+     *
+     * This is the defect: the trigger used to sit inside the reqack branch, so an ordinary
+     * dismissal left no trace an admin could reach. local_awareness_ack only ever holds reqack
+     * rows, and local_awareness_lastview records that the notice was met without recording who
+     * acted, so nothing anywhere logged it.
+     *
+     * The control is the reqack case below: both must fire, and only the compliance ROW differs
+     * between them. Without the pair, an assertion that "a dismissal fires" would be satisfied by
+     * the reqack path alone — which was already true before the fix.
+     */
+    public function test_dismissing_an_ordinary_notice_fires_dismissed(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Ordinary notice',
+            'content' => '<p>No acknowledgement required.</p>',
+            'reqack' => 0,
+        ]);
+        $notice->create();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+
+        $fired = $this->events_from(function () use ($notice) {
+            helper::dismiss_notice($notice);
+        });
+
+        $this->assertSame([awareness_dismissed::class], $fired);
+
+        // Precondition, so the assertion above cannot be satisfied by the reqack path instead.
+        $this->assertSame(0, (int) $notice->get('reqack'));
+    }
+
+    /**
+     * Dismissing a notice that DOES require acknowledgement fires the same event.
+     *
+     * The control for the test above. It also pins the rule the dedupe comment states: a repeated
+     * refusal is a real event even though the compliance row must not be duplicated, so the second
+     * dismissal fires again while writing nothing.
+     */
+    public function test_dismissing_a_reqack_notice_fires_dismissed_every_time(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Acknowledge me',
+            'content' => '<p>Acknowledgement required.</p>',
+            'reqack' => 1,
+        ]);
+        $notice->create();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+
+        $first = $this->events_from(fn() => helper::dismiss_notice($notice));
+        $second = $this->events_from(fn() => helper::dismiss_notice($notice));
+
+        $this->assertSame([awareness_dismissed::class], $first);
+        $this->assertSame([awareness_dismissed::class], $second);
+
+        // Two events, one compliance row: the dedupe guards the row, not the event.
+        $this->assertSame(1, $DB->count_records('local_awareness_ack', [
+            'noticeid' => $notice->get('id'),
+            'userid' => $user->id,
+            'action' => 0,
+        ]));
+    }
+
+    /**
+     * A guest dismissal fires nothing, because every guest session shares one user id.
+     */
+    public function test_a_guest_dismissal_fires_no_event(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Ordinary notice',
+            'content' => '<p>No acknowledgement required.</p>',
+            'reqack' => 0,
+        ]);
+        $notice->create();
+
+        $this->setGuestUser();
+
+        $fired = $this->events_from(function () use ($notice) {
+            helper::dismiss_notice($notice);
+        });
+
+        $this->assertSame([], $fired);
+
+        /*
+         * Control: the same notice, dismissed by a real user, DOES fire. Without it this passes
+         * for any reason at all — including the trigger having been deleted outright.
+         */
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+        $this->assertSame(
+            [awareness_dismissed::class],
+            $this->events_from(fn() => helper::dismiss_notice($notice))
+        );
+    }
+
+    /**
+     * Recording a link click fires awareness_link_clicked, naming the notice it came from.
+     */
+    public function test_tracking_a_link_fires_link_clicked(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Policy update',
+            'content' => '<p>Read <a href="https://example.com/policy">the policy</a>.</p>',
+        ]);
+        $notice->create();
+
+        $link = noticelink::create_new_link((object) [
+            'noticeid' => $notice->get('id'),
+            'text' => 'the policy',
+            'link' => 'https://example.com/policy',
+        ]);
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+
+        $sink = $this->redirectEvents();
+        $result = helper::track_link((int) $link->get('id'));
+        $events = $sink->get_events();
+        $sink->close();
+
+        // Precondition: the click was actually accepted, so the assertion is not vacuous.
+        $this->assertTrue($result['status']);
+
+        $this->assertCount(1, $events);
+        $event = reset($events);
+        $this->assertInstanceOf(awareness_link_clicked::class, $event);
+        $this->assertSame('local_awareness_hlinks', $event->objecttable);
+        $this->assertEquals($link->get('id'), $event->objectid);
+        $this->assertEquals($notice->get('id'), $event->other['noticeid']);
+    }
+
+    /**
+     * A refused click fires nothing — the event follows the row, not the request.
+     */
+    public function test_a_refused_link_click_fires_no_event(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+
+        $sink = $this->redirectEvents();
+        $result = helper::track_link(-1);
+        $events = $sink->get_events();
+        $sink->close();
+
+        // Precondition: the click really was refused, so "no event" means the guard held.
+        $this->assertFalse($result['status']);
+        $this->assertSame([], array_map(static fn($e): string => get_class($e), $events));
+    }
+
+    /**
+     * The editor's Recalculate button fires awareness_audience_estimated.
+     *
+     * notice_audience::refresh() is the second job-creation site, and the one the manual
+     * recalculation and every notice save go through. An earlier draft of this fix instrumented
+     * only the web service, which would have logged the editor's debounced previews — which mostly
+     * reuse a job and create nothing — while missing every deliberate recalculation.
+     */
+    public function test_recalculating_an_audience_fires_the_estimate_event(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $notice = $this->make_notice();
+
+        $fired = $this->events_from(function () use ($notice) {
+            notice_audience::refresh($notice, true);
+        });
+
+        $this->assertSame([awareness_audience_estimated::class], $fired);
+    }
+
+    /**
      * Every event class the plugin ships is reachable from a write path.
      *
      * A class nobody fires is a promise to an admin building an event-monitor rule. This walks
      * classes/event/ from disk rather than from a hand-kept list, so a new event class added
      * later without a firing site turns this red instead of shipping dead.
+     *
+     * The scan reads the WHOLE plugin source, not helper.php alone. It used to read that one file,
+     * which is an inclusion list of size one: the day a trigger landed anywhere else — and
+     * awareness_audience_estimated is triggered from persistent\audience_job — the test would have
+     * reported a live event as dead, and the obvious repair would have been to add a second
+     * filename rather than to notice the shape of the mistake. Exclusion list, scanned from the
+     * plugin root, so a directory nobody thought of is covered by default.
      */
     public function test_no_event_class_is_unreachable(): void {
         global $CFG;
 
-        $sources = file_get_contents($CFG->dirroot . '/local/awareness/classes/helper.php');
+        $root = $CFG->dirroot . '/local/awareness';
+        $skip = ['tests', 'lang', 'docs', 'amd', 'pix', '.git'];
+
+        $sources = '';
+        $scanned = 0;
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveCallbackFilterIterator(
+                new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+                static function ($current) use ($skip): bool {
+                    return !($current->isDir() && in_array($current->getFilename(), $skip, true));
+                }
+            )
+        );
+        foreach ($iterator as $file) {
+            if ($file->isFile() && $file->getExtension() === 'php') {
+                $sources .= file_get_contents($file->getPathname());
+                $scanned++;
+            }
+        }
+
+        $classes = glob($root . '/classes/event/*.php');
 
         $unfired = [];
-        foreach (glob($CFG->dirroot . '/local/awareness/classes/event/*.php') as $path) {
+        foreach ($classes as $path) {
             $class = basename($path, '.php');
             if (!str_contains($sources, $class . '::create')) {
                 $unfired[] = $class;
             }
         }
 
-        $this->assertSame([], $unfired, 'event classes with no firing site in helper.php');
-        // Non-vacuity: the scan found classes at all.
-        $this->assertGreaterThan(0, count(glob($CFG->dirroot . '/local/awareness/classes/event/*.php')));
+        $this->assertSame([], $unfired, 'event classes with no firing site in the plugin source');
+
+        /*
+         * Non-vacuity on both halves. The class glob proves there was something to check, and the
+         * file counter proves the sweep actually read the tree — an excluded-everything filter
+         * would otherwise satisfy the assertion above by finding no source at all, which is the
+         * failure mode the widening introduces.
+         */
+        $this->assertGreaterThan(0, count($classes));
+        $this->assertGreaterThan(20, $scanned, 'the source sweep read implausibly few files');
     }
 }

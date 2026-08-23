@@ -173,4 +173,73 @@ final class systemreports_test extends \advanced_testcase {
         $this->assertFalse(has_capability('local/awareness:manage', \context_system::instance()));
         $this->assertInstanceOf($class, $this->make_report($class, $notice));
     }
+
+    /**
+     * The download name identifies the notice, so two notices do not export the same filename.
+     *
+     * Named after the datasource alone, every notice's export arrived as "Acknowledged notices" —
+     * byte-indistinguishable, which defeats the point of an export kept as a compliance record.
+     *
+     * reset_caches() between the two builds is load-bearing, and without it this test passes
+     * vacuously. core_reportbuilder\manager caches report instances under
+     * "<reportid>:<userid>" — the PARAMETERS are not in that key — and both notices resolve to the
+     * same report persistent, so the second create() would hand back the first instance verbatim
+     * and the two names would match because they are literally the same object.
+     *
+     * @dataProvider report_provider
+     * @param string $class The system report class.
+     */
+    public function test_the_download_name_identifies_the_notice(string $class): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $first = $this->seed_notice();
+        $second = new awareness(0, (object) [
+            'title' => 'Second policy',
+            'content' => '<p>Another one.</p>',
+        ]);
+        $second->create();
+
+        // Precondition: two distinct notices, or "the names differ" would be meaningless.
+        $this->assertNotEquals($first->get('id'), $second->get('id'));
+
+        $firstname = $this->make_report($class, $first)->get_downloadfilename();
+        \core_reportbuilder\manager::reset_caches();
+        $secondname = $this->make_report($class, $second)->get_downloadfilename();
+
+        $this->assertNotSame($firstname, $secondname, 'both notices export under the same filename');
+        $this->assertStringContainsString((string) $first->get('id'), $firstname);
+        $this->assertStringContainsString((string) $second->get('id'), $secondname);
+        $this->assertStringContainsString('Policy update', $firstname);
+        $this->assertStringContainsString('Second policy', $secondname);
+    }
+
+    /**
+     * A title carrying an ampersand reaches the filename in the PLAIN spelling.
+     *
+     * The sink is a Content-Disposition header, not HTML. With the escaped spelling the title
+     * becomes "A &amp; B" and clean_filename() then strips the ampersand, leaving the literal word
+     * "amp;" in the name of a compliance export.
+     *
+     * @dataProvider report_provider
+     * @param string $class The system report class.
+     */
+    public function test_an_ampersand_in_the_title_does_not_become_amp_in_the_filename(string $class): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Safety & Conduct',
+            'content' => '<p>Read it.</p>',
+        ]);
+        $notice->create();
+
+        $name = $this->make_report($class, $notice)->get_downloadfilename();
+
+        $this->assertStringNotContainsString('amp;', $name);
+        $this->assertStringContainsString('Safety', $name);
+
+        // Precondition: the fixture really does carry the character under test.
+        $this->assertStringContainsString('&', $notice->get('title'));
+    }
 }

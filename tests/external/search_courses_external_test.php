@@ -122,6 +122,53 @@ final class search_courses_external_test extends \advanced_testcase {
     }
 
     /**
+     * The fullname comes back in the ESCAPED spelling, because the sink renders it as HTML.
+     *
+     * course_search.js hands the label to core's autocomplete, which appends it into the hidden
+     * select and re-renders it through the triple stash in form_autocomplete_suggestions.mustache.
+     * Nothing between json_encode() and that stash escapes anything, so an unformatted fullname
+     * reaches the notice author's DOM as live markup — and a course fullname is settable by anyone
+     * holding moodle/course:update, a strictly lower privilege than local/awareness:manage.
+     *
+     * A bare ampersand is the fixture on purpose. Tag-shaped input like <b>x</b> is stripped
+     * identically whether or not the value was formatted, so it would prove nothing; the ampersand
+     * rule is the one that actually differs between the two spellings.
+     */
+    public function test_the_fullname_is_returned_escaped(): void {
+        $this->resetAfterTest();
+
+        $this->getDataGenerator()->create_course(['fullname' => 'Physics & Chemistry']);
+        $this->login_as_manager();
+
+        $courses = $this->search('Physics');
+
+        $this->assertCount(1, $courses);
+        $this->assertSame('Physics &amp; Chemistry', $courses[0]['fullname']);
+    }
+
+    /**
+     * The query still matches the RAW stored fullname, not the escaped one.
+     *
+     * Deliberate, and the opposite of what WS-03 had to do for roles: the author types the text
+     * they actually entered, so "Physics &" must find the course. Making the two "consistent" by
+     * matching on the formatted string would break exactly this.
+     */
+    public function test_the_query_matches_the_unescaped_name(): void {
+        $this->resetAfterTest();
+
+        $wanted = $this->getDataGenerator()->create_course(['fullname' => 'Physics & Chemistry']);
+        $this->login_as_manager();
+
+        $courses = $this->search('Physics & Chem');
+
+        $this->assertCount(1, $courses);
+        $this->assertSame((int) $wanted->id, $courses[0]['id']);
+
+        // Control: the escaped spelling is NOT what the query is compared against.
+        $this->assertSame([], $this->search('Physics &amp; Chem'));
+    }
+
+    /**
      * The match is case-insensitive and matches anywhere in the name.
      */
     public function test_the_match_is_case_insensitive_and_unanchored(): void {

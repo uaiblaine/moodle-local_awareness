@@ -6,6 +6,110 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — admin-set names reached the course and category pickers unescaped (version 2026082300, audit WS-06)
+
+`search_courses()` returned `$course->fullname` straight out of the database. The label travels
+through `course_search.js` into core's autocomplete, which appends it to the hidden select and
+re-renders it through the **triple stash** in `form_autocomplete_suggestions.mustache` — so a
+fullname carrying markup arrived in the notice author's DOM as live markup, and a multilang fullname
+arrived as literal `{mlang}` text. A course fullname is settable by anyone holding
+`moodle/course:update`, a strictly lower privilege than `local/awareness:manage`.
+
+`format_string()`'s default escape is the right spelling for that sink, and it is applied exactly
+once: nothing between `json_encode()` and the stash escapes anything.
+
+**Deliberately not `\core_external\util::format_string()`.** That helper honours
+`external_settings`, whose constructor only sets `filter = true` when the request is neither
+`AJAX_SCRIPT`, `CLI_SCRIPT` nor `WS_SERVER` — and this function is only ever reached over AJAX. The
+core helper would therefore have left the multilang markup unresolved, which is half of what the
+finding named. The comment records this so the plain call is not "modernised" into the broken form.
+
+**The picker has two halves, and the finding named only one.** The same field is emitted by
+`notice_form` for the pre-loaded selection (`reqcourse` and `filter_course`) and by
+`helper::get_category_options()` for the category list, all three into core's
+`element-autocomplete.mustache`, which is also a triple stash. Fixing the AJAX half alone would have
+left the suggestions and the stored selection disagreeing about the same course. All three now go
+through `format_string()`; the course label is a single `notice_form::course_label()` so the two
+course fields cannot drift.
+
+The LIKE still matches the **raw** stored fullname, which is what keeps a course called
+"R&D methods" findable by typing the text its author actually entered. That is the opposite of what
+WS-03 had to do for roles, and it is pinned by its own test so nobody "makes them consistent".
+
+### Fixed — two 'write' web services fired no event, and ordinary dismissals were unlogged (version 2026082300, audit WS-10)
+
+Three halves, all closed.
+
+`local_awareness_tracklink` and `local_awareness_estimate_audience` are both declared `type =>
+'write'` in `db/services.php` and neither fired an event. Two new classes, `awareness_link_clicked`
+and `awareness_audience_estimated`, now do.
+
+**Dismissing a notice that does not require acknowledgement left no trace anywhere an admin could
+reach.** The `awareness_dismissed` trigger sat inside the `reqack` branch, and `local_awareness_ack`
+only ever holds reqack rows while `local_awareness_lastview` records that the notice was met without
+recording who acted. The trigger moved out of that branch; the guest guard stayed, because every
+guest session shares one user id and the log would otherwise read as a single person dismissing the
+same notice for ever.
+
+**The estimate event is fired from job creation, not from the web service, and that distinction was
+the whole difficulty.** Audience-job rows are created in **two** places: the web service, and
+`notice_audience::refresh()` — which is what a notice save *and* the editor's Recalculate button
+both go through. Instrumenting only the web service would have logged the editor's debounced
+previews, which mostly reuse an existing job and create nothing, while missing every deliberate
+recalculation. The trigger therefore lives in `audience_job::trigger_created_event()` and is called
+from both sites.
+
+`tests/event/events_test.php` grew six cases and its reachability sweep was widened. That sweep used
+to read `classes/helper.php` alone — an inclusion list of size one — so the first trigger to land
+anywhere else would have been reported as dead code, and the obvious repair would have been to add a
+second filename rather than to notice the shape of the mistake. It now sweeps the plugin root with an
+exclusion list, with a non-vacuity guard on the file count.
+
+### Changed — event names are readable (version 2026082300, audit LANG-05)
+
+`get_name()` returned bare lowercase verbs — `dismiss`, `create`, `enable` — which is what an admin
+saw in the Events reference and in every log report. They now read `Notice dismissed`,
+`Notice created`, `Notice enabled` and so on, in both packs. Each of these strings has exactly one
+consumer, the matching event class, so nothing else moves.
+
+### Fixed — the report builder printed the reset interval as a raw second count (version 2026082300, audit RB-03)
+
+`notice:resetinterval` rendered `86400`. It now renders `1 day` through core's
+`format::format_time()`, and a notice that never repeats renders an empty cell — which is what the
+manage table already does, so no second vocabulary is invented.
+
+Two constraints are not obvious and are recorded in the code. The column keeps `TYPE_INTEGER`:
+under `TYPE_TEXT` the sum/avg/min/max aggregations become incompatible and a **saved** report using
+one would throw on view, which is the trap RB-02 already worked around in this file. And the callback
+takes `?float`, not `?int` — `avg()` is compatible with an integer column and hands the callback the
+averaged float under strict types — and stays nullable, because four datasources LEFT JOIN this
+table.
+
+### Fixed — every system-report download had the same filename (version 2026082300, audit RB-06)
+
+Both reports named their export after the datasource, so the acknowledgement export for *every*
+notice arrived as `Acknowledged notices` — byte-indistinguishable, which defeats keeping one as a
+compliance record. The name now carries the notice id and its title.
+
+The id is what carries the distinction, because two notices may legitimately share a title. The
+title is formatted with `'escape' => false`: the sink is a plain-text `Content-Disposition` header,
+and the escaped spelling would leave a literal `amp;` in the filename once `clean_filename()` strips
+the ampersand.
+
+The test needs `\core_reportbuilder\manager::reset_caches()` between the two builds and would pass
+vacuously without it — report instances are cached under `<reportid>:<userid>` with the parameters
+**not** in the key, so both notices resolve to the same instance and the two names match because
+they are the same object. Mutation-checked in both directions.
+
+### Changed — role scoping binds its context values as placeholders (version 2026082300, audit SQL-05)
+
+`role_scope::sql()` concatenated the system context id and two context levels into the SQL. The
+values are core-derived integers so nothing was injectable, which is why the audit rated it
+informative — but the fleet rule is placeholders. The two new names carry the same `$suffix` the
+`get_in_or_equal` prefixes beside them already carry, because the estimator emits this fragment
+several times in one statement and Moodle counts placeholder *occurrences*.
+
+
 ### Security — notice attachments were readable outside the notice's audience (version 2026081613, audit SEC-05)
 
 `local_awareness_pluginfile()` checked only the `enabled` flag. A file URL carries a notice id and

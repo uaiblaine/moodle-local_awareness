@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 26 | 4 | 3 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 69 | 8 | 3 | 16 | **96** |
-| Informativo | 28 | 6 | 0 | 18 | **52** |
-| **Total** | **138** | **19** | **7** | **34** | **198** |
+| Baixo | 74 | 8 | 3 | 11 | **96** |
+| Informativo | 29 | 6 | 0 | 17 | **52** |
+| **Total** | **144** | **19** | **7** | **28** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **157 dos 198 estão encerrados; 41 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **163 dos 198 estão encerrados; 35 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -127,6 +127,36 @@ parciais, com o que falta nomeado.
 > E outra vez a mesma lição, agora ao contrário: eu tinha descrito os 42 restantes como
 > "apresentação ou higiene" na mensagem anterior. Sete não eram, e um deles era isto.
 >
+> **Atualizado pela fase 15** (versão `2026082300`, branch `fix/phase-15-functional`). Seis achados
+> fechados: **WS-06**, **WS-10**, **RB-03**, **RB-06**, **SQL-05** e **LANG-05**. Os oito candidatos
+> foram investigados aos pares — um agente a propor a correção, um adversarial a tentar refutá-la — e
+> **três das oito propostas não sobreviveram à refutação**, cada uma por uma razão que teria passado
+> em revisão:
+>
+> - A do **WS-10** instrumentava só o web service. As linhas de job nascem em **dois** sítios, e o
+>   segundo é o `notice_audience::refresh()` — por onde passam o gravar de um aviso e o botão
+>   Recalcular. O log resultante teria mostrado as pré-visualizações especulativas do editor e
+>   nenhuma recalculação deliberada, debaixo de um docblock a afirmar o contrário.
+> - A do **RB-01** reabria, pelo download em PDF, exatamente o buraco que o PR #40 fechou: o writer
+>   de PDF do core lê ficheiros por hash de caminho sem verificação nenhuma, portanto resolver os
+>   `@@PLUGINFILE@@` na coluna do relatório entrega os bytes do anexo a quem estiver no público do
+>   relatório. **Fica em aberto à espera de decisão de produto** — ver abaixo.
+> - A do **RB-03** propunha `?int` no callback. Medido, não deduzido: o `avg()` é compatível com uma
+>   coluna inteira e entrega um float sob strict types, portanto `?int` rebenta.
+>
+> **Uma correção ao método, não só ao código.** A varredura do `test_no_event_class_is_unreachable`
+> lia **um único ficheiro**, o `helper.php`. É a mesma forma de erro que a frota já registou com
+> listas de inclusão de diretórios: o primeiro gatilho a aparecer noutro sítio seria dado como código
+> morto, e a reparação óbvia seria acrescentar um segundo nome de ficheiro em vez de reparar na forma
+> do erro. Passou a varrer a raiz do plugin com lista de exclusão, com guarda de não-vacuidade sobre
+> a contagem de ficheiros lidos.
+>
+> **E uma mutação minha que não mutou nada.** Ao verificar o teste do RB-06 corri um `sed` cujo
+> padrão não casou; o teste passou e eu quase registei isso como "a guarda não é necessária". Refeita
+> a sério, a mutação É apanhada — sem o `manager::reset_caches()` os dois relatórios devolvem o mesmo
+> nome, porque as instâncias são cacheadas por `<reportid>:<userid>` e os parâmetros não entram na
+> chave. Um teste de mutação que não altera o ficheiro é indistinguível de um teste que passa.
+
 > *Texto original da decisão, mantido por registo:*
 >
 > ~~**Continua aberto e é decisão de produto: BIZ-08.**~~ Um aviso com curso obrigatório ignora a
@@ -352,7 +382,7 @@ diz o que resta e onde.
 - **C7** · sem objeto — Report filter state is stored under an unprefixed global session key
   <br>classes/report_filter.php was deleted in commit 2c2e787 (`git log --oneline --diff-filter=D -- classes/report_filter.php` returns that commit), together with report/acknowledged_report.php and report/dismissed_report.php. No replacement carries the defect: `grep -rn 'SESSION' .
 
-### Padrões de código / lang — 4 de 19 em aberto
+### Padrões de código / lang — 3 de 19 em aberto
 
 - **LANG-01** · corrigido — The 'Is perpetual' form field has a help string but no addHelpButton call, so the help text never reaches the user
   <br>Fechado na fase 11 (2026-08-17): `addHelpButton('perpetual', …)` no `notice_form.php`, com um teste que percorre o pack de idioma e exige que todo campo renderizado com `_help` mostre o texto na página.
@@ -363,9 +393,8 @@ diz o que resta e onde.
 - **LANG-04** · **parcial** — Ten language strings are defined in both en and pt_br but referenced nowhere in the plugin
   <br>Recomputed the unreferenced set at 896dfc2 and on HEAD (extract keys from lang/en, grep every non-lang/non-docs/non-amd-build file, then discount the keys required by convention: _help paired with an addHelpButton, cachedef_* named in db/caches.php, capability and messageprovider names).
   <br>*Falta:* `event:timecreated` survives unreferenced (lang/en/local_awareness.php:119, lang/pt_br:118), as does the orphan `notice:perpetual_help` (lang/en:207 — see LANG-01). Four new dead strings were introduced since: `editor:action:cancel` (lang/en:79), `editor:action:save_draft` (:81), `editor:action:save_publish` (:82) and `notice:timemodified` (:220) — the only apparent hit for the last one is the distinct key `report_notice:timemodified` at classes/reportbuilder/local/entities/notice.php:181. Six dead strings today against ten then.
-- **LANG-05** · **aberto** — Event get_name() returns lowercase verbs instead of readable event names
-  <br>lang/en/local_awareness.php:112-120 still holds the lowercase verbs — `event:acknowledge` = 'acknowledge', `event:create` = 'create', `event:delete` = 'delete', `event:disable` = 'disable', `event:dismiss` = 'dismiss', `event:enable` = 'enable', `event:reset` = 'reset', `event:update` = 'update' — and each is what get_name() returns: classes/event/awareness_acknowledged.php:50, awareness_created.php:50, awareness_deleted.php:50, awareness_disabled.php:50, awareness_dismissed.php:50, awareness_enabled.php:50, awaren…
-  <br>*Falta:* Eight strings at lang/en/local_awareness.php:112-120 and their pt_br mirrors need readable event names (e.g. 'Notice acknowledged'); these are what the log report and the events list display.
+- **LANG-05** · corrigido — Event get_name() returns lowercase verbs instead of readable event names
+  <br>Fechado na fase 15 (2026-08-23): os nomes passam a legíveis (`Notice dismissed` em vez de `dismiss`) nos dois packs. Cada uma destas strings tem exatamente um consumidor, a classe de evento correspondente, portanto nada mais se mexe.
 - **LANG-06** · corrigido — html_writer used in plugin code, against the zero-html_writer rule
   <br>Fechado na fase 13 (2026-08-17): zero `html_writer` em código de plugin. As células da tabela de gestão passaram a seis templates Mustache (`manage/cell_status`, `cell_chips`, `cell_validity`, `cell_audience`, `cell_title`, mais `resultcount` e `backlink`), e o `use html_writer` saiu do ficheiro.
 - **LANG-07** · corrigido — tests/local/bootstrap_compat_test.php carries copied local_dimensions references to files, classes and a commit that do not exist in this repository
@@ -397,7 +426,7 @@ diz o que resta e onde.
 - **LANG-19** · corrigido — Behat step carries a copied comment describing forum discussions
   <br>Fechado na fase 12: o comentário copiado sobre fóruns foi substituído.
 
-### Web services — 6 de 18 em aberto
+### Web services — 4 de 18 em aberto
 
 - **WS-01** · **parcial** — get_notices returns the entire notice DB record as a JSON blob in PARAM_RAW, defeating the execute_returns allowlist and leaking targeting…
   <br>The record-wide serialisation is gone: classes/external.php:253 copies a fixed 7-key allowlist out of to_record() (id, title, reqack, forcelogout, modal_width, modal_height, outsideclick) plus content/bgimageurl, and tests/external/notice_external_test.php:560-589 asserts the exact key set.
@@ -410,18 +439,16 @@ diz o que resta e onde.
   <br>Duplicate queueing: classes/external.php:580-587 now joins an in-flight job — `if ($inflight = audience_job::find_in_flight($hash))` returns before any create()/queue_adhoc_task(), backed by classes/persistent/audience_job.php:142-153 (criteriahash + STATUS_PENDING + PENDING_WINDOW) and covered by t…
 - **WS-05** · corrigido — local_awareness_audience_jobs stores a userid but is invisible to the privacy provider
   <br>classes/privacy/provider.php covers local_awareness_audience_jobs on every required path: metadata at :274-281 (add_database_table with userid/criteria/timecreated and key privacy:metadata:local_awareness_audience_jobs), get_contexts_for_userid at :68-70 (EXISTS on job.userid), get_users_in_context…
-- **WS-06** · **aberto** — search_courses returns course fullname unformatted into a triple-stash autocomplete template
-  <br>classes/external.php:492 — `$results[] = ['id' => (int) $course->id, 'fullname' => $course->fullname];` with no format_string(); the select at :487 fetches 'id, fullname' straight from {course}. amd/src/course_search.js:31-35 maps that value to `label`, and core's suggestion template renders it triple-stashed: moodle-502/public/lib/templates/form_autocomplete_suggestions.mustache:47 is `{{{label}}}`.
-  <br>*Falta:* Still unformatted. Two live consequences: a multilang course fullname renders its {mlang} markup literally in the picker, and any markup a course editor put in a fullname reaches innerHTML in the notice author's browser. Smallest fix: `format_string($course->fullname, true, ['context' => \context_system::instance()])` at classes/external.php:492. (search_roles at :427 is already safe by accident — role_get_name() format_string()s the name, moodle-502/public/lib/accesslib.php:4577.)
+- **WS-06** · corrigido — search_courses returns course fullname unformatted into a triple-stash autocomplete template
+  <br>Fechado na fase 15 (2026-08-23): `format_string()` no `search_courses()` — a grafia ESCAPADA, que é a que o triple stash do `form_autocomplete_suggestions.mustache` precisa. **Deliberadamente não** `\core_external\util::format_string()`: esse helper respeita o `external_settings`, cujo construtor só liga `filter` fora de AJAX, e esta função só é alcançada por AJAX — o helper do core deixaria o multilang por resolver. E o picker tem duas metades: o `notice_form` (reqcourse e filter_course, via `course_label()`) e o `helper::get_category_options()` emitem o mesmo tipo de nome para o `element-autocomplete.mustache`, também triple stash, e foram corrigidos no mesmo commit. O LIKE continua a comparar o nome CRU, de propósito.
 - **WS-07** · corrigido — get_notices ships notice content that was filtered once at save time, never at output
   <br>Save-time filtering removed: classes/helper.php:251-271 (update_hyperlinks) now loads the raw content into DOMDocument, with the comment at :256-263 stating the format_text()/file_rewrite_pluginfile_urls() pass was moved out because it froze multilang "into whichever language the author happened to…
 - **WS-08** · corrigido — The web services stay live when the plugin's own 'enabled' kill switch is off
   <br>Fechado na fase 8 (2026-08-16): `helper::is_delivery_enabled()` partilhado, chamado nos quatro pontos de entrada de leitura do `external.php` — `get_notices`, `dismiss_notice`, `acknowledge_notice`, `track_link`.
 - **WS-09** · corrigido — local/awareness:manage lacks RISK_XSS although the web service pipes unfiltered notice HTML into jQuery .html() on every user's page
   <br>db/access.php:43 — `'riskbitmask' => RISK_CONFIG \| RISK_XSS,` for local/awareness:manage, with the comment at :29-39 explaining the exact chain the finding described (PARAM_RAW content, helper::render_content() with 'noclean' => true, and the result reaching core's Modal.setBody(), i.e. innerHTML).
-- **WS-10** · **aberto** — Two web services declared 'write' fire no event, and dismissals of non-reqack notices are unlogged
-  <br>`ls classes/event/` lists only awareness_acknowledged/created/deleted/disabled/dismissed/enabled/reset/updated — there is no link-tracked or audience-estimate event class. classes/helper.php:1056-1085 (track_link) creates a linkhistory row and returns ['status' => true] with no ::create()/->trigger() anywhere; classes/external.php:589-618 (estimate_audience, type 'write' in db/services.php:95) creates the audience_job and queues the task with no event either.
-  <br>*Falta:* All three halves stand. The two 'write' services with no event are local_awareness_tracklink (db/services.php:46-53) and local_awareness_estimate_audience (db/services.php:91-98). Smallest fix: add event classes and trigger them in helper::track_link() and external::estimate_audience(), and move the awareness_dismissed trigger in helper::dismiss_notice() outside the reqack branch (keeping the guest guard).
+- **WS-10** · corrigido — Two web services declared 'write' fire no event, and dismissals of non-reqack notices are unlogged
+  <br>Fechado na fase 15 (2026-08-23), nas três metades. Duas classes novas — `awareness_link_clicked` e `awareness_audience_estimated` — e o gatilho do `awareness_dismissed` saiu do ramo `reqack`, mantendo a guarda de convidado. O evento de estimativa dispara na CRIAÇÃO do job, a partir de `audience_job::trigger_created_event()`, porque as linhas nascem em **dois** sítios: o web service e o `notice_audience::refresh()`, que é por onde passam o gravar de um aviso e o botão Recalcular. Instrumentar só o web service teria registado as pré-visualizações debounced do editor e perdido todas as recalculações deliberadas.
 - **WS-11** · corrigido — Six of the eight external functions have no tests, and two capability gates are not mutation-covered
   <br>Sem objeto desde a fase 6: duplicado do M29, já corrigido.
 - **WS-12** · **aberto** — validate_context() is called before validate_parameters() in all eight external functions
@@ -442,23 +469,21 @@ diz o que resta e onde.
   <br>`grep -rn "capabilities" db/services.php` returns nothing (exit 1). Each of the nine entries at db/services.php:28-107 declares only classname, methodname, description, type, loginrequired and ajax. Five of them do require a capability at runtime: check_collision (classes/external.php:331), search_roles (:391), search_courses (:470), estimate_audience (:542) and get_estimate (:653) all call require_capability('local/awareness:manage', $syscontext).
   <br>*Falta:* No 'capabilities' key on any entry. The runtime gate holds, so this is not an access hole — but the missing declaration means the admin "Web service functions" screen and the service-authorisation UI cannot warn that a token's user lacks the capability. Smallest fix: add `'capabilities' => 'local/awareness:manage'` to those five entries in db/services.php, with a version.php bump (service definitions only install on upgrade).
 
-### Report Builder — 5 de 16 em aberto
+### Report Builder — 3 de 16 em aberto
 
 - **RB-01** · **aberto** — notice:content column dumps the raw stored notice HTML with no format_text() and no pluginfile rewriting
   <br>classes/reportbuilder/local/entities/notice.php:200-208 — the 'content' column is add_fields("{$alias}.content") + set_type(TYPE_LONGTEXT) with no add_callback() at all. Contrast helper::render_content() (classes/helper.php:1353-1367), which does file_rewrite_pluginfile_urls() then format_text(); `grep -rn 'PLUGINFILE\\|@@' classes/reportbuilder/` returns nothing.
   <br>*Falta:* The report-builder content column still emits the stored HTML unprocessed: no format_text() and no file_rewrite_pluginfile_urls(), so @@PLUGINFILE@@ URLs are broken in the report and in every download. Smallest fix: add_callback() on the column mirroring helper::render_content() (it needs the notice id, so also add_field the id, or fall back to format_text with a plain-text/strip callback for downloads).
 - **RB-02** · corrigido — notice:reqcourse is typed TYPE_BOOLEAN over a course-id column, so the report cannot say which course is required
   <br>Fechado na fase 11 (2026-08-17): a coluna normaliza em SQL (`CASE WHEN reqcourse > 0 THEN 1 ELSE 0 END`), mantendo o tipo booleano e as agregações guardadas válidas.
-- **RB-03** · **aberto** — notice:resetinterval renders the raw second count instead of a human-readable interval
-  <br>classes/reportbuilder/local/entities/notice.php:190-198 — the 'resetinterval' column is add_fields + set_type(column::TYPE_INTEGER) + set_is_sortable(true) and no add_callback(). Note the manage table did learn this lesson (classes/table/all_notices.php:547 uses format_time($interval)), but the report entity was not updated with it.
-  <br>*Falta:* Still renders the raw second count. Smallest fix: ->add_callback(static fn($v): string => $v ? format_time((int) $v) : '') on that column.
+- **RB-03** · corrigido — notice:resetinterval renders the raw second count instead of a human-readable interval
+  <br>Fechado na fase 15 (2026-08-23): `format::format_time()`, com célula vazia para zero — que é o que a tabela de gestão já faz. O tipo fica `TYPE_INTEGER` (sob `TYPE_TEXT` as agregações guardadas rebentariam na visualização, a armadilha que o RB-02 já contornou) e o callback recebe `?float`, não `?int`, porque o `avg()` é compatível com uma coluna inteira e entrega o float sob strict types.
 - **RB-04** · corrigido — Every in-scope file carries an @author tag and an undated @copyright, contrary to the fleet header standard
   <br>`grep -rn '@author' classes/reportbuilder classes/table report tests/reportbuilder tests/table` exits 1 with no output. Every in-scope file now carries the dated house tag, e.g.
 - **RB-05** · corrigido — Neither system report has any PHPUnit coverage — the can_view() capability gate and both base conditions are untested
   <br>Sem objeto desde a fase 6: duplicado do M11, já corrigido — `tests/reportbuilder/systemreports_test.php`.
-- **RB-06** · **aberto** — System report downloads are all named after the datasource, so files for different notices are indistinguishable
-  <br>classes/reportbuilder/local/systemreports/acknowledged_notice.php:95 `$this->set_downloadable(true, get_string('datasource:acknowledgednotices', 'local_awareness'));` and dismissed_notice.php:95 with 'datasource:dismissednotices'. lang/en/local_awareness.php:74,76 define those as the fixed labels 'Acknowledged notices' / 'Dismissed notices' — no {$a}, so the notice identity never reaches the filename.
-  <br>*Falta:* Downloads for different notices are still byte-indistinguishable by name. Smallest fix: pass a name built from the notice (title or noticeid), which the report already has via $this->get_parameter('noticeid', …) on line 58.
+- **RB-06** · corrigido — System report downloads are all named after the datasource, so files for different notices are indistinguishable
+  <br>Fechado na fase 15 (2026-08-23): o nome do ficheiro passa a levar o id e o título do aviso. O id é o que distingue — dois avisos podem partilhar título — e o título vai com `'escape' => false`, porque o destino é um cabeçalho `Content-Disposition` em texto simples e a grafia escapada deixaria um `amp;` literal depois de o `clean_filename()` tirar o `&`. O teste precisa de `manager::reset_caches()` entre as duas construções ou passa em vazio.
 - **RB-07** · sem objeto — col_hlinkcount builds HTML by string concatenation with unescaped link text and URL
   <br>classes/table/acknowledged_notice.php (and dismissed_notice.php) were deleted in commit 2c2e787 (`git log --diff-filter=D --name-only -- 'classes/table/*'`). `grep -rn 'hlinkcount' .` finds no PHP source hit outside CHANGELOG/docs.
 - **RB-08** · corrigido — Unaliased COUNT() in count_clicked_links() makes $count->count undefined on MySQL/MariaDB
@@ -701,7 +726,7 @@ diz o que resta e onde.
 - **PRIV-06** · corrigido — Provider file header carries a banned @author tag and a @copyright without the required year
   <br>Já corrigido: o provedor não tem `@author`.
 
-### SQL / portabilidade — 1 de 5 em aberto
+### SQL / portabilidade — 0 de 5 em aberto
 
 - **SQL-01** · corrigido — Audience-estimate breakdown drops the role scoping keys, so the per-rule chip counts a site-wide role instead of the scoped one
   <br>classes/audience/estimator.php:189 builds each breakdown column from `self::isolate_rule($criteria, $rule)`, and isolate_rule() at classes/audience/estimator.php:237-251 keeps filter_role_context, filter_category and filter_course alongside filter_role (and filter_competency_requireall alongside the…
@@ -711,12 +736,8 @@ diz o que resta e onde.
   <br>classes/table/all_notices.php:203 now spells the direction on every key: `ORDER BY enabled DESC, timemodified DESC, id DESC`. The August code was `awareness::get_records([], 'enabled, timemodified', 'DESC', …)` (git show 896dfc2:classes/table/all_notices.php:110), which persistent::get_records conca…
 - **SQL-04** · corrigido — Guest user is excluded by a hard-coded id of 1 instead of $CFG->siteguest
   <br>Fechado na fase 6 (2026-08-16): `estimator::base_predicate()` liga `guestid` a `$CFG->siteguest` em vez do literal 1.
-- **SQL-05** · **aberto** — Context id and context levels are string-concatenated into SQL instead of being bound as placeholders
-  <br>The block moved out of classes/helper.php into classes/local/role_scope.php (commit history: role_scope::sql() is now the single definition, called from classes/audience/estimator.php:365 and helper's per-user role rule), and the concatenation moved with it: classes/local/role_scope.php:75 `$where = " AND {$ra}.contextid = " . $syscontext->id;`, :77-78 `… AND {$ctx}.contextlevel = " . CONTEXT_COURSECAT`, :86-87 the same with CONTEXT_COURSE. No placeholder is used for any of the three.
-  <br>*Falta:* Carried over verbatim into the replacement file. Values are core-derived ints so nothing is injectable (which is why the audit rated it Informativo), but the fleet rule is placeholders. Smallest fix: bind three named params in role_scope::sql() (they already take $suffix, so name collisions are handled).
-
-### core business-logic correctness — 0 de 1 em aberto
-
+- **SQL-05** · corrigido — Context id and context levels are string-concatenated into SQL instead of being bound as placeholders
+  <br>Fechado na fase 15 (2026-08-23): os três valores passam a parâmetros nomeados, com o mesmo `$suffix` que os prefixos do `get_in_or_equal` ao lado já carregam — o estimador emite este fragmento várias vezes na mesma instrução e o Moodle conta OCORRÊNCIAS de placeholder.
 - **X1-01** · corrigido — awareness_enabled and awareness_disabled events are dead code — enable and disable both log 'notice updated'
   <br>Fechado na fase 5 (2026-08-16): `enable_notice()` e `disable_notice()` disparam agora `awareness_enabled` e `awareness_disabled`, pinado por `tests/event/events_test.php`.
 
