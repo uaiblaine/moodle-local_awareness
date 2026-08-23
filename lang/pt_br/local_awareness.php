@@ -130,6 +130,7 @@ Quando competências são selecionadas, cada regra verifica se o usuário é pro
 Quando a opção “Proficiente em todas” está habilitada, o usuário deve ser proficiente em todas as competências selecionadas, independentemente das configurações individuais de cada regra.';
 $string['filter_competency_picker_addselected'] = 'Adicionar selecionadas';
 $string['filter_competency_picker_framework'] = 'Quadro de competencias';
+$string['filter_competency_picker_loaderror'] = 'Não foi possível carregar a lista de competências.';
 $string['filter_competency_picker_nocompetencies'] = 'Nenhuma competencia encontrada.';
 $string['filter_competency_picker_noframeworks'] = 'Nenhum quadro de competencias disponivel.';
 $string['filter_competency_picker_title'] = 'Selecionar competencias';
@@ -137,6 +138,7 @@ $string['filter_competency_proficient'] = 'Proficiente';
 $string['filter_competency_remove'] = 'Remover';
 $string['filter_competency_requireall'] = 'Proficiente em todas as competencias selecionadas';
 $string['filter_competency_requireall_help'] = 'Quando habilitado e houver mais de uma competencia selecionada, o alerta sera exibido apenas se o usuario for proficiente em todas as competencias selecionadas.';
+$string['filter_competency_rules_error'] = 'Não foi possível exibir as competências selecionadas.';
 $string['filter_course'] = 'Cursos';
 $string['filter_courseformat'] = 'Formato do curso';
 $string['filter_role'] = 'Papel';

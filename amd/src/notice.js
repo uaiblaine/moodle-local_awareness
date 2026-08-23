@@ -87,7 +87,7 @@ define(
                         modal.setOutsideClick(parseInt(nextnotice.outsideclick, 10) !== 0);
 
                         // Event listener for close button.
-                        modal.getModal().on('click', modal.getCloseButtonID(), function() {
+                        modal.getModal().on('click', modal.getCloseButtonSelector(), function() {
                             dismissNotice();
                         });
                         // Event listener for accept button.

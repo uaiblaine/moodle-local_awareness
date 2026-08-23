@@ -53,10 +53,15 @@ final class awareness_test extends \advanced_testcase {
         set_config('allow_delete', $allowdeletion, 'local_awareness');
         set_config('cleanup_deleted_notice', $cleanup, 'local_awareness');
 
+        /*
+         * No cohort branch here. There was one, assigning a BARE id where the four sibling loops in
+         * this file all assign [id] — and create_notices_provider has never supplied a 'cohorts'
+         * key, so it never ran. Dead code that disagreed with its own neighbours about the shape of
+         * the value is worse than no code: the day the provider gained a cohort case it would have
+         * written a scalar into a field the persistent stores as a list, and the four loops that do
+         * cover the array shape would still have been green.
+         */
         foreach ($formdata as $data) {
-            if (property_exists($data, 'cohorts')) {
-                $data->cohorts = $this->getDataGenerator()->create_cohort()->id;
-            }
             helper::create_new_notice($data);
         }
 

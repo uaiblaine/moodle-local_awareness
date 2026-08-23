@@ -131,6 +131,7 @@ When competencies are selected, each rule checks whether the user is proficient 
 When “Proficient in all” is enabled, the user must be proficient in all selected competencies, regardless of the individual rule settings.';
 $string['filter_competency_picker_addselected'] = 'Add selected';
 $string['filter_competency_picker_framework'] = 'Competency framework';
+$string['filter_competency_picker_loaderror'] = 'The competency list could not be loaded.';
 $string['filter_competency_picker_nocompetencies'] = 'No competencies found.';
 $string['filter_competency_picker_noframeworks'] = 'No competency frameworks available.';
 $string['filter_competency_picker_title'] = 'Select competencies';
@@ -138,6 +139,7 @@ $string['filter_competency_proficient'] = 'Proficient';
 $string['filter_competency_remove'] = 'Remove';
 $string['filter_competency_requireall'] = 'Proficient in all selected competencies';
 $string['filter_competency_requireall_help'] = 'When enabled and more than one competency is selected, the notice is shown only if the user is proficient in all selected competencies.';
+$string['filter_competency_rules_error'] = 'The selected competencies could not be displayed.';
 $string['filter_course'] = 'Courses';
 $string['filter_courseformat'] = 'Course format';
 $string['filter_role'] = 'Role';

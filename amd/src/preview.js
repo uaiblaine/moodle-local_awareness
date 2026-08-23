@@ -24,8 +24,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define(['jquery', 'core/modal_cancel', 'core/str'],
-    function($, ModalCancel, str) {
+define(['jquery', 'core/modal_cancel', 'core/str', 'core/notification'],
+    function($, ModalCancel, str, Notification) {
         var preview = {};
 
         preview.init = function() {
@@ -39,7 +39,8 @@ define(['jquery', 'core/modal_cancel', 'core/str'],
                 })
                     .then(function(modal) {
                         return modal.show();
-                    });
+                    })
+                    .catch(Notification.exception);
             });
         };
 

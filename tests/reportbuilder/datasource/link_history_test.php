@@ -23,7 +23,7 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once("{$CFG->dirroot}/reportbuilder/tests/helpers.php");
 
-use core_reportbuilder_testcase;
+use core_reportbuilder\tests\core_reportbuilder_testcase;
 use core_reportbuilder_generator;
 use local_awareness\reportbuilder\datasource\link_history;
 

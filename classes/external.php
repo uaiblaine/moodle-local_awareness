@@ -59,12 +59,12 @@ class external extends external_api {
      * @return array
      */
     public static function dismiss_notice(int $noticeid): array {
-        self::validate_context(\context_system::instance());
-
         $params = self::validate_parameters(
             self::dismiss_notice_parameters(),
             ['noticeid' => $noticeid]
         );
+
+        self::validate_context(\context_system::instance());
 
         $result = [
             'status' => 0,
@@ -128,12 +128,12 @@ class external extends external_api {
      * @return array
      */
     public static function acknowledge_notice(int $noticeid): array {
-        self::validate_context(\context_system::instance());
-
         $params = self::validate_parameters(
             self::acknowledge_notice_parameters(),
             ['noticeid' => $noticeid]
         );
+
+        self::validate_context(\context_system::instance());
 
         $result = [
             'status' => 0,
@@ -196,9 +196,9 @@ class external extends external_api {
      * @return array
      */
     public static function track_link(int $linkid): array {
-        self::validate_context(\context_system::instance());
-
         $params = self::validate_parameters(self::track_link_parameters(), ['linkid' => $linkid]);
+
+        self::validate_context(\context_system::instance());
 
         // See dismiss_notice(): the switch is enforced at the boundary, not in the helper.
         if (!helper::is_delivery_enabled()) {
@@ -245,12 +245,12 @@ class external extends external_api {
      * @throws \invalid_parameter_exception
      */
     public static function get_notices(string $pageurl, int $courseid = 0): array {
-        self::validate_context(\context_system::instance());
-
         $params = self::validate_parameters(
             self::get_notices_parameters(),
             ['pageurl' => $pageurl, 'courseid' => $courseid]
         );
+
+        self::validate_context(\context_system::instance());
 
         /*
          * This function returns rendered notice bodies, and the page URL is what drives the
@@ -371,17 +371,17 @@ class external extends external_api {
      * @throws \required_capability_exception
      */
     public static function check_collision(int $noticeid = 0, string $pathmatch = '', bool $repeats = false): array {
-        // Only reached from the notice editor, and it reports on notices the caller may not
-        // otherwise be able to see at all.
-        $syscontext = \context_system::instance();
-        self::validate_context($syscontext);
-        require_capability('local/awareness:manage', $syscontext);
-
         $params = self::validate_parameters(self::check_collision_parameters(), [
             'noticeid' => $noticeid,
             'pathmatch' => $pathmatch,
             'repeats' => $repeats,
         ]);
+
+        // Only reached from the notice editor, and it reports on notices the caller may not
+        // otherwise be able to see at all.
+        $syscontext = \context_system::instance();
+        self::validate_context($syscontext);
+        require_capability('local/awareness:manage', $syscontext);
 
         $clashes = collision::clashes_for(
             (int) $params['noticeid'],
@@ -431,16 +431,16 @@ class external extends external_api {
     public static function search_roles(string $query = '', int $contextlevel = 0): array {
         global $DB;
 
+        $params = self::validate_parameters(self::search_roles_parameters(), [
+            'query' => $query,
+            'contextlevel' => $contextlevel,
+        ]);
+
         // Only reached from the notice editor. Without this any authenticated user could
         // enumerate every role defined on the site.
         $syscontext = \context_system::instance();
         self::validate_context($syscontext);
         require_capability('local/awareness:manage', $syscontext);
-
-        $params = self::validate_parameters(self::search_roles_parameters(), [
-            'query' => $query,
-            'contextlevel' => $contextlevel,
-        ]);
 
         $query = $params['query'];
         $contextlevel = $params['contextlevel'];
@@ -537,14 +537,14 @@ class external extends external_api {
     public static function search_courses(string $query = ''): array {
         global $DB;
 
-        $syscontext = \context_system::instance();
-        self::validate_context($syscontext);
-        require_capability('local/awareness:manage', $syscontext);
-
         $params = self::validate_parameters(
             self::search_courses_parameters(),
             ['query' => $query]
         );
+
+        $syscontext = \context_system::instance();
+        self::validate_context($syscontext);
+        require_capability('local/awareness:manage', $syscontext);
 
         $query = trim($params['query']);
         $results = [];
@@ -631,14 +631,14 @@ class external extends external_api {
     public static function estimate_audience(string $criteria): array {
         global $USER;
 
-        $syscontext = \context_system::instance();
-        self::validate_context($syscontext);
-        require_capability('local/awareness:manage', $syscontext);
-
         $params = self::validate_parameters(
             self::estimate_audience_parameters(),
             ['criteria' => $criteria]
         );
+
+        $syscontext = \context_system::instance();
+        self::validate_context($syscontext);
+        require_capability('local/awareness:manage', $syscontext);
 
         $raw = json_decode($params['criteria'], true);
         if (!is_array($raw)) {
@@ -745,14 +745,14 @@ class external extends external_api {
      * @return array
      */
     public static function get_estimate(string $jobid): array {
-        $syscontext = \context_system::instance();
-        self::validate_context($syscontext);
-        require_capability('local/awareness:manage', $syscontext);
-
         $params = self::validate_parameters(
             self::get_estimate_parameters(),
             ['jobid' => $jobid]
         );
+
+        $syscontext = \context_system::instance();
+        self::validate_context($syscontext);
+        require_capability('local/awareness:manage', $syscontext);
 
         $job = audience_job::get_record(['jobid' => $params['jobid']]);
         if (!$job) {

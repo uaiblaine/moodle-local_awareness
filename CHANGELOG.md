@@ -6,6 +6,90 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the competency picker wrote translated text into HTML sinks (version 2026082302, audit JS-06, JS-08, JS-09, JS-10, JS-11)
+
+The picker builds its messages from language strings the server renders into `data-*` attributes,
+and concatenated them into `innerHTML`. A translator's ampersand rendered wrong and an angle bracket
+swallowed the rest of the fragment. Messages are now written as text nodes.
+
+**The finding named two sinks; there were four.** Besides the two `innerHTML` sites, the same labels
+reached `Modal.setTitle()`, which ends in jQuery `.html()`, and `Notification.addNotification()`,
+which renders through a triple stash in `notification_base.mustache` — whose own docblock asks for
+"a cleaned string". Both were verified identical on 4.5 and 5.2 before being escaped, because
+escaping against a text sink would have been its own defect. Neither can take a text node, so they
+are escaped exactly once on the way in, using the browser's own escaping rather than a hand-written
+character table.
+
+Two hardcoded English sentences became language keys in both packs. `preview.js` gained the
+`.catch()` its chain never had — a failed modal previously produced an unhandled rejection and a
+dead preview link with nothing reported. `modal_notice.js` lost a dead selector and two empty tooltip
+stubs, and its close hook now runs through one constant instead of the same literal in three places
+(the button carries both the id and the `data-action` hook — checked in the template first, because
+the two selectors were not equivalent).
+
+**The unused-string half of JS-08 was fixed by removing the indices, not the strings.** The estimator
+requested 21 strings as a literal array and read them back as `s[0]`..`s[20]`. Deleting the three
+that nothing reads would have silently re-labelled every audience chip after them. The list is now
+requested and mapped **by key**, so the three could go and the whole class of error went with them.
+
+`tests/local/picker_contract_test.php` pins all of this, because nothing in the pipeline reads a JS
+string literal. Four of its assertions were red on their first run — bugs in the test, fixed at
+source rather than loosened — and one mutation initially escaped it: a hardcoded label in the form
+passed, because the scan only inspected attributes already written in the correct form and so was
+blind to exactly the case it existed to catch.
+
+### Fixed — three test-suite guards that asserted nothing (version 2026082302, audit TEST-02, TEST-03, TEST-05, TPL-05, TPL-06)
+
+**`test_data_api_attributes_are_paired` reads zero lines.** The plugin wires nothing through
+Bootstrap's markup data-API, so the sweep had no input and the rule could not fail. The detector is
+now extracted and pinned with fixtures instead — a count guard would be red on a tree with no
+offender, and fixtures prove the rule can still fail without one.
+
+**The badge rule accepted `text-muted` and `text-body`** as a text colour for a saturated background,
+and neither is a contrast answer. It now matches the specific colour the table names. Measured first:
+all six live badges already carried the right one, so this closed a hole rather than a defect.
+
+**The polyfill's `$structural` exclusion list had ten entries and nine were dead** — they named
+classes `styles.css` does not define, and one belonged to a different plugin entirely. Measured, not
+assumed. Only the body gate remains, and removing it turns the test red, which is what proves the
+trimmed list is exact rather than over-trimmed.
+
+Non-vacuity guards were added to the scans that lacked them. `find_reusable()`'s two dedup
+predicates — READY status and the `DEDUP_WINDOW` — gained a negative control each; either could be
+deleted with the whole suite green before, and either deletion is a real defect (a failed job served
+as an answer, or a count from any point in the site's history served as current). And a dead cohort
+branch that assigned a bare id where its four sibling loops assign a list was deleted.
+
+### Changed — smaller things that were true and cheap (version 2026082302, audit RB-14, RB-16, WS-12, WS-18, TPL-08, TPL-09, LANG-18)
+
+- **RB-14** — both system reports registered the notice entity and its LEFT JOIN, and neither used a
+  column or filter from it. The report is already scoped to one notice by a base condition.
+- **RB-16** — the five datasource tests move to `core_reportbuilder\tests\core_reportbuilder_testcase`.
+  Moodle 4.5 already declares it under that namespace, so supporting 405 was never the blocker.
+- **WS-12** — `validate_parameters()` now precedes `validate_context()` in all nine functions. Inert:
+  the context is always the system context and is never derived from a parameter.
+- **WS-18** — `'capabilities'` declared on the five services that require one at runtime, so the
+  service-authorisation screen can warn when a token's user lacks it. The other four declare none
+  because they need none.
+- **TPL-09** — the inline `!important` in a Mustache `style` attribute is gone, and by removing the
+  conflict rather than forcing it: `.px-2` was what made it necessary, because Bootstrap 5 generates
+  spacing utilities with `!important` and Bootstrap 4 does not.
+- **TPL-08** — the stylesheet header claimed every selector sat under `.local-awareness-editor`.
+  Measured: 105 of 153 do not, and 65 of the 114 in that very section do not — the dialogue is
+  attached by core to `document.body` and the polyfill hangs off a body class. What actually keeps
+  this off the rest of Moodle is the prefix, and that is what it now says.
+- **LANG-18** — docblocks for the 12 remaining undocumented test methods, written from the code. One
+  proposed docblock described a "second pass" in the estimator that does not exist; it is a single
+  statement with one `SUM(CASE …)` column per rule.
+
+### Fixed — a section header this project's own tooling deleted (audit bookkeeping)
+
+Two `###` headers went missing from `docs/RECONCILIACAO-2026-08.md` in versions 2026082300 and
+2026082301. The script that flipped a finding's verdict delimited it by the next bullet, so a finding
+that was the **last in its section** swallowed the heading that followed. Restored, and the delimiter
+now stops at whichever comes first, a bullet or a heading.
+
+
 ### Fixed — the report builder emitted stored notice HTML unrendered (version 2026082301, audit RB-01)
 
 `notice:content` was `add_fields()` with no callback, so it printed the stored string — including a

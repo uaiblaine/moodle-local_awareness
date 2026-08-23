@@ -32,8 +32,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
             ACCEPT_BUTTON: '[data-action="accept"]',
             ACK_CHECKBOX: '#awareness-modal-ackcheckbox',
             ACK_CONTAINER: '#awareness-ack-container',
-            CAN_RECEIVE_FOCUS: 'input:not([type="hidden"]), a[href], button:not([disabled])',
-            TOOL_TIP_WRAPPER: '#tooltip-wrapper'
+            CAN_RECEIVE_FOCUS: 'input:not([type="hidden"]), a[href], button:not([disabled])'
         };
 
         var ATTRIBUTE = {
@@ -57,11 +56,17 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
         ModalNotice.create = Modal.create;
 
         /**
-         * Get ID of close button.
-         * @returns {string}
+         * Selector for the close button.
+         *
+         * One constant rather than the same selector spelled out at each of the three places that
+         * need it. The button carries both an id and the data-action hook
+         * (templates/modal_notice.mustache); the data-action form is what the rest of this file
+         * uses, so the close and accept hooks read the same way.
+         *
+         * @returns {String} A selector matching the modal's close button.
          */
-        ModalNotice.prototype.getCloseButtonID = function() {
-            return '#awareness-closebtn';
+        ModalNotice.prototype.getCloseButtonSelector = function() {
+            return SELECTORS.CLOSE_BUTTON;
         };
 
         /**
@@ -141,20 +146,6 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
         };
 
         /**
-         * Turn off tool tip
-         */
-        ModalNotice.prototype.turnoffToolTip = function() {
-            // Deprecated/Not used in new design.
-        };
-
-        /**
-         * Turn on tool tip
-         */
-        ModalNotice.prototype.turnonToolTip = function() {
-            // Deprecated/Not used in new design.
-        };
-
-        /**
          * Set background image on the modal content area.
          * @param {string} url URL of the background image, or empty to clear.
          */
@@ -221,7 +212,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
                         root.addClass('jelly-anim');
                         return;
                     }
-                    $('#awareness-closebtn').trigger('click');
+                    $(SELECTORS.CLOSE_BUTTON).trigger('click');
                 }
             });
 
@@ -239,7 +230,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
                         e.preventDefault();
                         return;
                     }
-                    $('#awareness-closebtn').trigger('click');
+                    $(SELECTORS.CLOSE_BUTTON).trigger('click');
                 }
             }.bind(this));
         };

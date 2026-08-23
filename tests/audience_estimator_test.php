@@ -40,6 +40,15 @@ final class audience_estimator_test extends \advanced_testcase {
         $this->resetAfterTest(true);
     }
 
+    /**
+     * Criteria are reduced to a canonical form: empty values dropped, lists deduplicated and sorted,
+     * and scalar keys that carry no restriction removed entirely.
+     *
+     * The sorting is what makes the hash stable, so it is asserted here rather than only through
+     * the hash — a normalise() that stopped sorting would still hash consistently with itself.
+     *
+     * @return void
+     */
     public function test_normalise_strips_empty_and_sorts(): void {
         $raw = [
             'cohorts' => [3, 1, 2, 0, ''],
@@ -56,12 +65,30 @@ final class audience_estimator_test extends \advanced_testcase {
         $this->assertArrayNotHasKey('pathmatch', $normalised);
     }
 
+    /**
+     * Two criteria sets differing only in key and list order hash the same.
+     *
+     * This is what the dedup window depends on: the editor sends criteria in whatever order the
+     * form happened to build them, and an order-sensitive hash would make every keystroke look
+     * like a new question.
+     *
+     * @return void
+     */
     public function test_hash_is_deterministic_across_orderings(): void {
         $a = estimator::normalise(['cohorts' => [1, 2, 3], 'filter_role' => [4, 5]]);
         $b = estimator::normalise(['filter_role' => [5, 4], 'cohorts' => [3, 1, 2]]);
         $this->assertSame(estimator::hash($a), estimator::hash($b));
     }
 
+    /**
+     * Only the rules that can be answered about a USER are reported as audience rules.
+     *
+     * The page-dependent keys are a different kind of restriction — they need a page URL, which no
+     * count has — so counting them among the audience rules would claim a precision the estimate
+     * does not have.
+     *
+     * @return void
+     */
     public function test_audience_rules_in_returns_every_rule_answerable_about_a_user(): void {
         $criteria = [
             'cohorts' => [1],
@@ -142,6 +169,16 @@ final class audience_estimator_test extends \advanced_testcase {
         $this->assertCount(2, $result['context_only_filters']);
     }
 
+    /**
+     * A single cohort rule counts its members and nobody else.
+     *
+     * The breakdown is asserted beside the total because estimate() produces both from ONE
+     * statement — a SUM(CASE ...) total plus one SUM(CASE ...) column per rule — so the two are
+     * built by sibling expressions over the same scan and can disagree if a rule's isolated form
+     * drifts from the combined one.
+     *
+     * @return void
+     */
     public function test_estimate_cohort_only(): void {
         $generator = $this->getDataGenerator();
         $cohort = $generator->create_cohort();
@@ -159,6 +196,14 @@ final class audience_estimator_test extends \advanced_testcase {
         $this->assertSame(2, $result['breakdown'][0]['count']);
     }
 
+    /**
+     * Audience rules combine by INTERSECTION: only the user matching both is counted.
+     *
+     * Three users make the two failure modes distinguishable — a union would answer 3 and a
+     * dropped rule would answer 2, so an answer of 1 can only be the intersection.
+     *
+     * @return void
+     */
     public function test_estimate_intersects_cohort_and_role(): void {
         global $DB;
 
@@ -183,6 +228,14 @@ final class audience_estimator_test extends \advanced_testcase {
         $this->assertSame(1, $result['count']);
     }
 
+    /**
+     * A required course removes the users who have already completed it.
+     *
+     * That is the point of the setting: the notice exists to push people towards the course, so
+     * whoever has finished it is not part of the audience.
+     *
+     * @return void
+     */
     public function test_estimate_excludes_users_who_completed_required_course(): void {
         global $DB;
 
