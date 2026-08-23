@@ -226,7 +226,7 @@ class notice_form extends \core\form\persistent {
         if ($persistent && $persistent->get('id') > 0 && $persistent->get('reqcourse') > 0) {
             $selcourse = $DB->get_record('course', ['id' => $persistent->get('reqcourse')], 'id, fullname');
             if ($selcourse) {
-                $reqcourseoptions[$selcourse->id] = $selcourse->fullname;
+                $reqcourseoptions[$selcourse->id] = self::course_label($selcourse);
             }
         }
 
@@ -355,7 +355,7 @@ class notice_form extends \core\form\persistent {
                     [$insql, $inparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED);
                     $selectedcourses = $DB->get_records_select('course', "id {$insql}", $inparams, '', 'id, fullname');
                     foreach ($selectedcourses as $sc) {
-                        $filtercoursedefaults[$sc->id] = $sc->fullname;
+                        $filtercoursedefaults[$sc->id] = self::course_label($sc);
                     }
                 }
             }
@@ -475,6 +475,24 @@ class notice_form extends \core\form\persistent {
         $mform->set_sticky_footer('buttonar');
     }
 
+
+    /**
+     * The display label for a course option, escaped for the stash core renders it through.
+     *
+     * element-autocomplete.mustache emits every option as a triple stash and lib/form/select.php
+     * passes the text through untouched, so a fullname carrying markup reaches the page as markup
+     * and a multilang fullname reaches it as literal {mlang} text. The default escape is what that
+     * sink wants, and it matches what external::search_courses() hands the same widget over AJAX —
+     * the two halves of this picker have to agree, because the author sees both in one field.
+     *
+     * @param \stdClass $course A course record carrying at least id and fullname.
+     * @return string The formatted, escaped course name.
+     */
+    private static function course_label(\stdClass $course): string {
+        $context = \context_course::instance($course->id, IGNORE_MISSING) ?: \context_system::instance();
+
+        return format_string($course->fullname, true, ['context' => $context]);
+    }
 
     /**
      * Collapse an optional section, unless the notice being edited already uses it.

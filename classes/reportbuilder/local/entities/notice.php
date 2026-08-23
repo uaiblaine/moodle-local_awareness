@@ -203,7 +203,24 @@ class notice extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.resetinterval")
             ->set_type(column::TYPE_INTEGER)
-            ->set_is_sortable(true);
+            ->set_is_sortable(true)
+            /*
+             * The stored value is a number of seconds, so with no callback the cell printed "86400".
+             * Zero means the notice never repeats and renders empty — the manage table shows nothing
+             * for it either, emitting no repeat chip at all, so this invents no second vocabulary.
+             *
+             * Two constraints that are not obvious. The type stays TYPE_INTEGER: under TYPE_TEXT the
+             * sum/avg/min/max aggregations become incompatible, and datasource::get_active_columns()
+             * applies a STORED aggregation without rechecking, so a saved report using one would
+             * throw on view — the same trap RB-02 already worked around in this file. And the
+             * parameter is ?float rather than ?int because avg() is compatible with an integer
+             * column and hands the callback the averaged float under strict types; it stays nullable
+             * because four datasources LEFT JOIN this table, so a row pointing at a deleted notice
+             * delivers null.
+             */
+            ->add_callback(static function (?float $value, \stdClass $row): string {
+                return empty($value) ? '' : format::format_time($value, $row);
+            });
 
         $columns[] = (new column(
             'content',

@@ -138,6 +138,63 @@ final class all_notices_test extends core_reportbuilder_testcase {
     }
 
     /**
+     * The reset interval renders as a duration, and a notice that never repeats renders empty.
+     *
+     * The two rows are paired on purpose. Asserting only the empty cell would keep passing with the
+     * callback deleted outright, because the raw column emits "0" for that row and an assertion
+     * loosened to assertEquals would accept it; the repeating row is the control that proves the
+     * callback is actually wired.
+     */
+    public function test_the_reset_interval_renders_as_a_duration(): void {
+        $this->resetAfterTest();
+
+        global $DB, $USER;
+        $this->setAdminUser();
+
+        $now = time();
+        foreach ([['Repeats daily', 86400], ['Never repeats', 0]] as [$title, $interval]) {
+            $DB->insert_record('local_awareness', (object)[
+                'title'         => $title,
+                'content'       => 'Content',
+                'contentformat' => FORMAT_HTML,
+                'cohorts'       => '',
+                'reqack'        => 0,
+                'reqcourse'     => 0,
+                'enabled'       => 1,
+                'resetinterval' => $interval,
+                'usermodified'  => $USER->id,
+                'timecreated'   => $now,
+                'timemodified'  => $now,
+                'timestart'     => 0,
+                'timeend'       => 0,
+                'forcelogout'   => 0,
+            ]);
+        }
+
+        /** @var core_reportbuilder_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_reportbuilder');
+        $report    = $generator->create_report([
+            'name'    => 'Reset interval rendering',
+            'source'  => all_notices::class,
+            'default' => 0,
+        ]);
+        $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:title']);
+        $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:resetinterval']);
+
+        $cells = [];
+        foreach ($this->get_custom_report_content($report->get('id')) as $row) {
+            $row = array_values($row);
+            $cells[$row[0]] = $row[1];
+        }
+
+        // Non-vacuity: both rows really came back, so the assertions below can fail.
+        $this->assertCount(2, $cells);
+
+        $this->assertSame('1 day', $cells['Repeats daily']);
+        $this->assertSame('', $cells['Never repeats']);
+    }
+
+    /**
      * Test filters.
      */
     public function test_datasource_filters(): void {

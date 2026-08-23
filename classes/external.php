@@ -484,7 +484,9 @@ class external extends external_api {
         $roles = [];
 
         foreach ($records as $record) {
-            $localname = isset($allroles[$record->id]) ? $allroles[$record->id]->localname : $record->name;
+            $localname = isset($allroles[$record->id])
+                ? $allroles[$record->id]->localname
+                : format_string($record->name, true, ['context' => $syscontext]);
             $matches = $needle === ''
                 || \core_text::strpos(\core_text::strtolower($localname), $needle) !== false
                 || \core_text::strpos(\core_text::strtolower((string) $record->name), $needle) !== false
@@ -559,7 +561,29 @@ class external extends external_api {
                 50
             );
             foreach ($courses as $course) {
-                $results[] = ['id' => (int) $course->id, 'fullname' => $course->fullname];
+                /*
+                 * The ESCAPED spelling, because this label is rendered as HTML twice over:
+                 * course_search.js hands it to core's autocomplete, which appends it into the
+                 * hidden select (lib/amd/src/form-autocomplete.js, updateAjax) and then renders it
+                 * back through the triple stash in lib/templates/form_autocomplete_suggestions.
+                 * mustache. Nothing between json_encode() and that stash escapes anything, so the
+                 * default escape is applied exactly once. It also resolves a multilang fullname,
+                 * which otherwise reaches the picker as literal {mlang} markup.
+                 *
+                 * Deliberately NOT \core_external\util::format_string(): that helper honours
+                 * external_settings, whose constructor only sets filter = true when the request is
+                 * neither AJAX_SCRIPT, CLI_SCRIPT nor WS_SERVER — and this function is only ever
+                 * reached over AJAX, so the core helper would leave the multilang markup unresolved.
+                 * The plain call is the one that does what this sink needs.
+                 *
+                 * The LIKE above still matches the RAW stored fullname, which is what makes a course
+                 * called "R&D methods" findable by typing the text its author actually typed.
+                 */
+                $coursecontext = \context_course::instance($course->id, IGNORE_MISSING) ?: \context_system::instance();
+                $results[] = [
+                    'id' => (int) $course->id,
+                    'fullname' => format_string($course->fullname, true, ['context' => $coursecontext]),
+                ];
             }
         }
 
@@ -666,6 +690,7 @@ class external extends external_api {
             'status' => audience_job::STATUS_PENDING,
         ]);
         $job->create();
+        audience_job::trigger_created_event($job);
 
         if (live_mode::is_live()) {
             estimate_audience_task::resolve($job);

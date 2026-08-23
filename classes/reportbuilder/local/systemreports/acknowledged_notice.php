@@ -19,6 +19,7 @@ declare(strict_types=1);
 namespace local_awareness\reportbuilder\local\systemreports;
 
 use context_system;
+use core_text;
 use core_reportbuilder\local\entities\user;
 use core_reportbuilder\local\helpers\database;
 use core_reportbuilder\system_report;
@@ -45,6 +46,8 @@ class acknowledged_notice extends system_report {
      * Initialise report.
      */
     protected function initialise(): void {
+        global $DB;
+
         $ackentity = new acknowledgement();
         $ackalias  = $ackentity->get_table_alias('local_awareness_ack');
 
@@ -92,7 +95,28 @@ class acknowledged_notice extends system_report {
         ]);
 
         $this->set_initial_sort_column('acknowledgement:timecreated', SORT_DESC);
-        $this->set_downloadable(true, get_string('datasource:acknowledgednotices', 'local_awareness'));
+        /*
+         * The download name has to identify the notice. Named after the datasource alone, every
+         * notice's export arrives as the same file, which is useless as a compliance record. The id
+         * is what carries the distinction, because two notices may legitimately share a title; the
+         * title is what makes the file readable.
+         *
+         * The title is PARAM_RAW and up to 1333 characters, so it is formatted and truncated before
+         * it goes anywhere near a file name. escape => false is deliberate: the sink is a plain-text
+         * Content-Disposition header, not HTML, and the escaped spelling would leave a literal
+         * "amp;" in the name once clean_filename() strips the ampersand. The non-escape branch of
+         * format_string() still strips tags and still resolves multilang.
+         */
+        $noticetitle = format_string(
+            (string) $DB->get_field('local_awareness', 'title', ['id' => $noticeid]),
+            true,
+            ['context' => context_system::instance(), 'escape' => false]
+        );
+        $downloadname = (object) [
+            'id' => $noticeid,
+            'title' => core_text::substr($noticetitle, 0, 60),
+        ];
+        $this->set_downloadable(true, get_string('download:acknowledged', 'local_awareness', $downloadname));
 
         // Row action: link to user profile.
         $this->add_action(new action(

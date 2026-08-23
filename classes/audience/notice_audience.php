@@ -175,6 +175,7 @@ class notice_audience {
             'status' => audience_job::STATUS_PENDING,
         ]);
         $job->create();
+        audience_job::trigger_created_event($job);
 
         if (live_mode::is_live()) {
             /*

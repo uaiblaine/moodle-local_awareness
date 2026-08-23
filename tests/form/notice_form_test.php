@@ -56,6 +56,26 @@ final class notice_form_test extends \advanced_testcase {
     }
 
     /**
+     * The option texts of one named select in the rendered form.
+     *
+     * Scoped to the element rather than matched across the whole page on purpose: a bare
+     * str_contains() over the rendered form matches the wanted text anywhere downstream — including
+     * a legitimate occurrence in a different element — and so passes while the select under test is
+     * wrong.
+     *
+     * @param string $html The rendered form.
+     * @param string $name The select's name attribute.
+     * @return array The option texts, in document order.
+     */
+    private function option_texts(string $html, string $name): array {
+        $matched = preg_match('/<select[^>]*name="' . preg_quote($name, '/') . '\[?\]?"[^>]*>(.*?)<\/select>/s', $html, $m);
+        $this->assertSame(1, $matched, "the form rendered no select named {$name}");
+
+        preg_match_all('/<option[^>]*>(.*?)<\/option>/s', $m[1], $options);
+        return array_map('trim', $options[1]);
+    }
+
+    /**
      * Read the form's default data, which is protected.
      *
      * @param notice_form $form Form instance.
@@ -211,5 +231,60 @@ final class notice_form_test extends \advanced_testcase {
             $checked,
             'the field this test was written for must be among those examined'
         );
+    }
+
+    /**
+     * Admin-set names reach the pickers in the ESCAPED spelling.
+     *
+     * Both option lists are rendered by core's element-autocomplete.mustache, which emits every
+     * option as {{{text}}} — a triple stash — and lib/form/select.php passes the text through
+     * untouched. So a course or category name carrying markup arrives as markup, and a multilang
+     * name arrives as literal {mlang} text.
+     *
+     * This is the half of the same defect that lives in PHP rather than in the web service. The
+     * finding named only search_courses(); the picker has two sides and the author sees both in
+     * one field, so fixing one and not the other would have left the AJAX suggestions and the
+     * pre-loaded selection disagreeing about the same course.
+     *
+     * A bare ampersand is the fixture because tag-shaped input is stripped identically in both
+     * spellings and would prove nothing.
+     */
+    public function test_admin_set_names_reach_the_pickers_escaped(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $PAGE->set_url(new \moodle_url('/local/awareness/editnotice.php'));
+
+        $category = $this->getDataGenerator()->create_category(['name' => 'Science & Tech']);
+        $course = $this->getDataGenerator()->create_course(['fullname' => 'Physics & Chemistry']);
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Policy update',
+            'content' => '<p>Read the policy.</p>',
+            'reqcourse' => $course->id,
+        ]);
+        $notice->create();
+
+        $form = new notice_form(null, ['persistent' => $notice, 'id' => $notice->get('id')]);
+        $html = $form->render();
+
+        $categories = $this->option_texts($html, 'filter_category');
+        $courses = $this->option_texts($html, 'reqcourse');
+
+        // Non-vacuity: the scan found the options at all, so the assertions below can fail.
+        $this->assertNotEmpty($categories);
+        $this->assertNotEmpty($courses);
+
+        $this->assertContains('Science &amp; Tech', $categories);
+        $this->assertContains('Physics &amp; Chemistry', $courses);
+
+        // Control: the unescaped spelling is not what was rendered.
+        $this->assertNotContains('Science & Tech', $categories);
+        $this->assertNotContains('Physics & Chemistry', $courses);
+
+        // Precondition: the fixtures really do carry the character under test.
+        $this->assertStringContainsString('&', $category->name);
+        $this->assertStringContainsString('&', $course->fullname);
     }
 }

@@ -51,7 +51,10 @@ class role_scope {
      * have to be unique per instance. $suffix is what makes them so. Moodle counts placeholder
      * OCCURRENCES against the parameter array and rejects any name that appears twice, so reusing a
      * fragment verbatim is not an option; it has to be rebuilt under a fresh suffix. The default is
-     * empty, which is exactly the single-fragment SQL this produced before.
+     * empty, which is exactly the single-fragment SQL this produced before. The two names written
+     * by hand here, rsysctx and rctxlvl, carry it for the same reason the get_in_or_equal prefixes
+     * below do; the context-level branches are mutually exclusive, so rctxlvl is never emitted
+     * twice by one call.
      *
      * @param array $filters Decoded filtervalues, or normalised estimator criteria.
      * @param int $rolectx Context level from filter_role_context; 0 means any context.
@@ -69,13 +72,17 @@ class role_scope {
         $params = [];
         $ctx = 'ctx' . $suffix;
         $crs = 'crs' . $suffix;
+        $sysparam = 'rsysctx' . $suffix;
+        $lvlparam = 'rctxlvl' . $suffix;
 
         if ($rolectx == CONTEXT_SYSTEM) {
             $syscontext = \context_system::instance();
-            $where = " AND {$ra}.contextid = " . $syscontext->id;
+            $where = " AND {$ra}.contextid = :{$sysparam}";
+            $params[$sysparam] = (int) $syscontext->id;
         } else if ($rolectx == CONTEXT_COURSECAT) {
             $join = " JOIN {context} {$ctx} ON {$ctx}.id = {$ra}.contextid"
-                . " AND {$ctx}.contextlevel = " . CONTEXT_COURSECAT;
+                . " AND {$ctx}.contextlevel = :{$lvlparam}";
+            $params[$lvlparam] = CONTEXT_COURSECAT;
             if (!empty($filters['filter_category'])) {
                 $catids = array_map('intval', $filters['filter_category']);
                 [$catinsql, $catinparams] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'rcat' . $suffix);
@@ -84,7 +91,8 @@ class role_scope {
             }
         } else if ($rolectx == CONTEXT_COURSE) {
             $join = " JOIN {context} {$ctx} ON {$ctx}.id = {$ra}.contextid"
-                . " AND {$ctx}.contextlevel = " . CONTEXT_COURSE;
+                . " AND {$ctx}.contextlevel = :{$lvlparam}";
+            $params[$lvlparam] = CONTEXT_COURSE;
             $coursewheres = [];
             if (!empty($filters['filter_course'])) {
                 $courseids = array_map('intval', $filters['filter_course']);

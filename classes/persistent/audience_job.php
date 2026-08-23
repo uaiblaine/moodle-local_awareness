@@ -193,4 +193,31 @@ class audience_job extends persistent {
             substr($hex, 20, 12)
         );
     }
+
+    /**
+     * Fire the audience-estimate event for a job row that has just been created.
+     *
+     * Lives here rather than at either call site because rows are created in TWO places — the
+     * estimate web service, and audience\notice_audience::refresh(), which is the path a notice
+     * save and the editor's Recalculate button both take. Instrumenting only the web service would
+     * have logged the editor's debounced previews, which mostly reuse an existing job and create
+     * nothing, while missing every deliberate recalculation and every save.
+     *
+     * The reuse and join paths deliberately do not call this: no row is created there, and the
+     * event's whole meaning is that a distinct criteria set was asked about for the first time
+     * inside the dedup window.
+     *
+     * @param self $job The job row that was just created.
+     * @return void
+     * @throws \coding_exception
+     */
+    public static function trigger_created_event(self $job): void {
+        $params = [
+            'context' => \context_system::instance(),
+            'objectid' => (int) $job->get('id'),
+            'other' => ['jobid' => $job->get('jobid')],
+        ];
+        $event = \local_awareness\event\awareness_audience_estimated::create($params);
+        $event->trigger();
+    }
 }

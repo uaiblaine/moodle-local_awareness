@@ -1060,15 +1060,27 @@ class helper {
              * a user who dismissed it — that is the whole point of requiring acknowledgement — so
              * an unguarded insert writes another row on every refusal, and the dismissed report,
              * whose heading is "List of users who dismissed the notice", lists the same person
-             * once per page load. The event still fires each time: a repeated refusal is a real
-             * event, it is the compliance ROW that must not be duplicated.
+             * once per page load. The event still fires each time — it is triggered below, outside
+             * this branch — because a repeated refusal is a real event; it is the compliance ROW
+             * that must not be duplicated.
              */
             if (!self::has_acknowledgement_record($notice, $userid, acknowledgement::ACTION_DISMISSED)) {
                 // Record dismiss action.
                 self::create_new_acknowledge_record($notice, acknowledgement::ACTION_DISMISSED);
             }
+        }
 
-            // Log dismissed event.
+        /*
+         * Every dismissal is logged, not only the ones that also write a compliance row. This
+         * trigger used to sit inside the reqack branch above, so dismissing an ordinary notice left
+         * no trace an admin could reach: local_awareness_ack only ever holds reqack rows, and
+         * local_awareness_lastview records that the notice was met without recording who acted.
+         *
+         * Guests stay out for the same reason their row does — every guest session shares the one
+         * guest user id, so the log would read as a single person dismissing the same notice for
+         * ever.
+         */
+        if (!$isguest) {
             $params = [
                 'context' => \context_system::instance(),
                 'objectid' => $notice->get('id'),
@@ -1171,6 +1183,18 @@ class helper {
         $data->userid = $USER->id;
         $persistent = new linkhistory(0, $data);
         $persistent->create();
+
+        /*
+         * The click is a write like any other, so it is logged. Guests returned at the top of this
+         * method, so nothing here needs a second guard.
+         */
+        $params = [
+            'context' => \context_system::instance(),
+            'objectid' => $linkid,
+            'other' => ['noticeid' => (int) $notice->get('id')],
+        ];
+        $event = \local_awareness\event\awareness_link_clicked::create($params);
+        $event->trigger();
 
         $result = [];
         $result['status'] = true;
@@ -1500,12 +1524,29 @@ class helper {
     }
 
     /**
-     * Get course category options.
-     * @return array
+     * Get course category options, formatted for the stash the autocomplete renders them through.
+     *
+     * Same sink and same reasoning as notice_form::course_label(): element-autocomplete.mustache
+     * emits every option as a triple stash, so an admin-set category name carrying markup reaches
+     * the page as markup and a multilang name reaches it as literal {mlang} text.
+     *
+     * The system context is deliberate rather than the category's own: it is what
+     * rule_describer::category_names() passes for the same names, and the picker's label and the
+     * rule chip that quotes it back are read side by side.
+     *
+     * @return array Category id => formatted name.
      */
     public static function get_category_options(): array {
         global $DB;
-        return $DB->get_records_menu('course_categories', null, 'name', 'id, name');
+
+        $records = $DB->get_records('course_categories', null, 'name', 'id, name');
+
+        $options = [];
+        foreach ($records as $record) {
+            $options[$record->id] = format_string($record->name, true, ['context' => \context_system::instance()]);
+        }
+
+        return $options;
     }
 
     /**
