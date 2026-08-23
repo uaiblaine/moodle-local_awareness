@@ -6,6 +6,65 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the report builder emitted stored notice HTML unrendered (version 2026082301, audit RB-01)
+
+`notice:content` was `add_fields()` with no callback, so it printed the stored string — including a
+literal `@@PLUGINFILE@@` wherever the author had embedded a file, and unfiltered markup where the
+modal would have run `format_text()`. It now renders exactly as the modal does, through a shared
+`helper::render_content_parts()` so the two cannot drift.
+
+**Read this before scoping a report audience.** Resolving the placeholders is what makes the images
+work, and it also means a **PDF export** of a report carrying this column embeds those files
+directly from storage: core's PDF writer looks them up by path hash
+(`lib/classes/dataformat/base.php`, `dataformat/pdf/classes/writer.php`) with no capability or
+audience check of its own. Anyone in the report's audience therefore receives attachment bytes that
+`local_awareness_pluginfile()` would have refused them. The on-screen table and the html dataformat
+still go through the plugin's gate; PDF does not. This is a deliberate, documented trade — a report
+carrying `notice:content` must have its audience scoped as if it carried the attachments, because it
+does.
+
+Two branch traps are guarded in the code. The callback falls back to the raw value when the extra
+fields are absent, because Moodle 4.5's `countdistinct` extends `base` rather than `count` and runs
+column callbacks without rebuilding the column's fields — without the guard a 4.5-only aggregation
+would wrap a count in a `text_to_html` div. And `content` must stay the FIRST field, because the
+callback is handed `reset($values)`; DML returns every column as a string, so a wrong order fails
+silently rather than throwing, and a test row in `FORMAT_MOODLE` is what pins it.
+
+### Fixed — the two scheduling-window predicates disagreed (version 2026082301, audit BIZ-11)
+
+`get_enabled_notices()` and `is_within_active_window()` were separate hand-written predicates. They
+are now three projections of one truth table in `local\window`, and **a zero bound means unbounded
+on that side** — core's convention for enrolments, and already this plugin's own in
+`audience\estimator`.
+
+|  timestart | timeend | open when |
+|---|---|---|
+| 0 | 0 | always |
+| 0 | Y | now < Y |
+| X | 0 | now >= X |
+| X | Y | X <= now < Y |
+
+The measured divergence was that "no start date, expires on Y" was dropped by the query entirely,
+and "a start date with no expiry" was reachable in the editor but never displayed — the plugin
+carried a warning class, `editor_state::WINDOW_OPEN_ENDED`, whose own docblock said it existed
+because the predicate compared `now` against a `timeend` of zero. That cause is gone, so the warning,
+its two lang strings and its Behat scenario went with it; the scenario is now inverted and asserts
+the notice displays.
+
+**The asymmetry between the SQL and the PHP is deliberate and is the thing most likely to be
+"tidied" into a bug.** `awareness::get_enabled_notices()` caches its rows in a `MODE_APPLICATION`
+store with **no TTL**, purged only when a notice is written. A condition that turns from true to
+false is safe there, because nothing brings the row back; a condition that turns from false to
+**true** is not, because no write happens at that instant and the stale cache never notices. So the
+query carries the upper bound only, and the lower bound is applied against a live clock on what
+comes back. Making the two symmetric would stop a scheduled notice appearing at all.
+
+That is pinned twice, and the second one is not redundant: `window_test` checks the relation in pure
+logic against a PHP model of the prefilter, and `enabled_notices_window_test` runs the **real query**
+against a database. Mutation-checked — making the prefilter symmetric is caught only by the
+database-backed test, because the pure-logic one models the SQL rather than executing it.
+
+
 ### Fixed — admin-set names reached the course and category pickers unescaped (version 2026082300, audit WS-06)
 
 `search_courses()` returned `$course->fullname` straight out of the database. The label travels

@@ -105,7 +105,6 @@ $string['editor:title:edit'] = 'Editar aviso';
 $string['editor:unsaved'] = 'Alterações não salvas';
 $string['editor:warning:window_expired'] = 'Este aviso deixou de ser exibido em {$a}. Ninguém o verá até que a data de expiração seja movida.';
 $string['editor:warning:window_inverted'] = 'A data de início é igual ou posterior à de expiração, então este aviso nunca poderá ser exibido. Corrija as datas em Comportamento.';
-$string['editor:warning:window_openended'] = 'Este aviso tem data de início mas não tem data de expiração, então nunca poderá ser exibido. Defina uma expiração ou torne-o perpétuo.';
 $string['entity_acknowledgement'] = 'Confirmação';
 $string['entity_linkhistory'] = 'Clique em link';
 $string['entity_notice'] = 'Alerta';

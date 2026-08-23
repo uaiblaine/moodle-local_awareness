@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\local\page_probe;
 use local_awareness\local\role_scope;
+use local_awareness\local\window;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
 use local_awareness\persistent\linkhistory;
@@ -817,26 +818,28 @@ class helper {
      * @return bool
      */
     private static function has_started(awareness $notice): bool {
-        return $notice->get('timestart') == 0 || time() >= $notice->get('timestart');
+        return window::has_started((int) $notice->get('timestart'), time());
     }
 
     /**
      * Whether the notice's scheduling window is open right now.
      *
-     * A notice is perpetual when both timestart and timeend are zero; otherwise it must fall
-     * inside the window. This is the DISPLAY test; writes use has_started() instead, which drops
-     * the upper bound — see is_notice_available_to_user() for why.
+     * The DISPLAY test, and the exact one: get_enabled_notices() prefilters on the upper bound
+     * alone, because that query is cached, so the lower bound is enforced here against a live
+     * clock. A zero bound is unbounded on that side — see local\window for the truth table.
+     * Writes use has_started() instead, which drops the upper bound; see
+     * is_notice_available_to_user() for why.
      *
      * @param awareness $notice Notice.
      * @return bool
      * @throws \coding_exception
      */
     private static function is_within_active_window(awareness $notice): bool {
-        $now = time();
-        $isperpetual = $notice->get('timestart') == 0 && $notice->get('timeend') == 0;
-        $isinactivewindow = $now >= $notice->get('timestart') && $now < $notice->get('timeend');
-
-        return $isperpetual || $isinactivewindow;
+        return window::is_open(
+            (int) $notice->get('timestart'),
+            (int) $notice->get('timeend'),
+            time()
+        );
     }
 
     /**
@@ -1464,16 +1467,40 @@ class helper {
      * @throws \coding_exception
      */
     public static function render_content(awareness $notice): string {
-        $content = file_rewrite_pluginfile_urls(
+        return self::render_content_parts(
             (string) $notice->get('content'),
+            (int) $notice->get('contentformat'),
+            (int) $notice->get('id')
+        );
+    }
+
+    /**
+     * Render stored notice content from the three columns it is made of.
+     *
+     * Same rules as render_content(), for callers holding the row rather than the persistent. The
+     * report builder content column is one: a column callback is handed the row's fields, and
+     * building a persistent per row would cost one extra query per report row.
+     *
+     * Both entry points come through here so the rules exist once. A second copy is exactly how the
+     * report and the modal would drift apart without anything failing.
+     *
+     * @param string $content Stored content, as the author wrote it.
+     * @param int $contentformat One of the FORMAT_* constants.
+     * @param int $noticeid Notice id, which is the itemid of the content file area.
+     * @return string HTML ready to place in the modal.
+     * @throws \coding_exception
+     */
+    public static function render_content_parts(string $content, int $contentformat, int $noticeid): string {
+        $content = file_rewrite_pluginfile_urls(
+            $content,
             'pluginfile.php',
             \context_system::instance()->id,
             'local_awareness',
             'content',
-            $notice->get('id')
+            $noticeid
         );
 
-        return format_text($content, (int) $notice->get('contentformat'), [
+        return format_text($content, $contentformat, [
             'noclean' => true,
             'context' => \context_system::instance(),
         ]);

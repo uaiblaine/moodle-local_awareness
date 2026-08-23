@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 26 | 4 | 3 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 74 | 8 | 3 | 11 | **96** |
-| Informativo | 29 | 6 | 0 | 17 | **52** |
-| **Total** | **144** | **19** | **7** | **28** | **198** |
+| Baixo | 75 | 8 | 3 | 10 | **96** |
+| Informativo | 30 | 6 | 0 | 16 | **52** |
+| **Total** | **146** | **19** | **7** | **26** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **163 dos 198 estão encerrados; 35 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **165 dos 198 estão encerrados; 33 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -140,7 +140,8 @@ parciais, com o que falta nomeado.
 > - A do **RB-01** reabria, pelo download em PDF, exatamente o buraco que o PR #40 fechou: o writer
 >   de PDF do core lê ficheiros por hash de caminho sem verificação nenhuma, portanto resolver os
 >   `@@PLUGINFILE@@` na coluna do relatório entrega os bytes do anexo a quem estiver no público do
->   relatório. **Fica em aberto à espera de decisão de produto** — ver abaixo.
+>   relatório. Foi levado ao dono do produto em vez de ser resolvido em silêncio, e **decidido na
+>   fase 16 pela correção completa, com a consequência do PDF documentada**.
 > - A do **RB-03** propunha `?int` no callback. Medido, não deduzido: o `avg()` é compatível com uma
 >   coluna inteira e entrega um float sob strict types, portanto `?int` rebenta.
 >
@@ -156,6 +157,18 @@ parciais, com o que falta nomeado.
 > a sério, a mutação É apanhada — sem o `manager::reset_caches()` os dois relatórios devolvem o mesmo
 > nome, porque as instâncias são cacheadas por `<reportid>:<userid>` e os parâmetros não entram na
 > chave. Um teste de mutação que não altera o ficheiro é indistinguível de um teste que passa.
+
+> **Atualizado pela fase 16** (versão `2026082301`, branch `fix/phase-16-rb01-biz11`). Os dois
+> achados que a fase 15 levou a decisão de produto foram decididos e fechados: **RB-01** pela
+> correção completa, com a consequência do PDF escrita no CHANGELOG e aqui em vez de descoberta mais
+> tarde por alguém; e **BIZ-11** pela regra "um limite a zero é ilimitado desse lado".
+>
+> **A lição desta fase é sobre testes que modelam em vez de medir.** O `window_test` avalia o
+> prefiltro cacheado escrevendo em PHP o que o SQL *quer dizer*. Quando a mutação tornou o prefiltro
+> simétrico — que é o defeito real, porque o cache não tem TTL e um aviso agendado deixaria de
+> aparecer — o `window_test` **passou**, e só o `enabled_notices_window_test`, que corre a query
+> verdadeira contra a base, a apanhou. Um modelo do código não é o código. Onde o defeito vive na
+> fronteira com a base de dados, o teste tem de atravessar essa fronteira.
 
 > *Texto original da decisão, mantido por registo:*
 >
@@ -469,11 +482,10 @@ diz o que resta e onde.
   <br>`grep -rn "capabilities" db/services.php` returns nothing (exit 1). Each of the nine entries at db/services.php:28-107 declares only classname, methodname, description, type, loginrequired and ajax. Five of them do require a capability at runtime: check_collision (classes/external.php:331), search_roles (:391), search_courses (:470), estimate_audience (:542) and get_estimate (:653) all call require_capability('local/awareness:manage', $syscontext).
   <br>*Falta:* No 'capabilities' key on any entry. The runtime gate holds, so this is not an access hole — but the missing declaration means the admin "Web service functions" screen and the service-authorisation UI cannot warn that a token's user lacks the capability. Smallest fix: add `'capabilities' => 'local/awareness:manage'` to those five entries in db/services.php, with a version.php bump (service definitions only install on upgrade).
 
-### Report Builder — 3 de 16 em aberto
+### Report Builder — 2 de 16 em aberto
 
-- **RB-01** · **aberto** — notice:content column dumps the raw stored notice HTML with no format_text() and no pluginfile rewriting
-  <br>classes/reportbuilder/local/entities/notice.php:200-208 — the 'content' column is add_fields("{$alias}.content") + set_type(TYPE_LONGTEXT) with no add_callback() at all. Contrast helper::render_content() (classes/helper.php:1353-1367), which does file_rewrite_pluginfile_urls() then format_text(); `grep -rn 'PLUGINFILE\\|@@' classes/reportbuilder/` returns nothing.
-  <br>*Falta:* The report-builder content column still emits the stored HTML unprocessed: no format_text() and no file_rewrite_pluginfile_urls(), so @@PLUGINFILE@@ URLs are broken in the report and in every download. Smallest fix: add_callback() on the column mirroring helper::render_content() (it needs the notice id, so also add_field the id, or fall back to format_text with a plain-text/strip callback for downloads).
+- **RB-01** · corrigido — notice:content column dumps the raw stored notice HTML with no format_text() and no pluginfile rewriting
+  <br>Fechado na fase 16 (2026-08-23), **com uma decisão de produto registada**. A coluna passa a renderizar como o modal, por um `helper::render_content_parts()` partilhado. Resolver os `@@PLUGINFILE@@` é o que faz as imagens funcionarem — e também significa que um download em **PDF** de um relatório com esta coluna embute os ficheiros direto do armazenamento: o writer de PDF do core procura-os por hash de caminho, sem verificação de capacidade nem de público. Quem estiver no público do relatório recebe bytes que o `local_awareness_pluginfile()` lhe recusaria. O ecrã e o dataformat html continuam a passar pelo portão do plugin; o PDF não. **Um relatório que carregue `notice:content` tem de ter o público definido como se carregasse os anexos, porque carrega.** Duas armadilhas de ramo estão guardadas no código: o callback devolve o valor cru quando os campos extra faltam (o `countdistinct` do 4.5 estende `base` e corre callbacks sem reconstruir os campos), e o `content` tem de ser o PRIMEIRO campo — o DML devolve tudo como string, portanto a ordem errada falha em silêncio.
 - **RB-02** · corrigido — notice:reqcourse is typed TYPE_BOOLEAN over a course-id column, so the report cannot say which course is required
   <br>Fechado na fase 11 (2026-08-17): a coluna normaliza em SQL (`CASE WHEN reqcourse > 0 THEN 1 ELSE 0 END`), mantendo o tipo booleano e as agregações guardadas válidas.
 - **RB-03** · corrigido — notice:resetinterval renders the raw second count instead of a human-readable interval
@@ -636,7 +648,7 @@ diz o que resta e onde.
 - **JS-12** · corrigido — version.php was not bumped in the commits that shipped amd/src + amd/build changes
   <br>Every commit touching amd/src or amd/build since the audit also bumped $plugin->version: 83c8b60→2026081100, e9af3df→2026081200, 163ab38→2026081305, b52f8d4→2026081402, f1d5b1e→2026081501, a6862a7→2026081508, 98c47a4→2026081509, 91a32ec→2026081510, 22b9f05→2026081512, d0cebfc→2026081514, 79a7b15→202…
 
-### Lógica de negócio — 1 de 11 em aberto
+### Lógica de negócio — 0 de 11 em aberto
 
 - **BIZ-01** · corrigido — Audience-estimate jobs accumulate forever and one ad-hoc task is queued per typing pause
   <br>Both halves are closed. Accumulation: classes/task/purge_audience_jobs.php:42,60-84 deletes every job with timecreated older than DAYSECS, registered as a scheduled task in db/tasks.php:29-36 with lang key present (lang/en/local_awareness.php:302).
@@ -658,12 +670,8 @@ diz o que resta e onde.
   <br>Refutado na fase 11 (2026-08-17): investigado nos dois sentidos e concluído que não é defeito.
 - **BIZ-10** · corrigido — libxml internal error handling is switched on globally and never restored
   <br>Fechado na fase 12: `libxml_use_internal_errors()` guarda e repõe o valor anterior.
-- **BIZ-11** · **aberto** — get_enabled_notices() and retrieve_user_notices() disagree on half-open scheduling windows (latent — not reachable through the form)
-  <br>Both predicates are unchanged from August. classes/persistent/awareness.php:220 selects `enabled = ? AND ((timeend = 0 AND timestart = 0) OR (timeend <> 0 AND timestart <> 0 AND ? < timeend))` — identical to `git show 896dfc2:classes/persistent/awareness.php` line 203. classes/helper.php:825-831 (is_within_active_window) treats a notice as live when `timestart == 0 && timeend == 0` OR `now >= timestart && now < timeend` — the same test as `git show 896dfc2:classes/helper.php` lines 444-446.
-  <br>*Falta:* Still latent, as the audit said — the form writes timestart and timeend together (classes/form/notice_form.php:151,156, both hidden behind the perpetual flag), so no form-authored row lands half-open; a row edited by hand, restored from another site, or written by a future code path would. Smallest fix: express one window predicate in one place and have both callers use it.
-
-### Testes — 4 de 10 em aberto
-
+- **BIZ-11** · corrigido — get_enabled_notices() and retrieve_user_notices() disagree on half-open scheduling windows (latent — not reachable through the form)
+  <br>Fechado na fase 16 (2026-08-23): os dois predicados passam a três projeções de uma tabela-verdade em `local\window`, e **um limite a zero significa ILIMITADO desse lado** — a convenção do core para inscrições e a que o `audience\estimator` já usava aqui. A divergência medida era "sem início, expira em Y", descartado pela query, e "com início e sem expiração", alcançável no editor e nunca exibido — o plugin carregava um aviso, `editor_state::WINDOW_OPEN_ENDED`, cujo próprio docblock dizia existir por causa deste defeito; saiu, com as duas strings e o cenário Behat, agora invertido. **A assimetria entre o SQL e o PHP é deliberada**: o cache é `MODE_APPLICATION` sem TTL, purgado só por escrita, portanto a query só pode carregar condições MONÓTONAS — `now >= timestart` é uma transição para visível e deixaria um aviso agendado permanentemente fora do conjunto cacheado. Fixado duas vezes, e a segunda não é redundante: o `window_test` compara com um modelo PHP do prefiltro, o `enabled_notices_window_test` corre a query REAL. Tornar o prefiltro simétrico só é apanhado pelo segundo.
 - **TEST-01** · corrigido — No test asserts that any of the eight events fires, so the "every write fires an event" rule is unverified
   <br>Fechado na fase 5 (2026-08-16): `tests/event/events_test.php`, 8 testes, um por verbo mais a distinção entre eles.
 - **TEST-02** · **aberto** — Dead cohort branch in awareness_test::test_create_notices would silently drop the cohort if the provider ever supplied one

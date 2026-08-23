@@ -195,6 +195,81 @@ final class all_notices_test extends core_reportbuilder_testcase {
     }
 
     /**
+     * The content column renders like the modal does: filters applied, file URLs resolved.
+     *
+     * Content is stored as the author wrote it, so with no callback the column emitted the raw
+     * stored string — including a literal @@PLUGINFILE@@ in place of every embedded file.
+     *
+     * The three rows are doing different jobs. The FORMAT_MOODLE row proves the format column is
+     * actually reaching the callback: under FORMAT_MOODLE a newline becomes a <br>, and if the
+     * field order were wrong the callback would receive the format NUMBER as its content and this
+     * row would render that number instead. That is the only cheap guard on the field order, which
+     * is load-bearing and which nothing else checks — DML returns every column as a string, so a
+     * wrong order fails silently rather than throwing.
+     */
+    public function test_the_content_column_renders_like_the_modal(): void {
+        $this->resetAfterTest();
+
+        global $DB, $USER;
+        $this->setAdminUser();
+
+        $now = time();
+        $rows = [
+            ['Html row', '<p>Read the <em>policy</em>.</p>', FORMAT_HTML],
+            ['Plugin row', '<p><img src="@@PLUGINFILE@@/diagram.png" alt="d"></p>', FORMAT_HTML],
+            ['Moodle row', "First line\nSecond line", FORMAT_MOODLE],
+        ];
+        foreach ($rows as [$title, $content, $format]) {
+            $DB->insert_record('local_awareness', (object)[
+                'title'         => $title,
+                'content'       => $content,
+                'contentformat' => $format,
+                'cohorts'       => '',
+                'reqack'        => 0,
+                'reqcourse'     => 0,
+                'enabled'       => 1,
+                'resetinterval' => 0,
+                'usermodified'  => $USER->id,
+                'timecreated'   => $now,
+                'timemodified'  => $now,
+                'timestart'     => 0,
+                'timeend'       => 0,
+                'forcelogout'   => 0,
+            ]);
+        }
+
+        /** @var core_reportbuilder_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_reportbuilder');
+        $report    = $generator->create_report([
+            'name'    => 'Content rendering',
+            'source'  => all_notices::class,
+            'default' => 0,
+        ]);
+        $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:title']);
+        $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:content']);
+
+        $cells = [];
+        foreach ($this->get_custom_report_content($report->get('id')) as $row) {
+            $row = array_values($row);
+            $cells[$row[0]] = $row[1];
+        }
+
+        // Non-vacuity: all three rows came back, so the assertions below can fail.
+        $this->assertCount(3, $cells);
+
+        // The placeholder is resolved, not emitted.
+        $this->assertStringNotContainsString('@@PLUGINFILE@@', $cells['Plugin row']);
+        $this->assertStringContainsString('pluginfile.php', $cells['Plugin row']);
+
+        // The filters ran: under FORMAT_MOODLE a newline becomes a break.
+        $this->assertStringContainsString('<br', $cells['Moodle row']);
+        $this->assertStringContainsString('First line', $cells['Moodle row']);
+
+        // And the ordinary case still carries its markup through.
+        $this->assertStringContainsString('<em>policy</em>', $cells['Html row']);
+    }
+
+    /**
      * Test filters.
      */
     public function test_datasource_filters(): void {
