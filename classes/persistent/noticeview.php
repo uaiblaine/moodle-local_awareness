@@ -45,7 +45,7 @@ class noticeview extends persistent {
                 'null' => NULL_NOT_ALLOWED,
             ],
             'action' => [
-                'type' => PARAM_RAW_TRIMMED,
+                'type' => PARAM_INT,
                 'null' => NULL_NOT_ALLOWED,
             ],
         ];

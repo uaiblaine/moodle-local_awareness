@@ -46,26 +46,12 @@ final class link_history_test extends core_reportbuilder_testcase {
      * @return array{noticeid: int, hlinkid: int, lhhid: int}
      */
     private function create_link_click(int|string $userid, string $text = 'Click me', string $url = 'https://example.com'): array {
-        global $DB, $USER;
+        global $DB;
 
         $userid = (int)$userid;
 
-        $noticeid = (int) $DB->insert_record('local_awareness', (object)[
-            'title'         => 'Link notice',
-            'content'       => '',
-            'contentformat' => FORMAT_HTML,
-            'cohorts'       => '',
-            'reqack'        => 0,
-            'reqcourse'     => 0,
-            'enabled'       => 1,
-            'resetinterval' => 0,
-            'usermodified'  => $USER->id,
-            'timecreated'   => time(),
-            'timemodified'  => time(),
-            'timestart'     => 0,
-            'timeend'       => 0,
-            'forcelogout'   => 0,
-        ]);
+        $noticeid = (int) $this->getDataGenerator()->get_plugin_generator('local_awareness')
+            ->create_notice(['title' => 'Link notice'])->get('id');
 
         $hlinkid = (int) $DB->insert_record('local_awareness_hlinks', (object)[
             'noticeid' => $noticeid,

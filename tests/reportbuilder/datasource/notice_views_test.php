@@ -45,23 +45,9 @@ final class notice_views_test extends core_reportbuilder_testcase {
      * @return int The inserted notice ID.
      */
     private function create_notice(string $title = 'View notice'): int {
-        global $DB, $USER;
-        return (int) $DB->insert_record('local_awareness', (object)[
-            'title'         => $title,
-            'content'       => '',
-            'contentformat' => FORMAT_HTML,
-            'cohorts'       => '',
-            'reqack'        => 0,
-            'reqcourse'     => 0,
-            'enabled'       => 1,
-            'resetinterval' => 0,
-            'usermodified'  => $USER->id,
-            'timecreated'   => time(),
-            'timemodified'  => time(),
-            'timestart'     => 0,
-            'timeend'       => 0,
-            'forcelogout'   => 0,
-        ]);
+        global $DB;
+        return (int) $this->getDataGenerator()->get_plugin_generator('local_awareness')
+            ->create_notice(['title' => $title])->get('id');
     }
 
     /**

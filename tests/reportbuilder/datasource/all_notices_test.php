@@ -43,42 +43,33 @@ final class all_notices_test extends core_reportbuilder_testcase {
     public function test_datasource_default(): void {
         $this->resetAfterTest();
 
-        global $DB, $USER;
         $this->setAdminUser();
 
         // Insert two notices directly.
         $now = time();
-        $DB->insert_record('local_awareness', (object)[
-            'title'        => 'Notice Alpha',
-            'content'      => 'Content A',
+        $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+            'title' => 'Notice Alpha',
+            'content' => 'Content A',
             'contentformat' => FORMAT_HTML,
-            'cohorts'      => '',
-            'reqack'       => 0,
-            'reqcourse'    => 0,
-            'enabled'      => 1,
+            'cohorts' => '',
+            'reqack' => 0,
+            'reqcourse' => 0,
+            'enabled' => 1,
             'resetinterval' => 0,
-            'usermodified' => $USER->id,
-            'timecreated'  => $now - 200,
-            'timemodified' => $now - 200,
-            'timestart'    => 0,
-            'timeend'      => 0,
-            'forcelogout'  => 0,
+            'timestart' => 0,
+            'timeend' => 0,
         ]);
-        $DB->insert_record('local_awareness', (object)[
-            'title'        => 'Notice Beta',
-            'content'      => 'Content B',
+        $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+            'title' => 'Notice Beta',
+            'content' => 'Content B',
             'contentformat' => FORMAT_HTML,
-            'cohorts'      => '',
-            'reqack'       => 1,
-            'reqcourse'    => 0,
-            'enabled'      => 0,
+            'cohorts' => '',
+            'reqack' => 1,
+            'reqcourse' => 0,
+            'enabled' => 0,
             'resetinterval' => 0,
-            'usermodified' => $USER->id,
-            'timecreated'  => $now - 100,
-            'timemodified' => $now - 100,
-            'timestart'    => 0,
-            'timeend'      => 0,
-            'forcelogout'  => 0,
+            'timestart' => 0,
+            'timeend' => 0,
         ]);
 
         /** @var core_reportbuilder_generator $generator */
@@ -99,25 +90,20 @@ final class all_notices_test extends core_reportbuilder_testcase {
     public function test_datasource_columns(): void {
         $this->resetAfterTest();
 
-        global $DB, $USER;
         $this->setAdminUser();
 
         $now = time();
-        $DB->insert_record('local_awareness', (object)[
-            'title'         => 'Notice Gamma',
-            'content'       => 'Content G',
+        $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+            'title' => 'Notice Gamma',
+            'content' => 'Content G',
             'contentformat' => FORMAT_HTML,
-            'cohorts'       => '',
-            'reqack'        => 0,
-            'reqcourse'     => 0,
-            'enabled'       => 1,
+            'cohorts' => '',
+            'reqack' => 0,
+            'reqcourse' => 0,
+            'enabled' => 1,
             'resetinterval' => 86400,
-            'usermodified'  => $USER->id,
-            'timecreated'   => $now,
-            'timemodified'  => $now,
-            'timestart'     => $now,
-            'timeend'       => $now + 3600,
-            'forcelogout'   => 0,
+            'timestart' => $now,
+            'timeend' => $now + 3600,
         ]);
 
         /** @var core_reportbuilder_generator $generator */
@@ -148,26 +134,21 @@ final class all_notices_test extends core_reportbuilder_testcase {
     public function test_the_reset_interval_renders_as_a_duration(): void {
         $this->resetAfterTest();
 
-        global $DB, $USER;
         $this->setAdminUser();
 
         $now = time();
         foreach ([['Repeats daily', 86400], ['Never repeats', 0]] as [$title, $interval]) {
-            $DB->insert_record('local_awareness', (object)[
-                'title'         => $title,
-                'content'       => 'Content',
+            $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+                'title' => $title,
+                'content' => 'Content',
                 'contentformat' => FORMAT_HTML,
-                'cohorts'       => '',
-                'reqack'        => 0,
-                'reqcourse'     => 0,
-                'enabled'       => 1,
+                'cohorts' => '',
+                'reqack' => 0,
+                'reqcourse' => 0,
+                'enabled' => 1,
                 'resetinterval' => $interval,
-                'usermodified'  => $USER->id,
-                'timecreated'   => $now,
-                'timemodified'  => $now,
-                'timestart'     => 0,
-                'timeend'       => 0,
-                'forcelogout'   => 0,
+                'timestart' => 0,
+                'timeend' => 0,
             ]);
         }
 
@@ -210,7 +191,6 @@ final class all_notices_test extends core_reportbuilder_testcase {
     public function test_the_content_column_renders_like_the_modal(): void {
         $this->resetAfterTest();
 
-        global $DB, $USER;
         $this->setAdminUser();
 
         $now = time();
@@ -220,21 +200,17 @@ final class all_notices_test extends core_reportbuilder_testcase {
             ['Moodle row', "First line\nSecond line", FORMAT_MOODLE],
         ];
         foreach ($rows as [$title, $content, $format]) {
-            $DB->insert_record('local_awareness', (object)[
-                'title'         => $title,
-                'content'       => $content,
+            $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+                'title' => $title,
+                'content' => $content,
                 'contentformat' => $format,
-                'cohorts'       => '',
-                'reqack'        => 0,
-                'reqcourse'     => 0,
-                'enabled'       => 1,
+                'cohorts' => '',
+                'reqack' => 0,
+                'reqcourse' => 0,
+                'enabled' => 1,
                 'resetinterval' => 0,
-                'usermodified'  => $USER->id,
-                'timecreated'   => $now,
-                'timemodified'  => $now,
-                'timestart'     => 0,
-                'timeend'       => 0,
-                'forcelogout'   => 0,
+                'timestart' => 0,
+                'timeend' => 0,
             ]);
         }
 
@@ -275,26 +251,21 @@ final class all_notices_test extends core_reportbuilder_testcase {
     public function test_datasource_filters(): void {
         $this->resetAfterTest();
 
-        global $DB, $USER;
         $this->setAdminUser();
 
         $now = time();
         foreach (['Notice One', 'Notice Two', 'Notice Three'] as $title) {
-            $DB->insert_record('local_awareness', (object)[
-                'title'         => $title,
-                'content'       => '',
+            $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+                'title' => $title,
+                'content' => '',
                 'contentformat' => FORMAT_HTML,
-                'cohorts'       => '',
-                'reqack'        => 0,
-                'reqcourse'     => 0,
-                'enabled'       => 1,
+                'cohorts' => '',
+                'reqack' => 0,
+                'reqcourse' => 0,
+                'enabled' => 1,
                 'resetinterval' => 0,
-                'usermodified'  => $USER->id,
-                'timecreated'   => $now,
-                'timemodified'  => $now,
-                'timestart'     => 0,
-                'timeend'       => 0,
-                'forcelogout'   => 0,
+                'timestart' => 0,
+                'timeend' => 0,
             ]);
         }
 
@@ -327,25 +298,20 @@ final class all_notices_test extends core_reportbuilder_testcase {
     public function test_stress_datasource(): void {
         $this->resetAfterTest();
 
-        global $DB, $USER;
         $this->setAdminUser();
 
         $now = time();
-        $DB->insert_record('local_awareness', (object)[
-            'title'         => 'Stress notice',
-            'content'       => '',
+        $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+            'title' => 'Stress notice',
+            'content' => '',
             'contentformat' => FORMAT_HTML,
-            'cohorts'       => '',
-            'reqack'        => 0,
-            'reqcourse'     => 0,
-            'enabled'       => 1,
+            'cohorts' => '',
+            'reqack' => 0,
+            'reqcourse' => 0,
+            'enabled' => 1,
             'resetinterval' => 0,
-            'usermodified'  => $USER->id,
-            'timecreated'   => $now,
-            'timemodified'  => $now,
-            'timestart'     => 0,
-            'timeend'       => 0,
-            'forcelogout'   => 0,
+            'timestart' => 0,
+            'timeend' => 0,
         ]);
 
         $this->datasource_stress_test_columns(all_notices::class);
@@ -368,7 +334,6 @@ final class all_notices_test extends core_reportbuilder_testcase {
     public function test_the_reqcourse_column_aggregates_as_a_boolean(): void {
         $this->resetAfterTest();
 
-        global $DB, $USER;
         $this->setAdminUser();
 
         $course = $this->getDataGenerator()->create_course();
@@ -376,21 +341,17 @@ final class all_notices_test extends core_reportbuilder_testcase {
 
         $now = time();
         foreach ([(int) $course->id, 0] as $i => $reqcourse) {
-            $DB->insert_record('local_awareness', (object) [
-                'title'         => 'Notice ' . $i,
-                'content'       => 'Content',
+            $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+                'title' => 'Notice ' . $i,
+                'content' => 'Content',
                 'contentformat' => FORMAT_HTML,
-                'cohorts'       => '',
-                'reqack'        => 0,
-                'reqcourse'     => $reqcourse,
-                'enabled'       => 1,
+                'cohorts' => '',
+                'reqack' => 0,
+                'reqcourse' => $reqcourse,
+                'enabled' => 1,
                 'resetinterval' => 0,
-                'usermodified'  => $USER->id,
-                'timecreated'   => $now,
-                'timemodified'  => $now,
-                'timestart'     => 0,
-                'timeend'       => 0,
-                'forcelogout'   => 0,
+                'timestart' => 0,
+                'timeend' => 0,
             ]);
         }
 
