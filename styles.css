@@ -278,8 +278,15 @@
 
 /* ===========================================================================
    Notice editor — admin shell
-   All selectors are scoped under .local-awareness-editor so the layout never
-   leaks to the rest of the Moodle UI.
+
+   What keeps this off the rest of the Moodle UI is the PREFIX, not a scoping
+   ancestor. This block used to claim every selector sat under
+   .local-awareness-editor; measured, 65 of the 114 in this section do not, and
+   they cannot: the notice dialogue is attached by core to its own element on
+   document.body, and the Bootstrap 4 polyfill hangs off a body class. The real
+   rule is that every selector this plugin owns is named .la-*, .awareness,
+   .competency-picker-*, or one of the #awareness-* ids — so read a new selector
+   against that, not against a containment promise the file never kept.
 
    Every colour is READ FROM THE THEME, never invented. The chain
    var(--bs-x, var(--x, literal)) resolves on both branches: Moodle 4.5 defines
@@ -1052,4 +1059,19 @@ body.local-awareness-bs4 .visually-hidden {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+/*
+ * The competency picker's rows carry their indent as an inline padding-left, because the depth is
+ * computed per row and cannot be a class.
+ *
+ * The row used to also carry Bootstrap's .px-2, and the inline rule then needed !important to win —
+ * Bootstrap 5 generates its spacing utilities with !important, so .px-2 outranked the attribute.
+ * That put an !important inside a Mustache style attribute, where stylelint's
+ * declaration-no-important cannot see it. Dropping .px-2 removes the conflict instead of forcing
+ * it: an inline declaration already outranks a class on both branches, and the horizontal padding
+ * the utility supplied is stated here.
+ */
+.competency-picker-item {
+    padding-right: 0.5rem;
 }

@@ -37,6 +37,14 @@ final class audience_external_test extends \advanced_testcase {
         $this->resetAfterTest(true);
     }
 
+    /**
+     * Requesting an estimate needs local/awareness:manage.
+     *
+     * The estimate counts users matching arbitrary criteria, so an ungated version answers
+     * "how many people are in cohort N" for any N the caller cares to name.
+     *
+     * @return void
+     */
     public function test_estimate_audience_requires_capability(): void {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
@@ -118,6 +126,15 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertSame('ready', $second['status']);
     }
 
+    /**
+     * A queued job polls as pending with no count, then as ready with one.
+     *
+     * audience_sync_limit is forced to 0 so the estimate really is queued: left at its default
+     * this site is small enough to resolve in the same request, and the pending state — the one
+     * this test exists for — would never be observed.
+     *
+     * @return void
+     */
     public function test_get_estimate_returns_pending_then_ready(): void {
         $this->setAdminUser();
         set_config('audience_sync_limit', 0, 'local_awareness');
@@ -309,6 +326,14 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertStringContainsString('Engineering school', $ready['breakdown']);
     }
 
+    /**
+     * An unknown job token answers error rather than throwing.
+     *
+     * The client polls on a timer; an exception here would surface as an unexplained failure
+     * notification on a page the author is still editing.
+     *
+     * @return void
+     */
     public function test_get_estimate_with_unknown_jobid_returns_error(): void {
         $this->setAdminUser();
         $response = external::get_estimate('00000000-0000-4000-8000-000000000000');

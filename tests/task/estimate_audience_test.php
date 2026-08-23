@@ -54,6 +54,11 @@ final class estimate_audience_test extends \advanced_testcase {
         return $job;
     }
 
+    /**
+     * The task computes a pending job's count and marks it ready.
+     *
+     * @return void
+     */
     public function test_execute_resolves_pending_job_to_ready(): void {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
@@ -73,6 +78,14 @@ final class estimate_audience_test extends \advanced_testcase {
         $this->assertNotNull($reloaded->get('timecompleted'));
     }
 
+    /**
+     * Running the task again over a job already marked ready changes nothing.
+     *
+     * An adhoc task can be retried, so a second run must not recompute a stored answer or move a
+     * job backwards out of its completed state.
+     *
+     * @return void
+     */
     public function test_execute_is_idempotent_on_already_completed_job(): void {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
@@ -102,6 +115,14 @@ final class estimate_audience_test extends \advanced_testcase {
         );
     }
 
+    /**
+     * A task whose job has been purged reports and returns instead of throwing.
+     *
+     * A throwing adhoc task is retried for ever, so a permanent failure has to end quietly with a
+     * trace rather than by raising.
+     *
+     * @return void
+     */
     public function test_execute_with_unknown_jobid_does_not_throw(): void {
         $jobid = 'does-not-exist-' . time();
 

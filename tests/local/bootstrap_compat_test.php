@@ -280,8 +280,17 @@ final class bootstrap_compat_test extends \basic_testcase {
      */
     public function test_every_bs5_utility_used_is_polyfilled(): void {
         $polyfilled = $this->polyfilled_tokens();
+        $used = $this->used_bs5_tokens();
+
+        /*
+         * Non-vacuity on both sides. "Every used token is polyfilled" is satisfied by a plugin that
+         * uses none, and by a scan that finds none — and those two look identical from here.
+         */
+        $this->assertNotEmpty($used, 'Found no Bootstrap 5 utility in the markup — the scan is broken, not the code.');
+        $this->assertNotEmpty($polyfilled, 'Found no polyfill rules in styles.css — the scan is broken, not the code.');
+
         $missing = [];
-        foreach ($this->used_bs5_tokens() as $token => $files) {
+        foreach ($used as $token => $files) {
             if (!in_array($token, $polyfilled, true)) {
                 $missing[] = $token . ' (used in ' . implode(', ', array_slice($files, 0, 3)) . ')';
             }
@@ -305,24 +314,22 @@ final class bootstrap_compat_test extends \basic_testcase {
      */
     public function test_polyfill_carries_nothing_unused(): void {
         $used = array_keys($this->used_bs5_tokens());
+        $polyfilled = $this->polyfilled_tokens();
+
         /*
-         * Structural helpers the polyfill needs but no markup names on its own: the .form-check
-         * parent it keys off, the .form-check-input and .form-check-label it repositions, the
-         * .btn-close and .modal chrome core emits, and the body gate itself.
+         * One structural entry, not ten. The list used to name form-check, btn-close, modal and
+         * friends as "helpers the polyfill needs", plus local-dimensions-central-page, which
+         * belongs to a different plugin entirely. Measured against styles.css, NINE of the ten
+         * named nothing this polyfill defines — so they excluded classes that were never in the
+         * result, and the prose describing them described rules that do not exist here. The body
+         * gate is the only real one: it is the selector every polyfill rule hangs off, so it can
+         * never appear as a class the markup "uses".
          */
-        $structural = [
-            bootstrap::BODY_CLASS_BS4,
-            'local-dimensions-central-page',
-            'form-check',
-            'form-check-input',
-            'form-check-label',
-            'btn-close',
-            'modal',
-            'modal-header',
-            'modal-body',
-            'modal-form-dialogue',
-        ];
-        $unused = array_values(array_diff($this->polyfilled_tokens(), $used, $structural));
+        $structural = [bootstrap::BODY_CLASS_BS4];
+
+        $this->assertNotEmpty($polyfilled, 'Found no polyfill rules in styles.css — the scan is broken, not the code.');
+
+        $unused = array_values(array_diff($polyfilled, $used, $structural));
         sort($unused);
         $this->assertSame(
             [],
@@ -333,6 +340,46 @@ final class bootstrap_compat_test extends \basic_testcase {
     }
 
     /**
+     * The Bootstrap data-API spellings missing from one line.
+     *
+     * Extracted from the sweep so the rule can be asserted against fixtures. With no live offender
+     * anywhere in the plugin, a test that only walks the tree cannot tell a working detector from a
+     * deleted one.
+     *
+     * @param string $line One line of markup.
+     * @return array The attribute names present without their counterpart, in declaration order.
+     */
+    private function data_api_offences(string $line): array {
+        $pairs = [
+            'data-toggle' => 'data-bs-toggle',
+            'data-target' => 'data-bs-target',
+            'data-dismiss' => 'data-bs-dismiss',
+            'data-parent' => 'data-bs-parent',
+        ];
+
+        /*
+         * data-target and data-parent are only Bootstrap's when a toggle sits beside them; on their
+         * own they are ordinary custom attributes, and this plugin uses data-target as its own hook.
+         */
+        $wired = preg_match('/(?<![-\w])data-(bs-)?toggle(?![-\w])/', $line);
+
+        $offences = [];
+        foreach ($pairs as $bs4 => $bs5) {
+            if (!$wired && in_array($bs4, ['data-target', 'data-parent'], true)) {
+                continue;
+            }
+            /* Match the attribute itself, never a longer name that merely starts with it. */
+            $hasbs4 = preg_match('/(?<![-\w])' . preg_quote($bs4, '/') . '(?![-\w])/', $line);
+            $hasbs5 = preg_match('/(?<![-\w])' . preg_quote($bs5, '/') . '(?![-\w])/', $line);
+            if ($hasbs4 !== $hasbs5) {
+                $offences[] = $hasbs4 ? $bs4 : $bs5;
+            }
+        }
+
+        return $offences;
+    }
+
+    /**
      * Every badge background must state its text colour, so it reads on both branches.
      *
      * @return void
@@ -340,18 +387,19 @@ final class bootstrap_compat_test extends \basic_testcase {
     public function test_badges_state_their_text_colour(): void {
         /*
          * Checked on every line carrying a background utility, NOT only lines that also say
-         * "badge". The first version of this test filtered on that word and stayed green while
-         * template_import_verdict.php returned bare 'bg-success' from a match arm - the word
-         * "badge" was in the method name, one line up. The exceptions below are the surfaces that
-         * legitimately carry a background without a text utility, because the plugin's own CSS
-         * sets the colour for them.
+         * "badge". An earlier version filtered on that word and stayed green against a method whose
+         * NAME carried it while the returned class did not.
+         *
+         * The required colour is matched exactly, not against a set. Accepting any of
+         * text-white|dark|body|muted let text-muted and text-body satisfy a saturated background,
+         * and neither of those is a contrast answer: the whole point is that Bootstrap 4 gives
+         * .badge no colour while Bootstrap 5 defaults it to white, so the pairing has to be the
+         * specific one the table names. There is no exception list — every live badge in this
+         * plugin already states the right colour, so an exception would only be a place to hide.
          */
-        $exceptions = ['hero_header.mustache'];
         $offenders = [];
+        $checked = 0;
         foreach ($this->markup_files() as $path) {
-            if (in_array(basename($path), $exceptions, true)) {
-                continue;
-            }
             foreach (file($path) as $number => $line) {
                 if ($this->is_comment_line($line)) {
                     continue;
@@ -360,12 +408,21 @@ final class bootstrap_compat_test extends \basic_testcase {
                     if (!preg_match('/\b' . preg_quote($background, '/') . '\b/', $line)) {
                         continue;
                     }
-                    if (!preg_match('/\btext-(white|dark|body|muted)\b/', $line)) {
+                    $checked++;
+                    if (!preg_match('/\b' . preg_quote($required, '/') . '\b/', $line)) {
                         $offenders[] = basename($path) . ':' . ($number + 1) . ' needs ' . $required;
                     }
                 }
             }
         }
+
+        /*
+         * Non-vacuity: the sweep found background utilities at all. Without it the assertion below
+         * is satisfied by a scan that reads nothing — which is what a renamed template directory or
+         * a broken markup_files() would produce, and it would read as a pass.
+         */
+        $this->assertGreaterThan(0, $checked, 'Found no background utility to check — the scan is broken, not the code.');
+
         $this->assertSame(
             [],
             $offenders,
@@ -385,43 +442,75 @@ final class bootstrap_compat_test extends \basic_testcase {
      */
     public function test_data_api_attributes_are_paired(): void {
         $offenders = [];
-        $pairs = [
-            'data-toggle' => 'data-bs-toggle',
-            'data-target' => 'data-bs-target',
-            'data-dismiss' => 'data-bs-dismiss',
-            'data-parent' => 'data-bs-parent',
-        ];
         foreach ($this->markup_files() as $path) {
             foreach (file($path) as $number => $line) {
                 if ($this->is_comment_line($line)) {
                     continue;
                 }
-                /*
-                 * data-target and data-parent are only Bootstrap's when a toggle sits beside
-                 * them; on their own they are ordinary custom attributes, and this plugin uses
-                 * data-target as its own sidenav hook, read back with getAttribute. Requiring a
-                 * data-bs-target there would be a false positive with no correct fix.
-                 */
-                $wired = preg_match('/(?<![-\w])data-(bs-)?toggle(?![-\w])/', $line);
-                foreach ($pairs as $bs4 => $bs5) {
-                    if (!$wired && in_array($bs4, ['data-target', 'data-parent'], true)) {
-                        continue;
-                    }
-                    /* Match the attribute itself, never a longer name that merely starts with it. */
-                    $hasbs4 = preg_match('/(?<![-\w])' . preg_quote($bs4, '/') . '(?![-\w])/', $line);
-                    $hasbs5 = preg_match('/(?<![-\w])' . preg_quote($bs5, '/') . '(?![-\w])/', $line);
-                    if ($hasbs4 !== $hasbs5) {
-                        $offenders[] = basename($path) . ':' . ($number + 1) . ' has only ' . ($hasbs4 ? $bs4 : $bs5);
-                    }
+                foreach ($this->data_api_offences($line) as $offence) {
+                    $offenders[] = basename($path) . ':' . ($number + 1) . ' has only ' . $offence;
                 }
             }
         }
+
+        /*
+         * NO non-vacuity guard here, deliberately, and this is the one place in the file where its
+         * absence is correct: the plugin currently wires nothing through Bootstrap's markup
+         * data-API, so a count guard would be red on a tree that has no defect to find. The rule is
+         * kept honest by test_the_data_api_detector_works instead, which proves the detector can
+         * still fail — a guarantee a tree-count could not give at zero sites anyway.
+         */
         $this->assertSame(
             [],
             $offenders,
             'Bootstrap 4 listens on data-toggle and Bootstrap 5 on data-bs-toggle, so markup-wired '
                 . 'components need both spellings side by side: ' . implode('; ', $offenders)
         );
+    }
+
+    /**
+     * The pairing detector reports what it should and stays quiet about what it should not.
+     *
+     * The sweep above reads zero lines today, so without this the rule is an assertion over an
+     * empty set: it would keep passing if the detector were deleted, and it would keep passing on
+     * the day someone adds an unpaired data-toggle, because by then nobody would think to re-check
+     * that the detector still worked. Fixtures let the rule be proven without a live offender.
+     *
+     * @return void
+     */
+    public function test_the_data_api_detector_works(): void {
+        $paired = 'data-toggle="dropdown" data-bs-toggle="dropdown"';
+        $this->assertSame([], $this->data_api_offences($paired), 'a correctly paired toggle was reported');
+
+        $this->assertSame(
+            ['data-toggle'],
+            $this->data_api_offences('<button data-toggle="dropdown">'),
+            'a Bootstrap 4 toggle with no Bootstrap 5 spelling was not reported'
+        );
+        $this->assertSame(
+            ['data-bs-toggle'],
+            $this->data_api_offences('<button data-bs-toggle="dropdown">'),
+            'a Bootstrap 5 toggle with no Bootstrap 4 spelling was not reported'
+        );
+
+        /*
+         * data-target on its own is this plugin's own hook, read back with getAttribute, and is not
+         * Bootstrap's unless a toggle sits beside it. Requiring a data-bs-target there would be a
+         * false positive with no correct fix, so that exemption is asserted rather than trusted.
+         */
+        $this->assertSame(
+            [],
+            $this->data_api_offences('<div data-target="competency-list">'),
+            'a bare data-target was treated as a Bootstrap hook'
+        );
+        $this->assertSame(
+            ['data-target'],
+            $this->data_api_offences('<div data-toggle="collapse" data-bs-toggle="collapse" data-target="#x">'),
+            'data-target beside a toggle IS Bootstrap\'s and must be paired'
+        );
+
+        // A longer attribute that merely starts with the same characters is not a match.
+        $this->assertSame([], $this->data_api_offences('<div data-toggle-mode="x">'), 'a longer name matched');
     }
 
     /**
@@ -477,14 +566,19 @@ final class bootstrap_compat_test extends \basic_testcase {
         $root = $this->plugin_root();
         $sheets = array_merge([$root . '/styles.css'], glob($root . '/styles_*.css') ?: []);
         $offenders = [];
+        $lines = 0;
         foreach ($sheets as $sheet) {
             foreach (file($sheet) as $number => $line) {
+                $lines++;
                 /* A declaration, not a mention: the property name followed by its colon. */
                 if (preg_match('/--mds-[a-z0-9-]+\s*:/i', $line)) {
                     $offenders[] = basename($sheet) . ':' . ($number + 1);
                 }
             }
         }
+        // Non-vacuity: a renamed stylesheet would otherwise satisfy this by being unreadable.
+        $this->assertGreaterThan(0, $lines, 'Found no stylesheet to read — the scan is broken, not the code.');
+
         $this->assertSame(
             [],
             $offenders,

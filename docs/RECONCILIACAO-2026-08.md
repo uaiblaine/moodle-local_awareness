@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 26 | 4 | 3 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 75 | 8 | 3 | 10 | **96** |
-| Informativo | 30 | 6 | 0 | 16 | **52** |
-| **Total** | **146** | **19** | **7** | **26** | **198** |
+| Baixo | 81 | 9 | 3 | 3 | **96** |
+| Informativo | 41 | 7 | 0 | 4 | **52** |
+| **Total** | **163** | **21** | **7** | **7** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **165 dos 198 estão encerrados; 33 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **184 dos 198 estão encerrados; 14 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -127,6 +127,12 @@ parciais, com o que falta nomeado.
 > E outra vez a mesma lição, agora ao contrário: eu tinha descrito os 42 restantes como
 > "apresentação ou higiene" na mensagem anterior. Sete não eram, e um deles era isto.
 >
+> **Decisão sobre o REPO-10 (2026-08-17): continua aberto de propósito.** O `version.php` declara
+> `MATURITY_STABLE` e o repositório não tem nenhuma tag; o dono do produto optou por continuar assim
+> por agora. Fica registado porque o PR #40 corrige uma divulgação de ficheiros e, sem tag, não há
+> versão publicada para onde apontar quem corra o plugin a partir de um zip. Reavaliar quando
+> houver utilizadores externos — não é dívida de papelada enquanto não houver.
+>
 > **Atualizado pela fase 15** (versão `2026082300`, branch `fix/phase-15-functional`). Seis achados
 > fechados: **WS-06**, **WS-10**, **RB-03**, **RB-06**, **SQL-05** e **LANG-05**. Os oito candidatos
 > foram investigados aos pares — um agente a propor a correção, um adversarial a tentar refutá-la — e
@@ -169,6 +175,36 @@ parciais, com o que falta nomeado.
 > aparecer — o `window_test` **passou**, e só o `enabled_notices_window_test`, que corre a query
 > verdadeira contra a base, a apanhou. Um modelo do código não é o código. Onde o defeito vive na
 > fronteira com a base de dados, o teste tem de atravessar essa fronteira.
+
+> **Atualizado pela fase 17** (versão `2026082302`, branch `fix/phase-17-remaining`). Dezanove
+> achados encerrados: dezassete corrigidos — JS-06, JS-08, JS-09, JS-10, JS-11, TPL-05, TPL-06,
+> TPL-08, TPL-09, TEST-02, TEST-03, TEST-05, RB-14, RB-16, WS-12, WS-18, LANG-18 — e dois *sem
+> objeto*: **LANG-09**, que é o WS-17 redigido noutra secção, e **DB-06**, que é a mesma alegação do
+> BIZ-09 e foi refutada pela segunda vez.
+>
+> **O que NÃO foi feito, e porquê.** Os seis grupos foram investigados aos pares e **os seis
+> veredictos adversariais vieram negativos** — nenhum plano passou intacto. Três consequências:
+>
+> - O **WS-01** não é entregável como foi desenhado: passar o payload de um blob JSON `PARAM_RAW`
+>   para uma estrutura real parte 20 pontos de chamada de testes e introduz um modo de perda
+>   silenciosa que nenhum dos testes propostos veria. Fica *parcial*, com o mecanismo nomeado.
+> - O **WS-17** (partir o `external.php` monolítico em nove ficheiros) é mecânico mas é churn puro;
+>   fica aberto de propósito, e o LANG-09 fecha por ser o mesmo achado.
+> - O plano dos **templates** teria produzido **CSS inválido**: os intervalos de linha estavam
+>   errados por uma linha e a substituição literal deixaria um `*/` órfão e uma regra por fechar.
+>
+> **A lição desta fase é sobre varreduras que só veem o que já está certo.** O
+> `test_data_api_attributes_are_paired` lê zero linhas — o plugin não liga nada ao data-API do
+> Bootstrap — portanto a regra não podia falhar. E o meu próprio teste novo tinha a mesma forma: um
+> rótulo escrito à mão no formulário passava, porque a varredura só inspecionava atributos **já
+> escritos na forma correta**. Uma varredura que casa o padrão bom e depois o verifica é cega
+> exatamente ao caso que existe para apanhar; enumerar tudo primeiro e só então classificar é a
+> diferença.
+>
+> **E um erro meu, já mergeado.** As fases 15 e 16 apagaram dois cabeçalhos `###` deste documento —
+> o script que virava o veredito de um achado delimitava-o pelo próximo marcador, e um achado que
+> era o **último da sua secção** engolia o cabeçalho seguinte. Repostos aqui, e o delimitador passou
+> a parar no que vier primeiro.
 
 > *Texto original da decisão, mantido por registo:*
 >
@@ -395,7 +431,7 @@ diz o que resta e onde.
 - **C7** · sem objeto — Report filter state is stored under an unprefixed global session key
   <br>classes/report_filter.php was deleted in commit 2c2e787 (`git log --oneline --diff-filter=D -- classes/report_filter.php` returns that commit), together with report/acknowledged_report.php and report/dismissed_report.php. No replacement carries the defect: `grep -rn 'SESSION' .
 
-### Padrões de código / lang — 3 de 19 em aberto
+### Padrões de código / lang — 1 de 19 em aberto
 
 - **LANG-01** · corrigido — The 'Is perpetual' form field has a help string but no addHelpButton call, so the help text never reaches the user
   <br>Fechado na fase 11 (2026-08-17): `addHelpButton('perpetual', …)` no `notice_form.php`, com um teste que percorre o pack de idioma e exige que todo campo renderizado com `_help` mostre o texto na página.
@@ -414,9 +450,8 @@ diz o que resta e onde.
   <br>Sem objeto: os artefactos copiados do local_dimensions saíram; resta uma menção em prosa num comentário.
 - **LANG-08** · corrigido — File header violates the fleet standard in 66 of 68 PHP files: forbidden @author, yearless @copyright, and untagged "Forked and adapted by" prose…
   <br>`grep -rln '@author' --include='*.php' .` and `grep -rln 'Forked and adapted' --include='*.php' .` both return zero files. A loop over all 92 PHP files checking for `@package`, `@copyright 20xx Anderson Blaine` and the GPL v3 license line printed no misses.
-- **LANG-09** · **aberto** — Web services are implemented as one monolithic classes/external.php rather than one class per file under classes/external/
-  <br>classes/external.php:41 is still `class external extends external_api`, 725 lines carrying 27 public static methods, and `ls classes/` shows no `external/` directory (only audience, event, form, local, output, persistent, privacy, reportbuilder, table, task). All nine registrations in db/services.php (lines 29, 38, 47, 56, 65, 74, 83, 92, 101) point at `local_awareness\external`.
-  <br>*Falta:* The monolith needs splitting into one class per file under classes/external/, with db/services.php classnames and a version.php bump in the same commit.
+- **LANG-09** · sem objeto — Web services are implemented as one monolithic classes/external.php rather than one class per file under classes/external/
+  <br>É o mesmo achado que o WS-17, redigido noutra secção. Fica encerrado por duplicação, não por correção — o `classes/external.php` continua monolítico.
 - **LANG-10** · corrigido — @return mixed on a method with a string return type
   <br>Já corrigido antes desta reconciliação: o `@return` é `string`.
 - **LANG-11** · corrigido — @package tag alignment inconsistent across the codebase (three different spacings)
@@ -433,13 +468,12 @@ diz o que resta e onde.
   <br>Fechado na fase 12: docblock de ficheiro acrescentado antes dos `use`.
 - **LANG-17** · corrigido — No-op statement left in a test purely to silence a linter
   <br>Já corrigido: a instrução no-op saiu com a reescrita do teste do estimador na fase 6.
-- **LANG-18** · **aberto** — Test methods lack docblocks in three test files while the plugin's other test files document every one
-  <br>An awk scan of every tests/**/*_test.php checking whether the last non-blank line before each `public function test_` ends in `*/` still reports three files, exactly the three that existed in August (git ls-tree -r 896dfc2 confirms all three were present): tests/audience_estimator_test.php (7 undocumented — lines 43, 59, 65, 145, 162, 186, 220), tests/task/estimate_audience_test.php (3 — lines 57, 76, 105) and tests/external/audience_external_test.php (3 — lines 39, 99, 290).
-  <br>*Falta:* 13 test methods across the three files listed above still need `/** */` docblocks.
+- **LANG-18** · corrigido — Test methods lack docblocks in three test files while the plugin's other test files document every one
+  <br>Fechado na fase 17: 12 métodos em três ficheiros, com texto escrito a partir do código. O agente propôs, para o `test_estimate_cohort_only`, um docblock que descrevia um "segundo passe" do estimador que **não existe** — é uma só instrução com `SUM(CASE…)` por regra; a refutação apanhou-o e o texto foi reescrito.
 - **LANG-19** · corrigido — Behat step carries a copied comment describing forum discussions
   <br>Fechado na fase 12: o comentário copiado sobre fóruns foi substituído.
 
-### Web services — 4 de 18 em aberto
+### Web services — 2 de 18 em aberto
 
 - **WS-01** · **parcial** — get_notices returns the entire notice DB record as a JSON blob in PARAM_RAW, defeating the execute_returns allowlist and leaking targeting…
   <br>The record-wide serialisation is gone: classes/external.php:253 copies a fixed 7-key allowlist out of to_record() (id, title, reqack, forcelogout, modal_width, modal_height, outsideclick) plus content/bgimageurl, and tests/external/notice_external_test.php:560-589 asserts the exact key set.
@@ -464,9 +498,8 @@ diz o que resta e onde.
   <br>Fechado na fase 15 (2026-08-23), nas três metades. Duas classes novas — `awareness_link_clicked` e `awareness_audience_estimated` — e o gatilho do `awareness_dismissed` saiu do ramo `reqack`, mantendo a guarda de convidado. O evento de estimativa dispara na CRIAÇÃO do job, a partir de `audience_job::trigger_created_event()`, porque as linhas nascem em **dois** sítios: o web service e o `notice_audience::refresh()`, que é por onde passam o gravar de um aviso e o botão Recalcular. Instrumentar só o web service teria registado as pré-visualizações debounced do editor e perdido todas as recalculações deliberadas.
 - **WS-11** · corrigido — Six of the eight external functions have no tests, and two capability gates are not mutation-covered
   <br>Sem objeto desde a fase 6: duplicado do M29, já corrigido.
-- **WS-12** · **aberto** — validate_context() is called before validate_parameters() in all eight external functions
-  <br>classes/external.php — in all nine functions validate_context() precedes validate_parameters(): :62/:64 (dismiss_notice), :120/:122 (acknowledge_notice), :177/:179 (track_link), :218/:220 (get_notices), :330/:333 (check_collision), :390/:393 (search_roles), :469/:472 (search_courses), :541/:544 (estimate_audience), :652/:655 (get_estimate).
-  <br>*Falta:* Unchanged from August in every function. The fleet checklist orders it validate_parameters() first, then require_login/validate_context/require_capability. Smallest fix: move the self::validate_parameters(...) assignment above the self::validate_context(...) line in each of the nine. Note that the context here is always \context_system::instance() and never derived from a parameter, so nothing currently depends on the order — this is a convention deviation, not a live hole.
+- **WS-12** · corrigido — validate_context() is called before validate_parameters() in all eight external functions
+  <br>Fechado na fase 17 nas nove funções. Inerte por construção: o contexto é sempre `\context_system::instance()` e nunca derivado de um parâmetro.
 - **WS-13** · refutado — get_estimate does not check that the polled job belongs to the caller
   <br>Refutado na fase 11 (2026-08-17): investigado nos dois sentidos e concluído que não é defeito.
 - **WS-14** · corrigido — estimate_audience accepts criteria lists of unbounded length, which reach get_in_or_equal unchecked
@@ -478,11 +511,9 @@ diz o que resta e onde.
 - **WS-17** · **aberto** — All eight external functions live in one monolithic classes/external.php instead of classes/external/<name>.php
   <br>`ls classes/external*` returns a single file, classes/external.php (27204 bytes) — there is no classes/external/ directory. `grep -c "public static function" classes/external.php` returns 27, i.e. nine functions × (parameters, implementation, returns) in the one class `local_awareness\external` declared at classes/external.php:41. db/services.php:28-107 registers all nine against 'classname' => 'local_awareness\external'.
   <br>*Falta:* Worse than August, not better: check_collision was added to the same monolith after the audit (classes/external.php:305-363), taking it from eight functions to nine. The fleet standard is one class per file under classes/external/<name>.php extending \core_external\external_api. Smallest fix is mechanical — split into nine files and update the nine 'classname' entries in db/services.php, with a version.php bump so the service definitions reinstall.
-- **WS-18** · **aberto** — db/services.php declares no 'capabilities' key for the functions that require one
-  <br>`grep -rn "capabilities" db/services.php` returns nothing (exit 1). Each of the nine entries at db/services.php:28-107 declares only classname, methodname, description, type, loginrequired and ajax. Five of them do require a capability at runtime: check_collision (classes/external.php:331), search_roles (:391), search_courses (:470), estimate_audience (:542) and get_estimate (:653) all call require_capability('local/awareness:manage', $syscontext).
-  <br>*Falta:* No 'capabilities' key on any entry. The runtime gate holds, so this is not an access hole — but the missing declaration means the admin "Web service functions" screen and the service-authorisation UI cannot warn that a token's user lacks the capability. Smallest fix: add `'capabilities' => 'local/awareness:manage'` to those five entries in db/services.php, with a version.php bump (service definitions only install on upgrade).
-
-### Report Builder — 2 de 16 em aberto
+- **WS-18** · corrigido — db/services.php declares no 'capabilities' key for the functions that require one
+  <br>Fechado na fase 17: `'capabilities' => 'local/awareness:manage'` nas cinco entradas que exigem a capacidade em runtime. As outras quatro ficam sem, de propósito — não exigem nenhuma.
+### Report Builder — 0 de 16 em aberto
 
 - **RB-01** · corrigido — notice:content column dumps the raw stored notice HTML with no format_text() and no pluginfile rewriting
   <br>Fechado na fase 16 (2026-08-23), **com uma decisão de produto registada**. A coluna passa a renderizar como o modal, por um `helper::render_content_parts()` partilhado. Resolver os `@@PLUGINFILE@@` é o que faz as imagens funcionarem — e também significa que um download em **PDF** de um relatório com esta coluna embute os ficheiros direto do armazenamento: o writer de PDF do core procura-os por hash de caminho, sem verificação de capacidade nem de público. Quem estiver no público do relatório recebe bytes que o `local_awareness_pluginfile()` lhe recusaria. O ecrã e o dataformat html continuam a passar pelo portão do plugin; o PDF não. **Um relatório que carregue `notice:content` tem de ter o público definido como se carregasse os anexos, porque carrega.** Duas armadilhas de ramo estão guardadas no código: o callback devolve o valor cru quando os campos extra faltam (o `countdistinct` do 4.5 estende `base` e corre callbacks sem reconstruir os campos), e o `content` tem de ser o PRIMEIRO campo — o DML devolve tudo como string, portanto a ordem errada falha em silêncio.
@@ -510,15 +541,12 @@ diz o que resta e onde.
   <br>report/acknowledged_report.php and report/dismissed_report.php were deleted in commit 2c2e787 (`git log --diff-filter=D --name-only -- 'report/*'`); `ls report/` now returns only acknowledged_systemreport.php and dismissed_systemreport.php.
 - **RB-13** · sem objeto — The legacy report pages never set a page title or heading, producing an empty <title>
   <br>Same deletion as RB-12: the August pages set only set_url/set_context/navbar and never set_title (`git show 896dfc2:report/acknowledged_report.php`, lines 42-49), and both were removed in 2c2e787.
-- **RB-14** · **aberto** — Both system reports register the notice entity but never use a column or filter from it
-  <br>classes/reportbuilder/local/systemreports/acknowledged_notice.php:73-78 builds the notice entity and LEFT JOINs {local_awareness}, but add_columns_from_entities() (lines 80-85) and add_filters_from_entities() (lines 87-92) list only 'user:fullname', 'acknowledgement:username', 'acknowledgement:idnumber', 'acknowledgement:timecreated'. dismissed_notice.php:73-92 is identical.
-  <br>*Falta:* Both reports still pay for an unused entity and its LEFT JOIN on {local_awareness}. Smallest fix: either drop the add_entity/add_join block, or use it — e.g. add 'notice:title' to the column list, which would also give RB-06's download name something to key off.
+- **RB-14** · corrigido — Both system reports register the notice entity but never use a column or filter from it
+  <br>Fechado na fase 17: a entidade `notice` e o seu LEFT JOIN saíram dos dois relatórios. Nenhum usava coluna ou filtro dela — o relatório já está limitado a um aviso por condição de base, portanto os campos do aviso seriam o mesmo valor em todas as linhas.
 - **RB-15** · sem objeto — dismissed_notice opens its class brace on the following line, unlike every other class in the plugin
   <br>classes/table/dismissed_notice.php was deleted in 2c2e787; `git show 896dfc2:classes/table/dismissed_notice.php` confirms it declared `class dismissed_notice extends table_sql implements renderable` with `{` alone on the next line.
-- **RB-16** · **aberto** — Datasource tests depend on the \core_reportbuilder_testcase alias deprecated since Moodle 5.0
-  <br>tests/reportbuilder/datasource/all_notices_test.php:26 `use core_reportbuilder_testcase;` and :39 `final class all_notices_test extends core_reportbuilder_testcase {`, after requiring reportbuilder/tests/helpers.php at :24. The same two lines are present in all five datasource tests — acknowledged_notices_test.php:26/:40, dismissed_notices_test.php:26/:40, link_history_test.php:26/:39, notice_views_test.php:26/:40.
-  <br>*Falta:* All five datasource tests still bind to the global \core_reportbuilder_testcase alias deprecated since Moodle 5.0. Smallest fix: `use core_reportbuilder\tests\core_reportbuilder_testcase;` and extend that — but check it resolves on the 4.05 leg before switching, since $plugin->supported still includes 405.
-
+- **RB-16** · corrigido — Datasource tests depend on the \core_reportbuilder_testcase alias deprecated since Moodle 5.0
+  <br>Fechado na fase 17: os cinco `use` passam a `core_reportbuilder\tests\core_reportbuilder_testcase`. O 4.5 já declara a classe com esse namespace, portanto não havia bloqueio nenhum enquanto o 405 for suportado.
 ### Repositório / CI / docs — 1 de 13 em aberto
 
 - **REPO-01** · corrigido — mustache-continue-on-error disables the Mustache gate on all four CI legs, while only two lines in one template actually fail it
@@ -549,7 +577,7 @@ diz o que resta e onde.
 - **REPO-13** · corrigido — version.php header carries a banned @author tag, a copyright without a year, and prose wedged between tags
   <br>Já corrigido: `version.php` não tem `@author`.
 
-### Schema XMLDB / upgrade — 5 de 13 em aberto
+### Schema XMLDB / upgrade — 4 de 13 em aberto
 
 - **DB-01** · **parcial** — CHANGELOG.md carries no entry for the new DB table, upgrade step, or two new web service functions
   <br>`rg -n "local_awareness_estimate_audience\|local_awareness_get_estimate" CHANGELOG.md` returns nothing; `rg -n "audience_jobs" CHANGELOG.md` returns only CHANGELOG.md:1005-1006 (the purge-task entry) and :1163 (the privacy entry). The commit that created the table and its upgrade step (fd7907c, now db/upgrade.php:106-131, savepoint 2026051401) still has no CHANGELOG entry of its own and none was backfilled.
@@ -563,9 +591,8 @@ diz o que resta e onde.
   <br>*Falta:* The column type is unchanged. Smallest fix: an upgrade step changing local_awareness_lastview.action to int(1) (with a cast of existing rows) plus the matching install.xml edit and PARAM_INT on the persistent property.
 - **DB-05** · corrigido — local_awareness_audience_jobs grows without bound — no delete path anywhere, no cleanup task, and no index to support one
   <br>Sem objeto desde a fase 5/6: existe `classes/task/purge_audience_jobs.php`, agendada em `db/tasks.php`, com teste.
-- **DB-06** · **aberto** — Four persistent-backed tables omit the timemodified/usermodified columns core\persistent always writes, so those values are silently discarded
-  <br>core\persistent defines timecreated/timemodified/usermodified for every subclass (/Users/uaiblaine/dev/moodle-502/public/lib/classes/persistent.php:280-290) and writes all three on create and two on update (:506-508, :566-567); insert_record silently drops columns the table does not have.
-  <br>*Falta:* Nothing was changed; the count has in fact grown from four to five since local_awareness_audience_jobs (classes/persistent/audience_job.php:28) is also persistent-backed. Smallest fix: add the missing columns via an upgrade step, or override `define_properties()`/stop extending persistent for the tables that genuinely do not want them.
+- **DB-06** · sem objeto — Four persistent-backed tables omit the timemodified/usermodified columns core\persistent always writes, so those values are silently discarded
+  <br>**Não é defeito**, e é a mesma alegação do BIZ-09, que já tinha sido refutado na fase 11. Investigado de novo aos pares na fase 17 e refutado outra vez.
 - **DB-07** · **aberto** — local_awareness_lastview declares no foreign keys, leaving noticeid-only lookups unindexed
   <br>db/install.xml:94-96 — local_awareness_lastview's KEYS block still holds only `<KEY NAME="primary" TYPE="primary" FIELDS="id"/>`; no foreign key to user or local_awareness. Its only index (db/install.xml:98) is `user_notice_uq` on `userid, noticeid`, whose leading column is userid, so noticeid-only lookups such as `noticeview::delete_notice_view()` (classes/persistent/noticeview.php:145-148, `delete_records(TABLE, ['noticeid' => $noticeid])`, called from classes/helper.php:422) cannot use it.
   <br>*Falta:* Smallest fix: mirror the 2026081103 step for local_awareness_lastview — add foreign keys on `noticeid` and `userid` (Moodle emits them as indexes) in install.xml plus an upgrade step.
@@ -583,7 +610,7 @@ diz o que resta e onde.
 - **DB-13** · corrigido — $plugin->release was left behind when $plugin->version was bumped
   <br>version.php:30 now reads `$plugin->release = 'v1.0';` against `$plugin->version = 2026081603` (version.php:29). At the audited commit it was `$plugin->release = '2026061600';` with version 2026080700 (`git show 896dfc2:version.php`) — a version number in the release field, dated before the version i…
 
-### Templates / Bootstrap 4-5 — 4 de 13 em aberto
+### Templates / Bootstrap 4-5 — 0 de 13 em aberto
 
 - **TPL-01** · corrigido — html_writer used in plugin code in four places
   <br>Fechado na fase 13 (2026-08-17): zero `html_writer` em código de plugin. As células da tabela de gestão passaram a seis templates Mustache (`manage/cell_status`, `cell_chips`, `cell_validity`, `cell_audience`, `cell_title`, mais `resultcount` e `backlink`), e o `use html_writer` saiu do ficheiro.
@@ -593,20 +620,16 @@ diz o que resta e onde.
   <br>Fechado na fase 5 (2026-08-16): docblock e exemplo de contexto passaram a `{key, label, value}`; o lint do 4.05 e do 5.02 renderiza o laço.
 - **TPL-04** · corrigido — The compat test scans only templates/, amd/src/ and classes/ — report/, renderer.php and the entry-point PHP files are outside every assertion
   <br>Sem objeto desde a fase 6: duplicado do M31, já corrigido — `markup_files()` percorre a raiz do plugin.
-- **TPL-05** · **aberto** — test_data_api_attributes_are_paired asserts over an empty set and has no non-vacuity guard
-  <br>`grep -rn "data-toggle\\|data-bs-toggle\\|data-dismiss\\|data-bs-dismiss\\|data-parent\\|data-bs-parent\\|data-target\\|data-bs-target" templates amd/src classes` returns nothing, so the inner comparison in test_data_api_attributes_are_paired (tests/local/bootstrap_compat_test.php:368-407) never evaluates a real attribute; it asserts [] === [] over an empty set. The method has no non-vacuity guard, unlike its two siblings (assertGreaterThan at line 437 and line 506).
-  <br>*Falta:* Add a counter of lines actually carrying one of the four attributes and assert it is greater than zero, or (since the plugin genuinely emits none) assert the count of files scanned plus a fixture line, so the test cannot stay green after markup_files() breaks.
-- **TPL-06** · **aberto** — The badge assertion accepts text-muted and text-body as a valid colour for saturated backgrounds
-  <br>tests/local/bootstrap_compat_test.php:345 still reads `if (!preg_match('/\btext-(white\|dark\|body\|muted)\b/', $line))`, so `text-muted` or `text-body` on a `bg-success`/`bg-primary`/`bg-danger` line satisfies the assertion even though the required colour declared in badge_text_colours() (lines 134-144) is `text-white`.
-  <br>*Falta:* The regex must require the specific `$required` colour for the matched background (e.g. preg_quote($required)), not any member of a four-name alternation. Until then a saturated badge labelled text-muted passes while failing the 4.5:1 floor the test exists to enforce.
+- **TPL-05** · corrigido — test_data_api_attributes_are_paired asserts over an empty set and has no non-vacuity guard
+  <br>Fechado na fase 17. O detetor foi extraído para `data_api_offences()` e fixado com fixtures, porque a varredura lê **zero** linhas hoje — o plugin não liga nada ao data-API do Bootstrap. Uma guarda de contagem seria vermelha numa árvore sem defeito; fixtures provam que a regra ainda sabe falhar.
+- **TPL-06** · corrigido — The badge assertion accepts text-muted and text-body as a valid colour for saturated backgrounds
+  <br>Fechado na fase 17: a cor exigida passa a ser comparada **exatamente**, em vez de aceitar qualquer de `text-white|dark|body|muted`. Medido primeiro: os seis badges vivos já carregavam a cor certa, portanto apertar a regra fechou um buraco sem defeito ativo.
 - **TPL-07** · corrigido — test_entry_points_mark_the_bootstrap_version skips the four report/ pages, none of which marks the Bootstrap version
   <br>Sem objeto desde a fase 6: duplicado do M31, já corrigido — a varredura de entry points reutiliza `markup_files()`.
-- **TPL-08** · **aberto** — styles.css header comment claims a scoping guarantee the file does not provide
-  <br>styles.css:281-282 still claims "All selectors are scoped under .local-awareness-editor so the layout never leaks to the rest of the Moodle UI", but the block it introduces is full of unscoped global class selectors: .la-shell (styles.css:348), .la-shell-main (362), .la-pagehead (367), .la-status-badge (396), .la-req-banner (449), .la-navhelp (468), .la-btn (684), .la-audience (742), .la-chip (896), .la-spinner (920). Only the token/box-sizing/focus blocks at 304-345 carry the .local-awareness-editor prefix.
-  <br>*Falta:* Either scope the .la-* rules under .local-awareness-editor (they are also used inside the preview dialogue attached to document.body, so a second root would have to be listed, exactly as the token block at line 304 does), or reword the comment to state what is actually guaranteed: a la- prefix, not a scoping ancestor.
-- **TPL-09** · **aberto** — Inline !important in a template style attribute, outside stylelint's reach
-  <br>templates/competency_picker_items.mustache:19 still reads `<div class="py-1 px-2 border-bottom competency-picker-item" style="padding-left: {{indent}}px !important;">` — an inline !important that stylelint's declaration-no-important never sees because it is inside a Mustache attribute.
-  <br>*Falta:* The indent is dynamic so it must stay inline, but the !important can go (nothing competes with an inline declaration); alternatively emit a CSS custom property in the style attribute and consume it from styles.css.
+- **TPL-08** · corrigido — styles.css header comment claims a scoping guarantee the file does not provide
+  <br>Fechado na fase 17, depois de medir: **105 dos 153 seletores** do ficheiro não estão sob `.local-awareness-editor`, e 65 dos 114 da própria secção que fazia a promessa. O que protege o resto do Moodle é o *prefixo*, não um ancestral — é isso que o cabeçalho passa a dizer.
+- **TPL-09** · corrigido — Inline !important in a template style attribute, outside stylelint's reach
+  <br>Fechado na fase 17 removendo o conflito em vez de o forçar: o `.px-2` saiu da linha, porque era ele que obrigava ao `!important` (o Bootstrap 5 gera as utilidades de espaçamento com `!important`, o 4 não). Uma declaração inline já ganha a uma classe nos dois ramos.
 - **TPL-10** · corrigido — shell.mustache and preview_card.mustache docblocks drift from the variables the templates use
   <br>templates/editor/preview_card.mustache was deleted in 0181eae (`git log --diff-filter=D --name-only -- templates/`), and templates/editor/shell.mustache's docblock (lines 22-30) now lists exactly the variables the body uses: pagetitle/subtitle (54-55), statuslabel + statusislive/statusisblocked (58-…
 - **TPL-11** · sem objeto — sidenav example context never sets the per-item flag the template branches on
@@ -616,7 +639,7 @@ diz o que resta e onde.
 - **TPL-13** · corrigido — Compat test carries dead exception lists copied from another plugin
   <br>Sem objeto: ver LANG-07.
 
-### AMD JavaScript — 5 de 12 em aberto
+### AMD JavaScript — 0 de 12 em aberto
 
 - **JS-01** · corrigido — Context-rule chips request their language strings with `param: ''`, which deletes the {$a} placeholder and makes the value-substitution branch dead…
   <br>`grep -rn "param:" amd/src/` returns nothing (exit 1). At 896dfc2 the list carried `param: ''` on pathmatch/filter_category/filter_course/filter_format/filter_theme and `param: '{$a}'` on cached/error/reach:value; the current list at amd/src/audience_estimator.js:100-121 has no `param` key at all, a…
@@ -628,23 +651,18 @@ diz o que resta e onde.
   <br>Fechado na fase 12: os cinco módulos AMD ganharam o bloco GPL e a etiqueta `@module`, e perderam o `@author`.
 - **JS-05** · corrigido — The AMD config passed from editnotice.php is discarded: notice_editor.init() takes no argument and calls AudienceEstimator.init() with none
   <br>The mismatch was removed from the caller side. At 896dfc2 editnotice.php:55-60 passed `js_call_amd('local_awareness/notice_editor', 'init', [['formSourceId' => ..., 'threshold' => editor_page::RULE_THRESHOLD, 'pollIntervalMs' => ..., 'pollMax' => ...]])`; today editnotice.php:53-55 passes no third a…
-- **JS-06** · **aberto** — Competency picker renders hardcoded English error text instead of language strings
-  <br>amd/src/notice_form.js:241 — `rulesContainer.innerHTML = '<div class="alert alert-warning">Error rendering rules.</div>';` and amd/src/notice_form.js:402 — `'<div class="p-3 text-center text-danger">Error loading competencies.</div>'`. Both are byte-identical to 896dfc2 (lines 241 and 402 of that revision). Neither string exists in lang/en/local_awareness.php.
-  <br>*Falta:* Two hardcoded English sentences remain in the competency picker's catch blocks (notice_form.js:241 and :402). They need lang keys plus a `core/str` fetch, or — matching the module's existing pattern — a `data-*` label attribute on `#awareness-competency-filter` resolved server-side alongside the other picker labels read at notice_form.js:155-158 and 292-298.
+- **JS-06** · corrigido — Competency picker renders hardcoded English error text instead of language strings
+  <br>Fechado na fase 17: as duas frases inglesas passam a chaves de lang lidas de atributos `data-*`, o padrão que o módulo já usava para os outros sete rótulos.
 - **JS-07** · corrigido — showAction() ignores its `visible` argument for the calculate button, so its JSDoc is wrong and the button stays clickable while a job is queued
   <br>Fechado na fase 12 pela documentação, não pela mudança: o botão Calcular fica sempre visível de propósito — é o controlo manual do autor — e era o JSDoc que estava errado.
-- **JS-08** · **aberto** — Loaded-but-unused language string and a wrong @param type on the poll job id
-  <br>Wrong @param type: amd/src/audience_estimator.js:289 still reads `@param {number} jobid`, but the job id is a UUID string — classes/persistent/audience_job.php:181 `public static function new_jobid(): string` returns an RFC-4122 v4 string, and classes/external.php:640/650 declare it `PARAM_ALPHANUMEXT` / `string $jobid`.
-  <br>*Falta:* Change line 289 to `@param {string} jobid`, and either drop `audience:state:idle`, `audience:btn:calculate` and `audience:btn:retry` from the get_strings() list at lines 100-121 (and their mappings at lines 124, 131, 132) or start using them — the two button labels are rendered by the template today, so the JS copies are redundant.
-- **JS-09** · **aberto** — DOM hooks are scattered class/id strings instead of a SELECTORS map of data-* selectors, and modal_notice's SELECTORS entries are partly dead
-  <br>amd/src/modal_notice.js:13-20 declares six SELECTORS. `grep -n 'SELECTORS\.' amd/src/modal_notice.js` shows references only to ACCEPT_BUTTON (55, 96), ACK_CHECKBOX (63, 97), ACK_CONTAINER (95) and CAN_RECEIVE_FOCUS (237): `CLOSE_BUTTON: '[data-action="close"]'` (line 14) and `TOOL_TIP_WRAPPER: '#tooltip-wrapper'` (line 19) are dead — the latter because turnoffToolTip/turnonToolTip are empty stubs (lines 129-138).
-  <br>*Falta:* Delete SELECTORS.TOOL_TIP_WRAPPER (and the two no-op tooltip methods), and route the close hook through SELECTORS.CLOSE_BUTTON instead of the literal '#awareness-closebtn' at modal_notice.js:47, 207 and 225.
-- **JS-10** · **aberto** — Server-provided label text is concatenated into innerHTML in the competency picker
-  <br>amd/src/notice_form.js:362-365 concatenates `labels.loading` into `listEl.innerHTML`, and amd/src/notice_form.js:375-377 does the same with `labels.noCompetencies`; line 402 concatenates a literal. Those labels come straight off server-rendered data attributes read at notice_form.js:291-299 (`container.getAttribute('data-picker-loading')`, `data-picker-nocompetencies`, …). Both blocks are byte-identical to 896dfc2:362-365 and :375-377.
-  <br>*Falta:* Build these two fragments with `document.createElement` + `textContent`, or escape the label before concatenation. Note the values are lang strings, so the practical risk is low — but a translated string containing an apostrophe or angle bracket already renders wrong today.
-- **JS-11** · **aberto** — preview.js has no rejection path on the modal promise chain
-  <br>amd/src/preview.js:18-25 — `ModalCancel.create({...}).then(function(modal) { return modal.show(); });` with no `.catch()` terminating the chain; the file (32 lines total) contains no `catch` at all and does not require `core/notification`. Byte-identical to 896dfc2. The module is live: managenotice.php:60 calls `js_call_amd('local_awareness/preview', 'init')` and the `a.notice-preview` anchor it binds to is emitted at classes/table/all_notices.php:461.
-  <br>*Falta:* Add `.catch(Notification.exception)` (and the `core/notification` dependency) to the chain at amd/src/preview.js:18-25; a failed modal creation currently produces an unhandled rejection and a dead preview link with nothing reported.
+- **JS-08** · corrigido — Loaded-but-unused language string and a wrong @param type on the poll job id
+  <br>Fechado na fase 17. O `@param` passa a `{String}`. As três strings mortas saíram — mas **não** por remoção da lista: eram lidas por posição (`s[0]`..`s[20]`) e tirar entradas re-etiquetaria em silêncio todos os chips seguintes, por isso o mapeamento passou a ser por chave e a classe de erro desapareceu com ele.
+- **JS-09** · corrigido — DOM hooks are scattered class/id strings instead of a SELECTORS map of data-* selectors, and modal_notice's SELECTORS entries are partly dead
+  <br>Fechado na fase 17: `TOOL_TIP_WRAPPER` e os dois stubs vazios saíram, e o gancho de fechar passa pelo `SELECTORS.CLOSE_BUTTON` nos três sítios. O botão carrega o id **e** o `data-action`, verificado no template antes de trocar — os dois seletores não eram equivalentes.
+- **JS-10** · corrigido — Server-provided label text is concatenated into innerHTML in the competency picker
+  <br>Fechado na fase 17, e **mais largo do que o achado dizia**. Além dos dois `innerHTML`, a refutação encontrou outros dois sinks de HTML cru a receber os mesmos rótulos: `Modal.setTitle()`, que acaba em `.html()`, e `Notification.addNotification()`, que rende por triple stash — ambos idênticos no 4.5 e no 5.2, confirmado antes de escapar.
+- **JS-11** · corrigido — preview.js has no rejection path on the modal promise chain
+  <br>Fechado na fase 17: `.catch(Notification.exception)` fecha a cadeia.
 - **JS-12** · corrigido — version.php was not bumped in the commits that shipped amd/src + amd/build changes
   <br>Every commit touching amd/src or amd/build since the audit also bumped $plugin->version: 83c8b60→2026081100, e9af3df→2026081200, 163ab38→2026081305, b52f8d4→2026081402, f1d5b1e→2026081501, a6862a7→2026081508, 98c47a4→2026081509, 91a32ec→2026081510, 22b9f05→2026081512, d0cebfc→2026081514, 79a7b15→202…
 
@@ -672,19 +690,18 @@ diz o que resta e onde.
   <br>Fechado na fase 12: `libxml_use_internal_errors()` guarda e repõe o valor anterior.
 - **BIZ-11** · corrigido — get_enabled_notices() and retrieve_user_notices() disagree on half-open scheduling windows (latent — not reachable through the form)
   <br>Fechado na fase 16 (2026-08-23): os dois predicados passam a três projeções de uma tabela-verdade em `local\window`, e **um limite a zero significa ILIMITADO desse lado** — a convenção do core para inscrições e a que o `audience\estimator` já usava aqui. A divergência medida era "sem início, expira em Y", descartado pela query, e "com início e sem expiração", alcançável no editor e nunca exibido — o plugin carregava um aviso, `editor_state::WINDOW_OPEN_ENDED`, cujo próprio docblock dizia existir por causa deste defeito; saiu, com as duas strings e o cenário Behat, agora invertido. **A assimetria entre o SQL e o PHP é deliberada**: o cache é `MODE_APPLICATION` sem TTL, purgado só por escrita, portanto a query só pode carregar condições MONÓTONAS — `now >= timestart` é uma transição para visível e deixaria um aviso agendado permanentemente fora do conjunto cacheado. Fixado duas vezes, e a segunda não é redundante: o `window_test` compara com um modelo PHP do prefiltro, o `enabled_notices_window_test` corre a query REAL. Tornar o prefiltro simétrico só é apanhado pelo segundo.
+### Testes — 1 de 10 em aberto
+
 - **TEST-01** · corrigido — No test asserts that any of the eight events fires, so the "every write fires an event" rule is unverified
   <br>Fechado na fase 5 (2026-08-16): `tests/event/events_test.php`, 8 testes, um por verbo mais a distinção entre eles.
-- **TEST-02** · **aberto** — Dead cohort branch in awareness_test::test_create_notices would silently drop the cohort if the provider ever supplied one
-  <br>tests/awareness_test.php:57-59 still reads `if (property_exists($data, 'cohorts')) { $data->cohorts = $this->getDataGenerator()->create_cohort()->id; }` — a bare scalar id, unlike the four sibling loops at lines 163, 199, 240 and 313 which assign `[...]`. `awk 'NR>=555' tests/awareness_test.php \| grep -n cohorts` returns nothing, so create_notices_provider (tests/awareness_test.php:555) never supplies a `cohorts` property and the branch is dead.
-  <br>*Falta:* Either delete the dead branch or make the provider supply a cohorts case and wrap the id in an array as the other four loops do.
-- **TEST-03** · **aberto** — find_reusable()'s dedup predicates (status = ready, timecompleted within DEDUP_WINDOW) are untested — either can be deleted with the suite green
-  <br>find_reusable lives at classes/persistent/audience_job.php:114-125 with both predicates intact (`status = :status`, `timecompleted >= :mints`). `grep -rn "DEDUP_WINDOW" tests/` returns nothing (exit 1) and `grep -rn "STATUS_ERROR" tests/` returns nothing, so no test ages a ready job past the 300s window nor stores an errored job.
-  <br>*Falta:* Two negative controls are missing: a ready job with `timecompleted` set to `time() - DEDUP_WINDOW - 60` must not be reused, and a STATUS_ERROR job with a timecompleted must not be reused.
+- **TEST-02** · corrigido — Dead cohort branch in awareness_test::test_create_notices would silently drop the cohort if the provider ever supplied one
+  <br>Fechado na fase 17 apagando o ramo: o provider nunca forneceu `cohorts`, e o ramo atribuía um escalar onde os quatro laços irmãos atribuem `[id]` — código morto que discordava dos vizinhos sobre a forma do valor.
+- **TEST-03** · corrigido — find_reusable()'s dedup predicates (status = ready, timecompleted within DEDUP_WINDOW) are untested — either can be deleted with the suite green
+  <br>Fechado na fase 17: `tests/persistent/audience_job_dedup_test.php`, com controlo positivo e um negativo por predicado. Apagar o teste de `status` ou o da janela `DEDUP_WINDOW` fica vermelho — verificado por mutação nos dois.
 - **TEST-04** · corrigido — tests/external/audience_external_test.php declares namespace local_awareness while living in tests/external/
   <br>Fechado na fase 12: o namespace passou a `local_awareness\external`, a condizer com o diretório.
-- **TEST-05** · **aberto** — Two of the five bootstrap_compat assertions have no "found nothing" guard, unlike the third which explicitly added one
-  <br>tests/local/bootstrap_compat_test.php now has seven test methods (lines 263, 288, 322, 368, 418, 458, 486) and only two `assertGreaterThan(0, …)` empty-scan guards, at line 437 (test_markup_carries_no_deprecated_bootstrap4_names, added after the audit) and line 506 (test_entry_points_mark_the_bootstrap_version, the one the audit already credited).
-  <br>*Falta:* Add a scanned-file/line counter and an `assertGreaterThan(0, …)` to each of the five methods at lines 263, 288, 322, 368 and 458 — the same two-line shape already used at line 437.
+- **TEST-05** · corrigido — Two of the five bootstrap_compat assertions have no "found nothing" guard, unlike the third which explicitly added one
+  <br>Fechado na fase 17. Guardas de não-vacuidade nas varreduras que as não tinham, e a lista `$structural` do polyfill — dez entradas — foi **medida**: nove nomeavam classes que o `styles.css` não define, e uma (`local-dimensions-central-page`) é de outro plugin. Ficou a única real, a classe-portão.
 - **TEST-06** · corrigido — bootstrap_compat_test carries copy-paste leftovers from local_dimensions: a whitelisted class and an exception file that do not exist in this plugin
   <br>Sem objeto: ver LANG-07.
 - **TEST-07** · corrigido — @covers claims coverage of \local_awareness\local\bootstrap but no test executes either of its methods
@@ -746,6 +763,8 @@ diz o que resta e onde.
   <br>Fechado na fase 6 (2026-08-16): `estimator::base_predicate()` liga `guestid` a `$CFG->siteguest` em vez do literal 1.
 - **SQL-05** · corrigido — Context id and context levels are string-concatenated into SQL instead of being bound as placeholders
   <br>Fechado na fase 15 (2026-08-23): os três valores passam a parâmetros nomeados, com o mesmo `$suffix` que os prefixos do `get_in_or_equal` ao lado já carregam — o estimador emite este fragmento várias vezes na mesma instrução e o Moodle conta OCORRÊNCIAS de placeholder.
+### core business-logic correctness — 0 de 1 em aberto
+
 - **X1-01** · corrigido — awareness_enabled and awareness_disabled events are dead code — enable and disable both log 'notice updated'
   <br>Fechado na fase 5 (2026-08-16): `enable_notice()` e `disable_notice()` disparam agora `awareness_enabled` e `awareness_disabled`, pinado por `tests/event/events_test.php`.
 

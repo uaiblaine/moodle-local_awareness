@@ -283,14 +283,15 @@ class notice_form extends \core\form\persistent {
                     data-yes-label="' . s(get_string('booleanformat:true', 'local_awareness')) . '"
                     data-no-label="' . s(get_string('booleanformat:false', 'local_awareness')) . '"
                     data-remove-label="' . s(get_string('filter_competency_remove', 'local_awareness')) . '"
+                    data-rules-error="' . s(get_string('filter_competency_rules_error', 'local_awareness')) . '"
                     data-picker-title="' . s(get_string('filter_competency_picker_title', 'local_awareness')) . '"
                     data-picker-framework="' . s(get_string('filter_competency_picker_framework', 'local_awareness')) . '"
                     data-picker-search="' . s(get_string('search')) . '"
                     data-picker-noframeworks="' . s(get_string('filter_competency_picker_noframeworks', 'local_awareness')) . '"
                     data-picker-nocompetencies="' . s(get_string('filter_competency_picker_nocompetencies', 'local_awareness')) . '"
                     data-picker-loading="' . s(get_string('loading', 'admin')) . '"
-                    data-picker-addselected="' . s(get_string('filter_competency_picker_addselected', 'local_awareness')) . '"
-                    data-picker-cancel="' . s(get_string('cancel')) . '">
+                    data-picker-loaderror="' . s(get_string('filter_competency_picker_loaderror', 'local_awareness')) . '"
+                    data-picker-addselected="' . s(get_string('filter_competency_picker_addselected', 'local_awareness')) . '">
                     <button type="button" id="id_awareness_add_competencies" class="btn btn-secondary">' .
                         s(get_string('filter_competency_add', 'local_awareness')) . '
                     </button>

@@ -103,6 +103,57 @@ define([], function() {
     };
 
     /**
+     * Escape a string for a sink that renders raw HTML.
+     *
+     * Two of core's own sinks take HTML and cannot be given a text node instead: Modal.setTitle()
+     * ends in jQuery .html() (lib/amd/src/modal.js, identical on 4.5 and 5.2), and
+     * Notification.addNotification() renders through a triple stash in notification_base.mustache,
+     * whose docblock asks for "a cleaned string". Both receive language strings from data-*
+     * attributes here, so they are escaped exactly once on the way in.
+     *
+     * The escaping is the browser's own rather than a hand-written character table — a table is a
+     * thing to get wrong, and this cannot be.
+     *
+     * @param {String} text The raw string.
+     * @returns {String} The same string, safe to place in an HTML sink.
+     */
+    var escapeText = function(text) {
+        var holder = document.createElement('div');
+        holder.appendChild(document.createTextNode(String(text)));
+
+        return holder.innerHTML;
+    };
+
+    /**
+     * Replace an element's contents with a single message box, written as TEXT.
+     *
+     * The message is a language string the server put in a data-* attribute, so it arrives as text
+     * and has to be written as text. Concatenated into innerHTML it is re-parsed as markup, and an
+     * ampersand or an angle bracket a translator wrote renders wrong or swallows the rest of the
+     * fragment. Nothing in the pipeline reads a JS string literal, so the guard is a source-contract
+     * test rather than a linter.
+     *
+     * @param {Element} target Element whose contents are replaced.
+     * @param {String} text The message to show.
+     * @param {String} classes Class attribute for the message box.
+     * @param {Boolean} spinner Whether to prefix a spinner.
+     */
+    var setMessage = function(target, text, classes, spinner) {
+        var box = document.createElement('div');
+        box.className = classes;
+        if (spinner) {
+            var spin = document.createElement('div');
+            spin.className = 'spinner-border spinner-border-sm';
+            spin.setAttribute('role', 'status');
+            box.appendChild(spin);
+            box.appendChild(document.createTextNode(' '));
+        }
+        box.appendChild(document.createTextNode(text));
+        target.innerHTML = '';
+        target.appendChild(box);
+    };
+
+    /**
      * Flatten a competency tree into a list of items with indent levels
      * suitable for the competency_picker_items template.
      *
@@ -173,6 +224,8 @@ define([], function() {
         var yesLabel = container.getAttribute('data-yes-label') || 'Yes';
         var noLabel = container.getAttribute('data-no-label') || 'No';
         var removeLabel = container.getAttribute('data-remove-label') || 'Remove';
+        var rulesErrorLabel = container.getAttribute('data-rules-error')
+            || 'The selected competencies could not be displayed.';
 
         var rules = parseRules(rulesInput.value).map(function(rule) {
             var id = parseInt(rule.id || rule.competencyid || 0, 10);
@@ -254,8 +307,8 @@ define([], function() {
                         return null;
                     })
                     .catch(function() {
-                        // Fallback: basic rendering if template fails.
-                        rulesContainer.innerHTML = '<div class="alert alert-warning">Error rendering rules.</div>';
+                        // Fallback when the template fails: a translated message, written as text.
+                        setMessage(rulesContainer, rulesErrorLabel, 'alert alert-warning', false);
                     });
             });
         };
@@ -312,6 +365,8 @@ define([], function() {
                 noFrameworks: container.getAttribute('data-picker-noframeworks') || 'No frameworks available.',
                 noCompetencies: container.getAttribute('data-picker-nocompetencies') || 'No competencies found.',
                 loading: container.getAttribute('data-picker-loading') || 'Loading...',
+                loadError: container.getAttribute('data-picker-loaderror')
+                    || 'The competency list could not be loaded.',
                 addSelected: container.getAttribute('data-picker-addselected') || 'Add selected'
             };
 
@@ -333,7 +388,10 @@ define([], function() {
                         }
                     }])[0].then(function(frameworks) {
                         if (!frameworks || !frameworks.length) {
-                            Notification.addNotification({message: labels.noFrameworks, type: 'warning'});
+                            Notification.addNotification({
+                                message: escapeText(labels.noFrameworks),
+                                type: 'warning'
+                            });
                             return null;
                         }
 
@@ -353,7 +411,7 @@ define([], function() {
                             });
 
                         return ModalSaveCancel.create({
-                            title: labels.title,
+                            title: escapeText(labels.title),
                             body: bodyPromise,
                             large: true,
                             show: true,
@@ -376,10 +434,7 @@ define([], function() {
                             if (!listEl) {
                                 return;
                             }
-                            listEl.innerHTML =
-                            '<div class="p-3 text-center text-muted">' +
-                            '<div class="spinner-border spinner-border-sm" role="status"></div> ' +
-                            labels.loading + '</div>';
+                            setMessage(listEl, labels.loading, 'p-3 text-center text-muted', true);
 
                             // eslint-disable-next-line promise/no-nesting
                             Ajax.call([{
@@ -389,9 +444,7 @@ define([], function() {
                                 if (!competencies || !competencies.length) {
                                     var el = root.querySelector('[data-region="competency-list"]');
                                     if (el) {
-                                        el.innerHTML =
-                                        '<div class="p-3 text-center text-muted">' +
-                                        labels.noCompetencies + '</div>';
+                                        setMessage(el, labels.noCompetencies, 'p-3 text-center text-muted', false);
                                     }
                                     return null;
                                 }
@@ -415,8 +468,7 @@ define([], function() {
                             }).catch(function() {
                                 var el = root.querySelector('[data-region="competency-list"]');
                                 if (el) {
-                                    el.innerHTML =
-                                    '<div class="p-3 text-center text-danger">Error loading competencies.</div>';
+                                    setMessage(el, labels.loadError, 'p-3 text-center text-danger', false);
                                 }
                             });
                         };

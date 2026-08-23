@@ -100,53 +100,63 @@ define([
          * erased the value from every context chip ("Course category: " with nothing after it).
          * Omitted, the raw {$a} survives the trip and the replace() calls below can find it.
          */
-        return str.get_strings([
-            {key: 'audience:state:idle', component: 'local_awareness'},
-            {key: 'audience:state:auto_pending', component: 'local_awareness'},
-            {key: 'audience:state:manual_ready', component: 'local_awareness'},
-            {key: 'audience:state:queued', component: 'local_awareness'},
-            {key: 'audience:state:cached', component: 'local_awareness'},
-            {key: 'audience:state:timeout', component: 'local_awareness'},
-            {key: 'audience:state:error', component: 'local_awareness'},
-            {key: 'audience:btn:calculate', component: 'local_awareness'},
-            {key: 'audience:btn:retry', component: 'local_awareness'},
-            {key: 'audience:reach:value', component: 'local_awareness'},
-            {key: 'audience:rules_too_many', component: 'local_awareness'},
-            {key: 'audience:rule:cohorts', component: 'local_awareness'},
-            {key: 'audience:rule:filter_role', component: 'local_awareness'},
-            {key: 'audience:rule:reqcourse', component: 'local_awareness'},
-            {key: 'audience:rule:pathmatch', component: 'local_awareness'},
-            {key: 'audience:rule:filter_category', component: 'local_awareness'},
-            {key: 'audience:rule:filter_course', component: 'local_awareness'},
-            {key: 'audience:rule:filter_format', component: 'local_awareness'},
-            {key: 'audience:rule:filter_theme', component: 'local_awareness'},
-            {key: 'audience:rule:filter_competency_rules', component: 'local_awareness'},
-            {key: 'audience:state:wholesite', component: 'local_awareness'}
-        ]).then(function(s) {
+        /*
+         * Requested and mapped BY KEY, never by position. The list used to be a literal array read
+         * back as s[0]..s[20], which meant removing one entry silently re-labelled every chip after
+         * it — and three entries did need removing, because audience:state:idle,
+         * audience:btn:calculate and audience:btn:retry are rendered server-side by
+         * templates/editor/audience_panel.mustache and were fetched here and never read.
+         */
+        var keys = [
+            'audience:state:auto_pending',
+            'audience:state:manual_ready',
+            'audience:state:queued',
+            'audience:state:cached',
+            'audience:state:timeout',
+            'audience:state:error',
+            'audience:reach:value',
+            'audience:rules_too_many',
+            'audience:rule:cohorts',
+            'audience:rule:filter_role',
+            'audience:rule:reqcourse',
+            'audience:rule:pathmatch',
+            'audience:rule:filter_category',
+            'audience:rule:filter_course',
+            'audience:rule:filter_format',
+            'audience:rule:filter_theme',
+            'audience:rule:filter_competency_rules',
+            'audience:state:wholesite'
+        ];
+
+        return str.get_strings(keys.map(function(key) {
+            return {key: key, component: 'local_awareness'};
+        })).then(function(s) {
+            var byKey = {};
+            keys.forEach(function(key, index) {
+                byKey[key] = s[index];
+            });
+
             state.strings = {
-                idle: s[0],
-                autoPending: s[1],
-                manualReady: s[2],
-                queued: s[3],
-                cachedTpl: s[4],
-                timeout: s[5],
-                errorTpl: s[6],
-                calculate: s[7],
-                retry: s[8],
-                reachValueTpl: s[9],
-                rulesTooMany: s[10],
+                autoPending: byKey['audience:state:auto_pending'],
+                manualReady: byKey['audience:state:manual_ready'],
+                queued: byKey['audience:state:queued'],
+                cachedTpl: byKey['audience:state:cached'],
+                timeout: byKey['audience:state:timeout'],
+                errorTpl: byKey['audience:state:error'],
+                reachValueTpl: byKey['audience:reach:value'],
+                rulesTooMany: byKey['audience:rules_too_many'],
                 ruleLabels: {
-                    cohorts: s[11],
-                    filter_role: s[12],
-                    reqcourse: s[13],
-                    pathmatch: s[14],
-                    filter_category: s[15],
-                    filter_course: s[16],
-                    filter_format: s[17],
-                    filter_theme: s[18],
-                    filter_competency_rules: s[19]
+                    cohorts: byKey['audience:rule:cohorts'],
+                    filter_role: byKey['audience:rule:filter_role'],
+                    reqcourse: byKey['audience:rule:reqcourse'],
+                    pathmatch: byKey['audience:rule:pathmatch'],
+                    filter_category: byKey['audience:rule:filter_category'],
+                    filter_course: byKey['audience:rule:filter_course'],
+                    filter_format: byKey['audience:rule:filter_format'],
+                    filter_theme: byKey['audience:rule:filter_theme'],
+                    filter_competency_rules: byKey['audience:rule:filter_competency_rules']
                 },
-                wholeSiteTpl: s[20]
+                wholeSiteTpl: byKey['audience:state:wholesite']
             };
             return state.strings;
         });
@@ -289,7 +299,7 @@ define([
     /**
      * Begin polling for a queued job.
      *
-     * @param {number} jobid The queued job identifier to poll for.
+     * @param {String} jobid The queued job's RFC-4122 token, not a database id.
      */
     function startPolling(jobid) {
         state.currentJobId = jobid;

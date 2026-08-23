@@ -26,7 +26,6 @@ use core_reportbuilder\system_report;
 use lang_string;
 use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
 use local_awareness\reportbuilder\local\entities\acknowledgement;
-use local_awareness\reportbuilder\local\entities\notice;
 use moodle_url;
 use pix_icon;
 use core_reportbuilder\local\report\action;
@@ -73,12 +72,13 @@ class acknowledged_notice extends system_report {
             "LEFT JOIN {user} {$useralias} ON {$useralias}.id = {$ackalias}.userid"
         ));
 
-        // Notice entity.
-        $noticeentity = new notice();
-        $noticealias  = $noticeentity->get_table_alias('local_awareness');
-        $this->add_entity($noticeentity->add_join(
-            "LEFT JOIN {local_awareness} {$noticealias} ON {$noticealias}.id = {$ackalias}.noticeid"
-        ));
+        /*
+         * The notice entity is deliberately NOT registered here. It was, with a LEFT JOIN on
+         * {local_awareness}, and neither report ever used a column or a filter from it — the column
+         * and filter lists below name only user: and acknowledgement: identifiers. This report is
+         * already scoped to one notice by a base condition, so the notice's own fields would be the
+         * same value on every row; the title needed for the download name is read directly below.
+         */
 
         $this->add_columns_from_entities([
             'user:fullname',
