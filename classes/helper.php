@@ -713,7 +713,7 @@ class helper {
             if (!isset($notices[$noticeid])) {
                 continue;
             }
-            if (self::must_reshow($notices[$noticeid], (int) $data['timeviewed'], $data['action'])) {
+            if (self::must_reshow($notices[$noticeid], (int) $data['timeviewed'], (int) $data['action'])) {
                 unset($USER->viewednotices[$noticeid]);
             }
         }
@@ -918,10 +918,10 @@ class helper {
      * Record the latest interaction with the notice of a user.
      *
      * @param \local_awareness\persistent\awareness $notice Notice instance.
-     * @param string $action Action.
+     * @param int $action acknowledgement::ACTION_DISMISSED or ACTION_ACKNOWLEDGED.
      * @param bool $sessiononly Record in the session only, without writing the shared row.
      */
-    private static function add_to_viewed_notices(awareness $notice, string $action, bool $sessiononly = false) {
+    private static function add_to_viewed_notices(awareness $notice, int $action, bool $sessiononly = false) {
         global $USER;
 
         /*
@@ -1326,7 +1326,7 @@ class helper {
         }
 
         $latestview = $latestview->to_record();
-        if (self::must_reshow($notice, (int) $latestview->timemodified, $latestview->action)) {
+        if (self::must_reshow($notice, (int) $latestview->timemodified, (int) $latestview->action)) {
             return false;
         }
 
@@ -1355,11 +1355,11 @@ class helper {
      *
      * @param awareness $notice The notice being judged.
      * @param int $timeviewed When the user last acted on it.
-     * @param string $action What they did — see \local_awareness\persistent\acknowledgement.
+     * @param int $action What they did — see \local_awareness\persistent\acknowledgement.
      * @return bool True when the notice must be shown again.
      */
-    private static function must_reshow(awareness $notice, int $timeviewed, string $action): bool {
-        $dismissed = $action == acknowledgement::ACTION_DISMISSED;
+    private static function must_reshow(awareness $notice, int $timeviewed, int $action): bool {
+        $dismissed = $action === acknowledgement::ACTION_DISMISSED;
         $resetinterval = (int) $notice->get('resetinterval');
 
         // The notice has been updated, reset or re-enabled since they saw it.

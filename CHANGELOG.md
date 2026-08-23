@@ -6,6 +6,69 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed — the schema said one thing and the queries wanted another (version 2026082304, audit DB-04, DB-07, DB-10)
+
+Three schema changes, each measured against every query in the plugin rather than guessed.
+
+**`ack_action` indexed a column with two values.** Around half the table qualifies for either one,
+so no planner would use it — it was paid for on every insert and read by nothing. Every predicate
+here that names `action` names `noticeid` beside it: the dedup on the dismissal write path, both
+system reports, and the two correlated subqueries behind the notice datasource's counts, which run
+once per notice row. It is now `(noticeid, action)`. The honest cost is the two datasources that
+filter on `action` alone, and one redundant leading column against the `noticeid` foreign key's own
+index on a fresh install — both stated in the upgrade step rather than hidden.
+
+**`local_awareness_lastview` had no way in by `noticeid`.** It is the plugin's largest table — one
+row per user per notice — and deleting a notice removes its view rows by `noticeid` with no
+`userid`, which the existing `(userid, noticeid)` index cannot serve. The foreign key is declared for
+the index it carries. Only that one: `add_key()` matches an existing index by exact column set, so a
+`userid` key would build a second index on a column the composite already leads with.
+
+**`lastview.action` was a `char(1333)` holding the same 0/1 enum `ack.action` stores as `int(1)`.**
+Nothing has ever written anything else. The rows are normalised before the type change rather than
+trusted to it — PostgreSQL's cast is a hard error on a non-numeric row and MySQL's `ALTER IGNORE`
+escape hatch is gated on a text column, not a char one, so an upgrade would have died mid-DDL. The
+new column takes no `DEFAULT`, so an insert that omits the action still fails loudly, and the PHP
+that handles the value is typed `int` in the same commit rather than left to coerce.
+
+### Fixed — the data export was written for the database, not for the person (version 2026082304, audit PRIV-05)
+
+`export_user_data()` looped over the contextlist without ever reading `$context`, so every context in
+it received the identical, complete payload. It now exports only into the subject's own user
+context — the same check `delete_data_for_user()` already carried, and an export that trusts what an
+erasure verifies was the asymmetry worth removing.
+
+The rows themselves went out as stored: unix integers for every timestamp and bare internal ids for
+the notice and the link. A person reading their own export learned that they had met notice 7 at
+1787500000. Timestamps are now dates, and each id is accompanied by the thing it names — resolved in
+one query for the whole export, not one per row. The ids stay, because a data request is also a
+record and dropping them would make it impossible to reconcile against the site. A notice deleted
+since is simply left unnamed; click history deliberately outlives the notice it belongs to.
+
+### Added — a data generator, and the language strings nobody used (version 2026082304, audit TEST-08, LANG-04)
+
+`tests/generator/lib.php` provides `create_notice()`, routed through the awareness persistent, and
+replaces the fourteen literal fields that five test files each hand-built. A test now states only
+what it is actually about, and a column added to the table is a one-line edit rather than fourteen.
+
+Five language strings were defined in both packs and used nowhere: three editor action labels, an
+event column header and `notice:timemodified`. That last one had survived two audits because its only
+apparent reference was the **distinct** key `report_notice:timemodified` — a substring match, which is
+why the new guard matches on bounded keys rather than with `str_contains`.
+
+`tests/local/lang_usage_test.php` now fails on a dead string and on the two packs drifting apart. The
+convention exemptions are named individually — `_help`, `cachedef_`, `messageprovider:`, `task_` — because
+each looks dead for a different reason and none may be deleted.
+
+### Added — backfilled entry for the audience-estimate machinery (audit DB-01)
+
+Recorded late, because it was never recorded at the time: the `local_awareness_audience_jobs` table
+and its upgrade step (savepoint `2026051401`) were added along with the two web-service functions
+`local_awareness_estimate_audience` and `local_awareness_get_estimate`, which queue an audience count
+and poll it. The table holds one row per distinct criteria set asked about, keyed by a hash, and is
+purged after a day by a scheduled task.
+
+
 ### Fixed — the competency picker wrote translated text into HTML sinks (version 2026082302, audit JS-06, JS-08, JS-09, JS-10, JS-11)
 
 The picker builds its messages from language strings the server renders into `data-*` attributes,

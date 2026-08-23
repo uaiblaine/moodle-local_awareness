@@ -253,5 +253,79 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026081503, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026082303) {
+        /*
+         * ack_action indexed a column with exactly two values. Around half the table qualifies for
+         * either one, so no planner will choose it — the index was paid for on every insert and
+         * read by nothing.
+         *
+         * Every predicate in the plugin that names action names noticeid beside it:
+         * helper::has_acknowledgement_record() on the dismissal write path, both system reports,
+         * and the two correlated subqueries behind the notice datasource's ack_count and
+         * dismiss_count columns, which run once per notice row. The composite is what those want.
+         *
+         * The two datasources that filter on action ALONE are the honest cost of this trade, and
+         * whether they were ever served by ack_action depended on a site's accept/dismiss ratio.
+         * The composite's leading column also duplicates the noticeid foreign key's own index on a
+         * fresh install; that is stated rather than hidden, and the key stays because it declares
+         * the relationship.
+         */
+        $ack = new xmldb_table('local_awareness_ack');
+
+        $old = new xmldb_index('ack_action', XMLDB_INDEX_NOTUNIQUE, ['action']);
+        if ($dbman->index_exists($ack, $old)) {
+            $dbman->drop_index($ack, $old);
+        }
+
+        $new = new xmldb_index('ack_noticeaction', XMLDB_INDEX_NOTUNIQUE, ['noticeid', 'action']);
+        if (!$dbman->index_exists($ack, $new)) {
+            $dbman->add_index($ack, $new);
+        }
+
+        /*
+         * local_awareness_lastview is the plugin's largest table — one row per (user, notice) — and
+         * had no way into it by noticeid. Deleting a notice removes its view rows with
+         * delete_records(TABLE, ['noticeid' => ...]), which had to scan the whole table. That path
+         * is gated behind two settings that both default to off, so this is not a hot path; the key
+         * is declared because the relationship is real and the table is the big one.
+         *
+         * Only noticeid. A userid key would be documentation with a cost: add_key() matches an
+         * existing index by exact column SET, so it would not recognise user_notice_uq and would
+         * build a second index on a column that index already leads with.
+         */
+        $lastview = new xmldb_table('local_awareness_lastview');
+        $key = new xmldb_key('noticeid', XMLDB_KEY_FOREIGN, ['noticeid'], 'local_awareness', ['id']);
+        $dbman->add_key($lastview, $key);
+
+        upgrade_plugin_savepoint(true, 2026082303, 'local', 'awareness');
+    }
+
+    if ($oldversion < 2026082304) {
+        /*
+         * local_awareness_lastview.action held the same 0/1 enum that local_awareness_ack.action
+         * stores as int(1), in a char(1333). Nothing has ever written anything else: the only
+         * writer is noticeview::add_notice_view(), typed int since the repository's first commit,
+         * and its callers pass the two acknowledgement constants.
+         *
+         * The rows are normalised BEFORE the type change rather than trusted to it.
+         * change_field_type() casts on its own — PostgreSQL is handed
+         * USING CAST(CAST(action AS NUMERIC) AS INTEGER) — but that cast is a hard error on a
+         * non-numeric row, and MySQL's ALTER IGNORE escape hatch is gated on a text column, not a
+         * char one. An upgrade dying half way through DDL is worse than one unreadable marker, so
+         * anything outside the enum becomes 0 — which is how must_reshow() has always read a value
+         * it does not recognise. On a site written by this plugin the UPDATE matches nothing.
+         *
+         * No DEFAULT on the new column, deliberately: an insert that omits the action should still
+         * fail loudly rather than silently record a dismissal.
+         */
+        $DB->execute("UPDATE {local_awareness_lastview} SET action = '0' WHERE action NOT IN ('0', '1')");
+
+        $lastview = new xmldb_table('local_awareness_lastview');
+        $field = new xmldb_field('action', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, null, 'userid');
+        $dbman->change_field_type($lastview, $field);
+
+        upgrade_plugin_savepoint(true, 2026082304, 'local', 'awareness');
+    }
+
     return true;
 }

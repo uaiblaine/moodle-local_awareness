@@ -41,12 +41,12 @@ defeito continua lá.
 | Alto | 10 | 0 | 0 | 0 | **10** |
 | Médio | 26 | 4 | 3 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 81 | 9 | 3 | 3 | **96** |
-| Informativo | 41 | 7 | 0 | 4 | **52** |
-| **Total** | **163** | **21** | **7** | **7** | **198** |
+| Baixo | 86 | 9 | 1 | 0 | **96** |
+| Informativo | 43 | 7 | 0 | 2 | **52** |
+| **Total** | **170** | **21** | **5** | **2** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **184 dos 198 estão encerrados; 14 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **191 dos 198 estão encerrados; 7 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -205,6 +205,34 @@ parciais, com o que falta nomeado.
 > o script que virava o veredito de um achado delimitava-o pelo próximo marcador, e um achado que
 > era o **último da sua secção** engolia o cabeçalho seguinte. Repostos aqui, e o delimitador passou
 > a parar no que vier primeiro.
+
+> **Atualizado pela fase 18** (versão `2026082304`, branch `fix/phase-18-schema-privacy`). Sete
+> achados fechados — **DB-04**, **DB-07**, **DB-10**, **TEST-08**, **PRIV-05**, **LANG-04** e
+> **DB-01** — dois deles saindo de *parcial*. **191 de 198 encerrados; restam 2 abertos e 5
+> parciais**, e os 5 são as decisões deliberadas (C3, M6, M7, M8, WS-01).
+>
+> **Duas mudanças de schema com passo de upgrade, corridas contra uma base real** antes de qualquer
+> teste: savepoint `2026082303` para os índices e `2026082304` para o tipo da coluna. A normalização
+> das linhas acontece **antes** da mudança de tipo e não é confiada a ela — o cast do PostgreSQL é
+> erro duro numa linha não numérica e o escape do MySQL só cobre `text`, portanto um upgrade morreria
+> a meio do DDL.
+>
+> **A lição desta fase é sobre mutações que não chegam ao sistema.** As duas primeiras mutações do
+> teste de schema deram "não apanhada" — e a razão não era o teste: o `phpunit-init` sem `--drop`,
+> e mesmo com `--drop` sem bump de versão, **não reconstrói as tabelas a partir de um `install.xml`
+> alterado**. A mutação nunca chegou à base. Com o bump a forçar a reconstrução, as três são
+> apanhadas. É a terceira vez nesta sessão que uma mutação minha não mutou nada, sempre com o mesmo
+> sintoma: um teste verde indistinguível de um teste que passa.
+>
+> **E uma asserção minha que nunca poderia falhar.** O primeiro teste de schema fazia
+> `assertArrayNotHasKey('ack_action', $indexes)` — mas o Moodle **gera** os nomes dos índices
+> (`t_locaawarack_notact_ix`), portanto a chave nomeada no `install.xml` nunca aparece no resultado e
+> a asserção era vazia por construção. Só uma sonda que imprimiu o array real o mostrou. As
+> asserções passaram a comparar **colunas**, que é o que a base devolve.
+>
+> O `notice:timemodified` sobreviveu a duas auditorias por um motivo que vale generalizar: a sua
+> única referência aparente era a chave **distinta** `report_notice:timemodified`. Uma varredura por
+> substring dá isso como usado. O `lang_usage_test` compara chaves delimitadas.
 
 > *Texto original da decisão, mantido por registo:*
 >
@@ -431,7 +459,7 @@ diz o que resta e onde.
 - **C7** · sem objeto — Report filter state is stored under an unprefixed global session key
   <br>classes/report_filter.php was deleted in commit 2c2e787 (`git log --oneline --diff-filter=D -- classes/report_filter.php` returns that commit), together with report/acknowledged_report.php and report/dismissed_report.php. No replacement carries the defect: `grep -rn 'SESSION' .
 
-### Padrões de código / lang — 1 de 19 em aberto
+### Padrões de código / lang — 0 de 19 em aberto
 
 - **LANG-01** · corrigido — The 'Is perpetual' form field has a help string but no addHelpButton call, so the help text never reaches the user
   <br>Fechado na fase 11 (2026-08-17): `addHelpButton('perpetual', …)` no `notice_form.php`, com um teste que percorre o pack de idioma e exige que todo campo renderizado com `_help` mostre o texto na página.
@@ -439,9 +467,8 @@ diz o que resta e onde.
   <br>Fechado na fase 12: a assinatura e o docblock passaram a `int $action`, que é o que as constantes são.
 - **LANG-03** · corrigido — @return \stdClass[] on a method that returns persistent objects
   <br>Já corrigido antes desta reconciliação: o `@return` é `self[]`.
-- **LANG-04** · **parcial** — Ten language strings are defined in both en and pt_br but referenced nowhere in the plugin
-  <br>Recomputed the unreferenced set at 896dfc2 and on HEAD (extract keys from lang/en, grep every non-lang/non-docs/non-amd-build file, then discount the keys required by convention: _help paired with an addHelpButton, cachedef_* named in db/caches.php, capability and messageprovider names).
-  <br>*Falta:* `event:timecreated` survives unreferenced (lang/en/local_awareness.php:119, lang/pt_br:118), as does the orphan `notice:perpetual_help` (lang/en:207 — see LANG-01). Four new dead strings were introduced since: `editor:action:cancel` (lang/en:79), `editor:action:save_draft` (:81), `editor:action:save_publish` (:82) and `notice:timemodified` (:220) — the only apparent hit for the last one is the distinct key `report_notice:timemodified` at classes/reportbuilder/local/entities/notice.php:181. Six dead strings today against ten then.
+- **LANG-04** · corrigido — Ten language strings are defined in both en and pt_br but referenced nowhere in the plugin
+  <br>Fechado na fase 18: as cinco strings mortas saíram dos dois packs. O `notice:timemodified` sobrevivera a duas auditorias porque a sua única referência aparente era a chave **distinta** `report_notice:timemodified` — um acerto por substring, e é por isso que o `lang_usage_test` novo compara chaves delimitadas em vez de usar `str_contains`. As isenções por convenção são nomeadas uma a uma, porque cada uma parece morta por uma razão diferente.
 - **LANG-05** · corrigido — Event get_name() returns lowercase verbs instead of readable event names
   <br>Fechado na fase 15 (2026-08-23): os nomes passam a legíveis (`Notice dismissed` em vez de `dismiss`) nos dois packs. Cada uma destas strings tem exatamente um consumidor, a classe de evento correspondente, portanto nada mais se mexe.
 - **LANG-06** · corrigido — html_writer used in plugin code, against the zero-html_writer rule
@@ -577,32 +604,28 @@ diz o que resta e onde.
 - **REPO-13** · corrigido — version.php header carries a banned @author tag, a copyright without a year, and prose wedged between tags
   <br>Já corrigido: `version.php` não tem `@author`.
 
-### Schema XMLDB / upgrade — 4 de 13 em aberto
+### Schema XMLDB / upgrade — 0 de 13 em aberto
 
-- **DB-01** · **parcial** — CHANGELOG.md carries no entry for the new DB table, upgrade step, or two new web service functions
-  <br>`rg -n "local_awareness_estimate_audience\|local_awareness_get_estimate" CHANGELOG.md` returns nothing; `rg -n "audience_jobs" CHANGELOG.md` returns only CHANGELOG.md:1005-1006 (the purge-task entry) and :1163 (the privacy entry). The commit that created the table and its upgrade step (fd7907c, now db/upgrade.php:106-131, savepoint 2026051401) still has no CHANGELOG entry of its own and none was backfilled.
-  <br>*Falta:* The table itself and the estimate feature are now described (CHANGELOG.md:599-728, 1003-1011, 1163), so the worst of the gap is closed. Still missing: any entry recording the creation of `local_awareness_audience_jobs`, its `2026051401` upgrade step, and the two web-service functions `local_awareness_estimate_audience` / `local_awareness_get_estimate` — neither name appears anywhere in CHANGELOG.md. Smallest fix: one backfilled `### Added` entry naming the table, the savepoint and the two WS functions.
+- **DB-01** · corrigido — CHANGELOG.md carries no entry for the new DB table, upgrade step, or two new web service functions
+  <br>Fechado na fase 18: entrada retroativa no `CHANGELOG.md` a nomear a tabela `local_awareness_audience_jobs`, o savepoint `2026051401` e as duas funções de web service `local_awareness_estimate_audience` / `local_awareness_get_estimate`.
 - **DB-02** · corrigido — local/awareness:manage declares only RISK_CONFIG although it lets its holder inject unfiltered HTML into every user's screen
   <br>db/access.php:43 now declares `'riskbitmask' => RISK_CONFIG \| RISK_XSS,` for `local/awareness:manage`, with db/access.php:29-39 explaining the noclean/format_text/Modal.setBody chain that makes RISK_XSS correct. db/access.php:55 additionally gives `local/awareness:viewreports` RISK_PERSONAL.
 - **DB-03** · corrigido — notice_view is a MODE_APPLICATION cache holding per-user viewing history that the privacy erasure path never clears
   <br>The cache is still MODE_APPLICATION (db/caches.php:32-34), but erasure now clears it: classes/persistent/noticeview.php:81-83 `purge_user_cache(int $userid)` deletes the user's key, and classes/privacy/provider.php:236 calls it from `delete_all_data_for_userid()` (classes/privacy/provider.php:226-23…
-- **DB-04** · **aberto** — local_awareness_lastview.action is char(1333) while it stores the same 0/1 enum that local_awareness_ack.action stores as int(1)
-  <br>db/install.xml:90 still declares `<FIELD NAME="action" TYPE="char" LENGTH="1333" NOTNULL="true" ... COMMENT="Action"/>` on local_awareness_lastview, while db/install.xml:48 stores the identical 0/1 enum on local_awareness_ack as `TYPE="int" LENGTH="1"`. The value written is an int: classes/helper.php:935 calls `noticeview::add_notice_view($id, $USER->id, $action)`, whose signature is `int $action` (classes/persistent/noticeview.php:123); the persistent types it `PARAM_RAW_TRIMMED` (classes/persistent/noticeview.php…
-  <br>*Falta:* The column type is unchanged. Smallest fix: an upgrade step changing local_awareness_lastview.action to int(1) (with a cast of existing rows) plus the matching install.xml edit and PARAM_INT on the persistent property.
+- **DB-04** · corrigido — local_awareness_lastview.action is char(1333) while it stores the same 0/1 enum that local_awareness_ack.action stores as int(1)
+  <br>Fechado na fase 18 (savepoint 2026082304): a coluna passa de `char(1333)` a `int(1)`, igual à irmã na tabela `ack`. As linhas são normalizadas **antes** da mudança de tipo, não confiadas a ela — o cast do PostgreSQL é erro duro numa linha não numérica e o escape do MySQL só cobre coluna `text`, portanto um upgrade morreria a meio do DDL. Sem `DEFAULT`, para que uma inserção que omita a ação continue a falhar alto; e o PHP que a manipula passou a `int` no mesmo commit.
 - **DB-05** · corrigido — local_awareness_audience_jobs grows without bound — no delete path anywhere, no cleanup task, and no index to support one
   <br>Sem objeto desde a fase 5/6: existe `classes/task/purge_audience_jobs.php`, agendada em `db/tasks.php`, com teste.
 - **DB-06** · sem objeto — Four persistent-backed tables omit the timemodified/usermodified columns core\persistent always writes, so those values are silently discarded
   <br>**Não é defeito**, e é a mesma alegação do BIZ-09, que já tinha sido refutado na fase 11. Investigado de novo aos pares na fase 17 e refutado outra vez.
-- **DB-07** · **aberto** — local_awareness_lastview declares no foreign keys, leaving noticeid-only lookups unindexed
-  <br>db/install.xml:94-96 — local_awareness_lastview's KEYS block still holds only `<KEY NAME="primary" TYPE="primary" FIELDS="id"/>`; no foreign key to user or local_awareness. Its only index (db/install.xml:98) is `user_notice_uq` on `userid, noticeid`, whose leading column is userid, so noticeid-only lookups such as `noticeview::delete_notice_view()` (classes/persistent/noticeview.php:145-148, `delete_records(TABLE, ['noticeid' => $noticeid])`, called from classes/helper.php:422) cannot use it.
-  <br>*Falta:* Smallest fix: mirror the 2026081103 step for local_awareness_lastview — add foreign keys on `noticeid` and `userid` (Moodle emits them as indexes) in install.xml plus an upgrade step.
+- **DB-07** · corrigido — local_awareness_lastview declares no foreign keys, leaving noticeid-only lookups unindexed
+  <br>Fechado na fase 18 (savepoint 2026082303): a `local_awareness_lastview` passa a declarar a chave estrangeira `noticeid`. É a maior tabela do plugin e apagar um aviso remove as suas linhas só por `noticeid`, forma que o `(userid, noticeid)` existente não serve. Só essa chave: o `add_key()` compara índices pelo CONJUNTO exato de colunas, portanto uma chave `userid` construiria um segundo índice sobre uma coluna que o composto já lidera.
 - **DB-08** · corrigido — The estimate_audience ad-hoc task has no lang string, so its name is untranslatable in the ad-hoc queue
   <br>Fechado na fase 12: `task_estimate_audience` acrescentada aos dois packs.
 - **DB-09** · corrigido — install.xml VERSION attribute is stale at 20220321 while the file gained a whole new table
   <br>db/install.xml:2 now reads `<XMLDB PATH="local/awareness/db" VERSION="20260815" ...>`; the stale 20220321 is confirmed gone (`git show 896dfc2:db/install.xml` line 2 carried it). Bumped in commit f1d5b1e ("perf: make the audience estimate fit sites with 200k users").
-- **DB-10** · **aberto** — ack_action indexes the two-value action column alone, while every query filters on (noticeid, action)
-  <br>db/install.xml:57 still carries `<INDEX NAME="ack_action" UNIQUE="false" FIELDS="action"/>` as local_awareness_ack's only index, on a column declared `int(1)` with two values (db/install.xml:48). `rg -n "ack_action\|local_awareness_ack" db/upgrade.php` returns nothing, so no upgrade step ever recomposed it.
-  <br>*Falta:* The index is unchanged. Note the finding's rationale is only half right and should not be copied forward verbatim: classes/reportbuilder/local/entities/notice.php:217 and :230 do filter `(noticeid, action)`, but the system reports filter on action alone with local_awareness_ack as the main table (classes/reportbuilder/local/systemreports/acknowledged_notice.php:51-63, dismissed_notice.php:51-63).
+- **DB-10** · corrigido — ack_action indexes the two-value action column alone, while every query filters on (noticeid, action)
+  <br>Fechado na fase 18 (savepoint 2026082303): `ack_action` cai e entra `(noticeid, action)`. Um índice sobre uma coluna de dois valores não é usável — metade da tabela qualifica de qualquer forma — e todos os predicados que nomeiam `action` nomeiam `noticeid` ao lado: a deduplicação no caminho de escrita, os dois relatórios de sistema e as duas subconsultas correlacionadas que correm uma vez por linha de aviso. O custo honesto são os dois datasources que filtram só por `action`, e uma coluna-líder redundante face ao índice da chave estrangeira numa instalação limpa — os dois ditos no passo de upgrade.
 - **DB-11** · corrigido — The contentformat column is written on every save but never read by any rendering path
   <br>classes/helper.php:1363 reads it: `return format_text($content, (int) $notice->get('contentformat'), ['noclean' => true, 'context' => \context_system::instance()]);` inside `render_content()` (classes/helper.php:1353).
 - **DB-12** · corrigido — Every in-scope db/ file and version.php carries an @author tag and a year-less @copyright, against the fleet header standard
@@ -690,7 +713,7 @@ diz o que resta e onde.
   <br>Fechado na fase 12: `libxml_use_internal_errors()` guarda e repõe o valor anterior.
 - **BIZ-11** · corrigido — get_enabled_notices() and retrieve_user_notices() disagree on half-open scheduling windows (latent — not reachable through the form)
   <br>Fechado na fase 16 (2026-08-23): os dois predicados passam a três projeções de uma tabela-verdade em `local\window`, e **um limite a zero significa ILIMITADO desse lado** — a convenção do core para inscrições e a que o `audience\estimator` já usava aqui. A divergência medida era "sem início, expira em Y", descartado pela query, e "com início e sem expiração", alcançável no editor e nunca exibido — o plugin carregava um aviso, `editor_state::WINDOW_OPEN_ENDED`, cujo próprio docblock dizia existir por causa deste defeito; saiu, com as duas strings e o cenário Behat, agora invertido. **A assimetria entre o SQL e o PHP é deliberada**: o cache é `MODE_APPLICATION` sem TTL, purgado só por escrita, portanto a query só pode carregar condições MONÓTONAS — `now >= timestart` é uma transição para visível e deixaria um aviso agendado permanentemente fora do conjunto cacheado. Fixado duas vezes, e a segunda não é redundante: o `window_test` compara com um modelo PHP do prefiltro, o `enabled_notices_window_test` corre a query REAL. Tornar o prefiltro simétrico só é apanhado pelo segundo.
-### Testes — 1 de 10 em aberto
+### Testes — 0 de 10 em aberto
 
 - **TEST-01** · corrigido — No test asserts that any of the eight events fires, so the "every write fires an event" rule is unverified
   <br>Fechado na fase 5 (2026-08-16): `tests/event/events_test.php`, 8 testes, um por verbo mais a distinção entre eles.
@@ -706,9 +729,8 @@ diz o que resta e onde.
   <br>Sem objeto: ver LANG-07.
 - **TEST-07** · corrigido — @covers claims coverage of \local_awareness\local\bootstrap but no test executes either of its methods
   <br>Fechado na fase 7 (2026-08-16): dois testes que EXECUTAM `bootstrap::is_bs4()` e `mark_page()` através da fronteira 405/499/500/502, com `$PAGE` isolado e reposto.
-- **TEST-08** · **aberto** — No plugin data generator — five test files each hand-build local_awareness rows with 15 literal fields, bypassing the persistent
-  <br>`ls tests/generator` → No such file or directory; the only lib.php in the repo is ./lib.php (`find . -name lib.php`), and no test calls `get_plugin_generator('local_awareness')` (every get_plugin_generator hit in tests/ names core_competency or core_reportbuilder). Five files still hand-build rows via `$DB->insert_record('local_awareness', …)`: tests/reportbuilder/datasource/acknowledged_notices_test.php:49 (14 literal fields, lines 49-64), all_notices_test.php (5 call sites), dismissed_notices_test.php (2), notice…
-  <br>*Falta:* No tests/generator/lib.php exists. Smallest fix: a `local_awareness_generator extends component_generator_base` with `create_notice(array $record)` routed through the awareness persistent, replacing the five private create_notice() helpers.
+- **TEST-08** · corrigido — No plugin data generator — five test files each hand-build local_awareness rows with 15 literal fields, bypassing the persistent
+  <br>Fechado na fase 18: `tests/generator/lib.php` com `create_notice()`, encaminhado pelo persistent, substituiu os catorze campos literais que cinco ficheiros construíam à mão. Um teste passa a declarar só aquilo de que trata.
 - **TEST-09** · corrigido — The estimate_audience task's error path and get_estimate's job-level error response are never exercised
   <br>Fechado na fase 11 (2026-08-17): `notice_audience::record()` recusa um job que não esteja `ready`; um job falhado deixou de gravar contagem 0 e de carimbar o hash, o que tornava a falha pegajosa e com ar de resultado.
 - **TEST-10** · corrigido — test_execute_with_unknown_jobid_does_not_throw asserts assertTrue(true)
@@ -735,7 +757,7 @@ diz o que resta e onde.
 - **SEC-09** · corrigido — styles.css is explicitly requested although Moodle already compiles it into the theme
   <br>`rg -n 'requires->css' --glob '*.php' .` returns zero hits (exit 1) across the whole plugin. The August call `$PAGE->requires->css('/local/awareness/styles.css');` lived at report/acknowledged_report.php:49 (`git show 896dfc2:report/acknowledged_report.php`); that file is deleted and its replacement…
 
-### Privacidade / LGPD-GDPR — 1 de 6 em aberto
+### Privacidade / LGPD-GDPR — 0 de 6 em aberto
 
 - **PRIV-01** · corrigido — Declared metadata under-states the columns that export_user_data actually ships
   <br>Fechado na fase 10 (2026-08-16): as quatro tabelas declaram agora todas as colunas que o `export_user_data()` envia (18 entradas novas), com um teste que compara a declaração contra as colunas REAIS da base, não contra uma lista escrita à mão.
@@ -745,9 +767,8 @@ diz o que resta e onde.
   <br>Fechado na fase 5 (2026-08-16): `delete_data_for_user()` percorre todos os contextos aprovados e tira o userid do contextlist.
 - **PRIV-04** · corrigido — local_awareness.usermodified (the notice author) is user-linked but is not declared, exported or considered anywhere in the provider
   <br>Fechado na fase 10 (2026-08-16): a tabela `local_awareness` é declarada pelo seu `usermodified` e deliberadamente nunca exportada nem apagada — um aviso é configuração do site, e apagar a coluna reescreveria quem o publicou. O teste afirma as duas metades.
-- **PRIV-05** · **aberto** — export_user_data ignores the context it is exporting for and ships raw unix timestamps and internal ids
-  <br>classes/privacy/provider.php:87-131 — the loop `foreach ($contextlist->get_contexts() as $context)` never uses $context in any of the four queries (provider.php:93-107 filter on :userid only), so every context in the list receives the identical, full payload; and the exported records are raw rows (`lv.*` etc.) so timecreated/timemodified go out as unix integers and noticeid/hlinkid/jobid as internal ids, with no transform anywhere between provider.php:113 and the export at provider.php:129.
-  <br>*Falta:* Unchanged. Smallest fix: transform timestamps with \core_privacy\local\request\transform::datetime() and resolve notice ids to titles before the export_data() call at provider.php:129 (the context loop is harmless once only one user context can ever be present, but the raw payload is what the finding names).
+- **PRIV-05** · corrigido — export_user_data ignores the context it is exporting for and ships raw unix timestamps and internal ids
+  <br>Fechado na fase 18, nas duas metades. O laço de contextos passa a exportar só para o contexto do próprio utilizador — a mesma verificação que o `delete_data_for_user()` já fazia. E as linhas deixam de sair como a base as guarda: datas em vez de inteiros unix, e cada id acompanhado do que nomeia, resolvido numa consulta para todo o export. Os ids ficam, porque um pedido de dados também é um registo. Um aviso apagado entretanto fica sem nome, não em erro.
 - **PRIV-06** · corrigido — Provider file header carries a banned @author tag and a @copyright without the required year
   <br>Já corrigido: o provedor não tem `@author`.
 

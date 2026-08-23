@@ -45,6 +45,21 @@ use local_awareness\persistent\noticeview;
  */
 final class provider_test extends \advanced_testcase {
     /**
+     * Start every test with an empty writer.
+     *
+     * The privacy writer is a static singleton that survives between tests in a run. Without this,
+     * an export assertion can be satisfied by data a PREVIOUS test wrote — the exact vacuity this
+     * repository has shipped before, and the reason the guard test below would otherwise pass
+     * against an export that writes nothing at all.
+     *
+     * @return void
+     */
+    protected function setUp(): void {
+        parent::setUp();
+        writer::reset();
+    }
+
+    /**
      * Every user-linked table, and a closure seeding exactly one row of it for a user.
      *
      * @return array
@@ -464,5 +479,114 @@ final class provider_test extends \advanced_testcase {
             (int) $DB->get_field('local_awareness', 'usermodified', ['id' => $noticeid]),
             'erasing the author must not rewrite who published the notice'
         );
+    }
+
+    /**
+     * The export goes only into the subject's own user context.
+     *
+     * The loop used to iterate the contextlist without ever reading $context, so every context in
+     * it received the identical, complete payload. get_contexts_for_userid() only ever adds this
+     * user's own context, so the list cannot hold a foreign one today — but delete_data_for_user()
+     * carries this very check, and an export that trusts what an erasure verifies is the asymmetry
+     * worth removing.
+     *
+     * @return void
+     */
+    public function test_export_writes_nothing_into_a_foreign_context(): void {
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+        foreach (array_column(self::table_provider(), 0) as $table) {
+            $this->seed_one($table, (int) $user->id);
+        }
+
+        $course = $this->getDataGenerator()->create_course();
+        $foreign = \context_course::instance($course->id);
+
+        provider::export_user_data(new approved_contextlist($user, 'local_awareness', [$foreign->id]));
+
+        $this->assertFalse(
+            writer::with_context($foreign)->has_any_data(),
+            'the export wrote this user\'s data into a context that is not theirs'
+        );
+
+        /*
+         * Control: the same seeded user, exported into their OWN context, DOES produce data.
+         * Without it, "wrote nothing" is satisfied by an export_user_data() that does nothing at
+         * all — including one whose body has been deleted.
+         */
+        $own = \context_user::instance($user->id);
+        provider::export_user_data(new approved_contextlist($user, 'local_awareness', [$own->id]));
+        $this->assertTrue(writer::with_context($own)->has_any_data(), 'the control export produced nothing');
+    }
+
+    /**
+     * Exported rows carry dates and names, not unix integers and bare ids.
+     *
+     * A data export is read by the person it is about. A row saying noticeid 7 at 1787500000 tells
+     * them nothing about what they actually saw or when.
+     *
+     * @return void
+     */
+    public function test_the_export_is_readable(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+
+        $notice = new \local_awareness\persistent\awareness(0, (object) [
+            'title' => 'Safety & Conduct',
+            'content' => '<p>Read it.</p>',
+        ]);
+        $notice->create();
+
+        $DB->insert_record('local_awareness_lastview', (object) [
+            'noticeid' => $notice->get('id'),
+            'userid' => $user->id,
+            'action' => 1,
+            'timecreated' => 1787500000,
+            'timemodified' => 1787500000,
+        ]);
+
+        $context = \context_user::instance($user->id);
+        provider::export_user_data(new approved_contextlist($user, 'local_awareness', [$context->id]));
+
+        $data = writer::with_context($context)->get_data([get_string('pluginname', 'local_awareness')]);
+        $row = reset($data->lastview);
+
+        $this->assertNotEmpty($row, 'the export shipped no view row — this assertion is blind');
+
+        // The timestamp is a date, not the integer that went in.
+        $this->assertNotEquals('1787500000', (string) $row->timecreated, 'the timestamp is still a raw integer');
+        $this->assertStringContainsString('2026', (string) $row->timecreated, 'the timestamp is not a readable date');
+
+        // The internal id is accompanied by the thing it names, escaped for the sink.
+        $this->assertSame('Safety &amp; Conduct', $row->noticename);
+        $this->assertEquals($notice->get('id'), $row->noticeid, 'the id itself must stay, so the row can be reconciled');
+    }
+
+    /**
+     * A view row whose notice has since been deleted still exports, simply unnamed.
+     *
+     * Click history deliberately outlives the notice it belongs to, so a missing target is an
+     * ordinary state and must not be treated as an error.
+     *
+     * @return void
+     */
+    public function test_the_export_tolerates_a_deleted_notice(): void {
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->seed_one('local_awareness_lastview', (int) $user->id);
+
+        $context = \context_user::instance($user->id);
+        provider::export_user_data(new approved_contextlist($user, 'local_awareness', [$context->id]));
+
+        $data = writer::with_context($context)->get_data([get_string('pluginname', 'local_awareness')]);
+        $row = reset($data->lastview);
+
+        $this->assertNotEmpty($row, 'the export shipped no view row at all');
+        $this->assertObjectNotHasProperty('noticename', $row, 'a deleted notice was given a name');
     }
 }

@@ -21,6 +21,7 @@ use core_privacy\local\request\approved_contextlist;
 use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\contextlist;
 use core_privacy\local\request\userlist;
+use core_privacy\local\request\transform;
 use core_privacy\local\request\writer;
 use local_awareness\persistent\noticeview;
 
@@ -87,47 +88,155 @@ class provider implements
     public static function export_user_data(approved_contextlist $contextlist) {
         global $DB;
 
+        $user = $contextlist->get_user();
+
+        /*
+         * Only the subject's OWN user context. The loop used to export into every context in the
+         * list without ever reading $context, so each one received the identical, complete payload.
+         * get_contexts_for_userid() only ever adds this user's own context, so today the list
+         * cannot hold another — but delete_data_for_user() carries exactly this check a few methods
+         * below, and an export that trusts what an erasure verifies is the asymmetry worth removing.
+         */
+        $usercontext = null;
         foreach ($contextlist->get_contexts() as $context) {
-            $user = $contextlist->get_user();
-
-            $sql1 = "SELECT lv.*
-                       FROM {local_awareness_lastview} lv
-                      WHERE lv.userid = :userid";
-
-            $sql2 = "SELECT ack.*
-                       FROM {local_awareness_ack} ack
-                      WHERE ack.userid = :userid";
-
-            $sql3 = "SELECT his.*
-                       FROM {local_awareness_hlinks_his} his
-                      WHERE his.userid = :userid";
-
-            $sql4 = "SELECT job.*
-                       FROM {local_awareness_audience_jobs} job
-                      WHERE job.userid = :userid";
-
-            $params = [
-                'userid' => $user->id,
-            ];
-
-            $lastview = $DB->get_records_sql($sql1, $params);
-            $acknowlegement = $DB->get_records_sql($sql2, $params);
-            $linktracking = $DB->get_records_sql($sql3, $params);
-            $audiencejobs = $DB->get_records_sql($sql4, $params);
-
-            $data = (object)[
-                'lastview' => $lastview,
-                'acknowledgement' => $acknowlegement,
-                'linktracking' => $linktracking,
-                'audiencejobs' => $audiencejobs,
-            ];
-
-            $subcontext = [
-                get_string('pluginname', 'local_awareness'),
-            ];
-
-            writer::with_context($context)->export_data($subcontext, $data);
+            if ($context->contextlevel === CONTEXT_USER && (int) $context->instanceid === (int) $user->id) {
+                $usercontext = $context;
+            }
         }
+
+        if ($usercontext === null) {
+            return;
+        }
+
+        $params = ['userid' => $user->id];
+
+        $lastview = $DB->get_records_sql(
+            "SELECT lv.* FROM {local_awareness_lastview} lv WHERE lv.userid = :userid",
+            $params
+        );
+        $acknowledgement = $DB->get_records_sql(
+            "SELECT ack.* FROM {local_awareness_ack} ack WHERE ack.userid = :userid",
+            $params
+        );
+        $linktracking = $DB->get_records_sql(
+            "SELECT his.* FROM {local_awareness_hlinks_his} his WHERE his.userid = :userid",
+            $params
+        );
+        $audiencejobs = $DB->get_records_sql(
+            "SELECT job.* FROM {local_awareness_audience_jobs} job WHERE job.userid = :userid",
+            $params
+        );
+
+        $titles = self::notice_titles(array_merge($lastview, $acknowledgement, $audiencejobs));
+        $links = self::link_targets($linktracking);
+
+        $data = (object) [
+            'lastview' => self::readable($lastview, $titles),
+            'acknowledgement' => self::readable($acknowledgement, $titles),
+            'linktracking' => self::readable($linktracking, [], $links),
+            'audiencejobs' => self::readable($audiencejobs, $titles),
+        ];
+
+        $subcontext = [
+            get_string('pluginname', 'local_awareness'),
+        ];
+
+        writer::with_context($usercontext)->export_data($subcontext, $data);
+    }
+
+    /**
+     * Notice titles for every noticeid appearing in a set of rows.
+     *
+     * One query for the whole export rather than one per row: an export runs over everything a user
+     * ever met, and a per-row lookup turns that into an N+1 inside a data request.
+     *
+     * @param array $rows Rows that may carry a noticeid.
+     * @return array Notice id => title.
+     */
+    private static function notice_titles(array $rows): array {
+        global $DB;
+
+        $ids = [];
+        foreach ($rows as $row) {
+            if (!empty($row->noticeid)) {
+                $ids[(int) $row->noticeid] = true;
+            }
+        }
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        return $DB->get_records_list('local_awareness', 'id', array_keys($ids), '', 'id, title');
+    }
+
+    /**
+     * The link text and address behind every hlinkid appearing in a set of rows.
+     *
+     * @param array $rows Click-history rows.
+     * @return array Link id => record carrying text and link.
+     */
+    private static function link_targets(array $rows): array {
+        global $DB;
+
+        $ids = [];
+        foreach ($rows as $row) {
+            if (!empty($row->hlinkid)) {
+                $ids[(int) $row->hlinkid] = true;
+            }
+        }
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        return $DB->get_records_list('local_awareness_hlinks', 'id', array_keys($ids), '', 'id, text, link');
+    }
+
+    /**
+     * Turn stored rows into something a person reading their own data export can understand.
+     *
+     * Timestamps go out as dates rather than as unix integers, and an internal id is accompanied by
+     * the thing it names. The id columns stay: a data request is also a record, and dropping them
+     * would make the export impossible to reconcile against the site.
+     *
+     * A referenced notice or link may have been deleted since — the click history deliberately
+     * outlives the notice — so a missing target is simply left unnamed rather than treated as an
+     * error.
+     *
+     * @param array $rows Rows straight from the database.
+     * @param array $titles Notice id => title, from notice_titles().
+     * @param array $links Link id => record, from link_targets().
+     * @return array The same rows, with dates formatted and references named.
+     */
+    private static function readable(array $rows, array $titles, array $links = []): array {
+        $out = [];
+        foreach ($rows as $key => $row) {
+            $row = clone $row;
+
+            foreach (['timecreated', 'timemodified', 'timecompleted'] as $field) {
+                if (!empty($row->$field)) {
+                    $row->$field = transform::datetime((int) $row->$field);
+                }
+            }
+
+            if (!empty($row->noticeid) && isset($titles[(int) $row->noticeid])) {
+                $row->noticename = format_string(
+                    $titles[(int) $row->noticeid]->title,
+                    true,
+                    ['context' => \context_system::instance()]
+                );
+            }
+
+            if (!empty($row->hlinkid) && isset($links[(int) $row->hlinkid])) {
+                $row->linktext = $links[(int) $row->hlinkid]->text;
+                $row->linkurl = $links[(int) $row->hlinkid]->link;
+            }
+
+            $out[$key] = $row;
+        }
+
+        return $out;
     }
 
     /**
