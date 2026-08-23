@@ -16,6 +16,8 @@
 
 namespace local_awareness\persistent;
 
+use local_awareness\external\estimate_audience;
+
 /**
  * The dedup predicates on audience_job::find_reusable(), one negative control each.
  *
@@ -26,7 +28,7 @@ namespace local_awareness\persistent;
  * ERRORED is served as an answer, and without the window test a count from any point in the site's
  * history is served as current.
  *
- * Driven directly rather than through external::estimate_audience() on purpose. The end-to-end path
+ * Driven directly rather than through estimate_audience::execute() on purpose. The end-to-end path
  * runs through live_mode, cohort visibility, criteria normalisation and the adhoc task, any of which
  * can make a case pass or fail for a reason that has nothing to do with the predicate under test.
  *

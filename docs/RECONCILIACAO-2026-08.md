@@ -42,11 +42,11 @@ defeito continua lá.
 | Médio | 26 | 4 | 3 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
 | Baixo | 86 | 9 | 1 | 0 | **96** |
-| Informativo | 43 | 7 | 0 | 2 | **52** |
-| **Total** | **170** | **21** | **5** | **2** | **198** |
+| Informativo | 44 | 7 | 0 | 1 | **52** |
+| **Total** | **171** | **21** | **5** | **1** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **191 dos 198 estão encerrados; 7 continuam a merecer
+*sem objeto*. Somando corrigido e sem objeto, **192 dos 198 estão encerrados; 6 continuam a merecer
 uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
 parciais, com o que falta nomeado.
 
@@ -233,6 +233,23 @@ parciais, com o que falta nomeado.
 > O `notice:timemodified` sobreviveu a duas auditorias por um motivo que vale generalizar: a sua
 > única referência aparente era a chave **distinta** `report_notice:timemodified`. Uma varredura por
 > substring dá isso como usado. O `lang_usage_test` compara chaves delimitadas.
+
+> **Atualizado pela fase 19** (versão `2026082305`, branch `fix/phase-19-external-split`).
+> **WS-17** fechado, e com ele o último achado acionável: **192 de 198 encerrados**, restando o
+> **REPO-10** (decisão de produto, sem tag por opção) e os **5 parciais deliberados** — C3, M6, M7,
+> M8 e WS-01.
+>
+> Eu tinha classificado o WS-17 como *churn* e não o entreguei na fase 17. Revisto com uma medição
+> em vez de uma impressão: as nove funções não partilhavam **um único** método privado nem estado
+> estático, o que torna a divisão mecânica e sem risco de repartir lógica. O que a tornava cara eram
+> os 93 pontos de chamada nos testes, e isso é volume, não perigo. A impressão estava errada.
+>
+> **O WS-01 continua parcial e não é para "completar" sem decidir primeiro.** Passar o payload do
+> `get_notices` de um blob JSON `PARAM_RAW` para uma estrutura real muda o formato de rede que o
+> `amd/src` consome, parte 20 pontos de chamada e introduz uma perda silenciosa — o
+> `clean_returnvalue()` descarta chaves não declaradas sem avisar. A divisão desta fase põe cada
+> `execute_returns()` no seu próprio ficheiro, o que torna a mudança mais fácil de rever, mas não
+> altera nenhuma das três objeções.
 
 > *Texto original da decisão, mantido por registo:*
 >
@@ -500,7 +517,7 @@ diz o que resta e onde.
 - **LANG-19** · corrigido — Behat step carries a copied comment describing forum discussions
   <br>Fechado na fase 12: o comentário copiado sobre fóruns foi substituído.
 
-### Web services — 2 de 18 em aberto
+### Web services — 1 de 18 em aberto
 
 - **WS-01** · **parcial** — get_notices returns the entire notice DB record as a JSON blob in PARAM_RAW, defeating the execute_returns allowlist and leaking targeting…
   <br>The record-wide serialisation is gone: classes/external.php:253 copies a fixed 7-key allowlist out of to_record() (id, title, reqack, forcelogout, modal_width, modal_height, outsideclick) plus content/bgimageurl, and tests/external/notice_external_test.php:560-589 asserts the exact key set.
@@ -535,9 +552,8 @@ diz o que resta e onde.
   <br>Fechado na fase 12: `redirecturl` saiu do `track_link_returns()` e do retorno antecipado — nunca foi devolvido.
 - **WS-16** · corrigido — Web service files carry @author tags and a non-standard @copyright, against the fleet header standard
   <br>Já corrigido: nenhum ficheiro PHP do plugin tem `@author`.
-- **WS-17** · **aberto** — All eight external functions live in one monolithic classes/external.php instead of classes/external/<name>.php
-  <br>`ls classes/external*` returns a single file, classes/external.php (27204 bytes) — there is no classes/external/ directory. `grep -c "public static function" classes/external.php` returns 27, i.e. nine functions × (parameters, implementation, returns) in the one class `local_awareness\external` declared at classes/external.php:41. db/services.php:28-107 registers all nine against 'classname' => 'local_awareness\external'.
-  <br>*Falta:* Worse than August, not better: check_collision was added to the same monolith after the audit (classes/external.php:305-363), taking it from eight functions to nine. The fleet standard is one class per file under classes/external/<name>.php extending \core_external\external_api. Smallest fix is mechanical — split into nine files and update the nine 'classname' entries in db/services.php, with a version.php bump so the service definitions reinstall.
+- **WS-17** · corrigido — All eight external functions live in one monolithic classes/external.php instead of classes/external/<name>.php
+  <br>Fechado na fase 19: o `classes/external.php` de 822 linhas passou a nove ficheiros em `classes/external/`, um por função, cada um `execute()` / `execute_parameters()` / `execute_returns()` sobre o `external_api`. A divisão era segura por uma razão medida antes de começar: **zero métodos privados partilhados e zero estado estático** entre as nove funções, portanto não havia nada a repartir. O custo real foram os 93 pontos de chamada nos testes. O `services_contract_test` novo fixa as duas direções — toda a classe do diretório está registada e todo o registo tem classe — porque um `db/services.php` com um erro de escrita instala limpo, aparece na lista de administração e só rebenta no browser de quem estiver a editar um aviso.
 - **WS-18** · corrigido — db/services.php declares no 'capabilities' key for the functions that require one
   <br>Fechado na fase 17: `'capabilities' => 'local/awareness:manage'` nas cinco entradas que exigem a capacidade em runtime. As outras quatro ficam sem, de propósito — não exigem nenhuma.
 ### Report Builder — 0 de 16 em aberto
