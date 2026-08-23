@@ -106,7 +106,6 @@ $string['editor:title:edit'] = 'Edit notice';
 $string['editor:unsaved'] = 'Unsaved changes';
 $string['editor:warning:window_expired'] = 'This notice stopped displaying on {$a}. Nobody will see it until the expiry date is moved.';
 $string['editor:warning:window_inverted'] = 'The start date is on or after the expiry date, so this notice can never display. Fix the dates under Behaviour.';
-$string['editor:warning:window_openended'] = 'This notice has a start date but no expiry date, so it can never display. Set an expiry date, or make it perpetual.';
 $string['entity_acknowledgement'] = 'Acknowledgement';
 $string['entity_linkhistory'] = 'Link click';
 $string['entity_notice'] = 'Notice';

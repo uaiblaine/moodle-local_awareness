@@ -26,6 +26,7 @@ use core_reportbuilder\local\filters\text;
 use core_reportbuilder\local\helpers\format;
 use core_reportbuilder\local\report\column;
 use core_reportbuilder\local\report\filter;
+use local_awareness\helper;
 
 /**
  * Notice entity for Report Builder.
@@ -228,9 +229,33 @@ class notice extends base {
             $this->get_entity_name()
         ))
             ->add_joins($this->get_joins())
-            ->add_fields("{$alias}.content")
+            /*
+             * Content is stored as the author wrote it — @@PLUGINFILE@@ placeholders, unfiltered
+             * markup — so it is rendered here exactly as the modal renders it, which is why the
+             * format and the id ride along as extra fields. Content stays FIRST: the callback is
+             * handed reset($values), so the field order is load-bearing and is pinned by a test
+             * rather than by this comment.
+             */
+            ->add_fields("{$alias}.content, {$alias}.contentformat, {$alias}.id")
             ->set_type(column::TYPE_LONGTEXT)
-            ->set_is_sortable(false);
+            ->set_is_sortable(false)
+            ->add_callback(static function (?string $value, \stdClass $row): string {
+                if ($value === null) {
+                    return '';
+                }
+
+                /*
+                 * Under an aggregation that runs callbacks without rebuilding the column's fields —
+                 * countdistinct on Moodle 4.5, where it extends base rather than count — only the
+                 * first field is populated and $value is the aggregate, not the body. Rendering it
+                 * would wrap a count in a FORMAT_MOODLE div, so hand it back untouched.
+                 */
+                if (!isset($row->contentformat) || !isset($row->id)) {
+                    return $value;
+                }
+
+                return helper::render_content_parts($value, (int) $row->contentformat, (int) $row->id);
+            });
 
         $columns[] = (new column(
             'ack_count',

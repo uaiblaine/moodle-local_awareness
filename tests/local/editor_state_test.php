@@ -46,7 +46,8 @@ final class editor_state_test extends \basic_testcase {
             'expires exactly now' => [1, self::NOW - 20, self::NOW, [editor_state::WINDOW_EXPIRED]],
             'start after end' => [1, self::NOW + 20, self::NOW + 10, [editor_state::WINDOW_INVERTED]],
             'start equals end' => [1, self::NOW + 10, self::NOW + 10, [editor_state::WINDOW_INVERTED]],
-            'start with no end' => [1, self::NOW - 10, 0, [editor_state::WINDOW_OPEN_ENDED]],
+            'start with no end displays' => [1, self::NOW - 10, 0, []],
+            'start in the future with no end' => [1, self::NOW + 10, 0, []],
             'end with no start displays' => [1, 0, self::NOW + 10, []],
             'disabled is off, not broken' => [0, self::NOW - 20, self::NOW - 10, []],
         ];
@@ -73,7 +74,7 @@ final class editor_state_test extends \basic_testcase {
      * The cases that yield nothing must not all yield nothing for the same trivial reason.
      *
      * Without this the provider above would still pass if window_problems() returned [] for
-     * everything — six of its ten rows expect exactly that.
+     * everything — most of its rows expect exactly that.
      *
      * @return void
      */
@@ -87,9 +88,8 @@ final class editor_state_test extends \basic_testcase {
             [
                 editor_state::WINDOW_EXPIRED,
                 editor_state::WINDOW_INVERTED,
-                editor_state::WINDOW_OPEN_ENDED,
             ],
-            array_values(array_unique(array_slice($problems, 0, 5)))
+            array_values(array_unique($problems))
         );
     }
 }

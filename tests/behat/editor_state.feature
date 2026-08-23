@@ -22,16 +22,17 @@ Feature: The editor tells the truth about a notice that reaches nobody
     And I should see "This notice stopped displaying on"
     And I should not see "Live · being shown"
 
-  Scenario: A start date with no expiry is a window nothing satisfies
-    # It reads to an author as "from this date onwards" and behaves as "never", because the window
-    # check asks now < timeend with timeend zero. This is the shape most worth naming out loud.
+  Scenario: A start date with no expiry runs from that date onwards
+    # This used to read to an author as "from this date onwards" and behave as "never", because the
+    # window check asked now < timeend with timeend zero. A zero bound is now unbounded on that
+    # side, so the notice means what it says and the warning that papered over it is gone.
     Given the following site notices exist
       | title              | content            | enabled | timestart  | timeend |
       | Open ended notice  | <p>Body</p>        | 1       | 1600000000 | 0       |
     When I navigate to "Awareness > Manage" in site administration
     And I click on "Edit" "link" in the "Open ended notice" "table_row"
-    Then I should see "Published · nobody is seeing it"
-    And I should see "it can never display"
+    Then I should see "Live · being shown"
+    And I should not see "Published · nobody is seeing it"
 
   Scenario: A notice that is genuinely being shown still says Live
     # The control. Without it, a change that painted every notice as blocked would satisfy both

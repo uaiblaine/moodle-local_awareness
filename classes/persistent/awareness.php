@@ -17,6 +17,7 @@
 namespace local_awareness\persistent;
 
 use core\persistent;
+use local_awareness\local\window;
 
 /**
  * Site notice class.
@@ -217,8 +218,16 @@ class awareness extends persistent {
          * nearly every site is in nearly all of the time.
          */
         if (($result = self::get_enabled_notices_cache()->get('records')) === false) {
-            $select = "enabled = ? AND ((timeend = 0 AND timestart = 0) OR (timeend <> 0 AND timestart <> 0 AND ? < timeend))";
-            $result = self::get_records_select($select, [1, time()], 'id');
+            /*
+             * The window's LOWER bound is deliberately absent. This result is cached with no TTL
+             * and purged only by a write, so a condition that turns TRUE as the clock moves would
+             * leave a scheduled notice permanently outside the cached set — it would never appear
+             * at all. local\window explains it in full; helper::is_within_active_window() applies
+             * the lower bound against a live clock on what comes back.
+             */
+            [$windowsql, $windowparams] = window::open_prefilter_sql('win', time());
+            $select = "enabled = :enabled AND {$windowsql}";
+            $result = self::get_records_select($select, ['enabled' => 1] + $windowparams, 'id');
             self::get_enabled_notices_cache()->set('records', $result);
         }
 

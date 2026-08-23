@@ -242,8 +242,6 @@ class editor_page implements renderable, templatable {
                 return get_string('editor:warning:window_expired', 'local_awareness', $when);
             case editor_state::WINDOW_INVERTED:
                 return get_string('editor:warning:window_inverted', 'local_awareness');
-            case editor_state::WINDOW_OPEN_ENDED:
-                return get_string('editor:warning:window_openended', 'local_awareness');
             default:
                 return '';
         }

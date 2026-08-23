@@ -39,18 +39,15 @@ final class editor_state {
     /** The start date falls on or after the expiry date, so no instant satisfies the window. */
     public const WINDOW_INVERTED = 'window_inverted';
 
-    /** A start date with no expiry: is_within_active_window() compares now against 0, forever false. */
-    public const WINDOW_OPEN_ENDED = 'window_openended';
-
     /** The expiry date has passed. */
     public const WINDOW_EXPIRED = 'window_expired';
 
     /**
      * Why an enabled notice will never be shown to anybody.
      *
-     * Mirrors helper::is_within_active_window() exactly — perpetual, or now within [start, end) —
-     * and enumerates the ways that predicate becomes permanently false. A disabled notice is not
-     * broken, it is off, so it yields nothing.
+     * Mirrors window::is_open() exactly — a zero bound is unbounded on that side — and enumerates
+     * the ways that predicate becomes permanently false. A disabled notice is not broken, it is
+     * off, so it yields nothing.
      *
      * @param int $enabled 1 when the notice is published.
      * @param int $timestart Start of the display window, 0 for none.
@@ -63,18 +60,18 @@ final class editor_state {
             return [];
         }
 
-        // Perpetual: both zero. This is the one combination that always displays.
-        if ($timestart === 0 && $timeend === 0) {
-            return [];
-        }
-
         /*
-         * A start with no end. is_within_active_window() asks `now < timeend` with timeend 0, which
-         * is false for every instant after 1970 — so this reads to an author as "from March
-         * onwards" and behaves as "never". The perpetual checkbox is what they wanted.
+         * No expiry is no longer a problem. window treats a zero bound as unbounded, so a notice
+         * with a start and no end runs from that start onwards — which is what the author meant.
+         * The WINDOW_OPEN_ENDED warning that used to live here existed only because the old
+         * predicate compared now against a timeend of 0 and was false for every instant after 1970;
+         * its cause is gone, so the warning went with it.
+         *
+         * Inversion and expiry are only meaningful against a real end. Testing timestart >= timeend
+         * with timeend zero would call every open-ended notice inverted.
          */
         if ($timeend === 0) {
-            return [self::WINDOW_OPEN_ENDED];
+            return [];
         }
 
         // Inverted, including the equal case: the window is [start, end), so start == end is empty.
@@ -82,7 +79,7 @@ final class editor_state {
             return [self::WINDOW_INVERTED];
         }
 
-        if ($now >= $timeend) {
+        if (window::has_ended($timeend, $now)) {
             return [self::WINDOW_EXPIRED];
         }
 
