@@ -134,6 +134,17 @@ final class upgrade_insistence_test extends \advanced_testcase {
             $level($acking),
             'a notice that already required acknowledgement is at the top level and must not be demoted'
         );
+        /*
+         * ...and its STORED columns are untouched, which the level alone cannot show:
+         * get_insistence() short-circuits on reqack, so this row reports ACKNOWLEDGE whatever
+         * outsideclick holds. Without this line, deleting `AND reqack = 0` from the migration
+         * flips the column from 1 to 0 and every assertion in this test still passes.
+         */
+        $this->assertSame(
+            '1',
+            (string) $DB->get_field('local_awareness', 'outsideclick', ['id' => $acking]),
+            'the migration must not write to a row it has no business touching'
+        );
 
         // The historical fact is kept, not rewritten: the report column still shows what was asked.
         $this->assertSame(

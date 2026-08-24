@@ -21,7 +21,7 @@ This repository is currently maintained and evolved under the Awareness directio
 
 - Site-wide modal notices.
 - Three levels of insistence: informational, blocking, and must-acknowledge.
-- A named exit at every level, so a reader can always decline; declining is recorded and the notice returns.
+- A named exit at every level, so a reader can always decline. At the two insistent levels the decline is recorded and the notice is shown again; an informational notice is dismissed once and stays dismissed.
 - Audience targeting by cohort, role (optionally scoped to a course or category),
   course category, course, course format, theme, and competency rules.
 - An audience estimate in the editor, computed asynchronously, showing the reach of the

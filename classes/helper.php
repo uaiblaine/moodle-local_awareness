@@ -1155,16 +1155,28 @@ class helper {
         $isguest = isguestuser();
 
         $result = [];
-        // Check if require acknowledgement. Guests share one user id, so the row would be nobody's.
-        if ($notice->get('reqack') && !$isguest) {
+        /*
+         * A refusal is recorded wherever the notice asked for an answer, which is every level from
+         * Blocking up — not only the ones demanding a tick. This used to read `reqack`, and pairing
+         * that with a manage list that offers the Dismissed report from Blocking upwards would have
+         * produced the worst possible reading: a report that exists, is reachable, and is empty no
+         * matter how many people refused. An empty compliance report does not read as "not
+         * recorded", it reads as "nobody refused".
+         *
+         * Informational stays out. It asks nothing, so there is nothing to refuse; its dismissal is
+         * carried by the event and the lastview row, and the manage list offers it no report.
+         *
+         * Guests stay out too: every guest session shares one user id, so the row would be nobody's.
+         */
+        if ($notice->get_insistence() >= awareness::INSISTENCE_BLOCKING && !$isguest) {
             /*
-             * One row per reader per notice. A reqack notice is deliberately put back in front of
-             * a user who dismissed it — that is the whole point of requiring acknowledgement — so
-             * an unguarded insert writes another row on every refusal, and the dismissed report,
-             * whose heading is "List of users who dismissed the notice", lists the same person
-             * once per page load. The event still fires each time — it is triggered below, outside
-             * this branch — because a repeated refusal is a real event; it is the compliance ROW
-             * that must not be duplicated.
+             * One row per reader per notice. An insistent notice is deliberately put back in front
+             * of a user who refused it — that is the whole point of the level — so an unguarded
+             * insert writes another row on every refusal, and the dismissed report, whose heading
+             * is "List of users who dismissed the notice", lists the same person once per page
+             * load. The event still fires each time — it is triggered below, outside this branch —
+             * because a repeated refusal is a real event; it is the compliance ROW that must not
+             * be duplicated.
              */
             if (!self::has_acknowledgement_record($notice, $userid, acknowledgement::ACTION_DISMISSED)) {
                 // Record dismiss action.

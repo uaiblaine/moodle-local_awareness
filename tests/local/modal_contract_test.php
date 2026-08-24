@@ -249,12 +249,24 @@ final class modal_contract_test extends \basic_testcase {
      * read the help believed they had already asked for a logout. The checkbox label made the same
      * claim to the reader before JavaScript replaced it — and if that request lost, the claim stood.
      *
-     * @return array Language directory => list of forbidden substrings, lowercased.
+     * Each row also carries a SAMPLE: a sentence of the kind a drifting pack would plausibly
+     * contain, written out literally rather than assembled from the phrase list. That
+     * independence is the whole point of it — see the control at the end of the test.
+     *
+     * @return array Language directory => list of forbidden substrings, plus an offending sample.
      */
     public static function logout_claim_provider(): array {
         return [
-            'en' => ['en', ['log you off', 'logged out', 'log out', 'logged off']],
-            'pt_br' => ['pt_br', ['logout', 'desconectado', 'desconectar']],
+            'en' => [
+                'en',
+                ['log you off', 'logged out', 'log out', 'logged off'],
+                'If you do not accept this notice, you will be logged out of the site.',
+            ],
+            'pt_br' => [
+                'pt_br',
+                ['logout', 'desconectado', 'desconectar'],
+                'Se você não aceitar o alerta, será desconectado do site.',
+            ],
         ];
     }
 
@@ -264,9 +276,14 @@ final class modal_contract_test extends \basic_testcase {
      * @dataProvider logout_claim_provider
      * @param string $lang The language directory under lang/.
      * @param array $forbidden Lowercased substrings that would claim a logout.
+     * @param string $sample A sentence that does claim one, written independently of that list.
      * @return void
      */
-    public function test_acknowledgement_strings_do_not_promise_a_logout(string $lang, array $forbidden): void {
+    public function test_acknowledgement_strings_do_not_promise_a_logout(
+        string $lang,
+        array $forbidden,
+        string $sample
+    ): void {
         $string = [];
         require($this->plugin_root() . "/lang/{$lang}/local_awareness.php");
 
@@ -284,25 +301,27 @@ final class modal_contract_test extends \basic_testcase {
         }
 
         /*
-         * Control: the detector must be able to fire. It used to be pointed at the Force logout
-         * help string, which was the one place the packs legitimately talked about ending a
-         * session — and retiring that setting deleted the string, which would have left this test
-         * passing over a matcher that could no longer match anything. The control is now built
-         * here instead of borrowed from the pack, so it cannot be removed by a change elsewhere.
+         * Control: the phrase list must be able to catch a pack that drifts.
+         *
+         * It is run against $sample, which the provider writes out as a literal sentence — NOT
+         * assembled from the phrase list. An earlier version of this control built its probe by
+         * interpolating each phrase into "Prefix {phrase} suffix" and then searched it with the
+         * same list, so it was true by construction: emptying the list, or misspelling every
+         * phrase in it, left the guarded assertions above making no assertions at all and the
+         * control still green. That is precisely the failure this control exists to prevent, and
+         * it is why the probe has to come from somewhere the list cannot reach.
          */
+        $lowered = \core_text::strtolower($sample);
+        $hits = 0;
         foreach ($forbidden as $claim) {
-            $synthetic = \core_text::strtolower("Prefix {$claim} suffix.");
-            $fired = false;
-            foreach ($forbidden as $probe) {
-                if (str_contains($synthetic, $probe)) {
-                    $fired = true;
-                }
-            }
-            $this->assertTrue(
-                $fired,
-                "The phrase '{$claim}' is not detected in a string that contains it, so the assertions above "
-                    . 'cannot fail and this test proves nothing.'
-            );
+            $hits += substr_count($lowered, $claim);
         }
+        $this->assertGreaterThan(
+            0,
+            $hits,
+            "None of the phrases this test searches for appears in a sentence that plainly claims a logout "
+                . "(\"{$sample}\"). The list no longer matches how lang/{$lang} would express it, so the "
+                . 'assertions above cannot fail. Update the phrase list.'
+        );
     }
 }

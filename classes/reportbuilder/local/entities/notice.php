@@ -164,15 +164,20 @@ class notice extends base {
                  * A literal per level. get_string() with a built identifier would read more
                  * tidily and is banned for a reason: nothing then proves the strings exist, and a
                  * missing one renders as its own identifier rather than failing.
+                 *
+                 * Compared with >= rather than equality, like every other reader of the level. An
+                 * exact match here would have printed "Informational" for any level added above
+                 * Acknowledge while must_reshow() and the manage list treated it as insistent —
+                 * the report would have contradicted the behaviour it exists to describe.
                  */
-                switch ((int) $value) {
-                    case awareness_persistent::INSISTENCE_ACKNOWLEDGE:
-                        return get_string('notice:insistence:acknowledge', 'local_awareness');
-                    case awareness_persistent::INSISTENCE_BLOCKING:
-                        return get_string('notice:insistence:blocking', 'local_awareness');
-                    default:
-                        return get_string('notice:insistence:informational', 'local_awareness');
+                $level = (int) $value;
+                if ($level >= awareness_persistent::INSISTENCE_ACKNOWLEDGE) {
+                    return get_string('notice:insistence:acknowledge', 'local_awareness');
                 }
+                if ($level >= awareness_persistent::INSISTENCE_BLOCKING) {
+                    return get_string('notice:insistence:blocking', 'local_awareness');
+                }
+                return get_string('notice:insistence:informational', 'local_awareness');
             });
 
         $columns[] = (new column(

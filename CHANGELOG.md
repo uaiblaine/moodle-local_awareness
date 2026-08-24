@@ -48,11 +48,29 @@ no ejection left there was nothing to protect, and leaving the third would have 
 one level an admin could dismiss for good by accident. A notice requiring acknowledgement has always
 come back for admins too, so this makes the levels consistent rather than stricter.
 
+**One class of existing notice changes behaviour without the migration touching it, and that is
+worth knowing before upgrading.** A notice saved as *Requires acknowledgement = No, Dismiss on
+outside click = No* is Blocking under the new mapping — that is the mapping, deliberately. But the
+escalation happens in code, not in the `UPDATE`: previously neither `must_reshow()` clause fired for
+that combination, so the reader closed it once and never saw it again. Now it returns until they
+accept, and accepting writes an acknowledgement row for a notice whose author never asked for one.
+The old help text for that setting said only that the reader "must use the close button or accept
+button" and nothing about the notice returning, so an author who chose it was not told this could
+follow. Sites that used the setting purely to stop stray backdrop clicks should review those notices
+after upgrading and set them to Informational.
+
 **A refused notice comes back, but does not jump the queue.** `must_reshow()` gained one clause
 reading the level with `>=`, which subsumes the acknowledgement clause it replaces. It is
 deliberately not promoted ahead of notices the reader has not seen yet: an exit that returns
 immediately and forever is not an exit. It cannot be starved either, because the only tier above it
 holds notices not yet shown, and one display empties it.
+
+**A refusal is recorded from Blocking upwards, not only where a tick was demanded.**
+`dismiss_notice()` used to gate the compliance row on `reqack`. Widening the manage list's report
+buttons to the level without widening that gate would have produced the worst possible reading — a
+Dismissed report that exists, is reachable, and is empty however many people refused. An empty
+compliance report does not read as "not recorded"; it reads as "nobody refused". Informational stays
+out: it asks nothing, so there is nothing to refuse, and it offers no report.
 
 **Smaller things that went with the retirement.** `redirecturl` is gone from both write web
 services and from the JS that read it — nothing has set it since the logout left, and `track_link`

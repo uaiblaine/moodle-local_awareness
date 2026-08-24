@@ -17,6 +17,7 @@
 namespace local_awareness;
 
 use local_awareness\local\page_probe;
+use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
 
@@ -416,17 +417,72 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
-     * A dismissed forced-logout notice must still be acknowledgeable. Audit finding M12.
+     * Each level the author can choose survives the trip into storage.
      *
-     * The display path re-shows a dismissed notice whose author asked for a forced logout; the
-     * acknowledge path did not carry that condition, so it reported the notice as already handled
-     * and acknowledge_notice() returned before writing the row, before the event and before the
-     * logout. The user got the modal back on every page load with an Accept button that did
-     * nothing, and Close — which logs them out — as the only control with an effect.
+     * helper::sanitise_data() is the only place a chosen level becomes reqack and outsideclick,
+     * and awareness::get_insistence() is its inverse. Nothing exercised level 2 through it: the
+     * Behat generator carries its own copy of the mapping and inserts rows directly, and the form
+     * test covers only the other direction. Changing the Acknowledge comparison from >= to > would
+     * therefore store every "Must acknowledge" notice as Blocking — no checkbox, Accept never
+     * gated, no acknowledgement ever demanded — with the whole suite green.
+     *
+     * The stored columns are asserted as well as the level, because get_insistence() short-circuits
+     * on reqack: a level assertion alone cannot see outsideclick going astray at level 2.
+     *
+     * @covers \local_awareness\helper::create_new_notice
+     */
+    public function test_every_level_the_author_can_choose_survives_into_storage(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $cases = [
+            [awareness::INSISTENCE_INFORMATIONAL, 0, 1],
+            [awareness::INSISTENCE_BLOCKING, 0, 0],
+            [awareness::INSISTENCE_ACKNOWLEDGE, 1, 0],
+        ];
+
+        foreach ($cases as [$level, $reqack, $outsideclick]) {
+            helper::create_new_notice((object) [
+                'title' => 'Level ' . $level,
+                'content' => '<p>Body</p>',
+                'perpetual' => 1,
+                'insistence' => $level,
+            ]);
+
+            $stored = null;
+            foreach (awareness::get_all_notices() as $candidate) {
+                if ($candidate->get('title') === 'Level ' . $level) {
+                    $stored = $candidate;
+                }
+            }
+            $this->assertNotNull($stored, "the notice for level {$level} was not created");
+
+            $this->assertSame($reqack, (int) $stored->get('reqack'), "level {$level} must store reqack={$reqack}");
+            $this->assertSame(
+                $outsideclick,
+                (int) $stored->get('outsideclick'),
+                "level {$level} must store outsideclick={$outsideclick}"
+            );
+            $this->assertSame($level, $stored->get_insistence(), "level {$level} must read back as itself");
+        }
+    }
+
+    /**
+     * A refused Blocking notice must still be acknowledgeable. Audit finding M12.
+     *
+     * The display path re-shows a notice the reader refused; the acknowledge path did not carry
+     * the same condition, so it reported the notice as already handled and acknowledge_notice()
+     * returned before writing the row and before the event. The reader got the modal back on
+     * every page load with an Accept button that did nothing.
+     *
+     * The fixture is a Blocking notice because that is what the forced-logout notice this test
+     * was written against becomes: same shape, same trap, and it is the level where a refusal now
+     * writes a compliance row of its own — asserted below, since the two rows are what tell a
+     * refusal and an acceptance apart in the report.
      *
      * @covers \local_awareness\helper::acknowledge_notice
      */
-    public function test_a_dismissed_forced_logout_notice_can_still_be_acknowledged(): void {
+    public function test_a_refused_blocking_notice_can_still_be_acknowledged(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -434,7 +490,7 @@ final class helper_test extends \advanced_testcase {
         $this->setUser($user);
 
         $notice = new awareness(0, (object) [
-            'title' => 'Forced logout',
+            'title' => 'Blocking',
             'content' => '<p>Body</p>',
             'enabled' => 1,
             'reqack' => 0,
@@ -442,22 +498,42 @@ final class helper_test extends \advanced_testcase {
         ]);
         $notice->create();
 
-        // Close: a Blocking notice records no compliance row for a refusal it did not demand.
+        // Not now: a Blocking notice records the refusal, because its manage list offers a report
+        // of exactly these rows.
         helper::dismiss_notice($notice);
-        $this->assertSame(0, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
+        $this->assertSame(
+            1,
+            $DB->count_records('local_awareness_ack', [
+                'noticeid' => $notice->get('id'),
+                'action' => acknowledgement::ACTION_DISMISSED,
+            ]),
+            'a refusal at Blocking must reach the compliance table the Dismissed report reads'
+        );
 
-        // They log back in, and the notice is waiting for them again — which is the correct half.
+        // They come back, and the notice is waiting for them again — which is the correct half.
         $this->setUser($user);
         $this->assertArrayHasKey($notice->get('id'), helper::retrieve_user_notices('/my/'));
 
-        $result = helper::acknowledge_notice($notice);
+        $sink = $this->redirectEvents();
+        helper::acknowledge_notice($notice);
 
         $this->assertSame(
             1,
-            $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]),
-            'Accept after a dismissal must record the acknowledgement rather than silently do nothing.'
+            $DB->count_records('local_awareness_ack', [
+                'noticeid' => $notice->get('id'),
+                'action' => acknowledgement::ACTION_ACKNOWLEDGED,
+            ]),
+            'Accept after a refusal must record the acknowledgement rather than silently do nothing.'
         );
-        $this->assertTrue($result['status'], 'the acknowledgement must report success, not merely write a row');
+        /*
+         * Not assertTrue($result['status']): acknowledge_notice() opens with ['status' => true]
+         * and the M12 failure path returns that same array without writing anything, so such an
+         * assertion is satisfied by exactly the regression this test exists to catch. The row
+         * count above is the real assertion; this one adds that the event fired, which the early
+         * return also skips.
+         */
+        $this->assertCount(1, $sink->get_events(), 'accepting must fire the acknowledged event, not just write a row');
+        $sink->close();
     }
 
     /**

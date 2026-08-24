@@ -29,7 +29,7 @@ define([], function() {
     var SELECTORS = {
         RESET_NUMBER: 'id_resetinterval_number',
         RESET_UNIT: 'id_resetinterval_timeunit',
-        REQACK: 'id_reqack',
+        INSISTENCE: 'id_insistence',
         REQCOURSE: 'id_reqcourse',
         COMPETENCY_FILTER_CONTAINER: 'awareness-competency-filter',
         COMPETENCY_ADD_BUTTON: 'id_awareness_add_competencies',
@@ -42,7 +42,8 @@ define([], function() {
     var DEFAULT_VALUES = {
         RESET_NUMBER: 0,
         RESET_UNIT: '60',
-        REQACK: '0'
+        // Informational. Mirrors awareness::INSISTENCE_INFORMATIONAL; this file cannot reach PHP.
+        INSISTENCE: '0'
     };
 
     // ───────────────────────────────────────────
@@ -57,7 +58,7 @@ define([], function() {
     var setDependentFields = function(disable) {
         [{id: SELECTORS.RESET_NUMBER, def: DEFAULT_VALUES.RESET_NUMBER},
             {id: SELECTORS.RESET_UNIT, def: DEFAULT_VALUES.RESET_UNIT},
-            {id: SELECTORS.REQACK, def: DEFAULT_VALUES.REQACK}
+            {id: SELECTORS.INSISTENCE, def: DEFAULT_VALUES.INSISTENCE}
         ].forEach(function(pair) {
             var el = document.getElementById(pair.id);
             if (!el) {

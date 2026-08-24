@@ -23,6 +23,9 @@ Feature: A notice is as hard to get past as its author asked, and never ends the
     When I log in as "bilbo"
     And I am on site homepage
     Then I should see "the kettle is on the way"
+    # The control for the blocking scenarios below: at this level the free exits ARE offered.
+    And "awareness-closebtn" "button" should be visible
+    And "awareness-closebtn-footer" "button" should be visible
     And I click on "awareness-closebtn-footer" "button"
     And I am on site homepage
     Then I should not see "the kettle is on the way"
@@ -36,6 +39,9 @@ Feature: A notice is as hard to get past as its author asked, and never ends the
     When I log in as "bilbo"
     And I am on site homepage
     Then I should see "this one asks again politely"
+    # The unlabelled exits are gone: leaving is a named choice, and it is recorded.
+    And "awareness-closebtn" "button" should not be visible
+    And "awareness-closebtn-footer" "button" should not be visible
     # The exit is named, and it is not acceptance.
     And I click on "awareness-notnowbtn" "button"
     And I should see "You are logged in as Bilbo Baggins"
@@ -55,6 +61,8 @@ Feature: A notice is as hard to get past as its author asked, and never ends the
     When I log in as "bilbo"
     And I am on site homepage
     Then I should see "tick the box before accepting"
+    And "awareness-closebtn" "button" should not be visible
+    And "awareness-closebtn-footer" "button" should not be visible
     And the "awareness-acceptbtn" "button" should be disabled
     And I click on "awareness-modal-ackcheckbox" "checkbox"
     And the "awareness-acceptbtn" "button" should be enabled
