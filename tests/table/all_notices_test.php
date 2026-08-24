@@ -91,6 +91,56 @@ final class all_notices_test extends \advanced_testcase {
     }
 
     /**
+     * The compliance reports are offered exactly where rows can exist, and nowhere else.
+     *
+     * These two buttons used to be gated on reqack, which is one of the two columns the insistence
+     * level is derived from rather than the level itself. A Blocking notice records acceptances and
+     * refusals just as an Acknowledge one does, so gating on reqack hid the reports for precisely
+     * the notices whose rows nothing else in the interface could reach — the manage list is the
+     * only route to them, and the report pages answer a hand-built URL.
+     *
+     * Nothing asserted this before, in either direction: a mutation putting the reqack gate back
+     * survived the whole suite.
+     *
+     * @return void
+     */
+    public function test_the_compliance_reports_are_offered_exactly_where_rows_can_exist(): void {
+        $this->setAdminUser();
+
+        $informational = $this->notice(['title' => 'Info', 'reqack' => 0, 'outsideclick' => 1]);
+        $blocking = $this->notice(['title' => 'Blocking', 'reqack' => 0, 'outsideclick' => 0]);
+        $acknowledge = $this->notice(['title' => 'Acknowledge', 'reqack' => 1]);
+
+        $table = new all_notices('test', new \moodle_url('/local/awareness/managenotice.php'));
+        $method = new \ReflectionMethod(all_notices::class, 'col_actions');
+        $method->setAccessible(true);
+
+        $acklabel = get_string('report:button:ack', 'local_awareness');
+        $dislabel = get_string('report:button:dis', 'local_awareness');
+
+        $informationalmenu = $method->invoke($table, $informational);
+        $blockingmenu = $method->invoke($table, $blocking);
+        $acknowledgemenu = $method->invoke($table, $acknowledge);
+
+        // The control: the menu really was rendered, so the absences below are absences of the
+        // report links and not of the whole column.
+        $this->assertStringContainsString(
+            get_string('notice:reset', 'local_awareness'),
+            $informationalmenu,
+            'the action menu did not render, so nothing below this line means anything'
+        );
+
+        $this->assertStringNotContainsString($acklabel, $informationalmenu);
+        $this->assertStringNotContainsString($dislabel, $informationalmenu);
+
+        $this->assertStringContainsString($acklabel, $blockingmenu, 'a Blocking notice records acceptances');
+        $this->assertStringContainsString($dislabel, $blockingmenu, 'a Blocking notice records refusals');
+
+        $this->assertStringContainsString($acklabel, $acknowledgemenu);
+        $this->assertStringContainsString($dislabel, $acknowledgemenu);
+    }
+
+    /**
      * With no filters every notice is listed.
      */
     public function test_no_filters_lists_everything(): void {

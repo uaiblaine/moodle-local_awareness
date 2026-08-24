@@ -94,9 +94,18 @@ class get_notices extends external_api {
                      */
                     $record = $notice->to_record();
                     $payload = new \stdClass();
-                    foreach (['id', 'title', 'reqack', 'forcelogout', 'modal_width', 'modal_height', 'outsideclick'] as $field) {
+                    foreach (['id', 'title', 'modal_width', 'modal_height'] as $field) {
                         $payload->$field = $record->$field;
                     }
+                    /*
+                     * One level rather than the three booleans that used to cross the boundary.
+                     * The dialogue's job is to be as insistent as the author asked, and it now
+                     * reads a single ordered value to decide that — so reqack, outsideclick and
+                     * forcelogout no longer travel, and the client cannot recombine them into a
+                     * state the server never meant. forcelogout in particular is gone from the
+                     * payload because nothing acts on it any more.
+                     */
+                    $payload->insistence = $notice->get_insistence();
                     // Storage holds the content as authored; filters and pluginfile URLs are
                     // resolved here so a multilang notice reads in each user's own language.
                     $payload->content = helper::render_content($notice);

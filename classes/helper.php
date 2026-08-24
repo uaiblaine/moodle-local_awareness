@@ -227,6 +227,19 @@ class helper {
      * @param \stdClass $data
      */
     private static function sanitise_data(\stdClass $data) {
+        /*
+         * The author chose one level; these are the two columns it has always been stored in. The
+         * mapping lives here rather than in the form because both write paths pass through this
+         * method, and a mapping that only one of them applied would let a notice be saved at a
+         * level the display path could not read. awareness::get_insistence() is the inverse.
+         */
+        if (isset($data->insistence)) {
+            $level = (int) $data->insistence;
+            $data->reqack = $level >= awareness::INSISTENCE_ACKNOWLEDGE ? 1 : 0;
+            $data->outsideclick = $level >= awareness::INSISTENCE_BLOCKING ? 0 : 1;
+            unset($data->insistence);
+        }
+
         foreach ((array) $data as $key => $value) {
             if (!key_exists($key, awareness::properties_definition())) {
                 unset($data->$key);
@@ -1183,12 +1196,6 @@ class helper {
         // without hiding it from the next guest.
         self::add_to_viewed_notices($notice, acknowledgement::ACTION_DISMISSED, $isguest);
 
-        if ((!is_siteadmin() && $notice->get('forcelogout'))) {
-            require_logout();
-            $loginpage = new \moodle_url("/login/index.php");
-            $result['redirecturl'] = $loginpage->out();
-        }
-
         $result['status'] = true;
         return $result;
     }
@@ -1207,8 +1214,9 @@ class helper {
 
         if ($isguest) {
             /*
-             * No shared row for a guest, but the session marker still has to be set or the modal
-             * reopens on every page load. Fall through to the forcelogout handling below.
+             * No shared row for a guest — every guest session shares one user id, so the row would
+             * be nobody's — but the session marker still has to be set or the modal reopens on
+             * every page load.
              */
             self::add_to_viewed_notices($notice, acknowledgement::ACTION_ACKNOWLEDGED, true);
         } else if (self::check_if_already_acknowledged_by_user($notice, $USER->id)) {
@@ -1227,12 +1235,6 @@ class helper {
             $event->trigger();
         } else {
             $result['status'] = false;
-        }
-
-        if (!is_siteadmin() && $notice->get('forcelogout')) {
-            require_logout();
-            $loginpage = new \moodle_url("/login/index.php");
-            $result['redirecturl'] = $loginpage->out();
         }
 
         return $result;
@@ -1427,17 +1429,21 @@ class helper {
     /**
      * Whether a notice this user has already seen has to be put in front of them again.
      *
-     * One predicate, two callers. It used to be two copies of the same four conditions, except that
-     * the copy here only ever had three: the display path re-showed a dismissed notice whose author
-     * had asked for a forced logout, and the acknowledge path did not. Audit finding M12, and the
-     * shape of it is why it is written once now — the two lists drifted silently, and a reader
-     * comparing them had to notice an absence rather than a difference.
+     * One predicate, two callers, and it is written once for a reason worth keeping: it used to be
+     * two copies of the same conditions, the copy here silently short of one, and a reader
+     * comparing them had to notice an ABSENCE rather than read a difference. That was audit
+     * finding M12.
      *
-     * What that cost: with reqack = 0 and forcelogout = 1, a non-admin who dismissed the notice got
-     * it back on every page load, and Accept then did nothing at all — no acknowledgement row, no
-     * event, no logout — because this method reported the notice as already acknowledged and
-     * acknowledge_notice() returned before doing any of it. Close was the only control with an
-     * effect, and its effect was to log them out again.
+     * The refusal clause reads the insistence LEVEL rather than testing the old booleans, which is
+     * what lets it be one clause instead of two. It is deliberately `>=`: a level added above
+     * Acknowledge later must not fall out of this test in silence, which is the same failure the
+     * M12 note above is about.
+     *
+     * A refused notice comes back, but it does not jump the queue — select_for_display() leaves it
+     * behind notices the reader has not met yet. That is the point of offering an exit at all: the
+     * reader gets on with what they were doing, and the notice asks again. It cannot be starved
+     * either, because the tier that outranks it holds only notices not yet seen, and one display
+     * empties it.
      *
      * @param awareness $notice The notice being judged.
      * @param int $timeviewed When the user last acted on it.
@@ -1449,10 +1455,8 @@ class helper {
 
         // The notice has been edited or its repeat interval has elapsed since they acted.
         return self::interaction_is_stale($notice, $timeviewed)
-            // They dismissed it, and it asks for an acknowledgement they have not given.
-            || ($dismissed && (int) $notice->get('reqack') === 1)
-            // They dismissed it, and it forces a logout — which admins are spared.
-            || ($dismissed && (int) $notice->get('forcelogout') === 1 && !is_siteadmin());
+            // They refused it, and it is insistent enough to ask again.
+            || ($dismissed && $notice->get_insistence() >= awareness::INSISTENCE_BLOCKING);
     }
 
     /**

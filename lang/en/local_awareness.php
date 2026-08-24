@@ -62,6 +62,8 @@ $string['awareness:viewreports'] = 'View awareness reports';
 $string['booleanformat:false'] = 'No';
 $string['booleanformat:true'] = 'Yes';
 $string['button:accept'] = 'Accept';
+$string['button:close'] = 'Close';
+$string['button:notnow'] = 'Not now';
 $string['cachedef_enabled_notices'] = 'A list of enabled notices';
 $string['cachedef_notice_view'] = 'A list of viewed notices';
 $string['cachedef_site_user_count'] = 'The site user count, which decides whether audience estimates run interactively';
@@ -164,8 +166,6 @@ $string['message:audience_ready:body'] = 'The audience estimate for "{$a->title}
 $string['message:audience_ready:subject'] = 'Audience estimate ready: {$a->title}';
 $string['messageprovider:audience_estimate_ready'] = 'Audience estimate finished';
 $string['modal:checkboxtext'] = 'I have read and understand the notice.';
-$string['modal:checkboxtext_logout'] = 'I have read and understand the notice (closing this notice will log you off this site).';
-$string['modal:checkboxtext_nologout'] = 'I have read and understand the notice.';
 $string['notice:activefrom'] = 'Active from';
 $string['notice:activefrom_help'] = 'The time and date from which the message will be active .';
 $string['notice:audience'] = 'Target audience';
@@ -192,25 +192,33 @@ $string['notice:disable'] = 'Disable notice';
 $string['notice:enable'] = 'Enable notice';
 $string['notice:expiry'] = 'Expiry';
 $string['notice:expiry_help'] = 'The time and date the messages expires and will not be shown to users anymore.';
-$string['notice:forcelogout'] = 'Force logout';
-$string['notice:forcelogout_help'] = 'If enabled, the user will be logged out after closing the notice. This setting does not affect the site administrator. ';
 $string['notice:info'] = 'Notice information';
+$string['notice:insistence'] = 'Insistence';
+$string['notice:insistence:acknowledge'] = 'Must acknowledge';
+$string['notice:insistence:blocking'] = 'Blocking';
+$string['notice:insistence:informational'] = 'Informational';
+$string['notice:insistence_help'] = 'How hard the notice is to get past, and what the reader may do instead of accepting it.
+
+Informational: the reader can dismiss it, including by clicking outside it, and the dismissal is
+recorded.
+
+Blocking: it cannot be dismissed by clicking outside it or by pressing Escape. The reader either
+accepts it or chooses Not now, and a notice that was not accepted is shown again.
+
+Must acknowledge: as Blocking, and the acknowledgement box must be ticked before Accept becomes
+available.
+
+No level logs the reader out.';
 $string['notice:modal_dimension_invalid'] = 'Invalid value. Use a number followed by px, %, vw, or vh (e.g. 600px, 80%, 50vw).';
 $string['notice:modal_height'] = 'Modal height';
 $string['notice:modal_height_help'] = 'Custom height for the notice modal. Accepted formats: pixels (e.g. 400px), percentage (e.g. 70%), or viewport height (e.g. 50vh). Leave empty for default size.';
 $string['notice:modal_width'] = 'Modal width';
 $string['notice:modal_width_help'] = 'Custom width for the notice modal. Accepted formats: pixels (e.g. 600px), percentage (e.g. 80%), or viewport width (e.g. 50vw). Leave empty for default size.';
 $string['notice:notice'] = 'Notice';
-$string['notice:outsideclick'] = 'Dismiss on outside click';
-$string['notice:outsideclick_help'] = 'If enabled, the user can close the notice by clicking outside the modal. If disabled, the user must use the close button or accept button.';
 $string['notice:pathmatch:anywhere'] = 'Anywhere on the site';
 $string['notice:perpetual'] = 'Is perpetual';
 $string['notice:perpetual_help'] = 'When set to yes, the notice will always be displayed (unless disabled). If set to no, a date and time range for the notice must be specified';
 $string['notice:preview'] = 'Preview the modal';
-$string['notice:reqack'] = 'Requires acknowledgement';
-$string['notice:reqack_help'] = 'If enabled, the user must tick the acknowledgement box before the Accept button becomes
-available, and the notice cannot be dismissed by clicking outside it or by pressing Escape. A user who closes the notice
-instead of accepting it is shown it again until they accept. It does not log the user out.';
 $string['notice:reqcourse'] = 'Requires course completion';
 $string['notice:reqcourse_help'] = 'Show the notice only to users who have not yet completed the selected course. It is an audience rule, not a display frequency: how often the notice reappears is set by the reset interval, and someone who completes the course stops seeing it.';
 $string['notice:reset'] = 'Reset notice';
@@ -289,6 +297,8 @@ $string['report_notice:content'] = 'Content';
 $string['report_notice:dismiss_count'] = 'Dismissed count';
 $string['report_notice:enabled'] = 'Enabled';
 $string['report_notice:forcelogout'] = 'Force logout';
+$string['report_notice:forcelogout:deprecated'] = 'Force logout no longer has any effect. Use Insistence instead; this column is kept so existing reports still show what the author originally asked for.';
+$string['report_notice:insistence'] = 'Insistence';
 $string['report_notice:reqack'] = 'Requires acknowledgement';
 $string['report_notice:reqcourse'] = 'Requires course completion';
 $string['report_notice:resetinterval'] = 'Reset interval';

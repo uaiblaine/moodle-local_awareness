@@ -61,6 +61,8 @@ $string['awareness:viewreports'] = 'Visualizar relatórios de alertas';
 $string['booleanformat:false'] = 'Não';
 $string['booleanformat:true'] = 'Sim';
 $string['button:accept'] = 'Aceitar';
+$string['button:close'] = 'Fechar';
+$string['button:notnow'] = 'Agora não';
 $string['cachedef_enabled_notices'] = 'Lista de alertas habilitados';
 $string['cachedef_notice_view'] = 'Lista de alertas visualizados';
 $string['cachedef_site_user_count'] = 'Contagem de usuários do site, que decide se a estimativa de público roda de forma interativa';
@@ -163,8 +165,6 @@ $string['message:audience_ready:body'] = 'A estimativa de público de "{$a->titl
 $string['message:audience_ready:subject'] = 'Estimativa de público pronta: {$a->title}';
 $string['messageprovider:audience_estimate_ready'] = 'Estimativa de público concluída';
 $string['modal:checkboxtext'] = 'Li e compreendi o alerta.';
-$string['modal:checkboxtext_logout'] = 'Li e compreendi o alerta (fechar este alerta fará logout do site).';
-$string['modal:checkboxtext_nologout'] = 'Li e compreendi o alerta.';
 $string['notice:activefrom'] = 'Ativo desde';
 $string['notice:activefrom_help'] = 'Data e hora a partir da qual a mensagem estará ativa.';
 $string['notice:audience'] = 'Público-alvo';
@@ -191,25 +191,32 @@ $string['notice:disable'] = 'Desabilitar alerta';
 $string['notice:enable'] = 'Habilitar alerta';
 $string['notice:expiry'] = 'Expiração';
 $string['notice:expiry_help'] = 'Data e hora em que a mensagem expira e não será mais exibida aos usuários.';
-$string['notice:forcelogout'] = 'Forçar logout';
-$string['notice:forcelogout_help'] = 'Se habilitado, o usuário será desconectado após fechar o alerta. Esta configuração não afeta o administrador do site.';
 $string['notice:info'] = 'Informações do alerta';
+$string['notice:insistence'] = 'Insistência';
+$string['notice:insistence:acknowledge'] = 'Exige reconhecimento';
+$string['notice:insistence:blocking'] = 'Bloqueante';
+$string['notice:insistence:informational'] = 'Informativo';
+$string['notice:insistence_help'] = 'O quanto o alerta é difícil de ultrapassar, e o que o leitor pode fazer em vez de aceitá-lo.
+
+Informativo: o leitor pode dispensá-lo, inclusive clicando fora dele, e a dispensa é registrada.
+
+Bloqueante: não pode ser dispensado clicando fora nem pressionando Esc. O leitor aceita ou escolhe
+Agora não, e um alerta que não foi aceito volta a ser exibido.
+
+Exige reconhecimento: como Bloqueante, e a caixa de reconhecimento precisa ser marcada antes que
+Aceitar fique disponível.
+
+Nenhum nível desconecta o leitor do site.';
 $string['notice:modal_dimension_invalid'] = 'Valor inválido. Use um número seguido de px, %, vw ou vh (ex: 600px, 80%, 50vw).';
 $string['notice:modal_height'] = 'Altura do modal';
 $string['notice:modal_height_help'] = 'Altura personalizada do modal de alerta. Formatos aceitos: pixels (ex: 400px), porcentagem (ex: 70%) ou altura da viewport (ex: 50vh). Deixe em branco para tamanho padrão.';
 $string['notice:modal_width'] = 'Largura do modal';
 $string['notice:modal_width_help'] = 'Largura personalizada do modal de alerta. Formatos aceitos: pixels (ex: 600px), porcentagem (ex: 80%) ou largura da viewport (ex: 50vw). Deixe em branco para tamanho padrão.';
 $string['notice:notice'] = 'Alerta';
-$string['notice:outsideclick'] = 'Dispensar ao clicar fora';
-$string['notice:outsideclick_help'] = 'Se habilitado, o usuário pode fechar o alerta clicando fora do modal. Se desabilitado, o usuário deve usar o botão fechar ou aceitar.';
 $string['notice:pathmatch:anywhere'] = 'Em todo o site';
 $string['notice:perpetual'] = 'É perpétuo';
 $string['notice:perpetual_help'] = 'Quando definido como sim, o alerta sempre será exibido (a menos que desabilitado). Se definido como não, um intervalo de data e hora deve ser especificado.';
 $string['notice:preview'] = 'Pré-visualizar o modal';
-$string['notice:reqack'] = 'Requer reconhecimento';
-$string['notice:reqack_help'] = 'Se habilitado, o usuário precisa marcar a caixa de reconhecimento antes que o botão Aceitar
-fique disponível, e o alerta não pode ser dispensado clicando fora dele nem pressionando Esc. Quem fecha o alerta em vez de
-aceitá-lo volta a vê-lo até aceitar. Não desconecta o usuário do site.';
 $string['notice:reqcourse'] = 'Requer conclusão do curso';
 $string['notice:reqcourse_help'] = 'Mostra o alerta apenas a quem ainda não concluiu o curso selecionado. É uma regra de público, não uma frequência de exibição: com que frequência o alerta reaparece é definido pelo intervalo de reexibição, e quem conclui o curso deixa de o ver.';
 $string['notice:reset'] = 'Redefinir alerta';
@@ -288,6 +295,8 @@ $string['report_notice:content'] = 'Conteúdo';
 $string['report_notice:dismiss_count'] = 'Total de dispensas';
 $string['report_notice:enabled'] = 'Habilitado';
 $string['report_notice:forcelogout'] = 'Forçar logout';
+$string['report_notice:forcelogout:deprecated'] = 'Forçar logout não tem mais efeito. Use Insistência; esta coluna é mantida para que relatórios existentes continuem mostrando o que o autor pediu originalmente.';
+$string['report_notice:insistence'] = 'Insistência';
 $string['report_notice:reqack'] = 'Requer confirmação';
 $string['report_notice:reqcourse'] = 'Requer conclusão do curso';
 $string['report_notice:resetinterval'] = 'Intervalo de redefinição';

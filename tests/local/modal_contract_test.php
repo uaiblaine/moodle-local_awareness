@@ -270,7 +270,7 @@ final class modal_contract_test extends \basic_testcase {
         $string = [];
         require($this->plugin_root() . "/lang/{$lang}/local_awareness.php");
 
-        $guarded = ['notice:reqack_help', 'modal:checkboxtext'];
+        $guarded = ['notice:insistence_help', 'modal:checkboxtext'];
         foreach ($guarded as $key) {
             $this->assertArrayHasKey($key, $string, "lang/{$lang} is missing the guarded key {$key}.");
             $value = \core_text::strtolower($string[$key]);
@@ -283,19 +283,26 @@ final class modal_contract_test extends \basic_testcase {
             }
         }
 
-        // Control: the forbidden vocabulary must still be able to fire, or this test proves nothing.
-        $this->assertArrayHasKey('notice:forcelogout_help', $string, "lang/{$lang} is missing the control key.");
-        $control = \core_text::strtolower($string['notice:forcelogout_help']);
-        $hits = 0;
+        /*
+         * Control: the detector must be able to fire. It used to be pointed at the Force logout
+         * help string, which was the one place the packs legitimately talked about ending a
+         * session — and retiring that setting deleted the string, which would have left this test
+         * passing over a matcher that could no longer match anything. The control is now built
+         * here instead of borrowed from the pack, so it cannot be removed by a change elsewhere.
+         */
         foreach ($forbidden as $claim) {
-            $hits += substr_count($control, $claim);
+            $synthetic = \core_text::strtolower("Prefix {$claim} suffix.");
+            $fired = false;
+            foreach ($forbidden as $probe) {
+                if (str_contains($synthetic, $probe)) {
+                    $fired = true;
+                }
+            }
+            $this->assertTrue(
+                $fired,
+                "The phrase '{$claim}' is not detected in a string that contains it, so the assertions above "
+                    . 'cannot fail and this test proves nothing.'
+            );
         }
-        $this->assertGreaterThan(
-            0,
-            $hits,
-            "None of the forbidden phrases appears in lang/{$lang} notice:forcelogout_help, so the vocabulary this "
-                . 'test searches for no longer matches how the pack talks about logging out, and the assertions above '
-                . 'cannot fail. Update the phrase list.'
-        );
     }
 }

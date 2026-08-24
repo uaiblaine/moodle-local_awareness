@@ -797,12 +797,10 @@ final class notice_external_test extends \advanced_testcase {
         $expected = [
             'bgimageurl',
             'content',
-            'forcelogout',
             'id',
+            'insistence',
             'modal_height',
             'modal_width',
-            'outsideclick',
-            'reqack',
             'title',
         ];
         $actual = array_keys($payload);

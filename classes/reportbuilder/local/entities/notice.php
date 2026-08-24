@@ -27,6 +27,7 @@ use core_reportbuilder\local\helpers\format;
 use core_reportbuilder\local\report\column;
 use core_reportbuilder\local\report\filter;
 use local_awareness\helper;
+use local_awareness\persistent\awareness as awareness_persistent;
 
 /**
  * Notice entity for Report Builder.
@@ -139,6 +140,41 @@ class notice extends base {
                 return !empty($value) ? get_string('yes') : get_string('no');
             });
 
+        /*
+         * How insistent the notice is, as one ordered value. Derived in SQL from the two columns
+         * that store it rather than added to the table, so there is no third copy to drift from
+         * awareness::get_insistence() — the CASE below is that method, in ANSI, and the two must
+         * be changed together. A searched CASE keeps this portable across PostgreSQL and MariaDB,
+         * the same reason reqcourse above is written this way.
+         */
+        $columns[] = (new column(
+            'insistence',
+            new lang_string('report_notice:insistence', 'local_awareness'),
+            $this->get_entity_name()
+        ))
+            ->add_joins($this->get_joins())
+            ->add_field(
+                "CASE WHEN {$alias}.reqack = 1 THEN 2 WHEN {$alias}.outsideclick = 0 THEN 1 ELSE 0 END",
+                'insistence'
+            )
+            ->set_type(column::TYPE_INTEGER)
+            ->set_is_sortable(true)
+            ->add_callback(static function ($value): string {
+                /*
+                 * A literal per level. get_string() with a built identifier would read more
+                 * tidily and is banned for a reason: nothing then proves the strings exist, and a
+                 * missing one renders as its own identifier rather than failing.
+                 */
+                switch ((int) $value) {
+                    case awareness_persistent::INSISTENCE_ACKNOWLEDGE:
+                        return get_string('notice:insistence:acknowledge', 'local_awareness');
+                    case awareness_persistent::INSISTENCE_BLOCKING:
+                        return get_string('notice:insistence:blocking', 'local_awareness');
+                    default:
+                        return get_string('notice:insistence:informational', 'local_awareness');
+                }
+            });
+
         $columns[] = (new column(
             'forcelogout',
             new lang_string('report_notice:forcelogout', 'local_awareness'),
@@ -148,6 +184,14 @@ class notice extends base {
             ->add_fields("{$alias}.forcelogout")
             ->set_type(column::TYPE_BOOLEAN)
             ->set_is_sortable(true)
+            /*
+             * Deprecated rather than removed. Force logout no longer does anything at runtime, but
+             * the column records what an author once asked for, and dropping it would silently
+             * empty that column in every saved report carrying it — core drops an unknown column
+             * from a report without telling anyone. Deprecating keeps the history readable and
+             * puts the notice where the person building a report will see it.
+             */
+            ->set_is_deprecated(get_string('report_notice:forcelogout:deprecated', 'local_awareness'))
             ->add_callback(static function ($value): string {
                 return !empty($value) ? get_string('yes') : get_string('no');
             });

@@ -438,11 +438,11 @@ final class helper_test extends \advanced_testcase {
             'content' => '<p>Body</p>',
             'enabled' => 1,
             'reqack' => 0,
-            'forcelogout' => 1,
+            'outsideclick' => 0,
         ]);
         $notice->create();
 
-        // Close: the dismissal is recorded and dismiss_notice() logs them out, as it is meant to.
+        // Close: a Blocking notice records no compliance row for a refusal it did not demand.
         helper::dismiss_notice($notice);
         $this->assertSame(0, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
 
@@ -457,8 +457,7 @@ final class helper_test extends \advanced_testcase {
             $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]),
             'Accept after a dismissal must record the acknowledgement rather than silently do nothing.'
         );
-        // The forced logout sits after the same early return, so it was skipped too.
-        $this->assertArrayHasKey('redirecturl', $result);
+        $this->assertTrue($result['status'], 'the acknowledgement must report success, not merely write a row');
     }
 
     /**
@@ -480,7 +479,7 @@ final class helper_test extends \advanced_testcase {
             'content' => '<p>Body</p>',
             'enabled' => 1,
             'reqack' => 0,
-            'forcelogout' => 0,
+            'outsideclick' => 1,
         ]);
         $notice->create();
 

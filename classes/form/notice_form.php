@@ -17,6 +17,7 @@
 namespace local_awareness\form;
 
 use local_awareness\helper;
+use local_awareness\persistent\awareness;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -127,17 +128,24 @@ class notice_form extends \core\form\persistent {
         $mform->addHelpButton('resetinterval', 'notice:resetinterval', 'local_awareness');
         $mform->setDefault('resetinterval', 0);
 
-        $mform->addElement('selectyesno', 'reqack', get_string('notice:reqack', 'local_awareness'));
-        $mform->addHelpButton('reqack', 'notice:reqack', 'local_awareness');
-        $mform->setDefault('reqack', 0);
-
-        $mform->addElement('selectyesno', 'outsideclick', get_string('notice:outsideclick', 'local_awareness'));
-        $mform->addHelpButton('outsideclick', 'notice:outsideclick', 'local_awareness');
-        $mform->setDefault('outsideclick', 1);
-
-        $mform->addElement('selectyesno', 'forcelogout', get_string('notice:forcelogout', 'local_awareness'));
-        $mform->addHelpButton('forcelogout', 'notice:forcelogout', 'local_awareness');
-        $mform->setDefault('forcelogout', 0);
+        /*
+         * One question, three answers, where there used to be three yes/no questions whose eight
+         * combinations included two that made no sense together and one that did nothing. The
+         * author is choosing how insistent the notice is, and that is a single ordered decision;
+         * awareness::get_insistence() is where the levels are defined and mapped back to storage.
+         */
+        $mform->addElement(
+            'select',
+            'insistence',
+            get_string('notice:insistence', 'local_awareness'),
+            [
+                awareness::INSISTENCE_INFORMATIONAL => get_string('notice:insistence:informational', 'local_awareness'),
+                awareness::INSISTENCE_BLOCKING => get_string('notice:insistence:blocking', 'local_awareness'),
+                awareness::INSISTENCE_ACKNOWLEDGE => get_string('notice:insistence:acknowledge', 'local_awareness'),
+            ]
+        );
+        $mform->addHelpButton('insistence', 'notice:insistence', 'local_awareness');
+        $mform->setDefault('insistence', awareness::INSISTENCE_INFORMATIONAL);
 
         $mform->addElement('selectyesno', 'perpetual', get_string('notice:perpetual', 'local_awareness'));
         $mform->addHelpButton('perpetual', 'notice:perpetual', 'local_awareness');
@@ -576,6 +584,13 @@ class notice_form extends \core\form\persistent {
         if (empty($data->reqcourse)) {
             $data->reqcourse = 0;
         }
+
+        /*
+         * The insistence select is not a persistent property — it is the two stored columns read
+         * as one ordered decision, so there is no third copy of the truth. Derived here on the way
+         * in; helper::sanitise_data() writes it back out to those columns on the way out.
+         */
+        $data->insistence = $this->get_persistent()->get_insistence();
 
         // Unpack filter values.
         if (!empty($data->filtervalues)) {

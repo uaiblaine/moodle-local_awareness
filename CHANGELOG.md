@@ -6,6 +6,61 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Force logout is retired; insistence is one setting with three levels (version 2026082402)
+
+**Force logout never did what it promised, and it was the option an author reached for when a
+notice mattered most.** It was retroactive — the ejection arrived after the act, with the causal
+link invisible; it compelled nothing, because the reader logged straight back in and met the same
+notice; and it destroyed work, because this plugin injects itself into nearly every page, so being
+ejected mid-attempt is real loss. It treated an accidental click exactly like a deliberate refusal.
+For a guest it was incoherent twice over: guests share one account, so the ejection fired under a
+shared identity that the estimator excludes from every audience count, and on 4.5 and 5.1 the guest
+login button is shown by default, so the guest bounced straight back to the same notice.
+
+**Three yes/no switches became one ordered question.** `Requires acknowledgement`, `Dismiss on
+outside click` and `Force logout` had eight combinations between them, of which one was incoherent
+(demanding acknowledgement while letting the reader click away) and one did nothing at all. The
+author now chooses how insistent the notice is:
+
+| level | the reader can | recorded |
+|---|---|---|
+| **Informational** | dismiss it, including by clicking outside | the dismissal |
+| **Blocking** | accept it, or choose **Not now** — it cannot be clicked away, and it comes back | acceptance or refusal |
+| **Must acknowledge** | as Blocking, and Accept waits for the tick-box | acceptance or refusal |
+
+**The level is derived, not stored.** `awareness::get_insistence()` reads the two columns that
+always held it, so there is no third copy of the truth to drift from the display path. The web
+service now sends the resolved level instead of three booleans, so the client cannot recombine them
+into a state the server never meant.
+
+**On upgrade, insistence is preserved rather than reset.** A notice with Force logout on and no
+acknowledgement requirement becomes **Blocking** — still hard to escape, still returning, but
+without inventing a tick-box its author never asked for. One that already required an
+acknowledgement is at the top level and is untouched; the `WHERE` clause says so rather than
+relying on the assignment being a no-op. The `forcelogout` column is **kept**, and its report
+column is marked deprecated rather than dropped: it records what an author once asked for, and
+removing it would silently empty that column in every saved report carrying it.
+
+**All three admin exemptions went with it.** `is_siteadmin()` appeared three times against this
+feature, in two different spellings — truthiness on the two write paths, `=== 1` in `must_reshow()`.
+They existed to stop an administrator being ejected, not to excuse them from reading notices; with
+no ejection left there was nothing to protect, and leaving the third would have made Blocking the
+one level an admin could dismiss for good by accident. A notice requiring acknowledgement has always
+come back for admins too, so this makes the levels consistent rather than stricter.
+
+**A refused notice comes back, but does not jump the queue.** `must_reshow()` gained one clause
+reading the level with `>=`, which subsumes the acknowledgement clause it replaces. It is
+deliberately not promoted ahead of notices the reader has not seen yet: an exit that returns
+immediately and forever is not an exit. It cannot be starved either, because the only tier above it
+holds notices not yet shown, and one display empties it.
+
+**Smaller things that went with the retirement.** `redirecturl` is gone from both write web
+services and from the JS that read it — nothing has set it since the logout left, and `track_link`
+had already documented that it never returned the field its client was checking. The acknowledgement
+label no longer swaps its own text after render: the two exit buttons are both in the template and
+one is hidden, because the swap was an un-awaited promise, and if it lost, the wrong wording simply
+stood. That is how the checkbox came to claim a logout that no longer happened.
+
 ### Acceptance has an expiry date, and a public answer (version 2026082401)
 
 "Has this user accepted this notice" had no stable answer. The only one available was **"a row

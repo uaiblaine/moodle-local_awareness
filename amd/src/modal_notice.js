@@ -24,25 +24,37 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
-    function($, Modal, KeyCodes, str) {
+define(['jquery', 'core/modal', 'core/key_codes'],
+    function($, Modal, KeyCodes) {
 
         var SELECTORS = {
             CLOSE_BUTTON: '[data-action="close"]',
             ACCEPT_BUTTON: '[data-action="accept"]',
             ACK_CHECKBOX: '#awareness-modal-ackcheckbox',
-            ACK_CONTAINER: '#awareness-ack-container'
+            ACK_CONTAINER: '#awareness-ack-container',
+            HEADER_CLOSE: '#awareness-closebtn',
+            FOOTER_CLOSE: '#awareness-closebtn-footer',
+            NOT_NOW: '#awareness-notnowbtn'
+        };
+
+        /**
+         * How insistent a notice is. Mirrors the INSISTENCE_* constants on the awareness
+         * persistent, which is where the levels are defined and where the mapping to storage
+         * lives; the server sends the resolved level, so this file never sees the columns.
+         */
+        var INSISTENCE = {
+            INFORMATIONAL: 0,
+            BLOCKING: 1,
+            ACKNOWLEDGE: 2
         };
 
         var ATTRIBUTE = {
-            NOTICE_ID: 'data-noticeid',
-            REQUIRED_ACKNOWLEDGE: 'data-noticereqack'
+            NOTICE_ID: 'data-noticeid'
         };
 
         var ModalNotice = function(root) {
             var self = Reflect.construct(Modal, [root], ModalNotice);
-            self.reqack = false;
-            self.outsideclick = true;
+            self.insistence = INSISTENCE.INFORMATIONAL;
             return self;
         };
 
@@ -85,14 +97,6 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
         };
 
         /**
-         * Set outside click dismissed.
-         * @param {boolean} allowOutsideClick
-         */
-        ModalNotice.prototype.setOutsideClick = function(allowOutsideClick) {
-            this.outsideclick = allowOutsideClick;
-        };
-
-        /**
          * Set Notice ID to the current modal.
          * @param {Integer} noticeid
          */
@@ -109,39 +113,42 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
         };
 
         /**
-         * Add Checkbox if the notice requires acknowledgement.
-         * @param {Integer} reqack
+         * Dress the dialogue for how insistent this notice is.
+         *
+         * One call rather than three, because it is one decision. Everything it touches is already
+         * in the template, so nothing here fetches a string or waits on a promise: the exit button
+         * for this level is shown and the other is hidden.
+         *
+         *  - Informational  the header cross and a single Close; no Accept, so no acceptance can
+         *                   be recorded for a notice that never asked for one.
+         *  - Blocking       no cross, Not now beside Accept, and the backdrop refuses clicks.
+         *  - Acknowledge    as Blocking, and Accept waits for the checkbox.
+         *
+         * @param {Number} insistence One of the INSISTENCE values.
          */
-        ModalNotice.prototype.setRequiredAcknowledgement = function(reqack) {
-            var ackContainer = this.getFooter().find(SELECTORS.ACK_CONTAINER);
-            var acceptBtn = this.getFooter().find(SELECTORS.ACCEPT_BUTTON);
-            var checkbox = this.getFooter().find(SELECTORS.ACK_CHECKBOX);
+        ModalNotice.prototype.setInsistence = function(insistence) {
+            var level = parseInt(insistence, 10);
+            this.insistence = isNaN(level) ? INSISTENCE.INFORMATIONAL : level;
 
-            this.reqack = (reqack == 1);
+            var footer = this.getFooter();
+            var ackContainer = footer.find(SELECTORS.ACK_CONTAINER);
+            var acceptBtn = footer.find(SELECTORS.ACCEPT_BUTTON);
+            var checkbox = footer.find(SELECTORS.ACK_CHECKBOX);
+            var blocking = this.insistence >= INSISTENCE.BLOCKING;
 
-            if (this.reqack) {
+            this.getModal().find(SELECTORS.HEADER_CLOSE).toggleClass('d-none', blocking);
+            footer.find(SELECTORS.FOOTER_CLOSE).toggleClass('d-none', blocking);
+            footer.find(SELECTORS.NOT_NOW).toggleClass('d-none', !blocking);
+            acceptBtn.toggleClass('d-none', !blocking);
+
+            if (this.insistence >= INSISTENCE.ACKNOWLEDGE) {
                 ackContainer.removeClass('d-none');
                 acceptBtn.attr('disabled', true);
                 checkbox.prop('checked', false);
             } else {
                 ackContainer.addClass('d-none');
-                acceptBtn.show();
                 acceptBtn.removeAttr('disabled');
             }
-        };
-
-        /**
-         * Update checkbox label text based on forcelogout setting.
-         * @param {Integer} forcelogout 1 if force logout is enabled, 0 otherwise.
-         */
-        ModalNotice.prototype.setForceLogout = function(forcelogout) {
-            var stringKey = (parseInt(forcelogout, 10) === 1) ?
-                'modal:checkboxtext_logout' : 'modal:checkboxtext_nologout';
-            var label = this.getFooter().find('label[for="awareness-modal-ackcheckbox"]');
-            return str.get_string(stringKey, 'local_awareness').then(function(text) {
-                label.text(text);
-                return null;
-            });
         };
 
         /**
@@ -216,7 +223,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
                     return;
                 }
                 if ($(e.target).closest('[data-region="modal"]').length === 0) {
-                    if (modal.reqack || !modal.outsideclick) {
+                    if (modal.insistence >= INSISTENCE.BLOCKING) {
                         // The shake goes on the dialogue, which is the element carrying `awareness` and
                         // the element styles.css animates. It used to go on getRoot(), where the rule
                         // `.awareness.jelly-anim .modal-dialog` could never match - `awareness` sits on
@@ -237,7 +244,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
                 }
 
                 if (e.keyCode == KeyCodes.escape) {
-                    if (this.reqack || !this.outsideclick) {
+                    if (this.insistence >= INSISTENCE.BLOCKING) {
                         e.preventDefault();
                         return;
                     }
