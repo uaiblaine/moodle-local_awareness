@@ -6,6 +6,44 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Acceptance has an expiry date, and a public answer (version 2026082401)
+
+"Has this user accepted this notice" had no stable answer. The only one available was **"a row
+exists in `local_awareness_ack`"**, and that answer can only ever become *more* true: nothing
+deletes the row, and the acknowledge path deliberately writes a fresh one once the notice is edited
+or its reset interval elapses. **An author who sets a reset interval is saying the opposite** — that
+acceptance expires and has to be given again — so the only available answer contradicted the very
+setting it was most likely to be asked about.
+
+**The staleness rule now exists once and serves both readers.** `must_reshow()` already knew when an
+interaction had stopped speaking for the notice — edited since, or the repeat interval elapsed — but
+it knew it privately, mixed in with rules about what the user actually *did*. Those two
+time-only rules are now `interaction_is_stale()`, applied by `must_reshow()` to a recorded view and
+by the new predicate to an acknowledgement row. One definition, two consumers, no third copy to
+drift — the shape audit finding M12 was about.
+
+**`helper::acceptance_is_current()` is the public answer**, and differs from the private predicates
+next door in the three ways that made them unusable outside the display path: it reads
+`local_awareness_ack`, the compliance record, rather than `local_awareness_lastview`, which records
+that a notice was *met* without recording consent; it has no side effects, where
+`check_if_already_acknowledged_by_user()` writes into `$USER->viewednotices` despite taking a
+`$userid` parameter, so asking it about anyone else corrupts the viewing user's session; and it
+expires. A dismissal never satisfies it — the two actions share a table and are told apart by the
+action column, and a caller gating on consent must not be satisfied by a refusal.
+
+**No schema change and no migration.** Supersession is decided on read, so the duplicate rows
+already on existing sites become harmless rather than needing to be cleaned up: the predicate reads
+the newest row and asks whether it still stands. Historical compliance records are left exactly as
+they were, which is the right default for a table whose whole purpose is to be a record.
+
+**One docblock was simply false and is now a difference rather than an absence.**
+`has_acknowledgement_record()` claimed the duplicate check ran "at the only two writers". It has
+exactly one caller. The acknowledge path's omission is deliberate — a repeat *dismissal* is the same
+refusal recorded twice, while a repeat *acceptance* after an edit or a reset is a different fact,
+and deduplicating it would silently discard periodic re-acknowledgement. That reasoning is now
+written down, because the previous phase's post-mortem on M12 was that a drifted predicate is found
+by reading a difference and missed by having to notice an absence.
+
 ### Accessibility — the notice dialogue, and two strings that described a different setting (version 2026082400)
 
 Seven defects that shipped on 4.5, 5.1 and 5.2 at once, with CI green throughout. Nothing in the

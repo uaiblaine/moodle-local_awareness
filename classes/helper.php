@@ -1071,9 +1071,23 @@ class helper {
      * Whether this user already has a row of this kind for this notice.
      *
      * The acknowledgement table is the plugin's compliance record: it answers "who dismissed
-     * this" and "who accepted this", and both questions want one row per person. There is no
-     * unique key to lean on — adding one to a live table would fail the upgrade on any site that
-     * has already accumulated duplicates — so the check happens here, at the only two writers.
+     * this" and "who accepted this". There is no unique key to lean on — adding one to a live
+     * table would fail the upgrade on any site that has already accumulated duplicates — so the
+     * check happens in PHP.
+     *
+     * It has exactly ONE caller: the dismissal path. The docblock used to claim it ran "at the
+     * only two writers", which was never true, and the absence is deliberate rather than an
+     * oversight — so it is written here as a difference instead of leaving the next reader to
+     * notice it. A repeat DISMISSAL of the same notice is the same refusal recorded twice, and
+     * the dismissed report would list one person once per page load. A repeat ACCEPTANCE is not
+     * the same fact: once the author edits the notice or its reset interval elapses, the earlier
+     * acceptance no longer covers the current text, and a fresh row is exactly what was asked
+     * for. Deduplicating the acknowledge path would silently discard periodic re-acknowledgement,
+     * which is the whole point of resetinterval.
+     *
+     * What that leaves is a table where a user may hold several ACKNOWLEDGED rows for one notice.
+     * That is intended, and acceptance_is_current() is what turns those rows back into a single
+     * yes/no by reading the newest one.
      *
      * @param awareness $notice Notice.
      * @param int $userid User id.
@@ -1432,16 +1446,86 @@ class helper {
      */
     private static function must_reshow(awareness $notice, int $timeviewed, int $action): bool {
         $dismissed = $action === acknowledgement::ACTION_DISMISSED;
-        $resetinterval = (int) $notice->get('resetinterval');
 
-        // The notice has been updated, reset or re-enabled since they saw it.
-        return $timeviewed < (int) $notice->get('timemodified')
-            // Its repeat interval has elapsed.
-            || ($resetinterval > 0 && $timeviewed + $resetinterval < time())
+        // The notice has been edited or its repeat interval has elapsed since they acted.
+        return self::interaction_is_stale($notice, $timeviewed)
             // They dismissed it, and it asks for an acknowledgement they have not given.
             || ($dismissed && (int) $notice->get('reqack') === 1)
             // They dismissed it, and it forces a logout — which admins are spared.
             || ($dismissed && (int) $notice->get('forcelogout') === 1 && !is_siteadmin());
+    }
+
+    /**
+     * Whether an interaction recorded at this time no longer speaks for the notice as it stands.
+     *
+     * Two rules, and neither depends on WHAT the user did — only on when they did it. That is why
+     * this is separate: must_reshow() applies them to a recorded view to decide whether to put the
+     * modal back, and acceptance_is_current() applies the same two to an acknowledgement row to
+     * decide whether a recorded acceptance still counts. They were previously written once, inside
+     * must_reshow(), and so were available only to the display path.
+     *
+     * The consequence of them being available only there: "this user accepted this notice" could
+     * be answered ONLY as "a row exists", which never becomes false. An author who sets a reset
+     * interval is saying the opposite — that acceptance expires and has to be given again.
+     *
+     * @param awareness $notice The notice being judged.
+     * @param int $when When the user acted, as a unix timestamp.
+     * @return bool True when the interaction is stale.
+     */
+    private static function interaction_is_stale(awareness $notice, int $when): bool {
+        $resetinterval = (int) $notice->get('resetinterval');
+
+        // The notice has been updated, reset or re-enabled since they acted.
+        return $when < (int) $notice->get('timemodified')
+            // Its repeat interval has elapsed.
+            || ($resetinterval > 0 && $when + $resetinterval < time());
+    }
+
+    /**
+     * Whether this user currently stands as having accepted this notice.
+     *
+     * The plugin's answer to "has user U accepted notice N", and deliberately the only public one.
+     * Three properties that the private predicates next door do not have, each of which was a
+     * reason a caller outside the display path could not use them:
+     *
+     *  - It reads {local_awareness_ack}, the COMPLIANCE record, not {local_awareness_lastview},
+     *    which records that a notice was met without recording consent.
+     *  - It has no side effects. check_if_already_acknowledged_by_user() writes the answer into
+     *    $USER->viewednotices — correct for the session it is judging, corrupting for any other
+     *    user, and it takes $userid as a parameter.
+     *  - It expires. A user may hold several ACKNOWLEDGED rows for one notice (see
+     *    has_acknowledgement_record()); this reads the newest and asks whether it still speaks for
+     *    the notice as it now stands. "A row exists" only ever grows, which is the opposite of
+     *    what a reset interval means.
+     *
+     * A DISMISSAL is never an acceptance. The two actions are stored in the same table and told
+     * apart by the action column; a caller gating access on consent must not be satisfied by a
+     * refusal.
+     *
+     * @param awareness $notice The notice to test.
+     * @param int $userid The user to test.
+     * @return bool True when a current, unexpired acceptance is on record.
+     * @throws \dml_exception
+     */
+    public static function acceptance_is_current(awareness $notice, int $userid): bool {
+        global $DB;
+
+        $latest = $DB->get_field_sql(
+            "SELECT MAX(timecreated)
+               FROM {local_awareness_ack}
+              WHERE noticeid = :noticeid AND userid = :userid AND action = :action",
+            [
+                'noticeid' => $notice->get('id'),
+                'userid' => $userid,
+                'action' => acknowledgement::ACTION_ACKNOWLEDGED,
+            ]
+        );
+
+        if (empty($latest)) {
+            return false;
+        }
+
+        return !self::interaction_is_stale($notice, (int) $latest);
     }
 
     /**
