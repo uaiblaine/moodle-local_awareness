@@ -62,12 +62,20 @@ Behat site fails every scenario on the same core locator and looks like your bug
   needs its own tests, which is why `tests/check_filters_test.php` exists.
 
 - **`check_filters()` resolves the course through
-  `can_access_course($course, null, '', true)`.** That `$onlyactive = true`
-  demands an ACTIVE enrolment, so in tests an un-enrolled user gets
-  `$course = null` and every branch returns false *for the wrong reason* — the
-  negative cases pass while exercising nothing. Enrol the user. Consequence in
-  production, and deliberate: a course-targeted notice does not appear on that
-  course's own enrolment page.
+  `can_access_course($course, null, '', true)`.** In tests an un-enrolled user
+  gets `$course = null` and every branch returns false *for the wrong reason* —
+  the negative cases pass while exercising nothing. Enrol the user.
+
+  **`$onlyactive = true` constrains one leg of that function, not the function.**
+  This note used to say it "demands an ACTIVE enrolment", and that is only true
+  of the `is_enrolled($coursecontext, $USER, '', $onlyactive)` call. Execution
+  continues to a **temporary guest-access** leg (`lib/accesslib.php:2070-2082`,
+  identical on 4.5, 5.1 and 5.2) which walks the course's enabled enrol instances
+  calling `try_guestaccess()` and returns true if any grants it. So on a course
+  with guest access switched on, a **non-enrolled** user — and the guest user —
+  passes, and a course-targeted notice DOES reach them. The old claim that such a
+  notice never appears on the course's enrolment page holds only where guest
+  access is off.
 
 - **A named placeholder may appear only once per statement**, and the privacy
   provider's four-way `EXISTS` union is the place this bites. See the fleet file.
