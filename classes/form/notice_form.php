@@ -35,9 +35,16 @@ class notice_form extends \core\form\persistent {
     /** @var string Persistent class name. */
     protected static $persistentclass = 'local_awareness\persistent\awareness';
 
+    /*
+     * insistence sits here beside perpetual for the same reason: it is a form field, not a stored
+     * property. The author chooses one level and helper::sanitise_data() writes it back to the two
+     * columns that hold it. Listing it is a declaration rather than a fix — core's
+     * filter_data_for_persistent() removes only these names, and from_record() then drops anything
+     * that is not a property anyway — but the next reader should not have to derive that.
+     */
     /** @var array Fields to remove from the persistent validation. */
     protected static $foreignfields = [
-        'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
+        'insistence', 'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
         'filter_course', 'filter_format', 'filter_theme', 'filter_competency_rules',
         'filter_competency_requireall', 'bgimage',
     ];
