@@ -77,10 +77,14 @@ class acknowledge_notice extends external_api {
 
         $notice = awareness::get_record(['id' => $params['noticeid']]);
 
-        // The notice id comes from the client, so the audience test has to be repeated here —
-        // otherwise a user can record an interaction with a notice never shown to them, and the
-        // acknowledgement reports stop meaning anything.
-        if ($notice && helper::is_notice_available_to_user($notice)) {
+        /*
+         * The notice id comes from the client, so both halves have to be re-established here:
+         * the audience test, and the fact that this session was actually served the notice.
+         * Without the second one a user in the notice's cohort who is not in the course it targets
+         * could post a row that lands in the compliance report as consent given after display —
+         * and the report is the reason this plugin exists.
+         */
+        if ($notice && helper::may_act_on_notice($notice)) {
             $result = helper::acknowledge_notice($notice);
         }
 

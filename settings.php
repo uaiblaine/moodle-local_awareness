@@ -69,6 +69,30 @@ if ($hassiteconfig) {
         )
     );
 
+    /*
+     * A select, not a text box: the value is a fixed vocabulary and an admin_setting_configtext
+     * defaults to PARAM_RAW, which would store whatever was typed and change retention silently.
+     * Zero is "keep for ever" — core's own default for log retention, and the only default an
+     * upgrade may have, because anything else would discard a site's existing history the first
+     * time cron ran.
+     */
+    $temp->add(
+        new admin_setting_configselect(
+            'local_awareness/linkhistory_lifetime',
+            new lang_string('setting:linkhistory_lifetime', 'local_awareness'),
+            new lang_string('setting:linkhistory_lifetimedesc', 'local_awareness'),
+            0,
+            [
+                0 => new lang_string('never'),
+                30 => new lang_string('numdays', '', 30),
+                90 => new lang_string('numdays', '', 90),
+                180 => new lang_string('numdays', '', 180),
+                365 => new lang_string('numdays', '', 365),
+                730 => new lang_string('numdays', '', 730),
+            ]
+        )
+    );
+
     $temp->add(
         new admin_setting_configtext(
             'local_awareness/audience_sync_limit',

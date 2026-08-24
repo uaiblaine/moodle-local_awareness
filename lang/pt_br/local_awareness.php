@@ -310,8 +310,11 @@ Se habilitado, outros detalhes relacionados ao alerta sendo excluído, como link
 última visualização do usuário também serão excluídos';
 $string['setting:enabled'] = 'Habilitado';
 $string['setting:enableddesc'] = 'Habilitar alertas do site';
+$string['setting:linkhistory_lifetime'] = 'Manter o histórico de cliques em links por';
+$string['setting:linkhistory_lifetimedesc'] = 'Por quanto tempo é mantido o registo de um leitor que seguiu um link dentro de um aviso. O padrão é manter para sempre, então a atualização não descarta nada; escolher um período inicia uma limpeza noturna de tudo o que for mais antigo.';
 $string['setting:managenotice'] = 'Gerenciar alerta';
 $string['setting:settings'] = 'Configurações';
 $string['task_estimate_audience'] = 'Estimar o público de um alerta';
 $string['task_purge_audience_jobs'] = 'Expurgar trabalhos de estimativa de público já consumidos';
+$string['task_purge_link_history'] = 'Limpar histórico antigo de cliques em links';
 $string['timeformat:resetinterval'] = '%a dia(s), %h hora(s), %i minuto(s) e %s segundo(s)';

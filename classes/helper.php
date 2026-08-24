@@ -639,10 +639,18 @@ class helper {
         }
 
         /*
-         * Remember what was handed over, so an ignored notice stops counting as a first occurrence
-         * and yields the slot on the next page. This is session state on purpose: recording a
-         * display in the database would put a write on the read path, which is exactly the cost
-         * this plugin cannot afford on every page view.
+         * Remember what was handed over. Two consumers, and they must not be separated.
+         *
+         * The queue reads it so an ignored notice stops counting as a first occurrence and yields
+         * the slot on the next page. The WRITE PATH reads it too, through was_notice_delivered():
+         * this loop is the only record that the page-dependent rules — check_path_match() and the
+         * category, course, format, theme and competency blocks of check_filters() — were ever
+         * evaluated for this user, because they run here on the read path and cannot run on a
+         * write. Narrowing or deleting this loop does not merely reorder the queue; it reopens
+         * audit findings M6 and M8.
+         *
+         * Session state on purpose: recording a display in the database would put a write on the
+         * read path, which is exactly the cost this plugin cannot afford on every page view.
          */
         foreach (array_keys($selected) as $id) {
             $USER->awarenessshown[$id] = true;
@@ -857,11 +865,13 @@ class helper {
      *   modal was open would silently lose the very record this plugin exists to keep.
      * - The PAGE-DEPENDENT checks in check_filters() are not repeated, because they need the page
      *   URL and a write request has no trustworthy source for it. Category, course, format, theme
-     *   and competency rules are therefore not enforced here, and cannot be: a notice restricted
-     *   to one course stays writable from anywhere. The role rule is the exception — it asks what
-     *   the user holds, not where they are, so it is applied below through
-     *   user_matches_role_filter(), with the whole filters array so a course- or category-scoped
-     *   rule keeps its scope.
+     *   and competency rules are therefore not enforced HERE. On the write path they are covered
+     *   by a different route: may_act_on_notice() also requires that select_for_display() served
+     *   this notice to this session, which is where those rules did run. This method is the
+     *   audience half on its own, and local_awareness_pluginfile() uses it that way, having no
+     *   delivery to point at; that gate stays partial by construction. The role rule is applied
+     *   below through user_matches_role_filter(), with the whole filters array so a course- or
+     *   category-scoped rule keeps its scope.
      *
      * @param awareness $notice Notice.
      * @return bool
@@ -899,6 +909,68 @@ class helper {
         }
 
         return true;
+    }
+
+    /**
+     * Whether this session was actually served this notice.
+     *
+     * select_for_display() marks every notice it hands to the client, and it only ever sees
+     * notices that survived retrieve_user_notices() — the ONE place the page-dependent rules run:
+     * check_path_match() against the browser's URL, and check_filters() against a course the
+     * server re-resolved through can_access_course(). The marker is therefore a record that all of
+     * those passed for this user, at some point in this session, on some page. That is the fact
+     * is_notice_available_to_user() cannot establish from a write request and does not try to.
+     *
+     * The session is the right lifetime and needs no expiry of its own. A shorter one would
+     * discard an Accept from a modal left open over lunch, which is the loss the window rules
+     * deliberately refuse to take. When the session ends the caller is not logged in at all, so
+     * the web service rejects the request long before this is consulted.
+     *
+     * Deliberately NOT folded into is_notice_available_to_user(): that answers "is this notice's
+     * audience you", which local_awareness_pluginfile() asks of a file request that has no
+     * delivery to point at. Two questions, two methods, joined in may_act_on_notice().
+     *
+     * @param awareness $notice Notice.
+     * @return bool True when this session was handed this notice.
+     * @throws \coding_exception
+     */
+    public static function was_notice_delivered(awareness $notice): bool {
+        global $USER;
+
+        return isset($USER->awarenessshown[$notice->get('id')]);
+    }
+
+    /**
+     * Whether the logged-in user may record an interaction with this notice.
+     *
+     * One predicate behind dismiss, acknowledge and link tracking, so the three cannot drift.
+     *
+     * It is the conjunction of two independent facts, and the conjunction is not a tautology.
+     * Delivery says the page-dependent rules passed at some point in this session. The audience
+     * test says they still hold NOW — it is what catches state that changed between the delivery
+     * and the write, inside one session: the notice disabled, the user removed from the cohort,
+     * the role unassigned, the required course completed. Neither half implies the other.
+     *
+     * What this closes, precisely: a user who is in a notice's cohort and holds its role, but is
+     * not in the course it is targeted at, could post an acknowledgement that landed in the
+     * compliance report as consent given after display. The report is the reason this plugin
+     * exists, so a row that cannot be distinguished from a real one is the defect that matters.
+     *
+     * What it does NOT close: pathmatch is a client assertion on the read path too, so a reader
+     * who lies about their URL is no worse off here than there. The guarantee is exactly this —
+     * forging a write now costs what forging a READ already costs, and no less.
+     *
+     * One thing it narrows, stated so nobody is surprised: a notice delivered while live, then
+     * expired, then acted on after the session was replaced is lost for good, because
+     * is_within_active_window() will not serve it again for the marker to be re-minted.
+     *
+     * @param awareness $notice Notice.
+     * @return bool True when an interaction may be recorded.
+     * @throws \dml_exception
+     * @throws \coding_exception
+     */
+    public static function may_act_on_notice(awareness $notice): bool {
+        return self::is_notice_available_to_user($notice) && self::was_notice_delivered($notice);
     }
 
     /**
@@ -1177,7 +1249,7 @@ class helper {
         }
 
         $notice = awareness::get_record(['id' => $link->get('noticeid')]);
-        if (!$notice || !self::is_notice_available_to_user($notice)) {
+        if (!$notice || !self::may_act_on_notice($notice)) {
             return ['status' => false];
         }
 

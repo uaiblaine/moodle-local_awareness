@@ -311,8 +311,11 @@ If enabled, other details related to the notice being deleted, such as hyperlink
 user last view will also be deleted';
 $string['setting:enabled'] = 'Enabled';
 $string['setting:enableddesc'] = 'Enable site notice';
+$string['setting:linkhistory_lifetime'] = 'Keep link-click history for';
+$string['setting:linkhistory_lifetimedesc'] = 'How long a record of a reader following a link inside a notice is kept. Keep for ever is the default, so upgrading discards nothing; choosing a period starts a nightly purge of anything older.';
 $string['setting:managenotice'] = 'Manage notice';
 $string['setting:settings'] = 'Settings';
 $string['task_estimate_audience'] = 'Estimate a notice audience';
 $string['task_purge_audience_jobs'] = 'Purge spent audience estimate jobs';
+$string['task_purge_link_history'] = 'Purge old link-click history';
 $string['timeformat:resetinterval'] = '%a day(s), %h hour(s), %i minute(s) and %s second(s)';
