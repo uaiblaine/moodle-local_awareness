@@ -163,7 +163,7 @@ $string['manage:table:caption'] = 'Site notices';
 $string['message:audience_ready:body'] = 'The audience estimate for "{$a->title}" has finished. It reaches about {$a->count} users.';
 $string['message:audience_ready:subject'] = 'Audience estimate ready: {$a->title}';
 $string['messageprovider:audience_estimate_ready'] = 'Audience estimate finished';
-$string['modal:checkboxtext'] = 'I have read and understand the notice (closing this notice will log you off this site).';
+$string['modal:checkboxtext'] = 'I have read and understand the notice.';
 $string['modal:checkboxtext_logout'] = 'I have read and understand the notice (closing this notice will log you off this site).';
 $string['modal:checkboxtext_nologout'] = 'I have read and understand the notice.';
 $string['notice:activefrom'] = 'Active from';
@@ -208,8 +208,9 @@ $string['notice:perpetual'] = 'Is perpetual';
 $string['notice:perpetual_help'] = 'When set to yes, the notice will always be displayed (unless disabled). If set to no, a date and time range for the notice must be specified';
 $string['notice:preview'] = 'Preview the modal';
 $string['notice:reqack'] = 'Requires acknowledgement';
-$string['notice:reqack_help'] = 'If enabled, the user will need to accept the notice before they can continue to use the LMS site.
-If the user does not accept the notice, he/she will be logged out of the site.';
+$string['notice:reqack_help'] = 'If enabled, the user must tick the acknowledgement box before the Accept button becomes
+available, and the notice cannot be dismissed by clicking outside it or by pressing Escape. A user who closes the notice
+instead of accepting it is shown it again until they accept. It does not log the user out.';
 $string['notice:reqcourse'] = 'Requires course completion';
 $string['notice:reqcourse_help'] = 'Show the notice only to users who have not yet completed the selected course. It is an audience rule, not a display frequency: how often the notice reappears is set by the reset interval, and someone who completes the course stops seeing it.';
 $string['notice:reset'] = 'Reset notice';

@@ -31,8 +31,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
             CLOSE_BUTTON: '[data-action="close"]',
             ACCEPT_BUTTON: '[data-action="accept"]',
             ACK_CHECKBOX: '#awareness-modal-ackcheckbox',
-            ACK_CONTAINER: '#awareness-ack-container',
-            CAN_RECEIVE_FOCUS: 'input:not([type="hidden"]), a[href], button:not([disabled])'
+            ACK_CONTAINER: '#awareness-ack-container'
         };
 
         var ATTRIBUTE = {
@@ -196,6 +195,18 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
          * the parent Modal constructor calls `this.registerEventListeners()`.
          * Class fields are only initialised after super() returns, which means
          * the parent would use its own version instead of this override.
+         *
+         * Replacing core's version rather than extending it means core's own listeners never
+         * register, so what is NOT here is as load-bearing as what is. Deliberately dropped:
+         * core's Escape handler (it calls hide() with no server call, losing the dismissal
+         * record) and its data-action="hide" handler (this template uses data-action="close").
+         * Deliberately NOT reimplemented: the Tab trap. core/modal calls
+         * FocusLock.trapFocus() from attachToDOM() (lib/amd/src/modal.js), and focuslock binds
+         * keydown in the CAPTURE phase, so core already ran by the time a jQuery handler here
+         * would see the key. The copy this file used to carry ran second, fought core for the
+         * same keypress, and matched a narrower set of elements - it could not reach a select,
+         * a textarea or anything with tabindex inside a notice body, all of which an author can
+         * put there through the content editor.
          */
         ModalNotice.prototype.registerEventListeners = function() {
             var modal = this;
@@ -206,13 +217,17 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
                 }
                 if ($(e.target).closest('[data-region="modal"]').length === 0) {
                     if (modal.reqack || !modal.outsideclick) {
-                        var root = modal.getRoot();
-                        root.removeClass('jelly-anim');
-                        void root[0].offsetWidth;
-                        root.addClass('jelly-anim');
+                        // The shake goes on the dialogue, which is the element carrying `awareness` and
+                        // the element styles.css animates. It used to go on getRoot(), where the rule
+                        // `.awareness.jelly-anim .modal-dialog` could never match - `awareness` sits on
+                        // the dialog, not the root - so a blocked click produced no feedback at all.
+                        var dialog = modal.getModal();
+                        dialog.removeClass('jelly-anim');
+                        void dialog[0].offsetWidth;
+                        dialog.addClass('jelly-anim');
                         return;
                     }
-                    $(SELECTORS.CLOSE_BUTTON).trigger('click');
+                    modal.getModal().find(SELECTORS.CLOSE_BUTTON).trigger('click');
                 }
             });
 
@@ -221,54 +236,14 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/str'],
                     return;
                 }
 
-                if (e.keyCode == KeyCodes.tab) {
-                    this.handleTabLock(e);
-                }
-
                 if (e.keyCode == KeyCodes.escape) {
                     if (this.reqack || !this.outsideclick) {
                         e.preventDefault();
                         return;
                     }
-                    $(SELECTORS.CLOSE_BUTTON).trigger('click');
+                    this.getModal().find(SELECTORS.CLOSE_BUTTON).trigger('click');
                 }
             }.bind(this));
-        };
-
-        /**
-         * CAN_RECEIVE_FOCUS in modal.js does not check if the disabled or hidden button
-         * @param {Event} e
-         */
-        ModalNotice.prototype.handleTabLock = function(e) {
-            var target = $(document.activeElement);
-
-            var focusableElements = this.modal.find(SELECTORS.CAN_RECEIVE_FOCUS).filter(':visible');
-            var firstFocusable = focusableElements.first();
-            var lastFocusable = focusableElements.last();
-
-            var focusable = false;
-            var previous = 0;
-            focusableElements.each(function(index) {
-                if (target.is(this)) {
-                    focusable = true;
-                    previous = index;
-                }
-            });
-
-            if (focusable == false) {
-                e.preventDefault();
-                firstFocusable.focus();
-            } else if (target.is(firstFocusable) && e.shiftKey) {
-                lastFocusable.focus();
-                e.preventDefault();
-            } else if (target.is(lastFocusable) && !e.shiftKey) {
-                firstFocusable.focus();
-                e.preventDefault();
-            } else {
-                var next = !e.shiftKey ? focusableElements.get(previous + 1) : focusableElements.get(previous - 1);
-                next.focus();
-                e.preventDefault();
-            }
         };
 
         return ModalNotice;
