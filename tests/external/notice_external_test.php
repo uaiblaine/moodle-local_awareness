@@ -393,12 +393,12 @@ final class notice_external_test extends \advanced_testcase {
 
         $this->setUser($outsider);
         $result = get_notices::execute($url, (int) $course->id);
-        $this->assertSame([], json_decode($result['notices'], true));
+        $this->assertSame([], $result['notices']);
 
         // Control: the enrolled user does receive it, so the filter itself still works.
         $this->setUser($student);
         $result = get_notices::execute($url, (int) $course->id);
-        $this->assertCount(1, json_decode($result['notices'], true));
+        $this->assertCount(1, $result['notices']);
     }
 
     /**
@@ -432,11 +432,11 @@ final class notice_external_test extends \advanced_testcase {
         $url = '/course/view.php?id=' . $course->id;
 
         $this->setUser($suspended);
-        $this->assertSame([], json_decode(get_notices::execute($url, (int) $course->id)['notices'], true));
+        $this->assertSame([], get_notices::execute($url, (int) $course->id)['notices']);
 
         // Control: the actively enrolled user still receives it.
         $this->setUser($active);
-        $this->assertCount(1, json_decode(get_notices::execute($url, (int) $course->id)['notices'], true));
+        $this->assertCount(1, get_notices::execute($url, (int) $course->id)['notices']);
     }
 
     /**
@@ -467,10 +467,10 @@ final class notice_external_test extends \advanced_testcase {
         // Control: the role holder does receive it, so the role rule is what rejects the outsider
         // below rather than the notice being invisible to everyone.
         $this->setUser($teacher);
-        $this->assertCount(1, json_decode(get_notices::execute('/my/')['notices'], true));
+        $this->assertCount(1, get_notices::execute('/my/')['notices']);
 
         $this->setUser($outsider);
-        $this->assertSame([], json_decode(get_notices::execute('/my/')['notices'], true));
+        $this->assertSame([], get_notices::execute('/my/')['notices']);
 
         // And the outsider cannot get a different answer by declining to say where they are.
         $this->expectException(\invalid_parameter_exception::class);
@@ -513,7 +513,7 @@ final class notice_external_test extends \advanced_testcase {
         );
 
         $this->assertFalse($supplied['error']);
-        $this->assertCount(1, json_decode($supplied['data']['notices'], true));
+        $this->assertCount(1, $supplied['data']['notices']);
     }
 
     /**
@@ -778,9 +778,14 @@ final class notice_external_test extends \advanced_testcase {
      *
      * The record used to be serialised whole, shipping pathmatch, filtervalues, cohorts, the
      * scheduling window, resetinterval, the timestamps and the author's user id to every user the
-     * notice was displayed to. The returns declaration is PARAM_RAW JSON, so clean_returnvalue()
-     * strips nothing — this exact-set assertion is the only gate between to_record() and the
-     * browser, and it fails in both directions: a leaked extra field and a dropped needed one.
+     * notice was displayed to.
+     *
+     * Two gates now, and this asserts both. The first is the allowlist in execute(); the second is
+     * core, because the payload is a declared structure rather than a PARAM_RAW JSON string. While
+     * it was a string clean_returnvalue() had nothing to look inside, so a key added to the loop
+     * reached the browser whether or not anyone had thought about it — audit finding WS-01. The
+     * second half of this test is the one that proves the framework is now doing the work: it
+     * hands core a payload carrying a field nobody declared and shows it does not survive.
      */
     public function test_get_notices_payload_is_limited_to_what_the_modal_reads(): void {
         $this->setUser($this->getDataGenerator()->create_user());
@@ -790,7 +795,7 @@ final class notice_external_test extends \advanced_testcase {
             'resetinterval' => 3600,
         ]);
 
-        $notices = json_decode(get_notices::execute('/my/')['notices'], true);
+        $notices = get_notices::execute('/my/')['notices'];
         $this->assertCount(1, $notices);
         $payload = reset($notices);
 
@@ -810,6 +815,31 @@ final class notice_external_test extends \advanced_testcase {
         // What the modal reads is really there, so the trim cannot pass by shipping nothing.
         $this->assertSame('Policy update', $payload['title']);
         $this->assertStringContainsString('Read the policy.', $payload['content']);
+
+        /*
+         * And core enforces it, which is the half the exact-set assertion above cannot show: it
+         * only ever sees what execute() chose to build. Hand clean_returnvalue() a payload with an
+         * undeclared field and it must not come back. Revert the returns declaration to
+         * PARAM_RAW and this assertion fails while everything above it still passes.
+         */
+        $leaky = $payload;
+        $leaky['pathmatch'] = '/secret/%';
+        $cleaned = \core_external\external_api::clean_returnvalue(
+            get_notices::execute_returns(),
+            ['status' => true, 'notices' => [$leaky]]
+        );
+
+        $this->assertArrayNotHasKey(
+            'pathmatch',
+            $cleaned['notices'][0],
+            'core must strip a field the returns declaration does not name'
+        );
+        // Control: the declared fields survive the same call, so the assertion above is not
+        // satisfied by clean_returnvalue() having discarded everything. Sorted, because core
+        // returns them in declaration order rather than the order they were handed over in.
+        $survived = array_keys($cleaned['notices'][0]);
+        sort($survived);
+        $this->assertSame($expected, $survived);
     }
 
     /**
@@ -838,7 +868,7 @@ final class notice_external_test extends \advanced_testcase {
         set_config('enabled', 0, 'local_awareness');
 
         $off = get_notices::execute('/my/', 0);
-        $this->assertSame([], json_decode($off['notices'], true), 'no notice may be served while off');
+        $this->assertSame([], $off['notices'], 'no notice may be served while off');
 
         dismiss_notice::execute((int) $notice->get('id'));
         acknowledge_notice::execute((int) $notice->get('id'));
@@ -852,7 +882,7 @@ final class notice_external_test extends \advanced_testcase {
         set_config('enabled', 1, 'local_awareness');
 
         $on = get_notices::execute('/my/', 0);
-        $this->assertCount(1, json_decode($on['notices'], true), 'the fixture notice is deliverable');
+        $this->assertCount(1, $on['notices'], 'the fixture notice is deliverable');
 
         acknowledge_notice::execute((int) $notice->get('id'));
         track_link::execute((int) $link->get('id'));
@@ -882,7 +912,7 @@ final class notice_external_test extends \advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $this->assertCount(1, json_decode(get_notices::execute('/my/', 0)['notices'], true));
+        $this->assertCount(1, get_notices::execute('/my/', 0)['notices']);
 
         dismiss_notice::execute((int) $notice->get('id'));
 
@@ -892,7 +922,7 @@ final class notice_external_test extends \advanced_testcase {
 
         $this->assertSame(
             [],
-            json_decode(get_notices::execute('/my/', 0)['notices'], true),
+            get_notices::execute('/my/', 0)['notices'],
             'within the reset interval the notice must stay dismissed'
         );
 
@@ -908,7 +938,7 @@ final class notice_external_test extends \advanced_testcase {
 
         $this->assertCount(
             1,
-            json_decode(get_notices::execute('/my/', 0)['notices'], true),
+            get_notices::execute('/my/', 0)['notices'],
             'past the reset interval the notice must return'
         );
     }
@@ -937,7 +967,7 @@ final class notice_external_test extends \advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $this->assertCount(1, json_decode(get_notices::execute('/my/', 0)['notices'], true));
+        $this->assertCount(1, get_notices::execute('/my/', 0)['notices']);
 
         acknowledge_notice::execute((int) $notice->get('id'));
 
@@ -957,7 +987,7 @@ final class notice_external_test extends \advanced_testcase {
 
         $this->assertSame(
             [],
-            json_decode(get_notices::execute('/my/', 0)['notices'], true),
+            get_notices::execute('/my/', 0)['notices'],
             'an accepted notice must not come back at the next session'
         );
     }

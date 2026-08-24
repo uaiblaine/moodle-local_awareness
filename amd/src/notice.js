@@ -185,14 +185,10 @@ define(
             ]);
 
             promises[0].done(function(response) {
-                try {
-                    notices = JSON.parse(response.notices);
-                } catch (ex) {
-                    // JSON.parse runs inside done(), where fail() cannot see it: a malformed
-                    // payload used to kill the modal with nothing reported anywhere.
-                    Notification.exception(ex);
-                    return;
-                }
+                // No JSON.parse: the web service declares a real structure now, so core hands over
+                // an array that has already been through clean_returnvalue(). The parse used to sit
+                // inside done(), where fail() could not see it throw.
+                notices = response.notices || [];
                 $(document).ready(function() {
                     nextNotice();
                 });

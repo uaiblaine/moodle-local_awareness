@@ -18,6 +18,7 @@ namespace local_awareness\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
+use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
 use local_awareness\helper;
@@ -75,14 +76,21 @@ class get_notices extends external_api {
         // See dismiss_notice(): the switch is enforced at the boundary, not in the helper. An empty
         // list rather than an error — the client renders nothing and says nothing.
         if (!helper::is_delivery_enabled()) {
-            return ['status' => true, 'notices' => '[]'];
+            return ['status' => true, 'notices' => []];
         }
 
         $result = [];
         $result['status'] = true;
-        $result['notices'] = json_encode(
+        /*
+         * array_values(), because select_for_display() keys its result by notice id and array_map()
+         * preserves the keys of a single array. json_encode() used to turn that into a JSON OBJECT
+         * keyed by id; an external_multiple_structure is a list. The client never read those keys
+         * as ids — it uses them only to avoid showing the same entry twice in one page load, and
+         * takes the real id from the payload's own id field.
+         */
+        $result['notices'] = array_values(
             array_map(
-                function (awareness $notice): \stdClass {
+                function (awareness $notice): array {
                     /*
                      * Only what the modal reads crosses the boundary. The record used to be
                      * serialised whole, which shipped the notice's segmentation metadata —
@@ -93,9 +101,9 @@ class get_notices extends external_api {
                      * than re-cast, so the client keeps receiving the exact types it always has.
                      */
                     $record = $notice->to_record();
-                    $payload = new \stdClass();
+                    $payload = [];
                     foreach (['id', 'title', 'modal_width', 'modal_height'] as $field) {
-                        $payload->$field = $record->$field;
+                        $payload[$field] = $record->$field;
                     }
                     /*
                      * One level rather than the three booleans that used to cross the boundary.
@@ -105,26 +113,26 @@ class get_notices extends external_api {
                      * state the server never meant. forcelogout in particular is gone from the
                      * payload because nothing acts on it any more.
                      */
-                    $payload->insistence = $notice->get_insistence();
+                    $payload['insistence'] = $notice->get_insistence();
                     // Storage holds the content as authored; filters and pluginfile URLs are
                     // resolved here so a multilang notice reads in each user's own language.
-                    $payload->content = helper::render_content($notice);
+                    $payload['content'] = helper::render_content($notice);
                     /*
                      * The title gets the same treatment for the same reason. It is stored as the
                      * author typed it, and the modal renders it through {{title}}, so without this
                      * a multilang title shows its markup literally in the heading while the body
                      * beneath it resolves correctly — the one place the two disagree.
                      */
-                    $payload->title = format_string(
+                    $payload['title'] = format_string(
                         $record->title,
                         true,
                         ['context' => \context_system::instance()]
                     );
                     // Attach background image URL if one exists.
                     if (!empty($record->bgimage)) {
-                        $payload->bgimageurl = helper::get_bgimage_url($record->id);
+                        $payload['bgimageurl'] = helper::get_bgimage_url($record->id);
                     } else {
-                        $payload->bgimageurl = '';
+                        $payload['bgimageurl'] = '';
                     }
                     return $payload;
                 },
@@ -151,7 +159,34 @@ class get_notices extends external_api {
         return new external_single_structure(
             [
                 'status' => new external_value(PARAM_BOOL, 'status: true if success', VALUE_DEFAULT, "0"),
-                'notices' => new external_value(PARAM_RAW, 'json of notices', VALUE_DEFAULT, ""),
+                /*
+                 * A real structure, not a PARAM_RAW JSON blob. While this was a string core could
+                 * not see inside it: clean_returnvalue() had nothing to check, so the allowlist was
+                 * whatever the hand-written loop in execute() happened to copy, guarded by a single
+                 * PHPUnit assertion. Declaring it moves the guarantee into the framework — an
+                 * undeclared key is now stripped by core before it leaves the server, which is what
+                 * audit finding WS-01 asked for.
+                 *
+                 * The prose fields are PARAM_RAW on purpose, and it is not laziness. title and
+                 * content carry rendered HTML that has to reach the client byte for byte, and
+                 * modal_width / modal_height are PARAM_RAW in the persistent, so they can hold a
+                 * character PARAM_TEXT would strip — and a PARAM_TEXT field whose cleaned value
+                 * differs from the original THROWS, killing the whole response for every reader
+                 * rather than dropping one field. The allowlist is the key set; the types are only
+                 * what can safely be said about each value.
+                 */
+                'notices' => new external_multiple_structure(
+                    new external_single_structure([
+                        'id' => new external_value(PARAM_INT, 'Notice id'),
+                        'title' => new external_value(PARAM_RAW, 'Title, already through format_string()'),
+                        'content' => new external_value(PARAM_RAW, 'Body, filters and pluginfile URLs resolved'),
+                        'insistence' => new external_value(PARAM_INT, 'Insistence level; see awareness::INSISTENCE_*'),
+                        'modal_width' => new external_value(PARAM_RAW, 'Author-set modal width, or empty'),
+                        'modal_height' => new external_value(PARAM_RAW, 'Author-set modal height, or empty'),
+                        'bgimageurl' => new external_value(PARAM_URL, 'Background image URL, or empty'),
+                    ]),
+                    'The notices to display now'
+                ),
             ]
         );
     }

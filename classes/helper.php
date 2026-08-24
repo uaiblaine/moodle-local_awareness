@@ -1268,8 +1268,14 @@ class helper {
 
         /*
          * The link id arrives from the client. Without these checks any authenticated user could
-         * post arbitrary ids and fabricate click history — or simply create unbounded rows in a
-         * table that has no index on either column it is queried by.
+         * post arbitrary ids and fabricate click history for a notice never aimed at them.
+         *
+         * What is NOT guarded here, deliberately: how often a user clicks their own link. Audit
+         * finding M7 asked for a rate limit and it is refused, because repeat clicks are the
+         * quantity being reported — see linkhistory::count_clicked_links(), whose docblock carries
+         * the reasoning, and the test that pins it. The table's growth is bounded by age instead,
+         * through the purge_link_history scheduled task, and both columns it is queried by now
+         * carry an index by way of their foreign keys (db/install.xml).
          */
         $link = noticelink::get_record(['id' => $linkid]);
         if (!$link) {
