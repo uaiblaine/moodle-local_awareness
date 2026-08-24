@@ -21,6 +21,7 @@ use local_awareness\external\dismiss_notice;
 use local_awareness\external\get_notices;
 use local_awareness\external\search_roles;
 use local_awareness\external\track_link;
+use local_awareness\helper;
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
@@ -80,6 +81,37 @@ final class notice_external_test extends \advanced_testcase {
     }
 
     /**
+     * Serve a notice to the current session through the REAL read path.
+     *
+     * The write gate now requires that select_for_display() actually handed this notice over, and
+     * that marker is the only record that the page-dependent rules ran. Setting it by hand would
+     * make every test below assert against a fiction, so this goes through get_notices and then
+     * asserts the marker really appeared — a delivery that silently failed would otherwise turn
+     * each caller into a test of nothing.
+     *
+     * It takes the URL because that is what the page-dependent rules are evaluated against, and it
+     * deliberately does NOT accept a notice to single out: select_for_display() hands over the head
+     * of the queue, so a test that needs one specific notice among several must not pretend it can
+     * name one. Those tests say so at their own call site.
+     *
+     * @param awareness $notice The notice expected to be delivered.
+     * @param string $url The page the reader is on.
+     * @param int $courseid The course the request came from, or 0.
+     * @return void
+     */
+    private function deliver(awareness $notice, string $url = '/my/', int $courseid = 0): void {
+        global $USER;
+
+        get_notices::execute($url, $courseid);
+
+        $this->assertTrue(
+            helper::was_notice_delivered($notice),
+            'the read path did not serve this notice, so the write below would prove nothing'
+        );
+        $this->assertNotEmpty($USER->awarenessshown ?? []);
+    }
+
+    /**
      * Count acknowledgement rows for a notice.
      *
      * @param awareness $notice Notice.
@@ -98,6 +130,7 @@ final class notice_external_test extends \advanced_testcase {
     public function test_dismissing_an_applicable_notice_is_recorded(): void {
         $this->setUser($this->getDataGenerator()->create_user());
         $notice = $this->create_notice();
+        $this->deliver($notice);
 
         $result = dismiss_notice::execute((int) $notice->get('id'));
 
@@ -110,11 +143,20 @@ final class notice_external_test extends \advanced_testcase {
      */
     public function test_dismissing_a_disabled_notice_records_nothing(): void {
         $this->setUser($this->getDataGenerator()->create_user());
-        $notice = $this->create_notice(['enabled' => 0]);
+        $notice = $this->create_notice();
+
+        /*
+         * Delivered while enabled, then disabled. A notice created disabled is never served at all,
+         * so the delivery half would reject it on its own and the enabled clause in
+         * is_notice_available_to_user() would keep passing with its test deleted.
+         */
+        $this->deliver($notice);
+        $notice->set('enabled', 0);
+        $notice->update();
 
         $result = dismiss_notice::execute((int) $notice->get('id'));
 
-        $this->assertFalse((bool) $result['status']);
+        $this->assertFalse((bool) $result['status'], 'a notice disabled after delivery was still recorded');
         $this->assertSame(0, $this->count_acks($notice));
     }
 
@@ -129,15 +171,33 @@ final class notice_external_test extends \advanced_testcase {
 
         $notice = $this->create_notice(['cohorts' => (string) $cohort->id]);
 
-        $this->setUser($outsider);
+        /*
+         * The outsider is never delivered the notice, so the delivery half alone would reject them
+         * and the cohort clause would go untested — the whole suite would stay green with
+         * is_notice_available_to_user()'s cohort block deleted.
+         *
+         * So the cohort membership is taken away from someone who WAS delivered it. The delivery
+         * marker survives in the session; only the audience answer changes. That isolates the
+         * clause, and it is the realistic shape too: a user removed from a cohort while their
+         * modal is open.
+         */
+        $this->setUser($member);
+        $this->deliver($notice);
+        cohort_remove_member($cohort->id, $member->id);
+
         $result = acknowledge_notice::execute((int) $notice->get('id'));
-        $this->assertFalse((bool) $result['status']);
+        $this->assertFalse((bool) $result['status'], 'a user removed from the cohort was still recorded');
         $this->assertSame(0, $this->count_acks($notice));
 
-        // Control: the cohort member is recorded, so the gate is what rejected the outsider.
-        $this->setUser($member);
+        // Control: put them back, and the same session records.
+        cohort_add_member($cohort->id, $member->id);
         $result = acknowledge_notice::execute((int) $notice->get('id'));
         $this->assertTrue((bool) $result['status']);
+        $this->assertSame(1, $this->count_acks($notice));
+
+        // And the outsider, who was never served it, is refused too.
+        $this->setUser($outsider);
+        $this->assertFalse((bool) acknowledge_notice::execute((int) $notice->get('id'))['status']);
         $this->assertSame(1, $this->count_acks($notice));
     }
 
@@ -158,6 +218,7 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice(['reqack' => 0]);
 
         $this->setGuestUser();
+        $this->deliver($notice);
         $result = dismiss_notice::execute((int) $notice->get('id'));
 
         $this->assertTrue((bool) $result['status']);
@@ -181,11 +242,16 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice(['reqack' => 0]);
 
         $this->setGuestUser();
+        $this->deliver($notice);
         dismiss_notice::execute((int) $notice->get('id'));
         $this->assertSame([], helper::retrieve_user_notices('/my/'));
 
-        // A new guest arrives: same user id, new session.
-        unset($USER->viewednotices);
+        /*
+         * A new guest arrives: same user id, new session. Both markers go, because both are
+         * session state — the viewed marker that suppresses, and the delivery marker the write
+         * gate reads.
+         */
+        unset($USER->viewednotices, $USER->awarenessshown);
         $this->assertCount(1, helper::retrieve_user_notices('/my/'));
     }
 
@@ -201,6 +267,7 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice();
 
         $this->setGuestUser();
+        $this->deliver($notice);
         $result = acknowledge_notice::execute((int) $notice->get('id'));
 
         $this->assertTrue((bool) $result['status']);
@@ -219,12 +286,22 @@ final class notice_external_test extends \advanced_testcase {
         $this->setUser($this->getDataGenerator()->create_user());
         $notice = $this->create_notice([
             'timestart' => time() - DAYSECS,
-            'timeend' => time() - HOURSECS,
+            'timeend' => time() + HOURSECS,
         ]);
+
+        /*
+         * Delivered while live, then expired under the reader — which is exactly the modal left
+         * open across the expiry. A notice created already-expired can never be delivered at all,
+         * so building the fixture that way would test the delivery gate and never reach the
+         * window rule this test is about.
+         */
+        $this->deliver($notice);
+        $notice->set('timeend', time() - HOURSECS);
+        $notice->update();
 
         $result = acknowledge_notice::execute((int) $notice->get('id'));
 
-        $this->assertTrue((bool) $result['status']);
+        $this->assertTrue((bool) $result['status'], 'an Accept was discarded because the notice expired');
         $this->assertSame(1, $this->count_acks($notice));
     }
 
@@ -261,7 +338,8 @@ final class notice_external_test extends \advanced_testcase {
             'link' => 'https://example.com/policy',
         ]);
 
-        // Control: a real link is recorded.
+        // Control: a real link on a delivered notice is recorded.
+        $this->deliver($notice);
         $result = track_link::execute((int) $link->get('id'));
         $this->assertTrue((bool) $result['status']);
         $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his'));
@@ -482,16 +560,29 @@ final class notice_external_test extends \advanced_testcase {
 
         $notice = awareness::get_record(['title' => 'Teachers only']);
 
-        $this->setUser($outsider);
+        /*
+         * The role is taken away from someone who WAS served the notice, rather than pointing an
+         * outsider at it. An outsider is never delivered it, so the delivery half alone would
+         * reject them and the role rule would go untested — user_matches_role_filter() could be
+         * deleted with this file green.
+         */
+        $this->setUser($teacher);
+        $this->deliver($notice);
+        role_unassign($teacherroleid, $teacher->id, \context_course::instance($course->id)->id);
+
         $result = acknowledge_notice::execute((int) $notice->get('id'));
-        $this->assertFalse((bool) $result['status']);
+        $this->assertFalse((bool) $result['status'], 'a user whose role was removed was still recorded');
         $this->assertSame(0, $this->count_acks($notice));
 
-        // Control: the role holder is recorded, so the role rule is what rejected the outsider and
-        // the write path has not simply been switched off.
-        $this->setUser($teacher);
+        // Control: give the role back, and the same session records.
+        $this->getDataGenerator()->enrol_user($teacher->id, $course->id, 'editingteacher');
         $result = acknowledge_notice::execute((int) $notice->get('id'));
         $this->assertTrue((bool) $result['status']);
+        $this->assertSame(1, $this->count_acks($notice));
+
+        // And the outsider, never served it, is refused.
+        $this->setUser($outsider);
+        $this->assertFalse((bool) acknowledge_notice::execute((int) $notice->get('id'))['status']);
         $this->assertSame(1, $this->count_acks($notice));
     }
 
@@ -527,16 +618,28 @@ final class notice_external_test extends \advanced_testcase {
 
         $notice = awareness::get_record(['title' => 'Teachers of one course']);
 
-        // Holds the role, but in a course the rule does not name.
-        $this->setUser($elsewhere);
+        /*
+         * Delivered from inside the named course — check_filters() re-resolves that course id
+         * through can_access_course(), so the delivery is the page-dependent half doing its job.
+         * The scoped role is then removed, which is the only thing that changes.
+         */
+        $this->setUser($inlisted);
+        $this->deliver($notice, '/course/view.php?id=' . $listed->id, (int) $listed->id);
+        role_unassign($teacherroleid, $inlisted->id, \context_course::instance($listed->id)->id);
+
         $result = dismiss_notice::execute((int) $notice->get('id'));
-        $this->assertFalse((bool) $result['status']);
+        $this->assertFalse((bool) $result['status'], 'the scoped role rule did not reject the write');
         $this->assertSame(0, $DB->count_records('local_awareness_lastview'));
 
-        // Control: the same role in the named course is accepted.
-        $this->setUser($inlisted);
+        // Control: the same role back in the named course is accepted.
+        $this->getDataGenerator()->enrol_user($inlisted->id, $listed->id, 'editingteacher');
         $result = dismiss_notice::execute((int) $notice->get('id'));
         $this->assertTrue((bool) $result['status']);
+        $this->assertSame(1, $DB->count_records('local_awareness_lastview'));
+
+        // Holds the role, but only in a course the rule does not name: never served it.
+        $this->setUser($elsewhere);
+        $this->assertFalse((bool) dismiss_notice::execute((int) $notice->get('id'))['status']);
         $this->assertSame(1, $DB->count_records('local_awareness_lastview'));
     }
 
@@ -858,6 +961,71 @@ final class notice_external_test extends \advanced_testcase {
             [],
             json_decode(get_notices::execute('/my/', 0)['notices'], true),
             'an accepted notice must not come back at the next session'
+        );
+    }
+
+    /**
+     * A user who is in the audience but was never SERVED the notice cannot record against it.
+     *
+     * This is audit findings M6 and M8, and it is the only test that isolates the delivery half of
+     * may_act_on_notice() — every other test in this file delivers first and then changes some
+     * audience fact, so deleting the delivery requirement would leave all of them green.
+     *
+     * The shape matters. The user passes is_notice_available_to_user() completely: the notice is
+     * enabled, live, has no cohort and no role rule. What they are missing is the PAGE-dependent
+     * half — the notice is targeted at one course, and that rule can only ever be evaluated on the
+     * read path, against a page. Before this gate they could post an acknowledgement from anywhere
+     * and it would land in the compliance report as consent given after display, indistinguishable
+     * from a real one. The report is the reason this plugin exists.
+     *
+     * Same user and same audience answer on both halves below; only the delivery differs.
+     */
+    public function test_a_notice_never_served_cannot_be_acknowledged(): void {
+        global $USER;
+
+        $course = $this->getDataGenerator()->create_course();
+        $user = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($user->id, $course->id);
+
+        $this->setAdminUser();
+        $data = new \stdClass();
+        $data->title = 'Course targeted';
+        $data->content = '<p>Only for one course.</p>';
+        $data->reqack = 1;
+        $data->filter_course = [$course->id];
+        helper::create_new_notice($data);
+        $notice = awareness::get_record(['title' => 'Course targeted']);
+
+        $this->setUser($user);
+
+        /*
+         * Precondition, and the whole point: the audience test says yes. If this ever goes false
+         * the test below would pass for the wrong reason — the audience half rejecting, not the
+         * delivery half.
+         */
+        $this->assertTrue(
+            helper::is_notice_available_to_user($notice),
+            'the audience half already refuses this user, so the delivery half would not be isolated'
+        );
+
+        $result = acknowledge_notice::execute((int) $notice->get('id'));
+        $this->assertFalse((bool) $result['status'], 'a notice that was never served was acknowledged anyway');
+        $this->assertSame(0, $this->count_acks($notice));
+
+        /*
+         * Control: served from inside the course it targets — which is where check_filters()
+         * re-resolves the course through can_access_course() — and the same call now records.
+         */
+        $this->deliver($notice, '/course/view.php?id=' . $course->id, (int) $course->id);
+        $result = acknowledge_notice::execute((int) $notice->get('id'));
+        $this->assertTrue((bool) $result['status']);
+        $this->assertSame(1, $this->count_acks($notice));
+
+        // And the marker is session state: a new session cannot act on it again.
+        unset($USER->awarenessshown);
+        $this->assertFalse(
+            (bool) dismiss_notice::execute((int) $notice->get('id'))['status'],
+            'a replaced session could still write without a fresh delivery'
         );
     }
 }

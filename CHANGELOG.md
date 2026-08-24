@@ -6,6 +6,60 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Security — a write now requires that the notice was actually served (version 2026082306, audit M6, M8)
+
+`dismiss_notice`, `acknowledge_notice` and `track_link` re-checked the notice's AUDIENCE and nothing
+else. The page-dependent rules — category, course, format, theme, competency — cannot be re-checked
+on a write, because a write request has no trustworthy page URL, and the docblock said so.
+
+**What that allowed:** a user who is in a notice's cohort and holds its role, but is not in the
+course the notice is targeted at, could post an acknowledgement. It landed in the compliance report
+as consent given after display, indistinguishable from a real one. The report is the reason this
+plugin exists.
+
+The fix consumes a fact the server had already computed rather than certifying a new one.
+`select_for_display()` already marks every notice it hands to the client, and it only ever sees
+notices that survived the page-dependent rules. `may_act_on_notice()` now requires both halves: the
+audience test, which catches state that changed since delivery, and that marker, which is the only
+record those rules ran at all. **No token, no new storage, no change to the web-service contract.**
+
+The guarantee, stated exactly so nobody over-reads it: **forging a write now costs what forging a
+READ already costs, and no less.** `pathmatch` remains a client assertion — it is one on the read
+path too. And one thing narrows: a notice delivered while live, then expired, then acted on after
+the session was replaced is lost, because it will not be served again for the marker to be re-minted.
+
+**An earlier draft of this entry claimed more than the code does.** "A plain notice can be
+permanently self-suppressed site-wide by enumeration" does not survive the code beside it:
+`must_reshow()` resurrects anything with `reqack` or `forcelogout`, and the shape that remains writes
+no compliance row at all. The narrower claim above is the true one.
+
+Thirteen test methods across four files were rewritten, and not by adding a delivery step. They now
+**deliver, then change the state under test, then write** — because once the read path checks the
+same clause, a negative test that simply never delivers is satisfied twice over and stops guarding
+anything. Deleting the cohort block, the role filter or the enabled test now turns those tests red
+again, which was verified one clause at a time.
+
+### Added — link-click history has a retention story (version 2026082306, audit M7, partial)
+
+Nothing ever removed a click row on a time basis: the only deletions happen when an author edits a
+link out of a notice, or deletes the notice with a setting that ships off, or a privacy erasure runs.
+A site kept every click for its whole life. A scheduled task now discards history past a configured
+lifetime, a day at a time with a runtime ceiling, modelled on `logstore_standard`'s cleanup —
+**including its default: zero means keep for ever**, so an upgrade discards nothing.
+
+**The other half of M7 stays open, and the reason it was given before was wrong.** "The abuse is
+visible" is false by default: nothing this plugin ships displays link-click history.
+`count_clicked_links()` has **no production callers**, the only system reports are the acknowledged
+and dismissed ones, and `link_history` is a datasource that exists only once an admin builds a report
+from it. A forged click therefore inflates a number no default site reads, under the forger's own
+user id, with per-row timestamps that give the run away the moment anyone looks.
+
+What actually forbids the obvious fix is the meaning of the number: **repeat clicks are the reported
+quantity.** Any throttle collapses a genuine second click into the first, buying a factor — the
+attacker rotates links — at the cost of `clickcount` no longer being a count of clicks. That is
+pinned by a test that fails if two clicks ever start counting as one.
+
+
 ### Changed — one web service per file (version 2026082305, audit WS-17)
 
 `classes/external.php` was 822 lines holding all nine external functions and their twenty-seven

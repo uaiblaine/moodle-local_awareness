@@ -39,16 +39,19 @@ defeito continua lá.
 | Severidade | corrigido | sem objeto | parcial | aberto | total |
 |---|---:|---:|---:|---:|---:|
 | Alto | 10 | 0 | 0 | 0 | **10** |
-| Médio | 26 | 4 | 3 | 0 | **33** |
+| Médio | 28 | 4 | 1 | 0 | **33** |
 | Crítico de completude | 5 | 1 | 1 | 0 | **7** |
 | Baixo | 86 | 9 | 1 | 0 | **96** |
 | Informativo | 44 | 7 | 0 | 1 | **52** |
-| **Total** | **171** | **21** | **5** | **1** | **198** |
+| **Total** | **173** | **21** | **3** | **1** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **192 dos 198 estão encerrados; 6 continuam a merecer
-uma decisão** — e **nenhum achado Alto ou Médio continua aberto**: os quatro Médios que restam são
-parciais, com o que falta nomeado.
+*sem objeto*. Somando corrigido e sem objeto, **194 dos 198 estão encerrados; 4 continuam a merecer
+uma decisão** — e **nenhum achado Alto ou Médio continua aberto**. Os quatro que restam são, um a
+um: **C3** (convidados e o `forcelogout`, em cima da mesa junto com o repensar do próprio mecanismo),
+**M7** (a inflação da própria contagem, recusada com razão escrita), **WS-01** (o payload do
+`get_notices`, cuja mudança parte vinte pontos de chamada e acrescenta perda silenciosa) e
+**REPO-10** (sem tag, por decisão do dono do produto). Nenhum é esquecimento.
 
 > **Atualizado em 2026-08-16 pela fase 5** (versão `2026081604`, branch `fix/phase-5-residue-and-coverage`).
 > Oito achados passaram a *corrigido* nessa fase: **C6** (`\Throwable` no gancho de rodapé), **C4**
@@ -251,6 +254,34 @@ parciais, com o que falta nomeado.
 > `execute_returns()` no seu próprio ficheiro, o que torna a mudança mais fácil de rever, mas não
 > altera nenhuma das três objeções.
 
+> **Atualizado pela fase 20** (versão `2026082306`, branch `fix/phase-20-write-path-binding`).
+> **M6 e M8 fechados; o M7 fica parcial, com metade entregue e a outra metade recusada por uma razão
+> melhor do que a que estava escrita.** 194 de 198 encerrados; restam o C3 e o WS-01 parciais, o M7
+> parcial e o REPO-10 aberto.
+>
+> **Três coisas que a refutação corrigiu e que eu teria enviado.**
+>
+> 1. A justificação do M6/M8 estava inflacionada. "Supressão permanente de qualquer aviso por
+>    enumeração" não se aguenta: o `must_reshow()` ressuscita o que tem `reqack` ou `forcelogout`, e
+>    a forma restante não grava conformidade nenhuma. O defeito verdadeiro é mais estreito e pior.
+> 2. A razão para recusar a metade (i) do M7 era "é visível" — **falsa por omissão**, porque nenhum
+>    ecrã do plugin mostra histórico de cliques. Verifiquei: zero consumidores em produção.
+> 3. Seis cláusulas de público perderiam a sua guarda de mutação, porque a leitura passa a verificar
+>    o mesmo. Reescritos como **entregar, mudar o estado sob teste, escrever** — 13 métodos em 4
+>    ficheiros, mais do que o desenho estimara.
+>
+> **E dois erros meus, ambos da mesma família.** Escrevi a proteção do M6/M8 e destruí o teste dela
+> ao mesmo tempo: como todos os testes passaram a entregar primeiro, apagar o `was_notice_delivered()`
+> deixava a suite **inteiramente verde**. E as quatro mutações do M7 deram "zero falhas" **sem terem
+> corrido** — bumpei a versão e não reinicializei o site de teste, a suite abortava e o `grep` de
+> falhas numeradas devolvia 0. Dei por isso porque a linha seguinte veio vazia, um resultado que não
+> podia ser verdade.
+>
+> **É a quinta vez nesta sessão que verifiquei um estado que não era o estado a entregar.** A regra
+> já está escrita neste documento e voltei a falhá-la. O que a torna acionável não é lembrar-se dela
+> — é desconfiar de todo o resultado *negativo*: uma mutação que não falha e uma varredura que não
+> encontra nada têm de ser provadas, não aceites.
+
 > *Texto original da decisão, mantido por registo:*
 >
 > ~~**Continua aberto e é decisão de produto: BIZ-08.**~~ Um aviso com curso obrigatório ignora a
@@ -388,7 +419,7 @@ diz o que resta e onde.
 - **H10** · corrigido — The five test_stress_datasource tests are gated behind PHPUNIT_LONGTEST, which moodle-plugin-ci never sets — they hide three real failures
   <br>`grep -rn 'PHPUNIT_LONGTEST' tests/ .github/` returns no `markTestSkipped` — only five docblocks stating the gate was removed: all_notices_test.php:191, acknowledged_notices_test.php:186, dismissed_notices_test.php:185, link_history_test.php:171, notice_views_test.php:176.
 
-### Importantes (M1–M33) — 3 de 33 em aberto
+### Importantes (M1–M33) — 1 de 33 em aberto
 
 - **M1** · corrigido — A stale Claude Code worktree is committed as a gitlink (submodule entry) with no .gitmodules, breaking every git submodule command
   <br>`git ls-files -s \| awk '$1=="160000"'` returns 0 rows and `git ls-files -s .claude` returns nothing; `git submodule status` now exits 0 with empty output. /Users/uaiblaine/dev/moodle-local_awareness/.gitignore lines 14-17 add `.claude/worktrees/` with a comment naming this exact gitlink incident.
@@ -400,13 +431,13 @@ diz o que resta e onde.
   <br>Fechado na fase 11 (2026-08-17): o `trigger()` compara os critérios com os anteriores ANTES de qualquer efeito colateral e sai cedo; os botões passam `force` para que um clique peça sempre.
 - **M5** · sem objeto — live_preview binds to TinyMCE only via the AddEditor event and only if window.tinymce already exists, so the content pane never updates while the author types
   <br>amd/src/live_preview.js and amd/build/live_preview.min.js{,.map} were deleted in commit 0181eae (`git log --diff-filter=D --name-only -- amd/src/live_preview.js`), and `ls amd/src` shows no successor live pane.
-- **M6** · **parcial** — acknowledge_notice accepts any notice id — a user can forge an acknowledgement for a notice they were never shown
-  <br>/Users/uaiblaine/dev/moodle-local_awareness/classes/external.php:132-139 now fetches the notice and calls `helper::is_notice_available_to_user($notice)` before helper::acknowledge_notice(). That helper (classes/helper.php:859-890) re-checks enabled + has_started() (:862), cohort membership (:866-871), the role filter via user_matches_role_filter() on the stored filtervalues (:875-878) and the reqcourse completion rule (:880-887); its docblock at :841-852 states which display checks it deliberately omits (the page-d…
+- **M6** · corrigido — acknowledge_notice accepts any notice id — a user can forge an acknowledgement for a notice they were never shown
+  <br>Fechado na fase 20. O caminho de escrita passa a exigir, além do público, que o `select_for_display()` **tenha realmente servido** o aviso a esta sessão — o marcador `awarenessshown` que o plugin já escrevia na leitura. É a única prova de que as regras dependentes de página correram, porque correm na leitura e não podem correr numa escrita. Nada de token novo, nada de armazenamento novo, nada de mudança no contrato do web service. **A garantia, dita com precisão: forjar uma escrita passa a custar o que forjar uma LEITURA já custava, e não menos.** O `pathmatch` continua a ser uma afirmação do cliente — na leitura também é.
 - **M7** · **parcial** — track_link writes an unvalidated, unbounded row per call — click history can be fabricated and the table flooded
-  <br>Validation added: classes/helper.php:1070-1078 loads the link with `noticelink::get_record(['id' => $linkid])`, returns status=false when absent, loads the parent notice and returns false unless `self::is_notice_available_to_user($notice)`; :1061-1063 short-circuits guests. classes/external.php:176-181 still delegates straight to helper::track_link(), which is fine now that the helper validates.
-  <br>*Falta:* Impact (a) of the finding — fabricating clicks on arbitrary link ids — is closed. Impact (b), the unbounded row flood, remains for any link on a notice the caller is genuinely served: is_notice_available_to_user() does not apply the page-dependent filters, so a plain site-wide enabled notice is 'available' to every authenticated user, who can loop track_link on its links and insert unlimited {local_awareness_hlinks_his} rows, inflating their own click count.
-- **M8** · **parcial** — dismiss_notice accepts any notice id — notices can be pre-dismissed before they are ever displayed
-  <br>/Users/uaiblaine/dev/moodle-local_awareness/classes/external.php:74-81 fetches the notice and gates on `helper::is_notice_available_to_user($notice)` before helper::dismiss_notice(), with the comment at :76-78 naming the client-supplied-id reason. The gate (classes/helper.php:859-890) rejects disabled notices and notices whose timestart has not arrived (:862 via has_started(), :810-812), so the pre-dismissal of not-yet-enabled or future-scheduled notices described in the finding no longer writes a lastview row.
+  <br>**Metade fechada na fase 20, metade recusada com uma razão melhor.** A retenção era defeito real: nada apagava um clique por idade, portanto um site guardava todos os cliques a vida inteira. Passou a haver tarefa agendada, com o padrão do core — **zero significa manter para sempre**, para que uma atualização não descarte nada em silêncio.
+  <br>*Falta, e fica de propósito:* a inflação da própria contagem. A razão anterior ("é visível") **é falsa por omissão** e foi substituída: o `count_clicked_links()` não tem **um único consumidor em produção** — os relatórios de sistema são só o de aceites e o de dispensas, e o `link_history` é um datasource que só existe depois de um admin construir um relatório. Um clique forjado infla um número que nenhum site lê por omissão, sob o próprio userid, com carimbos por linha que denunciam a série. E cliques repetidos são a grandeza **reportada**: qualquer throttle compra um fator — o atacante roda os links — ao custo de `clickcount` deixar de ser uma contagem de cliques. O `purge_link_history_test` fixa isso com um teste que falha se dois cliques passarem a contar como um.
+- **M8** · corrigido — dismiss_notice accepts any notice id — notices can be pre-dismissed before they are ever displayed
+  <br>Fechado na fase 20, pelo mesmo predicado `may_act_on_notice()` do M6. **A justificação foi corrigida pela refutação e vale registá-la:** a alegação de "supressão permanente de qualquer aviso por enumeração" **não se aguenta** — o `must_reshow()` ressuscita qualquer aviso com `reqack` ou `forcelogout`, e a forma que resta não grava linha de conformidade nenhuma. O defeito real é mais estreito e mais grave: quem está na coorte e tem o papel, mas não está no curso a que o aviso é dirigido, gravava um aceite que aterrava no relatório como consentimento dado após exibição, indistinguível de um verdadeiro.
 - **M9** · corrigido — get_notices decides audience from a client-supplied courseid, so course/category-targeted notices leak to users with no access to that course
   <br>/Users/uaiblaine/dev/moodle-local_awareness/classes/helper.php:1671-1700 now resolves the client-supplied courseid and then discards it unless the caller may enter: `if ($course && !can_access_course($course, null, '', true)) { $course = null; }` at :1694, with $onlyactive = true deliberately chosen…
 - **M10** · corrigido — No external function rejects the guest user, so one guest dismissal hides a notice from every subsequent guest

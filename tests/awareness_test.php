@@ -331,6 +331,23 @@ final class awareness_test extends \advanced_testcase {
         $link1 = array_shift($links);
         $link2 = array_shift($links);
 
+        /*
+         * Delivery through the real read path, because track_link() now requires it. The site
+         * switch is off by default, so turning it on is a precondition rather than the subject.
+         *
+         * select_for_display() hands over the HEAD of the queue, and with four applicable notices
+         * that head is not guaranteed to be the one this test picked with array_shift(). It is
+         * today, and the assertion below is what makes that a checked fact instead of a lucky one:
+         * change the queue order and this fails loudly rather than quietly clicking links on a
+         * notice nobody delivered.
+         */
+        set_config('enabled', 1, 'local_awareness');
+        \local_awareness\external\get_notices::execute('/my/');
+        $this->assertTrue(
+            helper::was_notice_delivered($notice1),
+            'the queue served a different notice, so this test would be clicking links on an undelivered one'
+        );
+
         // Clink on links.
         helper::track_link($link1->id);
         helper::track_link($link2->id);

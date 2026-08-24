@@ -65,6 +65,35 @@ final class events_test extends \advanced_testcase {
         return reset($notices);
     }
 
+
+    /**
+     * Serve a notice to the current session through the real read path.
+     *
+     * helper::track_link() now requires that select_for_display() actually handed this notice over
+     * — the only record that the page-dependent rules ran. Setting the marker by hand would make
+     * the assertions below test a fiction, so this goes through the web service and then checks
+     * the marker really appeared.
+     *
+     * @param awareness $notice The notice expected to be delivered.
+     * @return void
+     */
+    private function deliver(awareness $notice): void {
+        /*
+         * The site switch defaults to OFF (settings.php), and get_notices returns before minting
+         * anything when it is. Turning it on here is a precondition of delivery, not part of what
+         * any test in this file asserts — that the switch really gates delivery is pinned in
+         * tests/external/notice_external_test.php.
+         */
+        set_config('enabled', 1, 'local_awareness');
+
+        \local_awareness\external\get_notices::execute('/my/');
+
+        $this->assertTrue(
+            helper::was_notice_delivered($notice),
+            'the read path did not serve this notice, so the write below would prove nothing'
+        );
+    }
+
     /**
      * Capture the events fired while running a callable.
      *
@@ -366,6 +395,8 @@ final class events_test extends \advanced_testcase {
 
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
+
+        $this->deliver($notice);
 
         $sink = $this->redirectEvents();
         $result = helper::track_link((int) $link->get('id'));

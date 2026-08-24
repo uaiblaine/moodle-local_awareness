@@ -32,6 +32,30 @@ use local_awareness\persistent\noticelink;
  */
 final class helper_test extends \advanced_testcase {
     /**
+     * Serve a notice to the current session through the real read path.
+     *
+     * helper::track_link() requires that select_for_display() actually handed this notice over —
+     * the only record that the page-dependent rules ran. Setting the marker by hand would make the
+     * click assertions test a fiction, so this goes through the web service and checks the marker.
+     *
+     * The site switch defaults to OFF (settings.php) and get_notices mints nothing while it is, so
+     * turning it on is a precondition of delivery rather than part of what these tests assert.
+     *
+     * @param awareness $notice The notice expected to be delivered.
+     * @return void
+     */
+    private function deliver(awareness $notice): void {
+        set_config('enabled', 1, 'local_awareness');
+
+        \local_awareness\external\get_notices::execute('/my/');
+
+        $this->assertTrue(
+            helper::was_notice_delivered($notice),
+            'the read path did not serve this notice, so the click below would prove nothing'
+        );
+    }
+
+    /**
      * Test a list of cohorts is built properly.
      */
     public function test_built_cohort_options(): void {
@@ -545,6 +569,7 @@ final class helper_test extends \advanced_testcase {
         $linkid = (int) array_key_first($links);
 
         // A click on it, which is the thing that must survive the edit.
+        $this->deliver($notice);
         helper::track_link($linkid);
         $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $linkid]));
 
@@ -582,6 +607,7 @@ final class helper_test extends \advanced_testcase {
 
         $notice = awareness::get_record(['title' => 'Link goes away']);
         $linkid = (int) array_key_first(noticelink::get_notice_link_records($notice->get('id')));
+        $this->deliver($notice);
         helper::track_link($linkid);
         $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $linkid]));
 
