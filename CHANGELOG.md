@@ -6,6 +6,38 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The notices payload is a declared structure, and M7's refusal is written where it will be read (version 2026082403)
+
+**WS-01 closed by work.** `get_notices` returned its payload as a `PARAM_RAW` JSON string, so
+`clean_returnvalue()` had nothing to look inside: the allowlist was whatever the hand-written loop
+in `execute()` copied, guarded by one PHPUnit assertion. It is now an
+`external_multiple_structure` of `external_single_structure`, the `json_encode()` is gone, and the
+guarantee belongs to the framework — an undeclared key is stripped by core before it leaves the
+server. The test proves that directly rather than by proxy: it hands core a payload carrying a
+field nobody declared and requires that it not come back.
+
+Two details that decided the shape. The list is no longer keyed by notice id — `array_map()`
+preserves the keys of a single array, so `json_encode()` had been emitting a JSON *object*; the
+client never read those keys as ids, using them only to avoid showing an entry twice in one page
+load, and it takes the real id from the payload. And the prose fields stay `PARAM_RAW` on purpose:
+`title` and `content` carry rendered HTML that must arrive intact, while `modal_width` and
+`modal_height` are `PARAM_RAW` in the persistent and so can hold a character `PARAM_TEXT` would
+strip — and a `PARAM_TEXT` field whose cleaned value differs from the original **throws**, killing
+the whole response for every reader rather than dropping one field. The allowlist is the key set.
+
+**M7 closed by decision, and the decision is now where someone will read it.** The rate limit it
+asked for stays refused: repeat clicks are the quantity being reported, so a throttle of any window
+turns a reader who clicked twice into one who clicked once. What was missing was not the reasoning
+— that was already written and already pinned by a test — but a warning at the method the reasoning
+depends on. `linkhistory::count_clicked_links()` has **no production caller**, because nothing this
+plugin ships displays a click count, so every tool and every sweep reads it as dead. It is the
+measurement `test_two_clicks_on_one_link_are_two_clicks()` asserts through the real write path;
+deleting it would take that guarantee away silently, with the suite green. Its docblock now says so.
+
+While reading it: the comment in `track_link()` claiming an unbounded table "with no index on
+either column it is queried by" is no longer true — both foreign keys carry an index — and growth is
+bounded by age through the purge task. Corrected rather than left to mislead the next reader.
+
 ### Force logout is retired; insistence is one setting with three levels (version 2026082402)
 
 **Force logout never did what it promised, and it was the option an author reached for when a

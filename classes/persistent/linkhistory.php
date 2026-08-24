@@ -61,7 +61,25 @@ class linkhistory extends persistent {
     }
 
     /**
-     * Count how many time a user click on a link.
+     * How many times a user clicked each link in a notice.
+     *
+     * NO PRODUCTION CALLER, AND THAT IS DELIBERATE — DO NOT DELETE IT AS DEAD CODE.
+     *
+     * Nothing this plugin ships displays a click count: the two system reports are the acknowledged
+     * and dismissed ones, and link history is a report-builder datasource that exists only once an
+     * administrator has built a report from it. So every caller is a test, and a dead-code sweep
+     * reads that as an unused method.
+     *
+     * It is the measurement audit finding M7's refusal is pinned against.
+     * purge_link_history_test::test_two_clicks_on_one_link_are_two_clicks() calls this through the
+     * real write path to assert that two clicks count as two — which is what forbids the rate limit
+     * M7 asked for, because a throttle of any window would turn a reader who clicked twice into one
+     * who clicked once and stop this being a click count at all. Delete the method and that
+     * guarantee goes with it, silently, leaving the suite green.
+     *
+     * The same shape once nearly cost a sibling plugin its staleness detection: a private method
+     * with no resolvable caller that was in fact load-bearing. Grep the bare name before believing
+     * any tool that calls this unused.
      *
      * @param int $userid user ID.
      * @param int $noticeid notice ID.
