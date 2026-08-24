@@ -21,6 +21,17 @@ Mustache docblocks that drift from the variables their templates read.
 [`PLANO-correcoes.md`](PLANO-correcoes.md) is the four-phase work list that closed 27 items across
 PRs #26–#29; it is finished.
 
+## Prospective design
+
+[`AVAILABILITY-AWARENESS-FEASIBILITY.md`](AVAILABILITY-AWARENESS-FEASIBILITY.md) assesses a proposed
+`availability_awareness` condition plugin — restricting an activity on acceptance of a notice.
+Verdict: buildable, but it is a **teacher-facing, per-activity** tool that cannot express an
+administrator's site-wide compliance intent, and five defects in this plugin's own acceptance model
+have to be fixed before "accepted" means anything stable enough to gate on. Cost and cross-site
+restore are both solved there, including the assumption that did not survive review — core does
+**not** uniformly fail closed on a missing referent, so a dangling notice id would silently grant
+access under a negated condition.
+
 ## Approved UI mockups
 
 The HTML files under [`mockups/`](mockups/) are the self-contained prototypes
