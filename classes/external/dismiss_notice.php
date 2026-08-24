@@ -61,7 +61,6 @@ class dismiss_notice extends external_api {
 
         $result = [
             'status' => 0,
-            'redirecturl' => '',
         ];
 
         /*
@@ -100,7 +99,6 @@ class dismiss_notice extends external_api {
         return new external_single_structure(
             [
                 'status' => new external_value(PARAM_BOOL, 'status: true if success', VALUE_DEFAULT, "0"),
-                'redirecturl' => new external_value(PARAM_TEXT, 'redirect url', VALUE_DEFAULT, ""),
             ]
         );
     }

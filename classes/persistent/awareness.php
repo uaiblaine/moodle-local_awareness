@@ -31,6 +31,46 @@ class awareness extends persistent {
     /** Table name for the persistent. */
     const TABLE = 'local_awareness';
 
+    /** Insistence: the reader may dismiss the notice freely, including by clicking away from it. */
+    const INSISTENCE_INFORMATIONAL = 0;
+
+    /** Insistence: the reader must use a button, and a refusal brings the notice back. */
+    const INSISTENCE_BLOCKING = 1;
+
+    /** Insistence: blocking, and Accept is gated behind an explicit acknowledgement. */
+    const INSISTENCE_ACKNOWLEDGE = 2;
+
+    /**
+     * How insistent this notice is, as one ordered value.
+     *
+     * Derived rather than stored, so there is no third copy of the truth to drift from the two
+     * columns the display path has always read. The author sets one thing; these are how it lands:
+     *
+     *  - Informational  reqack = 0, outsideclick = 1
+     *  - Blocking       reqack = 0, outsideclick = 0
+     *  - Acknowledge    reqack = 1
+     *
+     * The fourth combination — reqack = 1 with outsideclick = 1 — is unreachable from the form but
+     * may exist in data written before the settings were consolidated, or by a web service. It
+     * reads as Acknowledge, because requiring an acknowledgement is the more insistent statement
+     * and because that is already how the dialogue behaves: its block test has always been
+     * `reqack || !outsideclick`.
+     *
+     * Ordered on purpose. Callers ask "is this at least Blocking", not "is this exactly Blocking",
+     * so a level added above Acknowledge later does not silently fall out of those tests.
+     *
+     * @return int One of the INSISTENCE_* constants.
+     */
+    public function get_insistence(): int {
+        if ((int) $this->get('reqack') === 1) {
+            return self::INSISTENCE_ACKNOWLEDGE;
+        }
+
+        return (int) $this->get('outsideclick') === 0
+            ? self::INSISTENCE_BLOCKING
+            : self::INSISTENCE_INFORMATIONAL;
+    }
+
     /**
      * Returns a list of properties.
      *

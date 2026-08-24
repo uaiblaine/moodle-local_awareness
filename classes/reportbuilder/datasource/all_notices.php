@@ -71,7 +71,7 @@ class all_notices extends datasource {
         return [
             'notice:title',
             'notice:enabled',
-            'notice:reqack',
+            'notice:insistence',
             'notice:ack_count',
             'notice:dismiss_count',
             'notice:timestart',

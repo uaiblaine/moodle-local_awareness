@@ -249,12 +249,24 @@ final class modal_contract_test extends \basic_testcase {
      * read the help believed they had already asked for a logout. The checkbox label made the same
      * claim to the reader before JavaScript replaced it — and if that request lost, the claim stood.
      *
-     * @return array Language directory => list of forbidden substrings, lowercased.
+     * Each row also carries a SAMPLE: a sentence of the kind a drifting pack would plausibly
+     * contain, written out literally rather than assembled from the phrase list. That
+     * independence is the whole point of it — see the control at the end of the test.
+     *
+     * @return array Language directory => list of forbidden substrings, plus an offending sample.
      */
     public static function logout_claim_provider(): array {
         return [
-            'en' => ['en', ['log you off', 'logged out', 'log out', 'logged off']],
-            'pt_br' => ['pt_br', ['logout', 'desconectado', 'desconectar']],
+            'en' => [
+                'en',
+                ['log you off', 'logged out', 'log out', 'logged off'],
+                'If you do not accept this notice, you will be logged out of the site.',
+            ],
+            'pt_br' => [
+                'pt_br',
+                ['logout', 'desconectado', 'desconectar'],
+                'Se você não aceitar o alerta, será desconectado do site.',
+            ],
         ];
     }
 
@@ -264,13 +276,18 @@ final class modal_contract_test extends \basic_testcase {
      * @dataProvider logout_claim_provider
      * @param string $lang The language directory under lang/.
      * @param array $forbidden Lowercased substrings that would claim a logout.
+     * @param string $sample A sentence that does claim one, written independently of that list.
      * @return void
      */
-    public function test_acknowledgement_strings_do_not_promise_a_logout(string $lang, array $forbidden): void {
+    public function test_acknowledgement_strings_do_not_promise_a_logout(
+        string $lang,
+        array $forbidden,
+        string $sample
+    ): void {
         $string = [];
         require($this->plugin_root() . "/lang/{$lang}/local_awareness.php");
 
-        $guarded = ['notice:reqack_help', 'modal:checkboxtext'];
+        $guarded = ['notice:insistence_help', 'modal:checkboxtext'];
         foreach ($guarded as $key) {
             $this->assertArrayHasKey($key, $string, "lang/{$lang} is missing the guarded key {$key}.");
             $value = \core_text::strtolower($string[$key]);
@@ -283,19 +300,28 @@ final class modal_contract_test extends \basic_testcase {
             }
         }
 
-        // Control: the forbidden vocabulary must still be able to fire, or this test proves nothing.
-        $this->assertArrayHasKey('notice:forcelogout_help', $string, "lang/{$lang} is missing the control key.");
-        $control = \core_text::strtolower($string['notice:forcelogout_help']);
+        /*
+         * Control: the phrase list must be able to catch a pack that drifts.
+         *
+         * It is run against $sample, which the provider writes out as a literal sentence — NOT
+         * assembled from the phrase list. An earlier version of this control built its probe by
+         * interpolating each phrase into "Prefix {phrase} suffix" and then searched it with the
+         * same list, so it was true by construction: emptying the list, or misspelling every
+         * phrase in it, left the guarded assertions above making no assertions at all and the
+         * control still green. That is precisely the failure this control exists to prevent, and
+         * it is why the probe has to come from somewhere the list cannot reach.
+         */
+        $lowered = \core_text::strtolower($sample);
         $hits = 0;
         foreach ($forbidden as $claim) {
-            $hits += substr_count($control, $claim);
+            $hits += substr_count($lowered, $claim);
         }
         $this->assertGreaterThan(
             0,
             $hits,
-            "None of the forbidden phrases appears in lang/{$lang} notice:forcelogout_help, so the vocabulary this "
-                . 'test searches for no longer matches how the pack talks about logging out, and the assertions above '
-                . 'cannot fail. Update the phrase list.'
+            "None of the phrases this test searches for appears in a sentence that plainly claims a logout "
+                . "(\"{$sample}\"). The list no longer matches how lang/{$lang} would express it, so the "
+                . 'assertions above cannot fail. Update the phrase list.'
         );
     }
 }

@@ -64,8 +64,22 @@
                             {{#str}} modal:checkboxtext, local_awareness {{/str}}
                         </label>
                     </div>
+                    {{!
+                        Two exit buttons rather than one whose label is swapped at runtime. Both
+                        carry data-action close and both record a dismissal; only one is ever
+                        visible. Swapping a label meant fetching a string asynchronously and
+                        writing it in after render, which is how the acknowledgement checkbox came
+                        to claim a logout that no longer happened - if that request lost, the wrong
+                        wording simply stood. A hidden sibling cannot lose a race.
+                    }}
                     <div class="ms-auto">
-                        <button id="awareness-acceptbtn" type="button" class="btn btn-primary px-4" data-action="accept">
+                        <button id="awareness-closebtn-footer" type="button" class="btn btn-primary px-4" data-action="close">
+                            {{#str}} button:close, local_awareness {{/str}}
+                        </button>
+                        <button id="awareness-notnowbtn" type="button" class="btn btn-secondary px-4 d-none" data-action="close">
+                            {{#str}} button:notnow, local_awareness {{/str}}
+                        </button>
+                        <button id="awareness-acceptbtn" type="button" class="btn btn-primary px-4 ms-2 d-none" data-action="accept">
                             {{#str}} button:accept, local_awareness {{/str}}
                         </button>
                     </div>

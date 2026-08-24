@@ -4,7 +4,7 @@
 
 Awareness is a Moodle local plugin to display policy, compliance, communication, and onboarding notices in modal form.
 
-The plugin supports mandatory acknowledgement workflows, optional forced logout, audience targeting, and reporting for dismissed and acknowledged interactions.
+The plugin supports three levels of insistence, from an informational notice through to one that cannot be clicked away and must be acknowledged, plus audience targeting and reporting for dismissed and acknowledged interactions.
 
 ## Credits
 
@@ -20,8 +20,8 @@ This repository is currently maintained and evolved under the Awareness directio
 ## Feature overview
 
 - Site-wide modal notices.
-- Optional mandatory acknowledgement before users can continue.
-- Optional force logout after dismissal or acknowledgement, depending on settings.
+- Three levels of insistence: informational, blocking, and must-acknowledge.
+- A named exit at every level, so a reader can always decline. At the two insistent levels the decline is recorded and the notice is shown again; an informational notice is dismissed once and stays dismissed.
 - Audience targeting by cohort, role (optionally scoped to a course or category),
   course category, course, course format, theme, and competency rules.
 - An audience estimate in the editor, computed asynchronously, showing the reach of the
@@ -80,12 +80,11 @@ When creating or editing a notice, you can configure:
 - Title and rich content.
 - Start/end window and perpetual mode.
 - Reset interval.
-- Force logout behavior.
-- Acknowledgement requirement.
+- Insistence: informational, blocking, or must-acknowledge.
 - Cohort visibility.
 - Required course completion.
 - URL path matching.
-- Modal presentation options (background image, width, height, outside click).
+- Modal presentation options (background image, width, height).
 
 ## Reports
 

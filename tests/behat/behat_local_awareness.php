@@ -60,6 +60,22 @@ class behat_local_awareness extends behat_base {
             $noticeinfo['timestart'] = $noticeinfo['timestart'] ?? 0;
             $noticeinfo['timeend'] = $noticeinfo['timeend'] ?? 0;
             $noticeinfo['forcelogout'] = $noticeinfo['forcelogout'] ?? 0;
+
+            /*
+             * A scenario may say `insistence` and mean the level an author would choose, rather
+             * than spell out the two columns it is stored in. The mapping is the same one
+             * helper::sanitise_data() applies to the form, and it is written out rather than
+             * shared because this file is loaded by Behat BEFORE config.php, so it cannot reach
+             * the plugin's classes. Keep the two in step.
+             */
+            if (isset($noticeinfo['insistence'])) {
+                $level = (int) $noticeinfo['insistence'];
+                $noticeinfo['reqack'] = $level >= 2 ? 1 : 0;
+                $noticeinfo['outsideclick'] = $level >= 1 ? 0 : 1;
+                unset($noticeinfo['insistence']);
+            }
+            $noticeinfo['outsideclick'] = $noticeinfo['outsideclick'] ?? 1;
+
             $DB->insert_record('local_awareness', $noticeinfo);
         }
 

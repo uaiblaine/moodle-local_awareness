@@ -327,5 +327,34 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026082304, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026082402) {
+        /*
+         * Force logout is retired, and the notices that used it must not quietly become the least
+         * insistent thing on the site.
+         *
+         * How insistent a notice is now reads as one ordered level derived from the two columns
+         * that always stored it — see awareness::get_insistence(). Force logout was a third,
+         * orthogonal switch, and it was the only one an author could reach for to say "this one
+         * really matters". It never delivered that: the reader was ejected AFTER the fact, could
+         * log straight back in, and on 4.5 and 5.1 the guest login button is on by default, so
+         * even a guest bounced straight back to the same notice. What it did reliably communicate
+         * was intent, and that intent is what this step preserves.
+         *
+         * Only rows that would otherwise LOSE insistence are touched: forcelogout = 1 with
+         * reqack = 0 becomes Blocking, which is outsideclick = 0. A notice that already required
+         * an acknowledgement is at the top level already and is left exactly as it is — the
+         * WHERE clause says so rather than relying on the assignment being a no-op.
+         *
+         * The column itself is kept. Dropping it would take the historical fact with it and break
+         * every saved report carrying the Force logout column; the column is marked deprecated in
+         * the report builder instead, and nothing reads it at runtime any more.
+         */
+        $DB->execute(
+            "UPDATE {local_awareness} SET outsideclick = 0 WHERE forcelogout = 1 AND reqack = 0 AND outsideclick <> 0"
+        );
+
+        upgrade_plugin_savepoint(true, 2026082402, 'local', 'awareness');
+    }
+
     return true;
 }

@@ -80,11 +80,9 @@ define(
                         modal = newmodal;
 
                         modal.setNoticeId(nextnotice.id);
-                        modal.setRequiredAcknowledgement(nextnotice.reqack);
-                        modal.setForceLogout(nextnotice.forcelogout);
+                        modal.setInsistence(nextnotice.insistence);
                         modal.setBackgroundImage(nextnotice.bgimageurl || '');
                         modal.setModalSize(nextnotice.modal_width || '', nextnotice.modal_height || '');
-                        modal.setOutsideClick(parseInt(nextnotice.outsideclick, 10) !== 0);
 
                         // Event listener for close button.
                         modal.getModal().on('click', modal.getCloseButtonSelector(), function() {
@@ -114,11 +112,9 @@ define(
                 modal.setTitle(nextnotice.title);
                 modal.setBody(nextnotice.content);
                 modal.setNoticeId(nextnotice.id);
-                modal.setRequiredAcknowledgement(nextnotice.reqack);
-                modal.setForceLogout(nextnotice.forcelogout);
+                modal.setInsistence(nextnotice.insistence);
                 modal.setBackgroundImage(nextnotice.bgimageurl || '');
                 modal.setModalSize(nextnotice.modal_width || '', nextnotice.modal_height || '');
-                modal.setOutsideClick(parseInt(nextnotice.outsideclick, 10) !== 0);
                 modal.show();
                 modal.getModal().focus();
             }
@@ -138,12 +134,8 @@ define(
                 {methodname: 'local_awareness_dismiss', args: {noticeid: noticeid}}
             ]);
 
-            promises[0].done(function(response) {
-                if (response.redirecturl) {
-                    window.open(response.redirecturl, "_parent", "");
-                } else {
-                    nextNotice();
-                }
+            promises[0].done(function() {
+                nextNotice();
             }).fail(Notification.exception).always(function() {
                 inflight = false;
             });
@@ -163,12 +155,8 @@ define(
                 {methodname: 'local_awareness_acknowledge', args: {noticeid: noticeid}}
             ]);
 
-            promises[0].done(function(response) {
-                if (response.redirecturl) {
-                    window.open(response.redirecturl, "_parent", "");
-                } else {
-                    nextNotice();
-                }
+            promises[0].done(function() {
+                nextNotice();
             }).fail(Notification.exception).always(function() {
                 inflight = false;
             });
@@ -183,11 +171,7 @@ define(
                 {methodname: 'local_awareness_tracklink', args: {linkid: linkid}}
             ]);
 
-            promises[0].done(function(response) {
-                if (response.redirecturl) {
-                    window.open(response.redirecturl, "_parent", "");
-                }
-            }).fail(Notification.exception);
+            promises[0].fail(Notification.exception);
         };
 
         /**

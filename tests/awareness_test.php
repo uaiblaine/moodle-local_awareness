@@ -490,11 +490,24 @@ final class awareness_test extends \advanced_testcase {
     }
 
     /**
-     * Test user see required notice when forcelogout logout.
+     * A Blocking notice comes back when it is refused, for everybody, and logs nobody out.
+     *
+     * This replaces the forced-logout test, and pins two deliberate changes rather than one.
+     *
+     * Nobody is ejected. The session is left alone on both write paths, so the assertion that used
+     * to read "user should be logged out" is now the opposite and is made for the ordinary user
+     * as well as the admin — the half most likely to regress if the levels are ever rewired.
+     *
+     * The site administrator is no longer exempt from being asked again. must_reshow() used to
+     * carry `&& !is_siteadmin()` on the forced-logout clause, and it was there to stop an admin
+     * being ejected, not to excuse them from reading notices — a notice requiring acknowledgement
+     * has always come back for admins too. With the ejection gone the exemption had nothing left
+     * to protect, and leaving it would have made Blocking the one level an admin could dismiss
+     * for good by accident.
      *
      * @covers \local_awareness\helper::retrieve_user_notices
      */
-    public function test_retrieve_user_notices_when_force_logout(): void {
+    public function test_a_blocking_notice_returns_after_it_is_refused(): void {
         global $USER;
 
         $this->resetAfterTest();
@@ -504,33 +517,60 @@ final class awareness_test extends \advanced_testcase {
             'title' => 'Notice 1',
             'content' => 'Notice 1 <a href="www.example1.com">Link 1</a> <a href="www.example2.com">Link 2</a>',
             'perpetual' => 1,
-            'reqack' => 0,
-            'forcelogout' => 1,
+            'insistence' => awareness::INSISTENCE_BLOCKING,
         ];
 
         helper::create_new_notice($formdata);
-        $allnotices = awareness::get_all_notices();
-        $notice = array_shift($allnotices);
+        helper::create_new_notice((object) [
+            'title' => 'Notice 2',
+            'content' => 'Body',
+            'perpetual' => 1,
+            'insistence' => awareness::INSISTENCE_INFORMATIONAL,
+        ]);
 
-        // Admin must see 1 notice.
-        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
+        $notices = [];
+        foreach (awareness::get_all_notices() as $candidate) {
+            $notices[$candidate->get('title')] = $candidate;
+        }
+        $notice = $notices['Notice 1'];
+        $second = $notices['Notice 2'];
+
+        $this->assertSame(
+            awareness::INSISTENCE_BLOCKING,
+            $notice->get_insistence(),
+            'the form value must reach storage as a Blocking notice, or the rest of this proves nothing'
+        );
+
+        /*
+         * Membership, not counts. Two notices are live, so a count assertion would pass or fail on
+         * the other one's state as readily as on this one's.
+         */
+        $blockingid = (int) $notice->get('id');
+
+        // The admin sees it, refuses it, is not logged out, and is asked again.
+        $this->assertArrayHasKey($blockingid, helper::retrieve_user_notices('/my/'));
         helper::dismiss_notice($notice);
-        // Admin shouldn't be logged out.
-        $this->assertNotEmpty($USER->username);
-        // After notice is dismissed, admin shouldb't see it anymore.
-        $this->assertCount(0, helper::retrieve_user_notices('/my/'));
+        $this->assertNotEmpty($USER->username, 'refusing a notice must never end the session');
+        $this->assertArrayHasKey($blockingid, helper::retrieve_user_notices('/my/'), 'admins are asked again too');
 
+        // And so does an ordinary user.
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        // After notice is dismissed, should still see 1 as it's required.
+        $this->assertArrayHasKey($blockingid, helper::retrieve_user_notices('/my/'));
         helper::dismiss_notice($notice);
-        // User should be logged out.
-        $this->assertTrue(!isset($USER->username));
+        $this->assertNotEmpty($USER->username, 'refusing a notice must never end the session');
+        $this->assertArrayHasKey($blockingid, helper::retrieve_user_notices('/my/'));
 
-        // Login again and check we still see the notice.
-        $this->setUser($user);
-        $this->assertCount(1, helper::retrieve_user_notices('/my/'));
+        // The control: an Informational notice settles when it is dismissed, so the assertions
+        // above are the level talking and not must_reshow() returning true for everything.
+        helper::dismiss_notice($second);
+        $remaining = helper::retrieve_user_notices('/my/');
+        $this->assertArrayNotHasKey(
+            $second->get('id'),
+            $remaining,
+            'an Informational notice must stay dismissed, or the Blocking assertions above are vacuous'
+        );
     }
 
     /**

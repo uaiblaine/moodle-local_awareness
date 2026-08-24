@@ -159,6 +159,51 @@ final class notice_form_test extends \advanced_testcase {
     }
 
     /**
+     * Editing a notice shows the insistence level it actually has.
+     *
+     * The level is derived rather than stored, so it has to be put into the form on the way in and
+     * mapped back to the two columns on the way out. Only the second direction had a test, and the
+     * first is the one that loses data: a form that silently offers "Informational" for a Blocking
+     * notice demotes it the moment the author saves anything else about it — a title fix would
+     * quietly make an unskippable notice skippable, with nothing on screen to say so.
+     *
+     * The three rows are each other's controls. A mapping stuck on any single value satisfies one
+     * of them and fails the other two.
+     *
+     * @return void
+     */
+    public function test_editing_a_notice_offers_the_level_it_actually_has(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $cases = [
+            [0, 1, awareness::INSISTENCE_INFORMATIONAL],
+            [0, 0, awareness::INSISTENCE_BLOCKING],
+            [1, 0, awareness::INSISTENCE_ACKNOWLEDGE],
+        ];
+
+        foreach ($cases as [$reqack, $outsideclick, $expected]) {
+            $notice = new awareness(0, (object) [
+                'title' => 'Level ' . $expected,
+                'content' => '<p>Body</p>',
+                'enabled' => 1,
+                'reqack' => $reqack,
+                'outsideclick' => $outsideclick,
+            ]);
+            $notice->create();
+
+            $form = new notice_form(null, ['persistent' => $notice, 'id' => $notice->get('id')]);
+            $data = $this->default_data($form);
+
+            $this->assertSame(
+                $expected,
+                $data->insistence,
+                "a notice stored as reqack={$reqack}, outsideclick={$outsideclick} must open at level {$expected}"
+            );
+        }
+    }
+
+    /**
      * Every field with a help string actually offers the help button.
      *
      * "Is perpetual" had `notice:perpetual_help` defined in both language packs and no

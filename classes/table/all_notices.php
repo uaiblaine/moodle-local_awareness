@@ -466,7 +466,13 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             ['recalculate', get_string('notice:audience:recalculate', 'local_awareness'), 'i/calc'],
             ['reset', get_string('notice:reset', 'local_awareness'), 't/reset'],
         ];
-        if ($awareness->get('reqack')) {
+        /*
+         * Gated on the level, not on reqack. A Blocking notice records acceptances and refusals
+         * just as an Acknowledge one does — it simply does not demand a tick first — so gating on
+         * reqack hid the reports for exactly the notices whose rows nobody could otherwise reach.
+         * Informational notices record no acceptance at all, so they still offer no report.
+         */
+        if ($awareness->get_insistence() >= awareness::INSISTENCE_BLOCKING) {
             $secondary[] = ['acknowledged_report', get_string('report:button:ack', 'local_awareness'), 'i/report'];
             $secondary[] = ['dismissed_report', get_string('report:button:dis', 'local_awareness'), 'i/report'];
         }
@@ -526,11 +532,21 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
              */
             $chips[] = get_string('notice:behaviour:repeat', 'local_awareness', format_time($interval));
         }
-        if ($awareness->get('reqack')) {
-            $chips[] = get_string('notice:reqack', 'local_awareness');
-        }
-        if ($awareness->get('forcelogout')) {
-            $chips[] = get_string('notice:forcelogout', 'local_awareness');
+        /*
+         * The level, and only when it is worth saying. Informational is the default and the least
+         * insistent, so chipping it would put a badge on almost every row and leave the "nothing
+         * to say here" state unreachable. This replaced two chips that reported two of the three
+         * booleans the level is derived from, which meant a notice could be hard to escape and
+         * say nothing about it.
+         */
+        $insistence = $awareness->get_insistence();
+        if ($insistence >= awareness::INSISTENCE_BLOCKING) {
+            $chips[] = get_string(
+                $insistence >= awareness::INSISTENCE_ACKNOWLEDGE
+                    ? 'notice:insistence:acknowledge'
+                    : 'notice:insistence:blocking',
+                'local_awareness'
+            );
         }
         if ($awareness->get('reqcourse')) {
             $chips[] = get_string('notice:reqcourse', 'local_awareness');

@@ -99,6 +99,7 @@ final class all_notices_test extends core_reportbuilder_testcase {
             'contentformat' => FORMAT_HTML,
             'cohorts' => '',
             'reqack' => 0,
+            'outsideclick' => 0,
             'reqcourse' => 0,
             'enabled' => 1,
             'resetinterval' => 86400,
@@ -115,12 +116,21 @@ final class all_notices_test extends core_reportbuilder_testcase {
         ]);
         $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:title']);
         $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:resetinterval']);
-        $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:forcelogout']);
+        $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:insistence']);
 
         $content = $this->get_custom_report_content($report->get('id'));
         $this->assertCount(1, $content);
         $row = array_values(reset($content));
         $this->assertEquals('Notice Gamma', $row[0]);
+
+        /*
+         * The insistence cell, not just its presence. This column is derived in SQL from two other
+         * columns and then mapped to a label by a callback, so a report can only be trusted if
+         * both halves are exercised: the fixture is deliberately Blocking rather than the default
+         * Informational, which would have been produced by the CASE falling through to ELSE and by
+         * a callback that had been deleted alike.
+         */
+        $this->assertEquals(get_string('notice:insistence:blocking', 'local_awareness'), $row[2]);
     }
 
     /**
