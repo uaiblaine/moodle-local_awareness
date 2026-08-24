@@ -32,6 +32,16 @@ restore are both solved there, including the assumption that did not survive rev
 **not** uniformly fail closed on a missing referent, so a dangling notice id would silently grant
 access under a negated condition.
 
+[`BLOCK-AWARENESS-FEASIBILITY.md`](BLOCK-AWARENESS-FEASIBILITY.md) assesses a course-level surface
+letting teachers write to their own participants. Verdict: the goal is reachable, but **not as a
+block** — core built this exact shape in `tool_monitor` (a `courseid` column, a capability at
+`CONTEXT_COURSE`, one page reached from course navigation, a `course_deleted` observer, and no block
+anywhere) — and **display needs nothing new**, because `filter_course` already means "only this
+course's pages, only for someone currently in it". The work is a security boundary that does not yet
+exist: `sanitise_data()` validates one of twelve audience inputs, a notice with no filters goes
+site-wide, and core declines to validate ajax autocomplete values server-side. The document also
+corrects a claim in this plugin's own `CLAUDE.md` about `can_access_course()`.
+
 ## Approved UI mockups
 
 The HTML files under [`mockups/`](mockups/) are the self-contained prototypes
