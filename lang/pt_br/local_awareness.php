@@ -162,7 +162,7 @@ $string['manage:table:caption'] = 'Avisos do site';
 $string['message:audience_ready:body'] = 'A estimativa de público de "{$a->title}" terminou. Ela alcança cerca de {$a->count} usuários.';
 $string['message:audience_ready:subject'] = 'Estimativa de público pronta: {$a->title}';
 $string['messageprovider:audience_estimate_ready'] = 'Estimativa de público concluída';
-$string['modal:checkboxtext'] = 'Li e compreendi o alerta (fechar este alerta fará logout do site).';
+$string['modal:checkboxtext'] = 'Li e compreendi o alerta.';
 $string['modal:checkboxtext_logout'] = 'Li e compreendi o alerta (fechar este alerta fará logout do site).';
 $string['modal:checkboxtext_nologout'] = 'Li e compreendi o alerta.';
 $string['notice:activefrom'] = 'Ativo desde';
@@ -207,8 +207,9 @@ $string['notice:perpetual'] = 'É perpétuo';
 $string['notice:perpetual_help'] = 'Quando definido como sim, o alerta sempre será exibido (a menos que desabilitado). Se definido como não, um intervalo de data e hora deve ser especificado.';
 $string['notice:preview'] = 'Pré-visualizar o modal';
 $string['notice:reqack'] = 'Requer reconhecimento';
-$string['notice:reqack_help'] = 'Se habilitado, o usuário precisará aceitar o alerta antes de continuar a usar o site.
-Se o usuário não aceitar o alerta, ele será desconectado do site.';
+$string['notice:reqack_help'] = 'Se habilitado, o usuário precisa marcar a caixa de reconhecimento antes que o botão Aceitar
+fique disponível, e o alerta não pode ser dispensado clicando fora dele nem pressionando Esc. Quem fecha o alerta em vez de
+aceitá-lo volta a vê-lo até aceitar. Não desconecta o usuário do site.';
 $string['notice:reqcourse'] = 'Requer conclusão do curso';
 $string['notice:reqcourse_help'] = 'Mostra o alerta apenas a quem ainda não concluiu o curso selecionado. É uma regra de público, não uma frequência de exibição: com que frequência o alerta reaparece é definido pelo intervalo de reexibição, e quem conclui o curso deixa de o ver.';
 $string['notice:reset'] = 'Redefinir alerta';

@@ -73,7 +73,12 @@
     -webkit-backdrop-filter: blur(4px);
 }
 
-/* Jelly bounce animation — plays when backdrop click is blocked */
+/* Jelly bounce animation — plays when a backdrop click or Escape is refused.
+
+   The class is applied by amd/src/modal_notice.js to getModal(), which IS this element:
+   templates/modal_notice.mustache puts `awareness` on the .modal-dialog. The rule used to read
+   `.awareness.jelly-anim .modal-dialog`, which could never match anything — it asked for a
+   .modal-dialog nested inside .awareness, and .awareness is the .modal-dialog. */
 @keyframes awareness-jelly {
     0% {
         transform: scale(1);
@@ -88,7 +93,7 @@
     }
 }
 
-.awareness.jelly-anim .modal-dialog {
+.awareness.jelly-anim {
     animation: awareness-jelly 0.4s ease-in-out;
     transform-origin: center;
 }

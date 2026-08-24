@@ -6,6 +6,57 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Accessibility — the notice dialogue, and two strings that described a different setting (version 2026082400)
+
+Seven defects that shipped on 4.5, 5.1 and 5.2 at once, with CI green throughout. Nothing in the
+pipeline reads any of them: phpcs reads PHP, the mustache lint reads structure, stylelint reads CSS,
+and none of them resolves a string id or compares a CSS selector against the element a JS file puts
+the class on.
+
+**The close button announced itself as `[[close]]`.** Its `aria-label` asked for
+`get_string('close', 'core')`, and that string does not exist — verified on all three branches, with
+`closebuttontitle` as a positive control proving the search worked. A missing id neither throws nor
+warns; `get_string()` returns the literal, so the only person who ever heard it was the one least
+able to report it. Now `{{#cleanstr}}closebuttontitle{{/cleanstr}}`, which is what core's own modal
+uses.
+
+**The dialogue had no accessible name and no `aria-modal`.** Both attributes now sit on the
+`role="dialog"` element, matching `lib/templates/modal.mustache`; the name used to sit one level in,
+on the `role="document"` element, where it is not announced as the dialogue's name.
+
+**The "your click was refused on purpose" feedback was dead CSS.** The JS put `jelly-anim` on the
+root while the rule read `.awareness.jelly-anim .modal-dialog` — and `awareness` *is* the
+`.modal-dialog`, so the selector asked for a descendant that cannot exist. A blocked backdrop click
+produced nothing at all, which reads as a broken page rather than a deliberate one. The class now
+goes on the dialogue and the rule targets it directly.
+
+**The plugin carried a second Tab trap on top of core's.** `core/modal` calls
+`FocusLock.trapFocus()` from `attachToDOM()`, and focuslock binds `keydown` in the **capture**
+phase — so the plugin's jQuery handler always ran second, on a key core had already acted on. It
+also matched a narrower set of elements than core's: it could not reach a `select`, a `textarea` or
+anything with `tabindex` inside a notice body, all of which an author can add through the content
+editor. Removed; core's lock is strictly better. What the override deliberately does *not* do is now
+written in its docblock, because the previous absence had to be noticed rather than read.
+
+**The close button was actuated document-wide.** `$('[data-action="close"]').trigger('click')` is
+not private to this plugin — core matches the same selector in `tool_lp`'s scale configuration page
+and in `mod_assign`'s grading filter dropdown, on every supported branch. Now scoped to the dialogue.
+
+**Two strings described a setting other than their own.** `notice:reqack_help` promised, in both
+packs, that a user who does not accept "will be logged out of the site". Requiring acknowledgement
+does not log anyone out; that was the separate Force logout setting. An author who read the help
+believed they had already asked for ejection. `modal:checkboxtext` — the label rendered before
+JavaScript replaces it — made the same claim, so a notice that logs nobody out still said it would,
+and if that string request lost the race the claim simply stood. Both now describe what
+acknowledgement actually does: the box must be ticked before Accept becomes available, the dialogue
+refuses backdrop clicks and Escape, and a notice closed rather than accepted comes back.
+
+`tests/local/modal_contract_test.php` pins all seven. Every scan asserts it found something before
+asserting anything about what it found, and the two language assertions carry a control proving the
+vocabulary they search for can still fire — a "did not happen" assertion over a pattern that
+silently stopped matching is indistinguishable from a passing one.
+
+
 ### Security — a write now requires that the notice was actually served (version 2026082306, audit M6, M8)
 
 `dismiss_notice`, `acknowledge_notice` and `track_link` re-checked the notice's AUDIENCE and nothing
