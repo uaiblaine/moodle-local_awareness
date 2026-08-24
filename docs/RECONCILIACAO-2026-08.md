@@ -8,6 +8,22 @@ Este documento existe porque o cabeçalho da auditoria sempre disse que ela era 
 partida, não a lista do que ainda está aberto", e essa lista nunca foi feita. Os 191 achados numerados
 mais os 7 do crítico de completude passam a ter estado conhecido.
 
+> **Atualização de 2026-08-24 (fase 23).** O **C3 fechou**. A metade que faltava era o
+> `forcelogout`, e ela deixou de existir: o mecanismo foi aposentado inteiro (PR #52), com as três
+> isenções de administrador — em duas grafias — a sair com ele. Convidados continuam a não ser
+> rejeitados **por decisão**, não por esquecimento: recebem um marcador só de sessão, que é a
+> correção do defeito original.
+>
+> **195 de 198 encerrados.** Restam o **WS-01** e o **M7**, ambos parciais com a recusa escrita, e o
+> **REPO-10**, decisão de produto. As contagens "194 de 198" mais abaixo são anteriores a esta
+> fase e ficam como estavam: são o registo do que se sabia quando foram escritas.
+>
+> Fecharam também, na mesma sequência, defeitos que a auditoria nunca apanhou porque nada no
+> pipeline os lê — o `aria-label="[[close]]"` do botão de fechar em todos os ramos suportados, uma
+> regra de CSS que não podia casar, e duas strings de idioma que descreviam uma opção diferente da
+> sua (PR #48). E o modelo de aceitação passou a ter prazo de validade e uma resposta pública
+> (PR #51), sem alteração de esquema nem migração.
+
 ## Como foi levantado
 
 Duas passagens independentes por lote, com o código aberto nas duas:
@@ -495,9 +511,10 @@ diz o que resta e onde.
   <br>classes/external.php:389-391 — search_roles() now does `$syscontext = \context_system::instance(); self::validate_context($syscontext); require_capability('local/awareness:manage', $syscontext);` before validate_parameters, with the comment naming the enumeration risk.
 - **C2** · corrigido — Manage-notices page re-reads the entire cohort table once per cohort per row — an N+1 of full table scans
   <br>classes/table/all_notices.php:48 declares `protected $cohortnames = null;` and :702 fills it once per render (`$this->cohortnames ??= helper::built_cohorts_options();`), passing the resolved list into helper::get_cohort_name((int)$cohortid, $options) at :706 — the option list is now built at most on…
-- **C3** · **parcial** — Guest users are never rejected: all guest sessions share one userid, so the first guest dismissal permanently hides the notice from every later guest
+- **C3** · **corrigido** — Guest users are never rejected: all guest sessions share one userid, so the first guest dismissal permanently hides the notice from every later guest
   <br>The cross-guest leak is gone: classes/helper.php:912-932 gives guests a session-only marker (`$sessiononly` writes only $USER->viewednotices and returns before noticeview::add_notice_view), dismiss_notice skips the acknowledgement row for a guest (:974-976, :994) and acknowledge_notice writes no row either (:1016-1024), track_link returns early for guests (:1057-1062). Pinned with a control at tests/external/notice_external_test.php:137 and :162 (a later guest session still receives the notice).
-  <br>*Falta:* Guests are still not rejected, and the forcelogout half of the audit's impact is untouched: a guest who dismisses or acknowledges a forcelogout notice still runs require_logout() and is redirected to /login/index.php (classes/helper.php:996-1000 and :1044-1048 — `!is_siteadmin()` is true for a guest). The module is also still loaded for guests by design (classes/local/hook_callbacks.php:73 guards only on !isloggedin(), and tests/local/hook_callbacks_test.php:141 test_guests_still_load_the_module deliberately pins that).
+  <br>**Encerrado na fase 23 (PR #52).** A metade que faltava era o `forcelogout`, e ela deixou de existir: o mecanismo foi aposentado inteiro, portanto nenhum utilizador — convidado ou não — é desligado por fechar um aviso, e as três isenções de administrador (`helper.php:1172`, `:1218`, `:1444`, em duas grafias diferentes) saíram com ele. A escrita morta desapareceu junto: o marcador de sessão do convidado já não é destruído por um `require_logout()` doze linhas adiante.
+  <br>*O que permanece por decisão, não por esquecimento:* convidados continuam a NÃO ser rejeitados. Recebem um marcador só de sessão e não escrevem linha partilhada nenhuma — que é a correção do defeito original — e o módulo continua a ser carregado para eles (`classes/local/hook_callbacks.php:73` guarda apenas `!isloggedin()`, e `tests/local/hook_callbacks_test.php:141` fixa isso deliberadamente). Rejeitá-los em bloco é uma decisão de produto sobre o que um convidado deve ver, não um defeito em aberto.
 - **C4** · corrigido — Notice content is filtered at save time, so multilang and every other text filter is frozen to the author's language for all users; titles are never filtered at all
   <br>Fechado na fase 5 (2026-08-16): o título passou a `format_string()` no payload do WS (`external.php`) e no `col_title()` da tabela; o `pathmatch` adjacente passou a `s()`.
 - **C5** · corrigido — Both MUC caches store an empty array, which is falsy, so the query re-runs on every request in the common empty case

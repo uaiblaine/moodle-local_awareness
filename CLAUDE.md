@@ -97,6 +97,19 @@ Behat site fails every scenario on the same core locator and looks like your bug
   each handle this; do not "simplify" them into a blanket `isguestuser()` reject
   without deciding what guests should see.
 
+- **How insistent a notice is has ONE source of truth, and it is derived.**
+  `awareness::get_insistence()` maps the two stored columns (`reqack`,
+  `outsideclick`) to Informational / Blocking / Acknowledge; the form, the web
+  service payload, `must_reshow()`, the manage-list chips and the report column
+  all read the level rather than the columns. Force logout was retired in phase
+  23 — the column survives for history and its report column is deprecated, but
+  nothing reads it at runtime, and there is no `require_logout()` and no
+  `is_siteadmin()` exemption anywhere in this plugin any more. Callers ask
+  `>= INSISTENCE_BLOCKING`, never `=== `, so a level added above Acknowledge
+  does not silently fall out of those tests. The Behat generator carries its own
+  copy of the mapping because it is loaded before `config.php` and cannot reach
+  the plugin's classes — keep the two in step.
+
 - **`filter_role_context` is a MODIFIER of `filter_role`**, not a rule of its
   own: it is absent from both `estimator::AUDIENCE_FIELDS` and `CONTEXT_FIELDS`,
   and never reaches `rule_describer::describe()`. The five keys `describe()`
