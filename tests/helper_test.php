@@ -417,6 +417,98 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
+     * A course that does not exist is refused on save, on both write paths.
+     *
+     * Nothing checked this before: the course picker is an ajax autocomplete, whose values core
+     * does not validate, and the write path packed whatever arrived into filtervalues. The real
+     * course saved first is the control — it proves the refusal is about the id and not about
+     * course filters as such — and the row count proves the refused save wrote nothing.
+     *
+     * @covers \local_awareness\helper::create_new_notice
+     * @covers \local_awareness\helper::update_notice
+     */
+    public function test_a_course_that_does_not_exist_is_refused_on_save(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        set_config('allow_update', 1, 'local_awareness');
+
+        $course = $this->getDataGenerator()->create_course();
+        $missing = (int) $DB->get_field_sql('SELECT MAX(id) FROM {course}') + 1000;
+        $this->assertFalse($DB->record_exists('course', ['id' => $missing]));
+
+        $data = new \stdClass();
+        $data->title = 'Scoped to a real course';
+        $data->content = '<p>Body</p>';
+        $data->filter_course = [(int) $course->id];
+        helper::create_new_notice($data);
+
+        $notice = awareness::get_record(['title' => 'Scoped to a real course']);
+        $this->assertSame([(int) $course->id], json_decode($notice->get('filtervalues'), true)['filter_course']);
+
+        $forged = new \stdClass();
+        $forged->title = 'Scoped to a course that is not there';
+        $forged->content = '<p>Body</p>';
+        $forged->filter_course = [(int) $course->id, $missing];
+        try {
+            helper::create_new_notice($forged);
+            $this->fail('a course that does not exist was accepted on create');
+        } catch (\invalid_parameter_exception $e) {
+            $this->assertStringContainsString('filter_course', $e->debuginfo);
+        }
+        $this->assertSame(1, $DB->count_records('local_awareness'), 'the refused create wrote a row');
+
+        $update = new \stdClass();
+        $update->title = 'Renamed';
+        $update->content = '<p>Body</p>';
+        $update->filter_course = [$missing];
+        try {
+            helper::update_notice($notice, $update);
+            $this->fail('a course that does not exist was accepted on update');
+        } catch (\invalid_parameter_exception $e) {
+            $this->assertStringContainsString('filter_course', $e->debuginfo);
+        }
+
+        // The refusal has to come before the write, or the rename lands and the exception lies.
+        $reread = awareness::get_record(['id' => $notice->get('id')]);
+        $this->assertSame('Scoped to a real course', $reread->get('title'), 'the refused update wrote the title');
+        $this->assertSame([(int) $course->id], json_decode($reread->get('filtervalues'), true)['filter_course']);
+    }
+
+    /**
+     * A list longer than the bound is cut on save, first entries kept, in order.
+     *
+     * The scope's existence lookups bind one placeholder per id, so the write path has to be
+     * bounded the way the estimate already was — and it was not, because nothing on it ever ran a
+     * statement over the list before. The one-course save in the test above is the control that a
+     * list within the bound is stored whole.
+     *
+     * @covers \local_awareness\helper::create_new_notice
+     */
+    public function test_an_oversized_list_is_bounded_on_save(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $ids = $this->getDataGenerator()->get_plugin_generator('local_awareness')
+            ->create_bare_courses(helper::CRITERIA_LIST_MAX + 50);
+
+        $data = new \stdClass();
+        $data->title = 'More courses than one statement should carry';
+        $data->content = '<p>Body</p>';
+        $data->filter_course = $ids;
+        helper::create_new_notice($data);
+
+        $stored = json_decode(
+            awareness::get_record(['title' => 'More courses than one statement should carry'])->get('filtervalues'),
+            true
+        )['filter_course'];
+
+        $this->assertCount(helper::CRITERIA_LIST_MAX, $stored);
+        $this->assertSame(array_slice($ids, 0, helper::CRITERIA_LIST_MAX), $stored);
+    }
+
+    /**
      * Each level the author can choose survives the trip into storage.
      *
      * helper::sanitise_data() is the only place a chosen level becomes reqack and outsideclick,

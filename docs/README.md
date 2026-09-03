@@ -42,6 +42,19 @@ exist: `sanitise_data()` validates one of twelve audience inputs, a notice with 
 site-wide, and core declines to validate ajax autocomplete values server-side. The document also
 corrects a claim in this plugin's own `CLAUDE.md` about `can_access_course()`.
 
+[`SCOPE-VALIDATOR-FEASIBILITY.md`](SCOPE-VALIDATOR-FEASIBILITY.md) prices the second of that
+document's build steps, the server-side scope validator, and the fork it forces first: a validator
+needs a scope to validate against, and the plugin has none. It checks the eleven-field
+classification against the code — nine of eleven labels stand, `filter_role_context` becomes FORCE
+and `reqcourse` becomes RESTRICT, and three labels keep their name for a different reason than
+given — inventories the entry points the boundary has to sit on, and prices three options. Verdict:
+build the validator as a **scope value object whose course branch is implemented and tested now
+against hand-built scopes** but is unreachable from production until a `courseid` column and a
+course capability land, in four pull requests; a site-scope-only validator is untestable by
+construction, and building the foundation in the same change creates an ownership hole in three
+files and cannot be bisected. Six decisions are the owner's and are listed there. Nothing in that
+analysis was executed.
+
 ## Approved UI mockups
 
 The HTML files under [`mockups/`](mockups/) are the self-contained prototypes

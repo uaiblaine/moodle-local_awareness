@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\local\author_scope;
 use local_awareness\local\page_probe;
 use local_awareness\local\role_scope;
 use local_awareness\local\window;
@@ -81,42 +82,12 @@ class helper {
      * @throws \dml_exception
      * @throws \core\invalid_persistent_exception
      * @throws \required_capability_exception
+     * @throws \invalid_parameter_exception When a value names something the site does not have.
      */
     public static function create_new_notice(\stdClass $data): string {
         self::check_manage_capability();
 
-        // Pack filter values.
-        $filters = [];
-        $filterfields = [
-            'filter_role_context',
-            'filter_role',
-            'filter_category',
-            'filter_course',
-            'filter_format',
-            'filter_theme',
-            'filter_competency_rules',
-            'filter_competency_requireall',
-        ];
-        foreach ($filterfields as $field) {
-            if (isset($data->$field)) {
-                $val = $data->$field;
-                if ($field === 'filter_competency_rules') {
-                    $val = self::normalise_competency_rules($val);
-                } else if ($field === 'filter_competency_requireall') {
-                    $val = empty($val) ? 0 : 1;
-                }
-                // Autocomplete may return special markers when nothing is selected.
-                if (is_array($val)) {
-                    $val = array_filter($val, function ($v) {
-                        return $v !== '' && $v !== '_qf__force_multiselect_submission';
-                    });
-                    $val = array_values($val);
-                }
-                $filters[$field] = $val;
-                unset($data->$field);
-            }
-        }
-        $data->filtervalues = json_encode($filters);
+        self::apply_author_scope($data, author_scope::site());
 
         // Create new notice.
         self::sanitise_data($data);
@@ -152,6 +123,7 @@ class helper {
      * @throws \core\invalid_persistent_exception
      * @throws \dml_exception
      * @throws \required_capability_exception
+     * @throws \invalid_parameter_exception When a value names something the site does not have.
      */
     public static function update_notice(awareness $awareness, \stdClass $data): string {
         self::check_manage_capability();
@@ -167,38 +139,7 @@ class helper {
             return \local_awareness\audience\notice_audience::STATE_NONE;
         }
 
-        // Pack filter values.
-        $filters = [];
-        $filterfields = [
-            'filter_role_context',
-            'filter_role',
-            'filter_category',
-            'filter_course',
-            'filter_format',
-            'filter_theme',
-            'filter_competency_rules',
-            'filter_competency_requireall',
-        ];
-        foreach ($filterfields as $field) {
-            if (isset($data->$field)) {
-                $val = $data->$field;
-                if ($field === 'filter_competency_rules') {
-                    $val = self::normalise_competency_rules($val);
-                } else if ($field === 'filter_competency_requireall') {
-                    $val = empty($val) ? 0 : 1;
-                }
-                // Autocomplete may return special markers when nothing is selected.
-                if (is_array($val)) {
-                    $val = array_filter($val, function ($v) {
-                        return $v !== '' && $v !== '_qf__force_multiselect_submission';
-                    });
-                    $val = array_values($val);
-                }
-                $filters[$field] = $val;
-                unset($data->$field);
-            }
-        }
-        $data->filtervalues = json_encode($filters);
+        self::apply_author_scope($data, author_scope::site());
 
         self::sanitise_data($data);
         awareness::update_notice_data($awareness, $data);
@@ -219,6 +160,76 @@ class helper {
         $event->trigger();
 
         return \local_awareness\audience\notice_audience::refresh($awareness);
+    }
+
+    /**
+     * Run the submitted audience and context fields through the author's scope, then pack the
+     * filter fields into the filtervalues JSON.
+     *
+     * This is the boundary. The form is not one: three of its pickers are ajax autocompletes,
+     * whose values core does not validate server-side, and a non-ajax select skips its allowlist
+     * when its option list is empty. And sanitise_data() cannot be one either — it runs after the
+     * filter fields have been folded into the opaque filtervalues string, so it never sees them.
+     * Both write paths therefore pass through here before anything is stored, with the scope the
+     * caller is writing under; see {@see author_scope} for what each scope allows and why.
+     *
+     * Refused rather than repaired. The form has already shown the author every problem through
+     * notice_form::extra_validation(), so a value that still arrives here bypassed the form, and a
+     * request like that gets an error, not a notice quietly different from the one it asked for.
+     * Cohorts are the documented exception and are narrowed silently by the scope itself.
+     *
+     * @param \stdClass $data Form data, modified in place: the filter fields leave it and
+     *                        filtervalues, cohorts and reqcourse arrive as the scope left them.
+     * @param author_scope $scope Who the notice is being written as.
+     * @throws \invalid_parameter_exception When a value names something that does not exist or
+     *                                      lies outside the scope.
+     */
+    private static function apply_author_scope(\stdClass $data, author_scope $scope): void {
+        $raw = [];
+        foreach (array_keys(author_scope::RULES) as $field) {
+            if (isset($data->$field)) {
+                $raw[$field] = $data->$field;
+            }
+        }
+
+        $result = $scope->apply($raw);
+        if (!$result->is_clean()) {
+            throw new \invalid_parameter_exception(
+                'Refused by the author scope: ' . implode(', ', $result->problem_fields())
+            );
+        }
+        $criteria = $result->criteria();
+
+        $filterfields = [
+            'filter_role_context',
+            'filter_role',
+            'filter_category',
+            'filter_course',
+            'filter_format',
+            'filter_theme',
+            'filter_competency_rules',
+            'filter_competency_requireall',
+        ];
+        $filters = [];
+        foreach ($filterfields as $field) {
+            if (!array_key_exists($field, $criteria)) {
+                continue;
+            }
+            $val = $criteria[$field];
+            if ($field === 'filter_competency_requireall') {
+                $val = empty($val) ? 0 : 1;
+            }
+            $filters[$field] = $val;
+            unset($data->$field);
+        }
+        $data->filtervalues = json_encode($filters);
+
+        if (array_key_exists('cohorts', $criteria)) {
+            $data->cohorts = $criteria['cohorts'];
+        }
+        if (array_key_exists('reqcourse', $criteria)) {
+            $data->reqcourse = $criteria['reqcourse'];
+        }
     }
 
     /**
@@ -246,16 +257,7 @@ class helper {
             }
         }
 
-        /*
-         * Cohorts are dropped to the set this user may target. The estimator counts members with a
-         * bare `cohortid IN (…)`, so an id that reached the POST without ever being offered still
-         * yields a population size — on the save path just as much as through the web service, only
-         * slower: save the notice, then read the audience column on the manage list.
-         */
-        if (isset($data->cohorts)) {
-            $submitted = is_string($data->cohorts) ? explode(',', $data->cohorts) : (array) $data->cohorts;
-            $data->cohorts = self::allowed_cohorts($submitted);
-        }
+        // Cohorts, and every other audience field, were already narrowed by apply_author_scope().
     }
 
     /**

@@ -17,6 +17,7 @@
 namespace local_awareness\form;
 
 use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 
 defined('MOODLE_INTERNAL') || die();
@@ -272,20 +273,7 @@ class notice_form extends \core\form\persistent {
             $existingrules = [];
             if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
                 $existingfilters = json_decode($persistent->get('filtervalues'), true);
-                $existingrules = helper::normalise_competency_rules($existingfilters['filter_competency_rules'] ?? []);
-
-                if (!empty($existingrules)) {
-                    $ids = array_map(function (array $rule): int {
-                        return (int) ($rule['id'] ?? 0);
-                    }, $existingrules);
-                    $names = helper::get_competency_names($ids);
-
-                    foreach ($existingrules as $index => $rule) {
-                        if (empty($existingrules[$index]['name']) && !empty($names[$rule['id']])) {
-                            $existingrules[$index]['name'] = $names[$rule['id']];
-                        }
-                    }
-                }
+                $existingrules = self::existing_competency_rules($existingfilters['filter_competency_rules'] ?? []);
             }
 
             $mform->addElement('static', 'filter_competency_label', get_string('filter_competency', 'local_awareness'), '');
@@ -493,6 +481,104 @@ class notice_form extends \core\form\persistent {
 
 
     /**
+     * Refuse a value that names something the site does not have, and say which field.
+     *
+     * The pickers cannot do this: three of them are ajax autocompletes whose values core declines
+     * to validate, and a non-ajax select skips its allowlist when its option list is empty. So the
+     * same scope the write path enforces is asked here first, where the answer can reach the
+     * author as an error on the field instead of an exception after they pressed Save.
+     *
+     * \core\form\persistent::validation() is final; this is the hook it leaves.
+     *
+     * @param \stdClass $data Submitted data.
+     * @param array $files Submitted files.
+     * @param array $errors Errors found so far.
+     * @return array Additional errors, keyed by element name.
+     */
+    protected function extra_validation($data, $files, array &$errors) {
+        $result = author_scope::site()->apply((array) $data);
+
+        $extra = [];
+        foreach ($result->problem_fields() as $field) {
+            // The competency rules travel in a hidden field; its label is what the author sees.
+            $element = $field === 'filter_competency_rules' ? 'filter_competency_label' : $field;
+            $extra[$element] = self::problem_message($field);
+        }
+
+        return $extra;
+    }
+
+    /**
+     * The message shown on a field the author scope corrected.
+     *
+     * A fixed key per field rather than a dynamic string id, and no value in the message: what was
+     * submitted is never echoed, so the error cannot confirm that a guessed id exists.
+     *
+     * @param string $field The corrected field.
+     * @return string
+     * @throws \coding_exception For a field with no message, so a field added to the scope cannot be mislabelled.
+     */
+    private static function problem_message(string $field): string {
+        switch ($field) {
+            case 'filter_category':
+                return get_string('scope:problem:filter_category', 'local_awareness');
+            case 'filter_competency_rules':
+                return get_string('scope:problem:filter_competency_rules', 'local_awareness');
+            case 'filter_course':
+                return get_string('scope:problem:filter_course', 'local_awareness');
+            case 'filter_format':
+                return get_string('scope:problem:filter_format', 'local_awareness');
+            case 'filter_role':
+                return get_string('scope:problem:filter_role', 'local_awareness');
+            case 'filter_role_context':
+                return get_string('scope:problem:filter_role_context', 'local_awareness');
+            case 'filter_theme':
+                return get_string('scope:problem:filter_theme', 'local_awareness');
+            case 'reqcourse':
+                return get_string('scope:problem:reqcourse', 'local_awareness');
+            default:
+                throw new \coding_exception("No message for a scope problem on '{$field}'");
+        }
+    }
+
+    /**
+     * The stored competency rules, normalised, named, and without any rule whose competency has
+     * since been deleted.
+     *
+     * The course, role and required-course pickers drop a dead referent because they re-query and
+     * offer only what they find. This field is a hidden JSON value the author cannot see, so a dead
+     * rule left in it would be resubmitted verbatim, refused by the author scope on save, and the
+     * author shown an error on a rule the page never displayed. Dropping it here is what makes
+     * "corrected the next time it is saved" true for this field too. Both places the form reads the
+     * stored rules go through here — the element's default in definition() and the data set over it
+     * from get_default_data() — so the two cannot disagree.
+     *
+     * @param mixed $raw The stored rules, as JSON or as an array.
+     * @return array Normalised rules, each with a name.
+     */
+    private static function existing_competency_rules($raw): array {
+        $rules = helper::normalise_competency_rules($raw);
+        if (empty($rules)) {
+            return [];
+        }
+
+        $names = helper::get_competency_names(array_column($rules, 'id'));
+
+        $kept = [];
+        foreach ($rules as $rule) {
+            if (!isset($names[$rule['id']])) {
+                continue;
+            }
+            if (empty($rule['name'])) {
+                $rule['name'] = $names[$rule['id']];
+            }
+            $kept[] = $rule;
+        }
+
+        return $kept;
+    }
+
+    /**
      * The display label for a course option, escaped for the stash core renders it through.
      *
      * element-autocomplete.mustache emits every option as a triple stash and lib/form/select.php
@@ -608,7 +694,7 @@ class notice_form extends \core\form\persistent {
         }
 
         if (isset($data->filter_competency_rules) && is_array($data->filter_competency_rules)) {
-            $data->filter_competency_rules = json_encode($data->filter_competency_rules);
+            $data->filter_competency_rules = json_encode(self::existing_competency_rules($data->filter_competency_rules));
         }
 
         return $data;

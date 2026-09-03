@@ -16,6 +16,7 @@
 
 namespace local_awareness\form;
 
+use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 
 /**
@@ -331,5 +332,99 @@ final class notice_form_test extends \advanced_testcase {
         // Precondition: the fixtures really do carry the character under test.
         $this->assertStringContainsString('&', $category->name);
         $this->assertStringContainsString('&', $course->fullname);
+    }
+
+    /**
+     * The form refuses a course that no longer exists, on the field the author can see.
+     *
+     * \core\form\persistent::validation() is final, so the check lives in extra_validation(),
+     * exercised here with the submitted-data shape the form hands it. The real course is the
+     * control: no error for it, or the hook would refuse every course filter.
+     */
+    public function test_the_form_refuses_a_course_that_no_longer_exists(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $course = $this->getDataGenerator()->create_course();
+        $missing = (int) $DB->get_field_sql('SELECT MAX(id) FROM {course}') + 1000;
+        $this->assertFalse($DB->record_exists('course', ['id' => $missing]));
+
+        $form = new notice_form(null, ['persistent' => null, 'id' => 0]);
+        $method = new \ReflectionMethod($form, 'extra_validation');
+        $method->setAccessible(true);
+        $errors = [];
+
+        $clean = $method->invokeArgs($form, [(object) ['filter_course' => [(int) $course->id]], [], &$errors]);
+        $this->assertSame([], $clean);
+
+        $refused = $method->invokeArgs($form, [(object) ['filter_course' => [(int) $course->id, $missing]], [], &$errors]);
+        $this->assertSame(
+            ['filter_course' => get_string('scope:problem:filter_course', 'local_awareness')],
+            $refused
+        );
+    }
+
+    /**
+     * Every field the site scope can report has a message, and a field without one fails loudly.
+     *
+     * Pinned against author_scope::RULES rather than a list of names, so a field added to the
+     * scope without a message here reddens instead of reaching an author as the wrong message.
+     */
+    public function test_every_field_the_scope_can_report_has_a_message(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $form = new notice_form(null, ['persistent' => null, 'id' => 0]);
+        $method = new \ReflectionMethod($form, 'problem_message');
+        $method->setAccessible(true);
+
+        foreach (array_keys(author_scope::RULES) as $field) {
+            if (author_scope::site()->rule_for($field) !== author_scope::RULE_EXISTS) {
+                continue;
+            }
+            $this->assertStringStartsNotWith('[[', $method->invoke(null, $field), "{$field} has no message");
+        }
+
+        $this->expectException(\coding_exception::class);
+        $method->invoke(null, 'cohorts');
+    }
+
+    /**
+     * A rule for a competency that no longer exists is dropped when the form loads.
+     *
+     * The other pickers drop a dead referent because they re-query; this field is a hidden JSON
+     * value the author cannot see, so a dead rule left in it would be resubmitted verbatim, refused
+     * on save, and reported on a field the page never showed as a problem. The surviving rule is
+     * the control, and the element's value is read after core has set the default data over it,
+     * which is the value the page actually carries.
+     */
+    public function test_a_rule_for_a_deleted_competency_is_dropped_when_the_form_loads(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        set_config('enabled', 1, 'core_competency');
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_competency');
+        $framework = $generator->create_framework();
+        $kept = (int) $generator->create_competency(['competencyframeworkid' => $framework->get('id')])->get('id');
+        $gone = (int) $generator->create_competency(['competencyframeworkid' => $framework->get('id')])->get('id');
+
+        $notice = $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+            'filtervalues' => json_encode(['filter_competency_rules' => [
+                ['id' => $kept, 'proficient' => 1, 'name' => 'Kept'],
+                ['id' => $gone, 'proficient' => 1, 'name' => 'Gone'],
+            ]]),
+        ]);
+        $DB->delete_records('competency', ['id' => $gone]);
+
+        $form = new notice_form(null, ['persistent' => $notice, 'id' => $notice->get('id')]);
+        $property = new \ReflectionProperty(\moodleform::class, '_form');
+        $property->setAccessible(true);
+        $value = json_decode($property->getValue($form)->getElement('filter_competency_rules')->getValue(), true);
+
+        $this->assertSame([$kept], array_column($value, 'id'));
     }
 }

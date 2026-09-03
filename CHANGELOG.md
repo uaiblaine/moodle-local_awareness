@@ -6,6 +6,39 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Every audience field is checked on the way in (version 2026090300)
+
+**Nothing validated ten of the eleven audience and context fields a notice carries.** Three of
+the form's pickers are ajax autocompletes, whose values core declines to validate server-side
+("when this was an ajax request, we do not know the allowed list of values"); a non-ajax select
+skips its allowlist whenever its option list is empty; and `helper::sanitise_data()` could never
+have helped, because both write paths fold the filter fields into the opaque `filtervalues`
+string before it runs. Only cohorts were checked. A hand-made request could save a notice naming
+any course, category, role or competency id, installed or not — and the speculative audience
+estimate, which runs before any save, counted active enrolments for any course id it was handed.
+
+**`author_scope` is the boundary now, on every path that accepts criteria.** Both write paths
+(`helper::create_new_notice()`, `helper::update_notice()`), the `estimate_audience` web service
+and the form's own validation run the submitted fields through it first. Under the site scope,
+the one every author has today, the rule is existence: a course, category, role, competency,
+format or theme that is named has to be one the site actually has, and `filter_role_context` has
+to be one of the four offered levels. The form reports the field to fix; a request that bypassed
+the form is refused with `invalid_parameter_exception` rather than quietly edited. Cohorts keep
+their documented behaviour and are narrowed silently.
+
+**The course scope is written and tested, and nothing in production can construct it yet.**
+`author_scope::course($courseid)` forces the course and `CONTEXT_COURSE`, forbids category,
+format and theme, restricts the required course to itself or none, cohorts to the ones the course
+enrols from, roles to the ones the site allows at course level and competencies to the ones
+linked to the course, and leaves the page pattern alone. It exists so that the policy is settled
+as code before any course-level capability is granted against it; the change that grants one is
+wiring. Each rule's reason, and the two labels that changed under verification, are in
+`docs/SCOPE-VALIDATOR-FEASIBILITY.md`.
+
+**Already-stored notices are left as they are.** The check runs on write only; a notice saved
+before this version with a referent that has since been deleted keeps whatever it did before, and
+is corrected the next time it is saved.
+
 ### The write verbs say what they do to consent (version 2026082404)
 
 **Every authoring action that saves a notice expires every acceptance on it, and none of their
