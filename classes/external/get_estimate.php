@@ -22,6 +22,8 @@ use core_external\external_single_structure;
 use core_external\external_value;
 use local_awareness\audience\estimator;
 use local_awareness\audience\rule_describer;
+use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\audience_job;
 use local_awareness\persistent\awareness;
 
@@ -59,7 +61,7 @@ class get_estimate extends external_api {
 
         $syscontext = \context_system::instance();
         self::validate_context($syscontext);
-        require_capability('local/awareness:manage', $syscontext);
+        helper::require_author(author_scope::site(), 'manage');
 
         $job = audience_job::get_record(['jobid' => $params['jobid']]);
         if (!$job) {

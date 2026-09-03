@@ -74,7 +74,7 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
      * Managers bypass it so the editor and the manage table can still render an unpublished
      * notice, which is the case the old enabled-only test existed for.
      */
-    $ismanager = has_capability('local/awareness:manage', \context_system::instance());
+    $ismanager = \local_awareness\helper::require_author(\local_awareness\local\author_scope::site(), 'manage', false);
     if (!$ismanager && !\local_awareness\helper::is_notice_available_to_user($notice)) {
         return false;
     }

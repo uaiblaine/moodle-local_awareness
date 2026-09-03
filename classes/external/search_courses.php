@@ -21,6 +21,7 @@ use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
 use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 
 /**
@@ -59,7 +60,7 @@ class search_courses extends external_api {
 
         $syscontext = \context_system::instance();
         self::validate_context($syscontext);
-        require_capability('local/awareness:manage', $syscontext);
+        helper::require_author(author_scope::site(), 'manage');
 
         $query = trim($params['query']);
         $results = [];

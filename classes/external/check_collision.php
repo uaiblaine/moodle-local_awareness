@@ -21,6 +21,8 @@ use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\local\collision;
 use local_awareness\persistent\awareness;
 
@@ -75,7 +77,7 @@ class check_collision extends external_api {
         // otherwise be able to see at all.
         $syscontext = \context_system::instance();
         self::validate_context($syscontext);
-        require_capability('local/awareness:manage', $syscontext);
+        helper::require_author(author_scope::site(), 'manage');
 
         $clashes = collision::clashes_for(
             (int) $params['noticeid'],
@@ -84,8 +86,19 @@ class check_collision extends external_api {
         );
 
         return [
-            'titles' => array_values(array_map(function ($notice): string {
-                return $notice->get('title');
+            /*
+             * Stripped, not escaped: the return slot is PARAM_TEXT, whose cleaner runs strip_tags(),
+             * and clean_returnvalue() throws when the cleaned value differs from the original — a
+             * title carrying a bare "<" before a letter failed the whole response for every author.
+             * escape => false keeps the plain spelling the client's own escaping expects, and the
+             * strip_tags() of our own is not redundant: format_string() only strips when the site's
+             * formatstringstriptags is on, and with it off a "<b>" in a title would come back whole
+             * and fail the same cleaning.
+             */
+            'titles' => array_values(array_map(function (awareness $notice) use ($syscontext): string {
+                return strip_tags(
+                    format_string($notice->get('title'), true, ['context' => $syscontext, 'escape' => false])
+                );
             }, $clashes)),
         ];
     }

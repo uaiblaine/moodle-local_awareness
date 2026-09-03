@@ -16,14 +16,15 @@
 
 namespace local_awareness\table;
 
-use local_awareness\persistent\awareness;
-use table_sql;
-use renderable;
-use local_awareness\helper;
-use moodle_url;
-use local_awareness\local\collision;
 use local_awareness\audience\notice_audience;
+use local_awareness\helper;
+use local_awareness\local\author_scope;
+use local_awareness\local\collision;
 use local_awareness\persistent\audience_job;
+use local_awareness\persistent\awareness;
+use moodle_url;
+use renderable;
+use table_sql;
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/tablelib.php');
@@ -115,7 +116,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @return bool
      */
     public function has_capability(): bool {
-        return has_capability('local/awareness:manage', $this->get_context());
+        return helper::require_author(author_scope::site(), 'manage', false);
     }
 
     /**

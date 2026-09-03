@@ -16,6 +16,11 @@
 
 namespace local_awareness;
 
+use local_awareness\external\check_collision;
+use local_awareness\external\estimate_audience;
+use local_awareness\external\get_estimate;
+use local_awareness\external\search_courses;
+use local_awareness\external\search_roles;
 use local_awareness\persistent\awareness;
 
 /**
@@ -35,7 +40,7 @@ use local_awareness\persistent\awareness;
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers \local_awareness\helper::check_manage_capability
+ * @covers \local_awareness\helper::require_author
  */
 final class helper_capability_test extends \advanced_testcase {
     /**
@@ -98,6 +103,32 @@ final class helper_capability_test extends \advanced_testcase {
             'delete_notice' => [
                 static function (awareness $notice): void {
                     helper::delete_notice($notice);
+                },
+            ],
+            // The author-side web services: gated by the same seam, with no negative test before.
+            'estimate_audience' => [
+                static function (awareness $notice): void {
+                    estimate_audience::execute(json_encode(['pathmatch' => '/my/']));
+                },
+            ],
+            'get_estimate' => [
+                static function (awareness $notice): void {
+                    get_estimate::execute('nosuchjob');
+                },
+            ],
+            'check_collision' => [
+                static function (awareness $notice): void {
+                    check_collision::execute(0, '/my/%', true);
+                },
+            ],
+            'search_courses' => [
+                static function (awareness $notice): void {
+                    search_courses::execute('Policy');
+                },
+            ],
+            'search_roles' => [
+                static function (awareness $notice): void {
+                    search_roles::execute('', 0);
                 },
             ],
         ];

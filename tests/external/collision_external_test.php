@@ -117,4 +117,51 @@ final class collision_external_test extends \advanced_testcase {
         $this->assertFalse($response['error']);
         $this->assertSame(['Dashboard rival'], $response['data']['titles']);
     }
+
+    /**
+     * A title with a bare "<" reaches the client instead of failing the whole response.
+     *
+     * The return slot is PARAM_TEXT, whose cleaner runs strip_tags(), and clean_returnvalue()
+     * throws when the cleaned value differs from the original. "A & B <3" is the fixture that
+     * matters: the "<3" is what used to fail every author's live collision check; a "<b>x</b>"
+     * fixture would prove nothing, because both escape modes strip it identically.
+     */
+    public function test_a_title_the_cleaner_would_alter_still_reaches_the_client(): void {
+        $this->setAdminUser();
+        $this->repeating('A & B <3', '/my/%');
+        $_POST['sesskey'] = sesskey();
+
+        $response = \core_external\external_api::call_external_function(
+            'local_awareness_check_collision',
+            ['noticeid' => 0, 'pathmatch' => '/my/%', 'repeats' => true],
+            false
+        );
+
+        $this->assertFalse($response['error'], 'the response failed cleaning');
+        $this->assertCount(1, $response['data']['titles']);
+        $this->assertStringStartsWith('A & B', $response['data']['titles'][0]);
+    }
+
+    /**
+     * The same guarantee holds on a site that has switched formatstringstriptags off.
+     *
+     * With it off, format_string() cleans rather than strips, and a real tag in a title comes back
+     * whole — which the PARAM_TEXT cleaner would then strip, and the response fail. The setting is
+     * a real administration checkbox that core's own Behat suite runs with, not a contrived state.
+     */
+    public function test_a_tagged_title_reaches_the_client_when_the_site_does_not_strip_tags(): void {
+        $this->setAdminUser();
+        set_config('formatstringstriptags', 0);
+        $this->repeating('<b>Renewal</b> rival', '/my/%');
+        $_POST['sesskey'] = sesskey();
+
+        $response = \core_external\external_api::call_external_function(
+            'local_awareness_check_collision',
+            ['noticeid' => 0, 'pathmatch' => '/my/%', 'repeats' => true],
+            false
+        );
+
+        $this->assertFalse($response['error'], 'the response failed cleaning');
+        $this->assertSame(['Renewal rival'], $response['data']['titles']);
+    }
 }

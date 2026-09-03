@@ -55,3 +55,19 @@ Feature: The editor tells the truth about a notice that reaches nobody
     And I should not see "Unsaved changes"
     When I set the field "Title" to "Touched"
     Then I should see "Unsaved changes"
+
+  Scenario: Saving a notice that was deleted in the meantime creates nothing
+    # The create-or-update branch used to key on whether the record was found, which is false both
+    # for "new notice" and for "deleted while this form was open" — so the save ran the create
+    # branch and produced a duplicate with every acknowledgement gone. The renamed title is what a
+    # duplicate would carry, so its absence from the list is the proof.
+    Given the following site notices exist
+      | title      | content     |
+      | Stale copy | <p>Body</p> |
+    When I navigate to "Awareness > Manage" in site administration
+    And I click on "Edit" "link" in the "Stale copy" "table_row"
+    And the site notice "Stale copy" has been deleted
+    And I set the field "Title" to "Stale copy edited"
+    And I press "Save changes"
+    Then I should see "The notice does not exist"
+    And I should not see "Stale copy edited"

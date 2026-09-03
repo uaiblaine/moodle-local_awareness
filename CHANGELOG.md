@@ -6,6 +6,37 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### One gate for every author, and an id that names nothing is refused (version 2026090301)
+
+**A save posted against a notice that no longer existed created a new one.** `editnotice.php` read
+the record with `IGNORE_MISSING` and branched on whether it found one, which is false both for "no
+id" and for "an id that was deleted while this form was open" — so the save ran the create branch
+and produced a duplicate with every acknowledgement gone, and nothing said so. `helper::resolve_notice()`
+now turns the id a request names into the notice it means, before the form is built, and fails
+closed; the editor redirects to the manage list with the message when the notice is gone.
+
+**`helper::require_author($scope, $verb)` is the only place a plugin capability is checked.** Both
+pages, the six helper verbs, the five author-side web services, the manage table, the two system
+reports, their wrapper pages and the file-serving gate all pass through it with the site scope, in
+place of the eleven separate `require_capability()` and `has_capability()` calls they carried. Under
+a course scope it checks the site capability in the course's context — a site manager inherits
+down — or the course capability there. `author_scope::context()` says where a scope is decided.
+
+**`local/awareness:managecourse` is declared, and nobody holds it.** `CONTEXT_COURSE`, `RISK_XSS`
+alone — a course notice is still unfiltered HTML into that course's modal, but changes no site
+configuration, the line core draws between `tool/monitor:managetool` and `managerules` — and no
+archetype, by decision. It exists now so that the seam's course branch is real code with real
+tests rather than a name nothing resolves; no page grants it until the foundation lands.
+
+**The collision web service no longer fails the whole response on a title with a bare `<`.** Its
+return slot is `PARAM_TEXT`, whose cleaner runs `strip_tags()`, and `clean_returnvalue()` throws
+when the cleaned value differs from the original. Titles are stripped for that slot now.
+
+The reports' `can_view()` and wrapper pages keep the system context on purpose: their rows are
+selected over a site-wide table, and the context and the row set have to move together, in the
+wiring PR. The collision decision for a course author is written into
+`docs/SCOPE-VALIDATOR-FEASIBILITY.md`.
+
 ### Every audience field is checked on the way in (version 2026090300)
 
 **Nothing validated ten of the eleven audience and context fields a notice carries.** Three of

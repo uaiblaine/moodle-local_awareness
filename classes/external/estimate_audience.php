@@ -75,7 +75,7 @@ class estimate_audience extends external_api {
 
         $syscontext = \context_system::instance();
         self::validate_context($syscontext);
-        require_capability('local/awareness:manage', $syscontext);
+        helper::require_author(author_scope::site(), 'manage');
 
         $raw = json_decode($params['criteria'], true);
         if (!is_array($raw)) {

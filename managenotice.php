@@ -28,11 +28,12 @@ require_once($CFG->libdir . '/adminlib.php');
 use core_table\local\filter\filter;
 use core_table\local\filter\string_filter;
 use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\output\manage_page;
 use local_awareness\table\all_notices;
 use local_awareness\table\all_notices_filterset;
 admin_externalpage_setup('local_awareness_managenotice');
-helper::check_manage_capability();
+helper::require_author(author_scope::site(), 'manage');
 
 $page = optional_param('page', 0, PARAM_INT);
 

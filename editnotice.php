@@ -25,14 +25,14 @@
 
 use local_awareness\form\notice_form;
 use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\output\editor_page;
-use local_awareness\persistent\awareness;
 
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/adminlib.php');
 
 admin_externalpage_setup('local_awareness_managenotice');
-helper::check_manage_capability();
+helper::require_author(author_scope::site(), 'manage');
 
 $PAGE->set_context(context_system::instance());
 \local_awareness\local\bootstrap::mark_page();
@@ -57,7 +57,25 @@ $PAGE->set_url($thispage);
 // collision warning. Everything they need is on data attributes in the markup they own.
 $PAGE->requires->js_call_amd('local_awareness/notice_editor', 'init');
 
-$awareness = awareness::get_record(['id' => $noticeid]);
+/*
+ * Resolved before the form is built, and refused rather than treated as "new": the create-or-update
+ * branch below keys on whether a notice was found, and an id that no longer exists must not look
+ * like no id at all. A redirect rather than the resolver's own error page, because the likeliest
+ * cause is another administrator deleting the notice while this one had it open.
+ */
+try {
+    $awareness = helper::resolve_notice($noticeid);
+} catch (moodle_exception $e) {
+    if ($e->errorcode !== 'notification:noticedoesnotexist') {
+        throw $e;
+    }
+    redirect(
+        $managenoticepage,
+        get_string('notification:noticedoesnotexist', 'local_awareness'),
+        null,
+        \core\output\notification::NOTIFY_ERROR
+    );
+}
 $customdata = [
     'persistent' => $awareness,
     'id' => $noticeid,
@@ -174,13 +192,13 @@ if ($noticeid == 0 && $action == 'create') {
     die;
 }
 
-// Check notice existence.
+/*
+ * No notice and not the create page: a URL shape the manage table never produces (every action
+ * link carries a real id), so a silent return to the list is all it needs. An id that named a
+ * deleted notice was refused above, with its message.
+ */
 if (!$awareness) {
-    echo $OUTPUT->header();
-    echo $OUTPUT->heading(get_string('notice:info', 'local_awareness'));
-    echo $OUTPUT->notification(get_string('notification:noticedoesnotexist', 'local_awareness'), 'notifyinfo');
-    echo $OUTPUT->footer();
-    die;
+    redirect($managenoticepage);
 }
 
 switch ($action) {

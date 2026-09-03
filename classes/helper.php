@@ -51,6 +51,17 @@ class helper {
     public const CRITERIA_LIST_MAX = 500;
 
     /**
+     * The capability that grants each authoring verb, under each scope.
+     *
+     * null means the scope has no capability of its own for the verb yet, so only the site
+     * capability, inherited into the scope's context, can grant it.
+     */
+    private const VERB_CAPABILITIES = [
+        'manage' => ['site' => 'local/awareness:manage', 'course' => 'local/awareness:managecourse'],
+        'viewreports' => ['site' => 'local/awareness:viewreports', 'course' => null],
+    ];
+
+    /**
      * Perform all required manipulations with content.
      *
      * @param \local_awareness\persistent\awareness $awareness Notice.
@@ -85,7 +96,7 @@ class helper {
      * @throws \invalid_parameter_exception When a value names something the site does not have.
      */
     public static function create_new_notice(\stdClass $data): string {
-        self::check_manage_capability();
+        self::require_author(author_scope::site(), 'manage');
 
         self::apply_author_scope($data, author_scope::site());
 
@@ -126,7 +137,7 @@ class helper {
      * @throws \invalid_parameter_exception When a value names something the site does not have.
      */
     public static function update_notice(awareness $awareness, \stdClass $data): string {
-        self::check_manage_capability();
+        self::require_author(author_scope::site(), 'manage');
 
         /*
          * The setting, enforced where the write happens. It used to be consulted only in
@@ -340,7 +351,7 @@ class helper {
      * @return void
      */
     public static function reset_notice(awareness $notice): void {
-        self::check_manage_capability();
+        self::require_author(author_scope::site(), 'manage');
         try {
             $notice = new awareness($notice->get('id'));
             $notice->update();
@@ -370,7 +381,7 @@ class helper {
      * @return void
      */
     public static function enable_notice(awareness $notice): void {
-        self::check_manage_capability();
+        self::require_author(author_scope::site(), 'manage');
         try {
             $notice->set('enabled', 1);
             $notice->update();
@@ -400,7 +411,7 @@ class helper {
      * @return void
      */
     public static function disable_notice(awareness $notice): void {
-        self::check_manage_capability();
+        self::require_author(author_scope::site(), 'manage');
         try {
             $notice->set('enabled', 0);
             $notice->update();
@@ -426,7 +437,7 @@ class helper {
      * @return void
      */
     public static function delete_notice(awareness $notice): void {
-        self::check_manage_capability();
+        self::require_author(author_scope::site(), 'manage');
         if (!get_config('local_awareness', 'allow_delete')) {
             return;
         }
@@ -1422,13 +1433,71 @@ class helper {
 
 
     /**
-     * Check capability.
-     * @throws \required_capability_exception
-     * @throws \dml_exception
+     * Whether the current user may perform an authoring verb under a scope, refusing when not.
+     *
+     * The one place "which capability, in which context" is decided. Every page, helper verb and
+     * web service that acts as an author asks here; nothing else in the plugin checks its own
+     * capabilities. Today every caller passes author_scope::site(), which is what the old
+     * check_manage_capability() meant; once a notice can belong to a course, the caller passes the
+     * scope the notice belongs to and this is what makes the course grant real.
+     *
+     * The site capability is checked in the scope's own context, so a system-level assignment
+     * inherits down and a site manager may act on a course's notice. The course capability is
+     * checked only for a course scope, and only where the verb has one: the reports verb has no
+     * course-level capability yet, so a course author reads no report until one is declared.
+     *
+     * @param author_scope $scope Who the caller is acting as.
+     * @param string $verb One of the keys of VERB_CAPABILITIES.
+     * @param bool $throw Whether to throw when refused, or only answer.
+     * @return bool Whether the verb is allowed.
+     * @throws \coding_exception For a verb the map does not know.
+     * @throws \required_capability_exception When refused and $throw is set.
      */
-    public static function check_manage_capability() {
-        $syscontext = \context_system::instance();
-        require_capability('local/awareness:manage', $syscontext);
+    public static function require_author(author_scope $scope, string $verb, bool $throw = true): bool {
+        if (!isset(self::VERB_CAPABILITIES[$verb])) {
+            throw new \coding_exception("Unknown authoring verb '{$verb}'");
+        }
+        $context = $scope->context();
+        $sitecapability = self::VERB_CAPABILITIES[$verb]['site'];
+        $coursecapability = self::VERB_CAPABILITIES[$verb]['course'];
+
+        $allowed = has_capability($sitecapability, $context);
+        if (!$allowed && !$scope->is_site() && $coursecapability !== null) {
+            $allowed = has_capability($coursecapability, $context);
+        }
+        if (!$allowed && $throw) {
+            $refused = $scope->is_site() ? $sitecapability : ($coursecapability ?? $sitecapability);
+            throw new \required_capability_exception($context, $refused, 'nopermissions', '');
+        }
+
+        return $allowed;
+    }
+
+    /**
+     * The notice a request names, or null when it names none.
+     *
+     * Fails closed on an id that names nothing. editnotice.php used to read the record with
+     * IGNORE_MISSING and branch on its truthiness, which is false both for "no id" and for "an id
+     * that no longer exists" — so a save posted against a notice deleted in the meantime, or
+     * against a forged id, ran the CREATE branch and produced a duplicate with every
+     * acknowledgement gone and nothing said. One resolver, called before the form is built, so no
+     * later branch can confuse the two cases.
+     *
+     * @param int $noticeid The id from the request; 0 means a new notice.
+     * @return awareness|null The notice, or null for a new one.
+     * @throws \moodle_exception When the id names no notice.
+     */
+    public static function resolve_notice(int $noticeid): ?awareness {
+        if ($noticeid <= 0) {
+            return null;
+        }
+
+        $notice = awareness::get_record(['id' => $noticeid]);
+        if (!$notice) {
+            throw new \moodle_exception('notification:noticedoesnotexist', 'local_awareness');
+        }
+
+        return $notice;
     }
 
     /**
