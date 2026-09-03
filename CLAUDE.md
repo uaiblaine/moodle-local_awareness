@@ -151,8 +151,13 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `estimate_audience` web service and `notice_form::extra_validation()` call the scope, in that
   shape, and existence checks stay OUT of `estimator::normalise()`, which is a pure shape-and-hash
   function unit-tested with literal ids. The course scope is implemented and tested but has no
-  production caller until the `courseid` column and a course capability exist; do not "clean it
-  up" as dead code, and do not wire it without reading `docs/SCOPE-VALIDATOR-FEASIBILITY.md`.
+  production caller until the `courseid` column exists; do not "clean it up" as dead code, and do
+  not wire it without reading `docs/SCOPE-VALIDATOR-FEASIBILITY.md`. Likewise
+  `helper::require_author($scope, $verb)` is the only place a plugin capability is checked — every
+  page, verb, web service and report passes through it with the site scope today — and
+  `local/awareness:managecourse` is declared so its course branch is testable, with no archetype
+  and nothing that grants it yet. `helper::resolve_notice()` is how a page turns an id into a
+  notice; it fails closed, because the editor's create-or-update branch once keyed on "not found".
 
 ## Testing notes
 

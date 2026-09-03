@@ -89,6 +89,18 @@ class behat_local_awareness extends behat_base {
     }
 
     /**
+     * Delete a notice behind an open page, the way another administrator would.
+     *
+     * @Given the site notice :title has been deleted
+     * @param string $title The notice's title.
+     */
+    public function the_site_notice_has_been_deleted(string $title): void {
+        global $DB;
+
+        $DB->delete_records('local_awareness', ['title' => $title]);
+    }
+
+    /**
      * Checks the notice module was queued into the current page.
      *
      * "I should see" on the modal text proves display; this proves delivery. Its negative twin

@@ -183,6 +183,23 @@ final class author_scope {
     }
 
     /**
+     * The context a decision about this scope is taken in.
+     *
+     * The system context for the site scope, the course's own for a course scope. Kept on the
+     * scope rather than computed by each caller, so that "which capability, in which context" has
+     * one answer: a context arriving from a caller is a context the caller chose.
+     *
+     * @return \context
+     */
+    public function context(): \context {
+        if ($this->is_site()) {
+            return \context_system::instance();
+        }
+
+        return \context_course::instance($this->courseid);
+    }
+
+    /**
      * The rule this scope applies to a field.
      *
      * @param string $field One of the keys of RULES.

@@ -459,4 +459,20 @@ final class author_scope_test extends \advanced_testcase {
         $this->assertTrue($result->is_clean());
         $this->assertSame(array_slice($ids, 0, helper::CRITERIA_LIST_MAX), $result->criteria()['filter_course']);
     }
+
+    /**
+     * A scope knows the context its decisions are taken in.
+     *
+     * Against a real generated course, so the lookup is a real one; and both scopes in one test,
+     * so an implementation returning either context unconditionally reddens.
+     */
+    public function test_the_scope_knows_the_context_it_is_decided_in(): void {
+        $course = $this->getDataGenerator()->create_course();
+
+        $this->assertInstanceOf(\context_system::class, author_scope::site()->context());
+
+        $context = author_scope::course((int) $course->id)->context();
+        $this->assertSame(CONTEXT_COURSE, (int) $context->contextlevel);
+        $this->assertSame((int) $course->id, (int) $context->instanceid);
+    }
 }

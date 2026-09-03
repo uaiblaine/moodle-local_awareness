@@ -26,6 +26,8 @@ require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/adminlib.php');
 
 use core_reportbuilder\system_report_factory;
+use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\reportbuilder\local\systemreports\acknowledged_notice;
 
 $noticeid = required_param('noticeid', PARAM_INT);
@@ -33,7 +35,7 @@ $noticeid = required_param('noticeid', PARAM_INT);
 require_login();
 
 $context = context_system::instance();
-require_capability('local/awareness:viewreports', $context);
+helper::require_author(author_scope::site(), 'viewreports');
 
 // Validate the notice exists.
 $notice = $DB->get_record('local_awareness', ['id' => $noticeid], '*', MUST_EXIST);

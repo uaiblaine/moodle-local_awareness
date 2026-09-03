@@ -19,16 +19,18 @@ declare(strict_types=1);
 namespace local_awareness\reportbuilder\local\systemreports;
 
 use context_system;
-use core_text;
 use core_reportbuilder\local\entities\user;
 use core_reportbuilder\local\helpers\database;
+use core_reportbuilder\local\report\action;
 use core_reportbuilder\system_report;
+use core_text;
 use lang_string;
+use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
 use local_awareness\reportbuilder\local\entities\acknowledgement;
 use moodle_url;
 use pix_icon;
-use core_reportbuilder\local\report\action;
 
 /**
  * Dismissed notice system report.
@@ -134,6 +136,6 @@ class dismissed_notice extends system_report {
      * @return bool
      */
     protected function can_view(): bool {
-        return has_capability('local/awareness:viewreports', context_system::instance());
+        return helper::require_author(author_scope::site(), 'viewreports', false);
     }
 }

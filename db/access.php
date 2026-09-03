@@ -57,4 +57,18 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
+    /*
+     * The capability a course-level author will hold, declared before any page can grant it so
+     * that helper::require_author()'s course branch is real code with real tests rather than a
+     * name nothing resolves. CONTEXT_COURSE, and RISK_XSS alone: a course notice is still
+     * format_text(noclean) into Modal.setBody(), so the trust is the same, but it changes no site
+     * configuration — core draws the same line between tool/monitor:managetool and
+     * tool/monitor:managerules. No archetype, by decision: an administrator grants it per role.
+     */
+    'local/awareness:managecourse' => [
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'riskbitmask' => RISK_XSS,
+        'archetypes' => [],
+    ],
 ];

@@ -260,14 +260,34 @@ anyone is granted anything; the foundation PR becomes wiring with the policy set
    `estimate_audience::execute()`; `notice_form::extra_validation()`; the fixtures repaired;
    version bump and `CHANGELOG`. The search endpoints need no existence check — they return rows —
    and get their scope restriction in PR 4.
-2. **PR 2 — hardening that is wrong today regardless of scope**, and must precede any grant: the
-   ownership check in `editnotice.php:60` and the two `report/` wrappers; a decision on the
-   collision title surface (`collision.php:213`, `check_collision.php:78`). Independent of PR 1.
-3. **PR 3 — the foundation.** Column, upgrade step, capability, `db/events.php` and observer,
-   navigation entry, the `pluginfile` gate, dual-mode pages.
-4. **PR 4 — the wiring.** `author_scope::course()` at the real entry points; the thirteen gates
-   made to accept a context; `search_courses` and `search_roles` returning only what the scope
-   allows; the manage list, reports, estimator and cache key scoped.
+2. **PR 2 — the seam.** One gate, `helper::require_author($scope, $verb)`, that every author-side
+   page, helper verb, web service, table and report passes through with `author_scope::site()`
+   today; `author_scope::context()`; the course capability `local/awareness:managecourse`, declared
+   with no archetypes so that the seam's course branch is real code with real tests; a fail-closed
+   `helper::resolve_notice()` for the identity defect in `editnotice.php`, where a save posted
+   against a deleted or forged id ran the create branch; the collision web service stripping titles
+   for its `PARAM_TEXT` slot; and the collision decision below. What the first cut called "the
+   ownership check in `editnotice.php:60`" was not one — nothing owns a notice yet — but an
+   identity defect was there. The `report/` wrappers keep their order: both orders fail closed.
+3. **PR 3 — the foundation.** Column, upgrade step, `db/events.php` and observer, navigation entry,
+   the `pluginfile` gate, dual-mode pages; and the owner's call on a course-level reports
+   capability, which the seam already leaves room for.
+4. **PR 4 — the wiring.** `author_scope::of($notice)` at the real entry points; the system reports'
+   `can_view()` honouring the context they are handed, in the same change as their row set, because
+   a report whose rows come from a site-wide table must not accept a course context first;
+   `search_courses` and `search_roles` returning only what the scope allows; the manage list, the
+   estimator and the cache key scoped; the collision surface redacted as decided below.
+
+**The collision decision.** Today every caller of the collision surface holds
+`local/awareness:manage` at the system context, so the titles it discloses are titles the same
+person can read by scrolling the manage list: no teeth, and no redaction. Once notices carry a
+`courseid`, the two functions that own the computation, `collision::clashes_for()` and
+`clash_titles_for()`, take the caller's scope and disclose a title only for a notice inside it. A
+competing notice outside the scope is still reported — as a site notice, or a notice in another
+course, without its title or audience — because the warning exists to say that the pages are
+contested, and an author who cannot see the rival still needs to know. The overlap test stays
+pathmatch-only, as its own docblock argues: a warning that is occasionally unnecessary costs less
+than one that is occasionally absent.
 
 ---
 
