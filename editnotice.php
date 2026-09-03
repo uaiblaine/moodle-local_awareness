@@ -42,7 +42,10 @@ $noticeid = optional_param('noticeid', 0, PARAM_INT);
 $action = optional_param('action', 'create', PARAM_TEXT);
 
 // Enforce sesskey on any state-changing action to prevent CSRF.
-$actionsrequiressesskey = ['disable', 'enable', 'reset', 'unconfirmeddelete', 'confirmeddelete', 'recalculate'];
+$actionsrequiressesskey = [
+    'disable', 'enable', 'unconfirmedreset', 'confirmedreset',
+    'unconfirmeddelete', 'confirmeddelete', 'recalculate',
+];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' || in_array($action, $actionsrequiressesskey, true)) {
     require_sesskey();
 }
@@ -189,7 +192,28 @@ switch ($action) {
         $reportpage = new moodle_url('/local/awareness/report/acknowledged_systemreport.php', ["noticeid" => $noticeid]);
         redirect($reportpage);
         break;
-    case 'reset':
+    case 'unconfirmedreset':
+        /*
+         * Confirmed like a delete, because it is closer to one than its old name suggested. Reset
+         * saves the notice, which moves timemodified, which is what every recorded interaction is
+         * judged against - so it asks the whole audience again and every acceptance on record
+         * stops counting as current. The rows survive; their standing does not. The old label,
+         * "Reset notice", said none of that and the action fired on a single click.
+         */
+        echo $OUTPUT->header();
+        echo $OUTPUT->box_start();
+        $thispage->params(['sesskey' => sesskey(), 'action' => 'confirmedreset', 'noticeid' => $noticeid]);
+        $confirmedreset = new single_button($thispage, get_string('notice:reset', 'local_awareness'), 'post');
+        $cancel = new single_button($managenoticepage, get_string('cancel'), 'get');
+        echo $OUTPUT->confirm(
+            get_string('confirmation:resetnotice', 'local_awareness', $awareness->get('title')),
+            $confirmedreset,
+            $cancel
+        );
+        echo $OUTPUT->box_end();
+        echo $OUTPUT->footer();
+        break;
+    case 'confirmedreset':
         helper::reset_notice($awareness);
         redirect($managenoticepage);
         break;

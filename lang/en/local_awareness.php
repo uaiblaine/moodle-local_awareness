@@ -72,6 +72,9 @@ $string['collision:badgetooltip'] = 'This repeating notice reaches the same page
 $string['collision:live'] = 'Heads up: this repeating notice reaches the same pages as: {$a}. Only one notice is shown at a time, so they will take turns interrupting the same people.';
 $string['collision:saved'] = 'Saved. This repeating notice reaches the same pages as: {$a}. Only one notice is shown at a time, so they will take turns interrupting the same people.';
 $string['confirmation:deletenotice'] = 'Do you really want to delete the notice "{$a}"';
+$string['confirmation:resetnotice'] = 'Ask everyone again about "{$a}"?
+
+Everyone who has already accepted this notice will be shown it again and asked to accept it once more. The acknowledgements already recorded are kept and stay visible in the reports, but they stop counting as current.';
 $string['course_search_placeholder'] = 'Type to search courses...';
 $string['datasource:acknowledgednotices'] = 'Acknowledged notices';
 $string['datasource:allnotices'] = 'All notices';
@@ -221,7 +224,7 @@ $string['notice:perpetual_help'] = 'When set to yes, the notice will always be d
 $string['notice:preview'] = 'Preview the modal';
 $string['notice:reqcourse'] = 'Requires course completion';
 $string['notice:reqcourse_help'] = 'Show the notice only to users who have not yet completed the selected course. It is an audience rule, not a display frequency: how often the notice reappears is set by the reset interval, and someone who completes the course stops seeing it.';
-$string['notice:reset'] = 'Reset notice';
+$string['notice:reset'] = 'Ask everyone again';
 $string['notice:resetinterval'] = 'Reset every';
 $string['notice:resetinterval_help'] = 'The notice will be displayed to user again once the specified period elapses.';
 $string['notice:status'] = 'Status';

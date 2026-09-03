@@ -327,7 +327,12 @@ class helper {
     }
 
     /**
-     * Reset a notice
+     * Ask the whole audience again.
+     *
+     * The whole of this method is a no-op save: re-read the persistent and update() it. That is
+     * not an oversight — moving timemodified is the entire mechanism. It supersedes every
+     * acceptance on record, which is why the action is labelled "Ask everyone again" rather than
+     * "Reset notice", and is confirmed before it fires. See acceptance_is_current().
      *
      * @param awareness $notice
      * @return void
@@ -352,7 +357,12 @@ class helper {
     }
 
     /**
-     * Enable a notice
+     * Enable a notice.
+     *
+     * The save expires every acceptance on this notice, because update() stamps timemodified and
+     * that is what acceptance_is_current() and must_reshow() both read. Re-displaying on re-enable
+     * is deliberate and always was; expiring recorded consent came with the acceptance predicate,
+     * which reads the same column. See acceptance_is_current() for the whole coupling.
      *
      * @param awareness $notice
      * @return void
@@ -379,7 +389,10 @@ class helper {
     }
 
     /**
-     * Disable a notice
+     * Disable a notice.
+     *
+     * Saves the notice, and so expires every acceptance on it — see enable_notice() and
+     * acceptance_is_current(). Hiding a notice is not a neutral act on the compliance record.
      *
      * @param awareness $notice
      * @return void
@@ -1523,6 +1536,24 @@ class helper {
      * A DISMISSAL is never an acceptance. The two actions are stored in the same table and told
      * apart by the action column; a caller gating access on consent must not be satisfied by a
      * refusal.
+     *
+     * WHAT EXPIRES AN ACCEPTANCE, and it is more than editing. This predicate shares its staleness
+     * rule with the display decision, so it reads {local_awareness}.timemodified — and
+     * core\persistent::update() is final and stamps that column unconditionally, whether or not
+     * anything changed. Every authoring action that saves the notice therefore expires every
+     * acceptance on it:
+     *
+     *  - reset_notice(), where that is the whole point and the label now says so;
+     *  - disable_notice() and enable_notice(), where it is a side effect of the save and NOTHING in
+     *    either name suggests it. An administrator hiding a notice for a week and putting it back
+     *    has changed no word of it and has expired every acceptance on record.
+     *
+     * The rows are not deleted — the reports still show them — but they stop counting as current.
+     * tests/consent_expiry_test.php pins all of this, including the untouched control.
+     *
+     * Anything gating ACCESS on this predicate inherits that coupling: a course or activity opened
+     * by acceptance closes again the next time an administrator toggles the notice's visibility.
+     * Decide deliberately whether that is what you want before consuming it.
      *
      * @param awareness $notice The notice to test.
      * @param int $userid The user to test.

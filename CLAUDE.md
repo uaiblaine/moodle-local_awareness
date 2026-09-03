@@ -118,6 +118,19 @@ Behat site fails every scenario on the same core locator and looks like your bug
   copy of the mapping because it is loaded before `config.php` and cannot reach
   the plugin's classes — keep the two in step.
 
+- **Every authoring action that SAVES a notice expires every acceptance on it.**
+  `core\persistent::update()` is final and stamps `timemodified` unconditionally,
+  and that column is what both `must_reshow()` and `acceptance_is_current()`
+  judge a recorded interaction against. So `reset_notice()` — whose entire body
+  is a no-op save — and `enable_notice()`/`disable_notice()` all supersede
+  recorded consent. Re-displaying on re-enable was always deliberate; expiring
+  consent arrived with the acceptance predicate, which reads the same column.
+  The rows are never deleted, so the reports still show them; what changes is
+  whether they count as current. `tests/consent_expiry_test.php` pins it with an
+  untouched control. Anything that gates ACCESS on acceptance inherits this: a
+  thing opened by acceptance closes again the next time an admin toggles the
+  notice's visibility.
+
 - **`filter_role_context` is a MODIFIER of `filter_role`**, not a rule of its
   own: it is absent from both `estimator::AUDIENCE_FIELDS` and `CONTEXT_FIELDS`,
   and never reaches `rule_describer::describe()`. The five keys `describe()`
