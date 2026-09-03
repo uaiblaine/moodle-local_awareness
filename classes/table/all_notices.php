@@ -464,7 +464,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
         $secondary = [
             ['recalculate', get_string('notice:audience:recalculate', 'local_awareness'), 'i/calc'],
-            ['reset', get_string('notice:reset', 'local_awareness'), 't/reset'],
+            ['unconfirmedreset', get_string('notice:reset', 'local_awareness'), 't/reset'],
         ];
         /*
          * Gated on the level, not on reqack. A Blocking notice records acceptances and refusals

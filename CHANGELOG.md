@@ -6,6 +6,45 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The write verbs say what they do to consent (version 2026082404)
+
+**Every authoring action that saves a notice expires every acceptance on it, and none of their
+names said so.** `core\persistent::update()` is `final` and stamps `timemodified` unconditionally —
+whether or not anything changed — and that column is what both `must_reshow()` and
+`acceptance_is_current()` judge a recorded interaction against.
+
+So three actions supersede recorded consent:
+
+| action | expiring consent is… |
+|---|---|
+| **Reset** | the entire point — its whole body is a no-op save |
+| **Disable** | a side effect of the save; nothing in the name suggests it |
+| **Enable** | the same, and it applies on its own |
+
+**"Reset notice" is now "Ask everyone again", and it is confirmed before it fires.** The old label
+described a mechanism; the new one describes the consequence. The confirmation names it in full —
+everyone who accepted is asked again, and the acknowledgements already recorded are kept and stay
+visible in the reports but stop counting as current. It used to happen on a single click.
+
+**Disable and enable keep their behaviour and gain the warning where it will be read.** Re-showing a
+notice on re-enable was always deliberate and is documented as such. What arrived later, with
+`acceptance_is_current()`, is that the same timestamp now also decides whether recorded consent
+still stands — so a visibility toggle became a consent operation without anyone deciding it should
+be. Rather than change that quietly, the coupling is written at the predicate, at all three verbs,
+and in `CLAUDE.md`.
+
+**The warning is aimed at a caller that does not exist yet, which is the point.**
+`acceptance_is_current()` has no production consumers today — it is the public answer built for a
+course surface or an availability condition to gate on. Whoever wires one up inherits this: a course
+or activity opened by acceptance closes again the next time an administrator toggles the notice's
+visibility. That is a decision to make deliberately, and the docblock now says so before the fact
+rather than after the incident.
+
+`tests/consent_expiry_test.php` pins all of it, including an untouched control. Each verb is tested
+in isolation — an earlier draft paired disable with enable, which proved nothing about the second,
+because the first had already moved the timestamp. That version survived the very mutation it
+existed to catch, and the isolation is what fixed it.
+
 ### The notices payload is a declared structure, and M7's refusal is written where it will be read (version 2026082403)
 
 **WS-01 closed by work.** `get_notices` returned its payload as a `PARAM_RAW` JSON string, so

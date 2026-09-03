@@ -71,6 +71,9 @@ $string['collision:badgetooltip'] = 'Este alerta repetível alcança as mesmas p
 $string['collision:live'] = 'Atenção: este alerta repetível alcança as mesmas páginas que: {$a}. Como apenas um alerta é exibido por vez, eles vão se revezar interrompendo as mesmas pessoas.';
 $string['collision:saved'] = 'Salvo. Este alerta repetível alcança as mesmas páginas que: {$a}. Como apenas um alerta é exibido por vez, eles vão se revezar interrompendo as mesmas pessoas.';
 $string['confirmation:deletenotice'] = 'Você realmente deseja excluir o alerta "{$a}"?';
+$string['confirmation:resetnotice'] = 'Perguntar de novo a todos sobre "{$a}"?
+
+Quem já aceitou este alerta voltará a vê-lo e será solicitado a aceitá-lo outra vez. Os reconhecimentos já registrados são mantidos e continuam visíveis nos relatórios, mas deixam de valer como atuais.';
 $string['course_search_placeholder'] = 'Escreva para buscar cursos...';
 $string['datasource:acknowledgednotices'] = 'Alertas confirmados';
 $string['datasource:allnotices'] = 'Todos os alertas';
@@ -219,7 +222,7 @@ $string['notice:perpetual_help'] = 'Quando definido como sim, o alerta sempre se
 $string['notice:preview'] = 'Pré-visualizar o modal';
 $string['notice:reqcourse'] = 'Requer conclusão do curso';
 $string['notice:reqcourse_help'] = 'Mostra o alerta apenas a quem ainda não concluiu o curso selecionado. É uma regra de público, não uma frequência de exibição: com que frequência o alerta reaparece é definido pelo intervalo de reexibição, e quem conclui o curso deixa de o ver.';
-$string['notice:reset'] = 'Redefinir alerta';
+$string['notice:reset'] = 'Perguntar a todos de novo';
 $string['notice:resetinterval'] = 'Redefinir a cada';
 $string['notice:resetinterval_help'] = 'O alerta será exibido ao usuário novamente após o período especificado.';
 $string['notice:status'] = 'Status';
