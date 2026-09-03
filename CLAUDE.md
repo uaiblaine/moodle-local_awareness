@@ -144,6 +144,16 @@ Behat site fails every scenario on the same core locator and looks like your bug
   focusable and announced while painted nowhere. Let the form declare its own
   `header` sections and style the fieldsets.
 
+- **`author_scope` is the boundary for every audience and context field; nothing else is.**
+  The form's three ajax autocompletes are not validated by core, a non-ajax select skips its
+  allowlist when its option list is empty, and `sanitise_data()` cannot see any `filter_*` key —
+  they are folded into the `filtervalues` JSON before it runs. Both write paths, the
+  `estimate_audience` web service and `notice_form::extra_validation()` call the scope, in that
+  shape, and existence checks stay OUT of `estimator::normalise()`, which is a pure shape-and-hash
+  function unit-tested with literal ids. The course scope is implemented and tested but has no
+  production caller until the `courseid` column and a course capability exist; do not "clean it
+  up" as dead code, and do not wire it without reading `docs/SCOPE-VALIDATOR-FEASIBILITY.md`.
+
 ## Testing notes
 
 - **Test metadata stays in docblocks (`@covers`, `@dataProvider`) while 405 is

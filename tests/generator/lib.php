@@ -30,6 +30,9 @@ class local_awareness_generator extends component_generator_base {
     /** @var int Number of notices created, so each gets a distinct default title. */
     protected $noticecount = 0;
 
+    /** @var int Number of bare course rows created, so each gets a distinct shortname. */
+    protected $barecount = 0;
+
     /**
      * Create a notice.
      *
@@ -59,5 +62,38 @@ class local_awareness_generator extends component_generator_base {
         $notice->create();
 
         return $notice;
+    }
+
+    /**
+     * Rows in {course} and nothing else, as many as asked for.
+     *
+     * For tests that need a list of ids the author scope will accept as courses, and nothing more:
+     * the scope asks only whether each id is a course. The course generator would pay for
+     * contexts, sections and enrolment instances such a test never looks at, and pay hundreds of
+     * times over when the subject is a bound on list length.
+     *
+     * @param int $count How many.
+     * @return int[] The new course ids, in creation order.
+     */
+    public function create_bare_courses(int $count): array {
+        global $DB;
+
+        $ids = [];
+        for ($i = 0; $i < $count; $i++) {
+            $this->barecount++;
+            $ids[] = (int) $DB->insert_record('course', (object) [
+                'category' => 1,
+                'fullname' => 'Bare course ' . $this->barecount,
+                'shortname' => 'bare' . $this->barecount,
+                'idnumber' => '',
+                'lang' => '',
+                'calendartype' => '',
+                'theme' => '',
+                'timecreated' => time(),
+                'timemodified' => time(),
+            ]);
+        }
+
+        return $ids;
     }
 }

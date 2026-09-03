@@ -23,6 +23,7 @@ use core_external\external_value;
 use local_awareness\audience\estimator;
 use local_awareness\audience\live_mode;
 use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\audience_job;
 use local_awareness\persistent\awareness;
 use local_awareness\task\estimate_audience as estimate_audience_task;
@@ -62,6 +63,7 @@ class estimate_audience extends external_api {
      *
      * @param string $criteria JSON-encoded criteria object
      * @return array
+     * @throws \invalid_parameter_exception When the criteria name something the site does not have.
      */
     public static function execute(string $criteria): array {
         global $USER;
@@ -81,20 +83,22 @@ class estimate_audience extends external_api {
         }
 
         /*
-         * Cohort ids come off the wire, so they are dropped to the set this user may target before
-         * anything counts members with them. Without this the panel answers "how many people are in
-         * cohort N?" for any N a manager cares to type, including cohorts in categories they cannot
-         * see — the estimator's predicate is a bare `cohortid IN (…)` with no visibility join.
-         *
-         * Filtered rather than rejected, matching what the save path does with the same ids: the
-         * editor's own menu only ever offers allowed cohorts, so a disallowed id means a hand-made
-         * request, and excluding it from the count reveals nothing about it either way.
+         * Run through the author's scope — the same check the save path applies, so a count and a
+         * saved notice cannot disagree about what a value means. The scope is what stops the panel
+         * answering "how many people are in course N?" for any N a caller cares to type: cohorts it
+         * narrows silently, for the reason given in its docblock, and anything else that does not
+         * exist is refused outright, because this request is speculative and the caller can fix it
+         * now. The scope bounds every list it reads before it looks anything up; the cap below
+         * bounds whatever it did not read, and runs AFTER it so that a legitimate cohort is never
+         * cut off for sitting behind a run of ids the scope was about to drop anyway.
          */
-        if (isset($raw['cohorts'])) {
-            $raw['cohorts'] = helper::allowed_cohorts((array) $raw['cohorts']);
+        $scoped = author_scope::site()->apply($raw);
+        if (!$scoped->is_clean()) {
+            throw new \invalid_parameter_exception(
+                'criteria name something the site does not have: ' . implode(', ', $scoped->problem_fields())
+            );
         }
-
-        $raw = helper::cap_criteria_lists($raw);
+        $raw = helper::cap_criteria_lists($scoped->criteria());
 
         $normalised = estimator::normalise($raw);
         $hash = estimator::hash($normalised);

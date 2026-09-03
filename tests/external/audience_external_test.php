@@ -454,6 +454,57 @@ final class audience_external_test extends \advanced_testcase {
     }
 
     /**
+     * A course that does not exist is refused before anything is counted.
+     *
+     * The estimate is speculative and runs before any save, so this was the one place a hand-made
+     * request could learn something a saved notice never would: the active head count of any
+     * course id it cared to name. The real course queued first is the control.
+     */
+    public function test_an_estimate_naming_a_course_that_does_not_exist_is_refused(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
+
+        $course = $this->getDataGenerator()->create_course();
+        $missing = (int) $DB->get_field_sql('SELECT MAX(id) FROM {course}') + 1000;
+        $this->assertFalse($DB->record_exists('course', ['id' => $missing]));
+
+        $response = estimate_audience::execute(json_encode(['filter_course' => [(int) $course->id]]));
+        $this->assertNotEmpty($response['jobid'], 'the control estimate was not queued');
+
+        $this->expectException(\invalid_parameter_exception::class);
+        estimate_audience::execute(json_encode(['filter_course' => [(int) $course->id, $missing]]));
+    }
+
+    /**
+     * A legitimate cohort behind a run of junk ids is still counted.
+     *
+     * The estimate used to narrow cohorts and then cap; the scope now does the narrowing, so the
+     * cap has to run after it. Capping first would cut the real cohort off at position five
+     * hundred along with the junk in front of it — a hand-made request, but a wrong answer. The
+     * stored criteria are what the job will count from, so they are what is asserted.
+     */
+    public function test_a_cohort_behind_a_run_of_junk_is_still_counted(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
+
+        $cohort = $this->getDataGenerator()->create_cohort();
+        $missing = (int) $DB->get_field_sql('SELECT MAX(id) FROM {cohort}') + 1000;
+        $junk = range($missing, $missing + \local_awareness\helper::CRITERIA_LIST_MAX + 100);
+
+        $response = estimate_audience::execute(json_encode(['cohorts' => array_merge($junk, [(int) $cohort->id])]));
+
+        $stored = json_decode(
+            $DB->get_field('local_awareness_audience_jobs', 'criteria', ['jobid' => $response['jobid']]),
+            true
+        );
+        $this->assertSame([(int) $cohort->id], $stored['cohorts']);
+    }
+
+    /**
      * A criteria list longer than the cap is trimmed rather than sent whole to the database.
      *
      * The criteria arrive as client JSON and reach get_in_or_equal() unbounded — one bound
@@ -467,7 +518,8 @@ final class audience_external_test extends \advanced_testcase {
         $this->setAdminUser();
         set_config('audience_sync_limit', 0, 'local_awareness');
 
-        $courses = range(1, \local_awareness\helper::CRITERIA_LIST_MAX + 250);
+        $courses = $this->getDataGenerator()->get_plugin_generator('local_awareness')
+            ->create_bare_courses(\local_awareness\helper::CRITERIA_LIST_MAX + 250);
         $response = estimate_audience::execute(json_encode(['filter_course' => $courses]));
 
         $stored = json_decode(
@@ -494,7 +546,7 @@ final class audience_external_test extends \advanced_testcase {
         $this->setAdminUser();
         set_config('audience_sync_limit', 0, 'local_awareness');
 
-        $courses = range(1, 12);
+        $courses = $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_bare_courses(12);
         $response = estimate_audience::execute(json_encode(['filter_course' => $courses]));
 
         $stored = json_decode(
