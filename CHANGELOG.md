@@ -6,6 +6,24 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The group picker appears where the groups are, and the competency picker says what is missing (version 2026090405)
+
+**The group mode was gating the picker, and it is the wrong question.** A course's group mode
+governs how *activities* separate participants; it does not decide whether the course has groups or
+whether a notice may address one, and core ships every course at "No groups" while group management
+works there unchanged. Gating on it hid the field on every real course of the dev site — the three
+with the most groups, 300, 30 and 9, all sit at `NOGROUPS`. What decides the picker now is whether
+there is a group to offer. Separation is still the mode's business, and still `is_restricted()`'s
+alone: a separate-groups course without `moodle/site:accessallgroups` confines an author to their
+own groups exactly as before.
+
+**The competency picker told the author the wrong thing was missing.** Under a course scope it
+offers only the frameworks holding a competency linked to that course, so an empty list there
+almost always means the course has none — but the warning read "No competency frameworks
+available", which sends the author looking for frameworks the site already has. It now says the
+course has no competencies linked to it, and what to do about it. Reported from the browser on a
+site with two frameworks and no course linked to either.
+
 ### A course notice can be aimed at groups, on Moodle's own terms (version 2026090404)
 
 **A course notice may now name the groups it is for.** A `Groups` picker joins the audience

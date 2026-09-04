@@ -133,8 +133,9 @@ included where the course allows guest access — so add a role, cohort or group
 further; category, theme and course-format filters do not apply to it, and it does not travel with a
 course backup. Groups follow the course's group mode the way Moodle applies it everywhere else: in
 separate groups mode an author without `moodle/site:accessallgroups` may address only their own
-groups and sees only the notices aimed at them; in visible groups mode, or with that capability, any
-group of the course. A holder of `viewreportscourse` alone sees the course's list read-only, with the two reports
+groups and sees only the notices aimed at them; otherwise, any group of the course. The course's
+group mode does not have to be set for a notice to address a group — that setting governs how
+activities separate participants, not who a notice reaches. A holder of `viewreportscourse` alone sees the course's list read-only, with the two reports
 of each notice and nothing to create or change.
 
 ## Contributing

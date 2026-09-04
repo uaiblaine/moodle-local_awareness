@@ -200,6 +200,43 @@ final class picker_contract_test extends \basic_testcase {
     }
 
     /**
+     * An empty framework list under a course scope does not blame the site.
+     *
+     * The picker filters the frameworks down to those holding a competency LINKED TO THE COURSE, so
+     * an empty list under a course scope almost always means the course has none — while the
+     * site-wide string says there are no frameworks at all, which sends the author looking for
+     * something the site already has. Reported from the browser on a site with two frameworks and
+     * no course linked to either; nothing in the pipeline reads which label a branch picks, so the
+     * rule is enforced here or not at all.
+     *
+     * @return void
+     */
+    public function test_an_empty_framework_list_in_a_course_names_the_course(): void {
+        $code = $this->amd_code('notice_form.js');
+
+        $uses = [];
+        foreach (explode("\n", $code) as $line) {
+            if (str_contains($line, 'labels.noFrameworks')) {
+                $uses[] = trim($line);
+            }
+        }
+
+        $this->assertNotEmpty($uses, 'the empty-framework message is gone — this assertion is now blind.');
+        foreach ($uses as $line) {
+            $this->assertStringContainsString(
+                'noCourseLinked',
+                $line,
+                'the site-wide message is used without the course case beside it'
+            );
+        }
+        $this->assertStringContainsString(
+            "getAttribute('data-picker-nocourselinked')",
+            $code,
+            'the course message is not read from the form'
+        );
+    }
+
+    /**
      * The preview modal chain reports a failure instead of dying silently.
      *
      * @return void
