@@ -44,6 +44,7 @@ class get_estimate extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'jobid' => new external_value(PARAM_ALPHANUMEXT, 'Job identifier', VALUE_REQUIRED),
+            'courseid' => new external_value(PARAM_INT, 'course the editor is scoped to, 0 for the site', VALUE_DEFAULT, 0),
         ]);
     }
 
@@ -51,19 +52,40 @@ class get_estimate extends external_api {
      * Poll the result of an audience-estimate job.
      *
      * @param string $jobid
+     * @param int $courseid The course the editor is scoped to, 0 for the site.
      * @return array
      */
-    public static function execute(string $jobid): array {
+    public static function execute(string $jobid, int $courseid = 0): array {
         $params = self::validate_parameters(
             self::execute_parameters(),
-            ['jobid' => $jobid]
+            ['jobid' => $jobid, 'courseid' => $courseid]
         );
 
-        $syscontext = \context_system::instance();
-        self::validate_context($syscontext);
-        helper::require_author(author_scope::site(), 'manage');
+        /*
+         * The scope the caller is writing under, from the courseid the editor sends: the site when
+         * absent. Validated as a context — which also requires login to the course — and then gated
+         * the way every author-side entry point is, so a course author's editor works and a caller
+         * naming a course they do not hold is refused before anything is read.
+         */
+        $scope = author_scope::for_request(null, (int) $params['courseid']);
+        self::validate_context($scope->context());
+        helper::require_author($scope, 'manage');
 
         $job = audience_job::get_record(['jobid' => $params['jobid']]);
+        /*
+         * A job is shared by criteria hash between whoever asks the same question, so it is bound
+         * to the scope rather than to a user: under a course scope the job's criteria must carry
+         * that course as their forced filter, which every job made under the scope does and no
+         * site job or other course's job can. A job outside the scope reads as no job at all, so a
+         * jobid is not an oracle over what other authors have asked.
+         */
+        if ($job && !$scope->is_site()) {
+            $jobcriteria = json_decode($job->get('criteria'), true) ?: [];
+            $jobcourses = array_map('intval', (array) ($jobcriteria['filter_course'] ?? []));
+            if ($jobcourses !== [$scope->get_courseid()]) {
+                $job = null;
+            }
+        }
         if (!$job) {
             return [
                 'jobid' => $params['jobid'],
@@ -92,7 +114,14 @@ class get_estimate extends external_api {
             $contextrules[] = $rule;
         }
 
-        $breakdown = json_decode($job->get('breakdown') ?: '[]', true);
+        /*
+         * No per-rule breakdown under a course scope. isolate_rule() reads each rule alone, on
+         * purpose, so every chip answers "how many users hold role X" or "are in cohort Y" over the
+         * whole site — the right reading for an administrator and a site-wide oracle for a course
+         * author. The total is what the course author asked for and is already confined to the
+         * course by the forced filter; the chips are not, so they stay with the site scope.
+         */
+        $breakdown = $scope->is_site() ? json_decode($job->get('breakdown') ?: '[]', true) : [];
         $breakdown = is_array($breakdown) ? $breakdown : [];
         foreach ($breakdown as $i => $row) {
             $key = (string) ($row['key'] ?? '');

@@ -124,7 +124,7 @@ final class audience_live_mode_test extends \advanced_testcase {
     public function test_the_editor_switches_the_automatic_estimate_off_on_a_large_site(): void {
         global $PAGE;
 
-        $page = new editor_page(null, '<form id="x"></form>', 'x', new \moodle_url('/'));
+        $page = new editor_page(null, '<form id="x"></form>');
         // The page renderer, not the DI container, which does not exist on 4.5.
         $renderer = $PAGE->get_renderer('core');
 

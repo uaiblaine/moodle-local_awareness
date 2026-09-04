@@ -37,6 +37,19 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
     // Long enough that typing a path does not fire a request per keystroke.
     var DEBOUNCE_MS = 400;
 
+    /**
+     * The course the editor writes for, read once from the editor root; 0 for the site.
+     *
+     * Every web service the editor calls takes it, so that a course author's requests are gated and
+     * scoped as a course author's rather than refused at the site.
+     *
+     * @returns {number}
+     */
+    var courseId = function() {
+        var root = document.querySelector('[data-region="la-editor"]');
+        return root ? (parseInt(root.getAttribute('data-courseid'), 10) || 0) : 0;
+    };
+
     var state = {
         noticeid: 0,
         slot: null,
@@ -122,6 +135,7 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
             methodname: 'local_awareness_check_collision',
             args: {
                 noticeid: state.noticeid,
+                courseid: courseId(),
                 pathmatch: pathfield.value,
                 repeats: true
             }

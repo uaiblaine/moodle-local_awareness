@@ -16,6 +16,8 @@
 
 namespace local_awareness\output;
 
+use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\local\collision;
 use local_awareness\persistent\awareness;
 use local_awareness\table\all_notices_filterset;
@@ -47,10 +49,22 @@ class manage_page implements renderable, templatable {
      * @param string $createurl URL of the create-notice page.
      * @param array $filtervalues Current filter values, keyed by filter name.
      */
-    public function __construct(string $tablehtml, string $createurl, array $filtervalues = []) {
+    /** @var author_scope The scope the list is for. */
+    protected $scope;
+
+    /**
+     * Constructor.
+     *
+     * @param string $tablehtml The rendered table.
+     * @param string $createurl Where the create button goes.
+     * @param array $filtervalues The current filter values.
+     * @param author_scope|null $scope The scope the list is for; the site when not given.
+     */
+    public function __construct(string $tablehtml, string $createurl, array $filtervalues = [], ?author_scope $scope = null) {
         $this->tablehtml = $tablehtml;
         $this->createurl = $createurl;
         $this->filtervalues = $filtervalues;
+        $this->scope = $scope ?? author_scope::site();
     }
 
     /**
@@ -68,12 +82,15 @@ class manage_page implements renderable, templatable {
     protected function stats(): array {
         global $DB;
 
+        // The population the numbers describe is the list's: a course page counts that course only.
+        $where = $this->scope->is_site() ? '' : ' WHERE courseid = :courseid';
+        $params = $this->scope->is_site() ? [] : ['courseid' => $this->scope->get_courseid()];
         $sql = 'SELECT COUNT(1) AS total,
                        SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) AS live,
                        SUM(CASE WHEN enabled = 0 THEN 1 ELSE 0 END) AS draft,
                        SUM(COALESCE(audiencecount, 0)) AS reach
-                  FROM {' . awareness::TABLE . '}';
-        $row = $DB->get_record_sql($sql);
+                  FROM {' . awareness::TABLE . '}' . $where;
+        $row = $DB->get_record_sql($sql, $params);
 
         /* Counts come back as strings under both drivers, so they are cast before formatting. */
         return [
@@ -94,7 +111,7 @@ class manage_page implements renderable, templatable {
             ],
             [
                 'label' => get_string('manage:stat:clash', 'local_awareness'),
-                'value' => number_format(count(collision::clashing_ids())),
+                'value' => number_format(count(collision::clashing_ids($this->scope))),
                 'accent' => false,
             ],
         ];
@@ -138,8 +155,9 @@ class manage_page implements renderable, templatable {
      */
     public function export_for_template(renderer_base $output) {
         return [
-            'lede' => get_string('manage:lede', 'local_awareness'),
-            'createurl' => $this->createurl,
+            'lede' => get_string($this->scope->is_site() ? 'manage:lede' : 'manage:lede:course', 'local_awareness'),
+            // Only an author is offered a create button; a reports-only viewer reads the list.
+            'createurl' => helper::require_author($this->scope, 'manage', false) ? $this->createurl : '',
             'createlabel' => get_string('notice:create', 'local_awareness'),
             'stats' => $this->stats(),
             'filters' => [

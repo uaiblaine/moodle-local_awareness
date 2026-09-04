@@ -42,6 +42,7 @@ class search_roles extends external_api {
         return new external_function_parameters([
             'query' => new external_value(PARAM_RAW, 'search query', VALUE_DEFAULT, ''),
             'contextlevel' => new external_value(PARAM_INT, 'context level', VALUE_DEFAULT, 0),
+            'courseid' => new external_value(PARAM_INT, 'course the editor is scoped to, 0 for the site', VALUE_DEFAULT, 0),
         ]);
     }
 
@@ -50,24 +51,35 @@ class search_roles extends external_api {
      *
      * @param string $query search string
      * @param int $contextlevel context level (e.g. 10, 40, 50)
+     * @param int $courseid The course the editor is scoped to, 0 for the site.
      * @return array
      */
-    public static function execute(string $query = '', int $contextlevel = 0): array {
+    public static function execute(string $query = '', int $contextlevel = 0, int $courseid = 0): array {
         global $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'query' => $query,
             'contextlevel' => $contextlevel,
+            'courseid' => $courseid,
         ]);
 
-        // Only reached from the notice editor. Without this any authenticated user could
+        // Only reached from the notice editor. Without the gate any authenticated user could
         // enumerate every role defined on the site.
+        /*
+         * The scope the caller is writing under, from the courseid the editor sends: the site when
+         * absent. Validated as a context — which also requires login to the course — and then gated
+         * the way every author-side entry point is, so a course author's editor works and a caller
+         * naming a course they do not hold is refused before anything is read.
+         */
+        $scope = author_scope::for_request(null, (int) $params['courseid']);
+        self::validate_context($scope->context());
+        helper::require_author($scope, 'manage');
         $syscontext = \context_system::instance();
-        self::validate_context($syscontext);
-        helper::require_author(author_scope::site(), 'manage');
 
         $query = $params['query'];
-        $contextlevel = $params['contextlevel'];
+        // A course author's roles are the roles a course can hold, whatever level the client named:
+        // the scope forces the role context to the course, and this is the same rule at the picker.
+        $contextlevel = $scope->is_site() ? $params['contextlevel'] : CONTEXT_COURSE;
 
         $sql = "SELECT r.id, r.name, r.shortname
                   FROM {role} r

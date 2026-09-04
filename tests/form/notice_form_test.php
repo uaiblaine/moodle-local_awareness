@@ -427,4 +427,159 @@ final class notice_form_test extends \advanced_testcase {
 
         $this->assertSame([$kept], array_column($value, 'id'));
     }
+
+    /**
+     * A fresh course with one cohort wired to it and one not.
+     *
+     * @return array [course, wired cohort, unwired cohort]
+     */
+    private function course_with_cohorts(): array {
+        global $DB;
+
+        $course = $this->getDataGenerator()->create_course();
+        $wired = $this->getDataGenerator()->create_cohort(['name' => 'Wired cohort']);
+        $unwired = $this->getDataGenerator()->create_cohort(['name' => 'Unwired cohort']);
+        $studentroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+        enrol_get_plugin('cohort')->add_instance($course, ['customint1' => $wired->id, 'roleid' => $studentroleid]);
+
+        return [$course, $wired, $unwired];
+    }
+
+    /**
+     * Under a course scope the form offers only what the scope admits; under the site, everything.
+     *
+     * Read from the rendered page, the only place that answers "did the author see this", and with
+     * the bracketed names the multi-selects emit. The site form in the same test is the control
+     * for every absence: a field missing from both is a broken selector, not a scoped form.
+     */
+    public function test_the_form_under_a_course_scope_offers_only_what_the_scope_admits(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $PAGE->set_url(new \moodle_url('/local/awareness/editnotice.php'));
+        [$course, $wired, $unwired] = $this->course_with_cohorts();
+
+        $site = (new notice_form(null, ['persistent' => null, 'id' => 0]))->render();
+        $mine = (new notice_form(null, [
+            'persistent' => null,
+            'id' => 0,
+            'scope' => author_scope::course((int) $course->id),
+        ]))->render();
+
+        // Forbidden and forced fields: rendered for the site, absent for the course.
+        foreach (['filter_category[]', 'filter_theme[]', 'filter_format[]', 'filter_course[]', 'filter_role_context'] as $name) {
+            $this->assertStringContainsString('name="' . $name . '"', $site, "the site form renders {$name}");
+            $this->assertStringNotContainsString('name="' . $name . '"', $mine, "the course form must not render {$name}");
+        }
+        $this->assertStringContainsString(get_string('notice:scope:thiscourse', 'local_awareness'), $mine);
+        $this->assertStringNotContainsString(get_string('notice:scope:thiscourse', 'local_awareness'), $site);
+
+        // The required course: a search on the site, a two-way choice in the course.
+        $this->assertSame(
+            1,
+            preg_match('/<select[^>]*name="reqcourse"[^>]*>(.*?)<\/select>/s', $mine, $select),
+            'reqcourse is a select'
+        );
+        $this->assertSame(2, substr_count($select[1], '<option'), 'no course, or this course');
+        $this->assertStringContainsString('value="' . $course->id . '"', $select[1]);
+
+        // The cohorts: only the wired one is offered in the course; both on the site.
+        $this->assertSame(1, preg_match('/<select[^>]*name="cohorts\[\]"[^>]*>(.*?)<\/select>/s', $mine, $cohorts));
+        $this->assertStringContainsString('Wired cohort', $cohorts[1]);
+        $this->assertStringNotContainsString('Unwired cohort', $cohorts[1]);
+        $this->assertSame(1, preg_match('/<select[^>]*name="cohorts\[\]"[^>]*>(.*?)<\/select>/s', $site, $sitecohorts));
+        $this->assertStringContainsString('Unwired cohort', $sitecohorts[1]);
+
+        // The competency picker is told its course.
+        $this->assertStringContainsString('data-courseid="' . $course->id . '"', $mine);
+        $this->assertStringContainsString('data-courseid="0"', $site);
+    }
+
+    /**
+     * extra_validation() applies the form's own scope: a category is refused in a course and accepted at the site.
+     *
+     * The submission names a real category, so the refusal is the FORBID rule and not existence;
+     * the site form accepting it in the same test is what proves the scope was read at all.
+     */
+    public function test_extra_validation_applies_the_form_s_scope(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course();
+        $data = (object) ['filter_category' => [(int) $course->category]];
+
+        $site = new notice_form(null, ['persistent' => null, 'id' => 0]);
+        $method = new \ReflectionMethod($site, 'extra_validation');
+        $method->setAccessible(true);
+        $errors = [];
+        $this->assertSame([], $method->invokeArgs($site, [$data, [], &$errors]), 'the site accepts a real category');
+
+        $mine = new notice_form(null, ['persistent' => null, 'id' => 0, 'scope' => author_scope::course((int) $course->id)]);
+        $this->assertSame(
+            ['filter_category' => get_string('scope:problem:filter_category', 'local_awareness')],
+            $method->invokeArgs($mine, [$data, [], &$errors]),
+            'the course refuses it, with the field\'s own message'
+        );
+    }
+
+    /**
+     * Every field the course scope can report — forbidden or restricted — has a message too.
+     */
+    public function test_every_field_the_course_scope_can_report_has_a_message(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $form = new notice_form(null, ['persistent' => null, 'id' => 0]);
+        $method = new \ReflectionMethod($form, 'problem_message');
+        $method->setAccessible(true);
+
+        $course = $this->getDataGenerator()->create_course();
+        $scope = author_scope::course((int) $course->id);
+        $checked = 0;
+        foreach (array_keys(author_scope::RULES) as $field) {
+            $rule = $scope->rule_for($field);
+            if ($rule !== author_scope::RULE_FORBID && $rule !== author_scope::RULE_RESTRICT) {
+                continue;
+            }
+            if ($field === 'cohorts') {
+                continue; // Narrowed silently, by design: no message, and the site test pins the exception.
+            }
+            $this->assertStringStartsNotWith('[[', $method->invoke(null, $field), "{$field} has no message");
+            $checked++;
+        }
+        $this->assertGreaterThanOrEqual(5, $checked, 'the course scope forbids or restricts several fields');
+    }
+
+    /**
+     * The competency picker is handed the course context, from which only 'parents' reaches a framework.
+     *
+     * Frameworks live at the system or a category context, never at a course, so a listing that
+     * walked 'children' from the course context would be empty on every site, always — which is what
+     * a first cut of this did, silently. The module asks for 'parents' from a course; this pins the
+     * pairing on the server side: the same seeded framework is found from the course context one way
+     * and not the other.
+     */
+    public function test_the_picker_s_course_context_reaches_a_framework_only_through_its_parents(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $PAGE->set_url(new \moodle_url('/local/awareness/editnotice.php'));
+        $course = $this->getDataGenerator()->create_course();
+        $this->getDataGenerator()->get_plugin_generator('core_competency')->create_framework();
+
+        $scope = author_scope::course((int) $course->id);
+        $html = (new notice_form(null, ['persistent' => null, 'id' => 0, 'scope' => $scope]))->render();
+        $context = \context_course::instance($course->id);
+        $this->assertStringContainsString(
+            'data-contextid="' . $context->id . '"',
+            $html,
+            'the picker is handed the course context'
+        );
+
+        $parents = \core_competency\api::list_frameworks('shortname', 'ASC', 0, 0, $context, 'parents', true);
+        $children = \core_competency\api::list_frameworks('shortname', 'ASC', 0, 0, $context, 'children', true);
+        $this->assertNotEmpty($parents, 'walking up from the course reaches the framework');
+        $this->assertEmpty($children, 'walking down from the course reaches nothing, on any site');
+    }
 }

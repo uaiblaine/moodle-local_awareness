@@ -6,6 +6,55 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The course editor: a course author reaches their notices from the course (version 2026090401)
+
+**Everything a course author can reach, in one change**, because the foundation showed the pieces
+cannot come apart: a link to an editor whose estimator, pickers and collision warning are gated
+at the site is a link to a broken page.
+
+- **A "Notices" entry in the course navigation**, for whoever holds `local/awareness:managecourse`
+  in the course. Core hands this callback the site course on every front-page activity page, and
+  the site has no course scope, so the callback returns before it asks for one.
+- **Both pages have a course mode.** With `courseid` the manage list and the editor sit inside the
+  course, are gated in the course context, and know only that course's notices. The list's scope
+  travels in its filterset, which is all the AJAX refresh rebuilds the table from, so the context,
+  the capability and the query cannot decide for different lists. The site list shows which course
+  a course notice belongs to. In the editor the URL's course is gated *before* the notice is looked
+  up, so nobody learns whether an id exists by naming it; and the notice's own scope wins over the
+  URL's, so a page never overrides where a stored notice belongs.
+- **The form offers only what the scope admits.** Under a course scope the fields the scope forces
+  (the course, the role context) and forbids (category, theme, format) are not rendered — a field
+  the author cannot change is not a field; the required course is a two-way choice; the cohorts are
+  the course's wired ones; the roles are the ones a course can hold; the competency picker offers
+  only the course's linked competencies — asking core for frameworks by walking *up* from the course
+  context, because frameworks live at the system or a category and a walk down from a course finds
+  nothing, on every site, always. What the form does not show, `extra_validation()` still refuses
+  with a message on the field, under the same scope.
+- **One answer for "no such notice" and "not yours".** `helper::resolve_notice_as_author()` folds
+  the two refusals into the same redirect and message, on the editor and on both report pages, so
+  a course author cannot learn by trying whether an id names a notice in someone else's course.
+- **`viewreportscourse` alone opens the course's list read-only**: the entry in the navigation, the
+  page, the preview and each notice's two reports, and nothing to create or change — the honest
+  reading of the capability's name, rather than a report URL nobody is handed.
+- **The five editor web services take `courseid`**, validate it as a context, gate on it as every
+  author entry point does, and answer inside it. The audience estimate is confined to the course by
+  the forced filter and comes back **without the per-rule chips**: each chip answers over the whole
+  site by documented intent, and for a course author that is an oracle. Withheld at the read, so a
+  job a site manager made for the same criteria — jobs are shared by criteria hash — still hands a
+  course author none; a job outside the scope reads as no job at all. A competing notice outside
+  the scope is reported as "a site notice" or "a notice in another course", not by its title, in
+  the editor's warning and on the list's badge alike.
+- **Deployment note.** A course-notice role needs enrolment, or `moodle/course:view`, beside
+  `managecourse`: `require_login($course)` is a gate of its own, and the capability does not open
+  it. No archetype holds either course capability; an administrator grants them per role. And a
+  course notice's confinement is the page's, not the enrolment's: it appears on the course's pages
+  to anyone who can open them, guests included where the course allows it, so a role or cohort rule
+  is the way to narrow it further — the form and the README say so in those words.
+
+Backup and restore still carry no notices, as `tool_monitor` carries no rules: a course notice does
+not follow a course that is backed up and restored. The AMD modules that call the web services now
+send the course with every request, and are rebuilt.
+
 ### A notice can belong to a course, and nothing a user can reach knows it yet (version 2026090400)
 
 **The foundation for course-scoped notices, and only that.** `local_awareness.courseid` (int, NOT

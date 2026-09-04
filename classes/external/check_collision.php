@@ -50,6 +50,7 @@ class check_collision extends external_api {
             'noticeid' => new external_value(PARAM_INT, 'notice being edited, 0 while it is new', VALUE_DEFAULT, 0),
             'pathmatch' => new external_value(PARAM_RAW, 'page reach being considered', VALUE_DEFAULT, ''),
             'repeats' => new external_value(PARAM_BOOL, 'whether the notice is set to repeat', VALUE_DEFAULT, false),
+            'courseid' => new external_value(PARAM_INT, 'course the editor is scoped to, 0 for the site', VALUE_DEFAULT, 0),
         ]);
     }
 
@@ -63,21 +64,30 @@ class check_collision extends external_api {
      * @param int $noticeid Notice being edited; 0 while it is new.
      * @param string $pathmatch Page reach being considered.
      * @param bool $repeats Whether the notice is set to repeat.
+     * @param int $courseid The course the editor is scoped to, 0 for the site.
      * @return array
      * @throws \required_capability_exception
      */
-    public static function execute(int $noticeid = 0, string $pathmatch = '', bool $repeats = false): array {
+    public static function execute(int $noticeid = 0, string $pathmatch = '', bool $repeats = false, int $courseid = 0): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'noticeid' => $noticeid,
             'pathmatch' => $pathmatch,
             'repeats' => $repeats,
+            'courseid' => $courseid,
         ]);
 
         // Only reached from the notice editor, and it reports on notices the caller may not
-        // otherwise be able to see at all.
+        // otherwise be able to see at all — which is why the titles below are the scope's to give.
+        /*
+         * The scope the caller is writing under, from the courseid the editor sends: the site when
+         * absent. Validated as a context — which also requires login to the course — and then gated
+         * the way every author-side entry point is, so a course author's editor works and a caller
+         * naming a course they do not hold is refused before anything is read.
+         */
+        $scope = author_scope::for_request(null, (int) $params['courseid']);
+        self::validate_context($scope->context());
+        helper::require_author($scope, 'manage');
         $syscontext = \context_system::instance();
-        self::validate_context($syscontext);
-        helper::require_author(author_scope::site(), 'manage');
 
         $clashes = collision::clashes_for(
             (int) $params['noticeid'],
@@ -95,9 +105,10 @@ class check_collision extends external_api {
              * formatstringstriptags is on, and with it off a "<b>" in a title would come back whole
              * and fail the same cleaning.
              */
-            'titles' => array_values(array_map(function (awareness $notice) use ($syscontext): string {
+            'titles' => array_values(array_map(function (awareness $notice) use ($syscontext, $scope): string {
+                // A rival outside the scope is named for what it is, not by its title.
                 return strip_tags(
-                    format_string($notice->get('title'), true, ['context' => $syscontext, 'escape' => false])
+                    format_string(collision::visible_title($notice, $scope), true, ['context' => $syscontext, 'escape' => false])
                 );
             }, $clashes)),
         ];

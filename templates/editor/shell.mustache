@@ -26,6 +26,8 @@
     * unsavedlabel (string) — what the save-state line says once the form is touched
     * requirements (string) — a warning to show above the form, or empty
     * formhtml (raw) — the rendered moodleform, tag and all
+    * courseid (int) — the course the editor writes for, 0 for the site; the modules send it with
+      every web-service call
     * helptitle (string), helpbody (raw — may include <b>)
     * audience (object) — see audience_panel.mustache
 
@@ -40,12 +42,13 @@
         "unsavedlabel": "Alterações não salvas",
         "requirements": "",
         "formhtml": "<form id=\"mform1\"><input type=\"text\"></form>",
+        "courseid": 0,
         "helptitle": "Como funciona",
         "helpbody": "Os filtros combinam por <b>interseção</b>.",
         "audience": {}
     }
 }}
-<div class="local-awareness-editor" data-region="la-editor">
+<div class="local-awareness-editor" data-region="la-editor" data-courseid="{{courseid}}">
     <div class="la-shell la-shell--single">
         <main class="la-shell-main">
 

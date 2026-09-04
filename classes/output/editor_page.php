@@ -17,6 +17,7 @@
 namespace local_awareness\output;
 
 use local_awareness\local\editor_state;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 use renderable;
 use templatable;
@@ -55,9 +56,20 @@ class editor_page implements renderable, templatable {
      * @param awareness|null $awareness The notice being edited, or null when creating.
      * @param string $formhtml Rendered moodleform HTML to embed.
      */
-    public function __construct(?awareness $awareness, string $formhtml) {
+    /** @var author_scope The scope the editor writes under. */
+    protected $scope;
+
+    /**
+     * Constructor.
+     *
+     * @param awareness|null $awareness The notice being edited, or null for a new one.
+     * @param string $formhtml The rendered form.
+     * @param author_scope|null $scope The scope the editor writes under; the site when not given.
+     */
+    public function __construct(?awareness $awareness, string $formhtml, ?author_scope $scope = null) {
         $this->awareness = $awareness;
         $this->formhtml = $formhtml;
+        $this->scope = $scope ?? author_scope::site();
     }
 
     /**
@@ -164,6 +176,8 @@ class editor_page implements renderable, templatable {
             'unsavedlabel' => get_string('editor:unsaved', 'local_awareness'),
             'requirements' => self::window_warning($this->awareness),
             'formhtml' => $formhtml,
+            // Read by every module that calls a web service: the scope travels with each request.
+            'courseid' => $this->scope->get_courseid(),
             'helptitle' => get_string('editor:nav:howitworks', 'local_awareness'),
             'helpbody' => get_string('editor:nav:howitworks:body', 'local_awareness'),
             'audience' => $audience,

@@ -358,6 +358,12 @@ define([], function() {
             if (!contextid) {
                 return;
             }
+            /*
+             * Under a course scope the save accepts only the competencies linked to the course, so
+             * the picker offers only those: the frameworks that hold at least one, and within each
+             * only the linked ones. Nothing it shows is something the save would refuse.
+             */
+            var courseid = parseInt(container.getAttribute('data-courseid'), 10) || 0;
 
             var labels = {
                 title: container.getAttribute('data-picker-title') || 'Select competencies',
@@ -379,15 +385,48 @@ define([], function() {
                 ['core/modal_save_cancel', 'core/modal_events', 'core/ajax', 'core/notification', 'core/templates'],
                 function(ModalSaveCancel, ModalEvents, Ajax, Notification, Templates) {
 
+                    // The course's competency ids and the frameworks they live in; empty sets mean "no limit".
+                    var allowed = null;
+                    var allowedFrameworks = null;
+                    var courseScope = courseid > 0
+                        ? Ajax.call([{
+                            methodname: 'core_competency_list_course_competencies',
+                            args: {id: courseid}
+                        }])[0].then(function(linked) {
+                            allowed = {};
+                            allowedFrameworks = {};
+                            (linked || []).forEach(function(entry) {
+                                if (entry && entry.competency) {
+                                    allowed[entry.competency.id] = true;
+                                    allowedFrameworks[entry.competency.competencyframeworkid] = true;
+                                }
+                            });
+                            return null;
+                        })
+                        : Promise.resolve(null);
+
                     // Fetch frameworks, then open the modal.
-                    Ajax.call([{
-                        methodname: 'core_competency_list_competency_frameworks',
-                        args: {
-                            sort: 'shortname', order: 'ASC', skip: 0, limit: 0,
-                            context: {contextid: contextid},
-                            includes: 'children', onlyvisible: true
+                    courseScope.then(function() {
+                        /*
+                         * Frameworks live at the system or a category context, never at a course:
+                         * from a course context 'children' finds nothing, on every site, always,
+                         * while 'parents' walks up to the category and the system. The site page
+                         * keeps 'children', which from the system context is every framework.
+                         */
+                        return Ajax.call([{
+                            methodname: 'core_competency_list_competency_frameworks',
+                            args: {
+                                sort: 'shortname', order: 'ASC', skip: 0, limit: 0,
+                                context: {contextid: contextid},
+                                includes: courseid > 0 ? 'parents' : 'children', onlyvisible: true
+                            }
+                        }])[0];
+                    }).then(function(frameworks) {
+                        if (allowedFrameworks) {
+                            frameworks = (frameworks || []).filter(function(fw) {
+                                return allowedFrameworks[fw.id];
+                            });
                         }
-                    }])[0].then(function(frameworks) {
                         if (!frameworks || !frameworks.length) {
                             Notification.addNotification({
                                 message: escapeText(labels.noFrameworks),
@@ -442,6 +481,11 @@ define([], function() {
                                 methodname: 'core_competency_search_competencies',
                                 args: {searchtext: searchText || '', competencyframeworkid: frameworkId}
                             }])[0].then(function(competencies) {
+                                if (allowed) {
+                                    competencies = (competencies || []).filter(function(competency) {
+                                        return allowed[competency.id];
+                                    });
+                                }
                                 if (!competencies || !competencies.length) {
                                     var el = root.querySelector('[data-region="competency-list"]');
                                     if (el) {

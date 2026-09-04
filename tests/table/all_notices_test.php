@@ -17,6 +17,7 @@
 namespace local_awareness\table;
 
 use core_table\local\filter\filter;
+use core_table\local\filter\integer_filter;
 use core_table\local\filter\string_filter;
 use local_awareness\persistent\awareness;
 
@@ -461,5 +462,196 @@ final class all_notices_test extends \advanced_testcase {
         }
 
         $this->assertLessThanOrEqual(2, $reads);
+    }
+
+    /**
+     * A table for the given course, or for the site, with the filterset the page would build.
+     *
+     * @param int|null $courseid The course, or null for the site.
+     * @return all_notices
+     */
+    private function scoped_table(?int $courseid): all_notices {
+        $table = new all_notices('scoped', new \moodle_url('/local/awareness/managenotice.php'));
+        $filterset = new all_notices_filterset();
+        $filterset->set_join_type(filter::JOINTYPE_ALL);
+        if ($courseid !== null) {
+            $filterset->add_filter(new integer_filter('courseid', filter::JOINTYPE_ANY, [$courseid]));
+        }
+        $table->set_filterset($filterset);
+
+        return $table;
+    }
+
+    /**
+     * The titles the given table lists.
+     *
+     * @param all_notices $table The table.
+     * @return string[]
+     */
+    private function titles_of(all_notices $table): array {
+        $table->query_db(all_notices::PER_PAGE, false);
+        $titles = array_map(static fn(awareness $n): string => $n->get('title'), $table->rawdata ?? []);
+        sort($titles);
+
+        return $titles;
+    }
+
+    /**
+     * A course list holds that course's notices and nothing else; the site list holds everything.
+     *
+     * Two courses and a site notice, so "only C" has something real to exclude in both directions.
+     */
+    public function test_a_course_list_holds_only_that_course_s_notices(): void {
+        $this->setAdminUser();
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $generator->create_notice(['title' => 'mine', 'courseid' => $mine->id]);
+        $generator->create_notice(['title' => 'theirs', 'courseid' => $other->id]);
+        $generator->create_notice(['title' => 'site']);
+
+        $this->assertSame(['mine'], $this->titles_of($this->scoped_table((int) $mine->id)));
+        $this->assertSame(['theirs'], $this->titles_of($this->scoped_table((int) $other->id)));
+        $this->assertSame(['mine', 'site', 'theirs'], $this->titles_of($this->scoped_table(null)));
+    }
+
+    /**
+     * The context and the capability follow the filterset, which is all the AJAX refresh has.
+     *
+     * A course author passes for their course's list, is refused another course's, and is refused
+     * the site's — whether the filterset says the site or says nothing at all.
+     */
+    public function test_the_context_and_the_capability_follow_the_filterset(): void {
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $user = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:managecourse', CAP_ALLOW, $roleid, \context_course::instance($mine->id)->id, true);
+        role_assign($roleid, $user->id, \context_course::instance($mine->id)->id);
+        $this->setUser($user);
+
+        $table = $this->scoped_table((int) $mine->id);
+        $this->assertSame(\context_course::instance($mine->id)->id, $table->get_context()->id);
+        $this->assertTrue($table->has_capability(), 'the course author sees their course\'s list');
+
+        $table = $this->scoped_table((int) $other->id);
+        $this->assertSame(\context_course::instance($other->id)->id, $table->get_context()->id);
+        $this->assertFalse($table->has_capability(), 'and not another course\'s');
+
+        $table = $this->scoped_table(null);
+        $this->assertInstanceOf(\context_system::class, $table->get_context());
+        $this->assertFalse($table->has_capability(), 'nor the site\'s');
+
+        $bare = new all_notices('bare');
+        $this->assertInstanceOf(\context_system::class, $bare->get_context(), 'no filterset at all is the site');
+        $this->assertFalse($bare->has_capability());
+    }
+
+    /**
+     * The site list says which course a course notice belongs to; a course list carries its course in every link.
+     */
+    public function test_the_site_list_names_the_course_and_the_course_list_keeps_it_in_its_links(): void {
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course(['fullname' => 'Astronomy 101']);
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $generator->create_notice(['title' => 'mine', 'courseid' => $course->id]);
+        $generator->create_notice(['title' => 'site']);
+
+        $site = $this->scoped_table(null);
+        $site->query_db(all_notices::PER_PAGE, false);
+        $rows = [];
+        foreach ($site->rawdata as $notice) {
+            $rows[$notice->get('title')] = $site->format_row($notice);
+        }
+        $this->assertStringContainsString('Astronomy 101', $rows['mine']['title'], 'the site list names the course');
+        $this->assertStringNotContainsString('Astronomy 101', $rows['site']['title'], 'a site notice names none');
+        $this->assertStringNotContainsString('courseid=', $rows['mine']['actions'], 'site-list links stay site links');
+
+        $mine = $this->scoped_table((int) $course->id);
+        $mine->query_db(all_notices::PER_PAGE, false);
+        $row = $mine->format_row(reset($mine->rawdata));
+        $this->assertStringNotContainsString('Astronomy 101', $row['title'], 'a course list needs no chip');
+        $this->assertStringContainsString('courseid=' . $course->id, $row['actions'], 'every action keeps the course');
+        $mine->guess_base_url();
+        $this->assertSame((int) $course->id, (int) $mine->baseurl->get_param('courseid'));
+    }
+
+    /**
+     * A reports-only viewer sees the course list, with the reports and the preview and none of the verbs.
+     *
+     * The manage holder beside them, on the same row, is the control that the verbs exist to be
+     * withheld; the report actions appear for both, because the notice is one that records answers.
+     */
+    public function test_a_reports_only_viewer_gets_a_read_only_list(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $generator->create_notice(['title' => 'mine', 'courseid' => $course->id, 'reqack' => 1]);
+        $context = \context_course::instance($course->id);
+
+        $reader = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:viewreportscourse', CAP_ALLOW, $roleid, $context->id, true);
+        role_assign($roleid, $reader->id, $context->id);
+
+        $author = $this->getDataGenerator()->create_user();
+        $authorrole = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:managecourse', CAP_ALLOW, $authorrole, $context->id, true);
+        role_assign($authorrole, $author->id, $context->id);
+
+        $this->setUser($reader);
+        $table = $this->scoped_table((int) $course->id);
+        $this->assertTrue($table->has_capability(), 'the reports capability opens the list');
+        $table->query_db(all_notices::PER_PAGE, false);
+        $actions = $table->format_row(reset($table->rawdata))['actions'];
+        $this->assertStringContainsString('action=acknowledged_report', $actions);
+        $this->assertStringContainsString('action=dismissed_report', $actions);
+        $verbs = ['action=edit', 'action=disable', 'action=unconfirmeddelete', 'action=unconfirmedreset', 'action=recalculate'];
+        foreach ($verbs as $verb) {
+            $this->assertStringNotContainsString($verb, $actions, "a reader is offered no {$verb}");
+        }
+
+        $this->setUser($author);
+        $table = $this->scoped_table((int) $course->id);
+        $table->query_db(all_notices::PER_PAGE, false);
+        $actions = $table->format_row(reset($table->rawdata))['actions'];
+        $this->assertStringContainsString('action=edit', $actions, 'the author is offered the verbs: the control');
+        $this->assertStringContainsString('action=acknowledged_report', $actions);
+    }
+
+    /**
+     * The "competing" filter on a course list keeps to that course's competing notices.
+     *
+     * A clashing pair in another course and a clashing site notice are seeded beside the course's
+     * own pair, so a filter that resolved the site's clashing ids and forgot the course reddens.
+     */
+    public function test_the_competing_filter_on_a_course_list_keeps_to_the_course(): void {
+        $this->setAdminUser();
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $seed = [
+            'mine a' => $mine->id,
+            'mine b' => $mine->id,
+            'theirs a' => $other->id,
+            'theirs b' => $other->id,
+            'site a' => 0,
+            'site b' => 0,
+        ];
+        foreach ($seed as $title => $courseid) {
+            $generator->create_notice([
+                'title' => $title,
+                'courseid' => $courseid,
+                'pathmatch' => '/my/%',
+                'resetinterval' => WEEKSECS,
+            ]);
+        }
+
+        $table = $this->scoped_table((int) $mine->id);
+        $filterset = $table->get_filterset();
+        $filterset->add_filter(new string_filter('status', filter::JOINTYPE_ANY, [all_notices_filterset::STATUS_CLASH]));
+        $table->set_filterset($filterset);
+
+        $this->assertSame(['mine a', 'mine b'], $this->titles_of($table));
     }
 }

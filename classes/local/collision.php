@@ -130,11 +130,13 @@ class collision {
      * Which of the given notices clash, resolved in one pass for a whole listing.
      *
      * @param awareness[] $notices Notices being listed.
+     * @param author_scope|null $scope Whose list it is; the site when not given. Decides which titles are shown.
      * @return array Map of notice id to the titles it clashes with; ids with no clash are absent.
      * @throws \coding_exception
      * @throws \dml_exception
      */
-    public static function clash_titles_for(array $notices): array {
+    public static function clash_titles_for(array $notices, ?author_scope $scope = null): array {
+        $scope = $scope ?? author_scope::site();
         $repeating = self::enabled_repeating_notices();
         if (count($repeating) < 2) {
             return [];
@@ -151,7 +153,7 @@ class collision {
                     continue;
                 }
                 if (self::pathmatch_overlaps($notice->get('pathmatch'), $other->get('pathmatch'))) {
-                    $titles[] = $other->get('title');
+                    $titles[] = self::visible_title($other, $scope);
                 }
             }
             if (!empty($titles)) {
@@ -160,6 +162,30 @@ class collision {
         }
 
         return $map;
+    }
+
+    /**
+     * A competing notice's title, as an author under the given scope may see it.
+     *
+     * The warning exists to say that the pages are contested, and an author who cannot see the
+     * rival still needs to know — so a competitor outside the scope is reported, but as "a site
+     * notice" or "a notice in another course" rather than by name: only the titles inside the
+     * scope cross the boundary. The site scope sees every title, as it sees every notice.
+     *
+     * @param awareness $other The competing notice.
+     * @param author_scope $scope The scope of the author being warned.
+     * @return string The title, or the fixed description of what it is.
+     */
+    public static function visible_title(awareness $other, author_scope $scope): string {
+        $courseid = (int) $other->get('courseid');
+        if ($scope->is_site() || $courseid === $scope->get_courseid()) {
+            return $other->get('title');
+        }
+
+        return get_string(
+            $courseid > 0 ? 'collision:redacted:course' : 'collision:redacted:site',
+            'local_awareness'
+        );
     }
 
     /**
@@ -174,11 +200,13 @@ class collision {
      * Shares enabled_repeating_notices() and pathmatch_overlaps() with clash_titles_for(), so the
      * filter and the badge cannot disagree about what a clash is.
      *
+     * @param author_scope|null $scope Whose list it is; the site when not given. Only that scope's ids are listed.
      * @return array List of notice ids, empty when nothing competes.
      * @throws \coding_exception
      * @throws \dml_exception
      */
-    public static function clashing_ids(): array {
+    public static function clashing_ids(?author_scope $scope = null): array {
+        $scope = $scope ?? author_scope::site();
         $repeating = self::enabled_repeating_notices();
         if (count($repeating) < 2) {
             return [];
@@ -186,6 +214,10 @@ class collision {
 
         $ids = [];
         foreach ($repeating as $notice) {
+            // A clash is a clash whoever the rival is; what the scope narrows is whose ids are listed.
+            if (!$scope->is_site() && (int) $notice->get('courseid') !== $scope->get_courseid()) {
+                continue;
+            }
             foreach ($repeating as $other) {
                 if ((int) $other->get('id') === (int) $notice->get('id')) {
                     continue;

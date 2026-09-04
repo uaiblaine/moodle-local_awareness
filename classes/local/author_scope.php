@@ -187,6 +187,45 @@ final class author_scope {
     }
 
     /**
+     * The scope a page request is acting under.
+     *
+     * The notice's own scope when there is a notice — a page never overrides where a stored notice
+     * belongs, whatever its URL says — and otherwise the course the URL names, or the site. The
+     * site course and anything at or below it read as the site, so a hand-typed courseid=1 opens
+     * the site page rather than throwing. This is the only place a page turns a raw parameter into
+     * a course scope.
+     *
+     * @param awareness|null $notice The notice the page is about, or null for a new one.
+     * @param int $courseid The courseid the URL carries, 0 for none.
+     * @return self
+     */
+    public static function for_request(?awareness $notice, int $courseid): self {
+        if ($notice !== null) {
+            return self::of($notice);
+        }
+
+        return $courseid > SITEID ? self::course($courseid) : self::site();
+    }
+
+    /**
+     * The cohorts a form under this scope may offer, as id => name.
+     *
+     * Every cohort on the site for the site scope; for a course, only the cohorts the course
+     * enrols from — the same set apply() narrows a submission to, so the picker never offers
+     * something the save would silently drop.
+     *
+     * @return array
+     */
+    public function cohort_options(): array {
+        $options = helper::built_cohorts_options();
+        if ($this->is_site()) {
+            return $options;
+        }
+
+        return array_intersect_key($options, array_flip($this->enrolled_cohort_ids()));
+    }
+
+    /**
      * Whether this is the site scope.
      *
      * @return bool

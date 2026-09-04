@@ -31,15 +31,33 @@ use local_awareness\output\editor_page;
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/adminlib.php');
 
-admin_externalpage_setup('local_awareness_managenotice');
-helper::require_author(author_scope::site(), 'manage');
-
-$PAGE->set_context(context_system::instance());
-\local_awareness\local\bootstrap::mark_page();
-$PAGE->navbar->add(get_string('notice:notice', 'local_awareness'));
-
+$courseid = optional_param('courseid', 0, PARAM_INT);
 $noticeid = optional_param('noticeid', 0, PARAM_INT);
 $action = optional_param('action', 'create', PARAM_TEXT);
+
+/*
+ * Two modes, one page, and two scopes to tell apart. The URL's scope is gated FIRST, before the
+ * notice is even looked up: in course mode the page knows its course from the URL, so a caller
+ * without the course capability is refused before learning whether an id exists. The notice's
+ * own scope is gated second, below, once it is resolved — and it wins: a page never overrides
+ * where a stored notice belongs, whatever its URL says.
+ */
+$requested = author_scope::for_request(null, $courseid);
+if ($requested->is_site()) {
+    admin_externalpage_setup('local_awareness_managenotice');
+    helper::require_author($requested, 'manage');
+    $PAGE->set_context(context_system::instance());
+} else {
+    $course = get_course($requested->get_courseid());
+    require_login($course);
+    helper::require_author($requested, 'manage');
+    $PAGE->set_context($requested->context());
+    $PAGE->set_pagelayout('incourse');
+    $PAGE->set_title(get_string('notice:notice', 'local_awareness'));
+    $PAGE->set_heading(format_string($course->fullname, true, ['context' => $requested->context()]));
+}
+\local_awareness\local\bootstrap::mark_page();
+$PAGE->navbar->add(get_string('notice:notice', 'local_awareness'));
 
 // Enforce sesskey on any state-changing action to prevent CSRF.
 $actionsrequiressesskey = [
@@ -50,8 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || in_array($action, $actionsrequiress
     require_sesskey();
 }
 
-$managenoticepage = new moodle_url('/local/awareness/managenotice.php');
-$thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid, 'action' => $action]);
+$requestedparams = $requested->is_site() ? [] : ['courseid' => $requested->get_courseid()];
+$managenoticepage = new moodle_url('/local/awareness/managenotice.php', $requestedparams);
+$thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid, 'action' => $action] + $requestedparams);
 $PAGE->set_url($thispage);
 // The notice_editor module boots notice_form, the live preview, the audience estimator and the
 // collision warning. Everything they need is on data attributes in the markup they own.
@@ -61,10 +80,12 @@ $PAGE->requires->js_call_amd('local_awareness/notice_editor', 'init');
  * Resolved before the form is built, and refused rather than treated as "new": the create-or-update
  * branch below keys on whether a notice was found, and an id that no longer exists must not look
  * like no id at all. A redirect rather than the resolver's own error page, because the likeliest
- * cause is another administrator deleting the notice while this one had it open.
+ * cause is another administrator deleting the notice while this one had it open. A notice outside
+ * this caller's authority gets the same redirect and the same message: the resolver folds the two
+ * refusals into one, so an id cannot be probed for existence across scopes.
  */
 try {
-    $awareness = helper::resolve_notice($noticeid);
+    $awareness = helper::resolve_notice_as_author($noticeid, 'manage');
 } catch (moodle_exception $e) {
     if ($e->errorcode !== 'notification:noticedoesnotexist') {
         throw $e;
@@ -76,9 +97,20 @@ try {
         \core\output\notification::NOTIFY_ERROR
     );
 }
+// The notice's scope wins over the URL's; for a new notice they are the same thing. The resolver
+// above has already decided the existing notice is this caller's to manage.
+$scope = author_scope::for_request($awareness, $courseid);
+if ($awareness === null) {
+    helper::require_author($scope, 'manage');
+}
+$scopeparams = $scope->is_site() ? [] : ['courseid' => $scope->get_courseid()];
+$managenoticepage = new moodle_url('/local/awareness/managenotice.php', $scopeparams);
+$thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid, 'action' => $action] + $scopeparams);
+
 $customdata = [
     'persistent' => $awareness,
     'id' => $noticeid,
+    'scope' => $scope,
 ];
 $mform = new notice_form($thispage, $customdata);
 
@@ -131,8 +163,8 @@ if ($formdata = $mform->get_data()) {
     );
 
     if (!$awareness) {
-        // Create new notice.
-        $audiencestate = helper::create_new_notice($formdata);
+        // Create new notice, in the scope this page is for.
+        $audiencestate = helper::create_new_notice($formdata, $scope);
     } else {
         // Update notice.
         $audiencestate = helper::update_notice($awareness, $formdata);
@@ -187,7 +219,7 @@ if ($noticeid == 0 && $action == 'create') {
     $formhtml = $rendermoodleform($mform);
     $output = $PAGE->get_renderer('local_awareness');
     echo $OUTPUT->header();
-    echo $output->render_editor_page(new editor_page(null, $formhtml));
+    echo $output->render_editor_page(new editor_page(null, $formhtml, $scope));
     echo $OUTPUT->footer();
     die;
 }
@@ -290,7 +322,7 @@ switch ($action) {
             $formhtml = $rendermoodleform($mform);
             $output = $PAGE->get_renderer('local_awareness');
             echo $OUTPUT->header();
-            echo $output->render_editor_page(new editor_page($awareness, $formhtml));
+            echo $output->render_editor_page(new editor_page($awareness, $formhtml, $scope));
             echo $OUTPUT->footer();
         } else {
             redirect($managenoticepage, get_string('notification:noupdateallowed', 'local_awareness'));
