@@ -109,13 +109,14 @@ since been deleted is silent in every case, and not uniform:
 | referent gone | display | write path | estimate |
 |---|---|---|---|
 | course in `filter_course`, category, role, cohort, theme | never shows | — | narrows to zero |
-| **course in `reqcourse`** | **shows to everyone** (`helper.php:825-827`, in the code's own words: "A course that no longer exists simply has no entry, which leaves its notices shown") | falls through to `return true` (`:937`) | `NOT EXISTS` vacuously true |
+| **course in `reqcourse`** | **shows to everyone** (`helper.php:825-827`, in the code's own words: "A course that no longer exists simply has no entry, which leaves its notices shown") — **fixed 2026-09-03: withheld** | falls through to `return true` (`:937`) — **fixed: refused** | `NOT EXISTS` vacuously true — **fixed: an `EXISTS` on `{course}` beside it** |
 | competency | **depends on the rule**: fails closed under `requireall` or `proficient = 1`; a permanent pass under `requireall = 0` with `proficient = 0` (`:2162-2171`) | — | — |
 | theme, when resolution *fails* rather than the name being unknown | block skipped — fails open (`:2131-2141`) | — | — |
 
-The `reqcourse` row is a live defect at site scope, independent of any of this: an administrator's
-completion gate silently disappears when the course it names is deleted, in a plugin whose every
-other filter fails closed.
+The `reqcourse` row was a live defect at site scope, independent of any of this: an administrator's
+completion gate silently disappeared when the course it names was deleted, in a plugin whose every
+other filter fails closed. Fixed on 2026-09-03 on all three paths, fail closed like the others and
+with no observer (see `CHANGELOG.md`); the table keeps the row as it was found.
 
 ---
 
@@ -312,7 +313,8 @@ capability exists.
 
 - **`reqcourse` fails open on a deleted course** — the only shows-to-everyone missing referent in
   the plugin, documented in its own comment (`helper.php:825-827`), on all three consumers. Worth
-  fixing on its own.
+  fixing on its own. **Fixed 2026-09-03**: all three withhold, no observer, pinned by
+  `tests/reqcourse_missing_course_test.php` with a live control beside each case.
 - **The theme filter fails open on a resolution failure** (`helper.php:2131-2141`): the block is
   skipped when `current_theme_name()` throws or returns empty. Value-independent; a real fail-open
   in a plugin whose other filters fail closed, and possibly the intended behaviour. Decide, and say.

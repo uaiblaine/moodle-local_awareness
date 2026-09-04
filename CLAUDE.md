@@ -131,6 +131,15 @@ Behat site fails every scenario on the same core locator and looks like your bug
   thing opened by acceptance closes again the next time an admin toggles the
   notice's visibility.
 
+- **Every rule withholds a notice whose referent it cannot resolve, `reqcourse` included.** A
+  deleted required course used to show its notice to everyone for ever, on the display path, the
+  write-path gate and the estimator, whose `NOT EXISTS` over `{course_completions}` went vacuously
+  true because deletion purges those rows. All three now fail closed, and there is deliberately no
+  `course_deleted` observer clearing the field: clearing it widens the audience, and an observer
+  can be missed where the consumers cannot. The editor drops the dead course on the next edit and
+  the scope refuses it on save. `tests/reqcourse_missing_course_test.php` pins the three beside a
+  live control; keep them in step.
+
 - **`filter_role_context` is a MODIFIER of `filter_role`**, not a rule of its
   own: it is absent from both `estimator::AUDIENCE_FIELDS` and `CONTEXT_FIELDS`,
   and never reaches `rule_describer::describe()`. The five keys `describe()`

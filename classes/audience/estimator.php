@@ -399,12 +399,19 @@ class estimator {
 
         if ($applies('reqcourse')) {
             $params['reqcourseid' . $suffix] = (int) $criteria['reqcourse'];
+            $params['reqcourseexists' . $suffix] = (int) $criteria['reqcourse'];
             $cc = 'cc' . $suffix;
+            $rc = 'rc' . $suffix;
             /*
              * Notice fires for users who have NOT completed the required course. Mirrors the
-             * course-completion block in helper::retrieve_user_notices() — being present in
-             * {course_completions} only counts when timecompleted is set.
+             * course-completion block in helper::collect_user_notices() — being present in
+             * {course_completions} only counts when timecompleted is set — and, like it, counts
+             * nobody once the course is gone. Deleting a course purges its completion rows, so
+             * the NOT EXISTS on its own went vacuously true and the estimate grew to the whole
+             * site the moment the gate stopped meaning anything. The same id is bound under two
+             * names because a named placeholder may appear only once per statement.
              */
+            $where[] = "EXISTS (SELECT 1 FROM {course} {$rc} WHERE {$rc}.id = :reqcourseexists{$suffix})";
             $where[] = "NOT EXISTS (SELECT 1 FROM {course_completions} {$cc}
                                       WHERE {$cc}.userid = u.id
                                         AND {$cc}.course = :reqcourseid{$suffix}
