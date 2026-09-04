@@ -65,6 +65,41 @@ class local_awareness_generator extends component_generator_base {
     }
 
     /**
+     * Create a carousel slide for a notice.
+     *
+     * An image slide is made by passing an 'image' filename: a placeholder file is written into
+     * the slide's own area, keyed by the slide id as the plugin does it.
+     *
+     * @param array|\stdClass|null $record noticeid (required), sortorder, videourl, caption, image.
+     * @return \local_awareness\persistent\slide
+     */
+    public function create_slide($record = null) {
+        $record = (array) ($record ?? []);
+        if (empty($record['noticeid'])) {
+            throw new \coding_exception('create_slide() needs a noticeid');
+        }
+        $image = $record['image'] ?? null;
+        unset($record['image']);
+
+        $record += ['sortorder' => 0, 'videourl' => null, 'caption' => null];
+        $slide = new \local_awareness\persistent\slide(0, (object) $record);
+        $slide->create();
+
+        if ($image !== null) {
+            get_file_storage()->create_file_from_string([
+                'contextid' => \context_system::instance()->id,
+                'component' => 'local_awareness',
+                'filearea' => \local_awareness\persistent\slide::FILEAREA,
+                'itemid' => $slide->get('id'),
+                'filepath' => '/',
+                'filename' => $image,
+            ], 'not really an image');
+        }
+
+        return $slide;
+    }
+
+    /**
      * Rows in {course} and nothing else, as many as asked for.
      *
      * For tests that need a list of ids the author scope will accept as courses, and nothing more:

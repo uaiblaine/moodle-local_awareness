@@ -1,0 +1,34 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_awareness/notice/video
+
+    The video layout's band: the player the multimedia filter built on the server, dropped into
+    the dialogue by modal_notice.js. The markup is trusted because it is the filter's own output,
+    which is why it is a triple stash.
+
+    Context variables required for this template:
+      * videohtml - the rendered player, from helper::render_video()
+
+    Example context (json):
+    {
+        "videohtml": "<div class=\"mediaplugin mediaplugin_youtube\"><iframe title=\"Tour\" src=\"https://www.youtube.com/embed/3b1aH9K0xQ4\"></iframe></div>"
+    }
+}}
+<div class="la-video" data-region="video-player">
+    {{{videohtml}}}
+</div>

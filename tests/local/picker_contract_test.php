@@ -207,7 +207,8 @@ final class picker_contract_test extends \basic_testcase {
     public function test_the_preview_chain_is_terminated(): void {
         $code = $this->amd_code('preview.js');
 
-        $this->assertStringContainsString('ModalCancel.create', $code, 'the preview modal is gone — assertion blind.');
+        // The real notice dialogue, since the preview started rendering layouts; not a plain cancel modal.
+        $this->assertStringContainsString('ModalNotice.create', $code, 'the preview modal is gone — assertion blind.');
         $this->assertStringContainsString('.catch(', $code, 'the preview chain has no rejection path');
         $this->assertStringContainsString('core/notification', $code, 'core/notification is not required');
     }

@@ -22,7 +22,7 @@ use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
 use local_awareness\helper;
-use local_awareness\persistent\awareness;
+use local_awareness\local\notice_payload;
 
 /**
  * The notices the current user should be shown on this page.
@@ -82,65 +82,15 @@ class get_notices extends external_api {
         $result = [];
         $result['status'] = true;
         /*
-         * array_values(), because select_for_display() keys its result by notice id and array_map()
-         * preserves the keys of a single array. json_encode() used to turn that into a JSON OBJECT
-         * keyed by id; an external_multiple_structure is a list. The client never read those keys
-         * as ids — it uses them only to avoid showing the same entry twice in one page load, and
-         * takes the real id from the payload's own id field.
+         * One builder for every service that hands a notice to the dialogue - see notice_payload.
+         * select_for_display() is what makes this one notice at a time: everything the user is
+         * eligible for is computed first; only the head of the queue is sent, so arriving at a
+         * page never stacks modals. array_values(), because it keys its result by notice id and
+         * an external_multiple_structure is a list.
          */
         $result['notices'] = array_values(
             array_map(
-                function (awareness $notice): array {
-                    /*
-                     * Only what the modal reads crosses the boundary. The record used to be
-                     * serialised whole, which shipped the notice's segmentation metadata —
-                     * pathmatch, filtervalues, cohorts, the scheduling window, resetinterval —
-                     * and the author's user id to every user the notice was displayed to. The
-                     * returns declaration is PARAM_RAW JSON, so nothing downstream strips a key;
-                     * this allowlist is the only gate. Values are picked from to_record() rather
-                     * than re-cast, so the client keeps receiving the exact types it always has.
-                     */
-                    $record = $notice->to_record();
-                    $payload = [];
-                    foreach (['id', 'title', 'modal_width', 'modal_height'] as $field) {
-                        $payload[$field] = $record->$field;
-                    }
-                    /*
-                     * One level rather than the three booleans that used to cross the boundary.
-                     * The dialogue's job is to be as insistent as the author asked, and it now
-                     * reads a single ordered value to decide that — so reqack, outsideclick and
-                     * forcelogout no longer travel, and the client cannot recombine them into a
-                     * state the server never meant. forcelogout in particular is gone from the
-                     * payload because nothing acts on it any more.
-                     */
-                    $payload['insistence'] = $notice->get_insistence();
-                    // Storage holds the content as authored; filters and pluginfile URLs are
-                    // resolved here so a multilang notice reads in each user's own language.
-                    $payload['content'] = helper::render_content($notice);
-                    /*
-                     * The title gets the same treatment for the same reason. It is stored as the
-                     * author typed it, and the modal renders it through {{title}}, so without this
-                     * a multilang title shows its markup literally in the heading while the body
-                     * beneath it resolves correctly — the one place the two disagree.
-                     */
-                    $payload['title'] = format_string(
-                        $record->title,
-                        true,
-                        ['context' => \context_system::instance()]
-                    );
-                    // Attach background image URL if one exists.
-                    if (!empty($record->bgimage)) {
-                        $payload['bgimageurl'] = helper::get_bgimage_url($record->id);
-                    } else {
-                        $payload['bgimageurl'] = '';
-                    }
-                    return $payload;
-                },
-                /*
-                 * select_for_display() is what makes this one notice at a time. Everything the
-                 * user is eligible for is computed first; only the head of the queue is sent, so
-                 * arriving at a page never stacks modals. See its docblock for the two tiers.
-                 */
+                [notice_payload::class, 'build'],
                 helper::select_for_display(
                     helper::retrieve_user_notices($params['pageurl'], (int) $params['courseid'])
                 )
@@ -175,18 +125,7 @@ class get_notices extends external_api {
                  * rather than dropping one field. The allowlist is the key set; the types are only
                  * what can safely be said about each value.
                  */
-                'notices' => new external_multiple_structure(
-                    new external_single_structure([
-                        'id' => new external_value(PARAM_INT, 'Notice id'),
-                        'title' => new external_value(PARAM_RAW, 'Title, already through format_string()'),
-                        'content' => new external_value(PARAM_RAW, 'Body, filters and pluginfile URLs resolved'),
-                        'insistence' => new external_value(PARAM_INT, 'Insistence level; see awareness::INSISTENCE_*'),
-                        'modal_width' => new external_value(PARAM_RAW, 'Author-set modal width, or empty'),
-                        'modal_height' => new external_value(PARAM_RAW, 'Author-set modal height, or empty'),
-                        'bgimageurl' => new external_value(PARAM_URL, 'Background image URL, or empty'),
-                    ]),
-                    'The notices to display now'
-                ),
+                'notices' => new external_multiple_structure(notice_payload::structure(), 'The notices to display now'),
             ]
         );
     }

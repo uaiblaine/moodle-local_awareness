@@ -69,6 +69,13 @@ $string['button:notnow'] = 'Not now';
 $string['cachedef_enabled_notices'] = 'A list of enabled notices';
 $string['cachedef_notice_view'] = 'A list of viewed notices';
 $string['cachedef_site_user_count'] = 'The site user count, which decides whether audience estimates run interactively';
+$string['carousel:choose'] = 'Choose a slide';
+$string['carousel:goto'] = 'Go to slide {$a}';
+$string['carousel:label'] = 'Carousel';
+$string['carousel:next'] = 'Next slide';
+$string['carousel:previous'] = 'Previous slide';
+$string['carousel:slide'] = 'Slide';
+$string['carousel:slideof'] = 'Slide {$a->index} of {$a->total}';
 $string['collision:badge'] = 'Competing';
 $string['collision:badgetooltip'] = 'This repeating notice reaches the same pages as: {$a}. Only one notice is shown at a time, so they will take turns interrupting the same people.';
 $string['collision:live'] = 'Heads up: this repeating notice reaches the same pages as: {$a}. Only one notice is shown at a time, so they will take turns interrupting the same people.';
@@ -95,7 +102,7 @@ $string['editor:preview:empty'] = 'This notice has no content yet.';
 $string['editor:preview:title'] = 'Preview';
 $string['editor:saved'] = 'Saved {$a}';
 $string['editor:section:appearance'] = 'Modal appearance';
-$string['editor:section:appearance:desc'] = 'Size and visual fit of the modal window.';
+$string['editor:section:appearance:desc'] = 'Layout, position on the screen, entrance and size of the modal window.';
 $string['editor:section:audience'] = 'Audience';
 $string['editor:section:audience:desc'] = 'Who the notice will be shown to. Filters combine with AND (intersection).';
 $string['editor:section:behavior'] = 'Behaviour';
@@ -179,6 +186,15 @@ $string['messageprovider:audience_estimate_ready'] = 'Audience estimate finished
 $string['modal:checkboxtext'] = 'I have read and understand the notice.';
 $string['notice:activefrom'] = 'Active from';
 $string['notice:activefrom_help'] = 'The time and date from which the message will be active .';
+$string['notice:animation'] = 'Entrance animation';
+$string['notice:animation:fade'] = 'Fade';
+$string['notice:animation:none'] = 'None';
+$string['notice:animation:slide'] = 'Slide';
+$string['notice:animation:spring'] = 'Spring';
+$string['notice:animation:zoom'] = 'Zoom';
+$string['notice:animation_help'] = 'How the dialogue arrives on the screen. Slide comes in from the edge nearest its position; a centred dialogue slides down from the top.
+
+A reader who has asked their device for reduced motion sees a plain fade whatever is chosen here.';
 $string['notice:audience'] = 'Target audience';
 $string['notice:audience:cohorts'] = 'Cohorts: {$a}';
 $string['notice:audience:computed'] = 'Computed {$a}';
@@ -193,7 +209,7 @@ $string['notice:behaviour'] = 'Behaviour';
 $string['notice:behaviour:none'] = 'No special behaviour';
 $string['notice:behaviour:repeat'] = 'Repeats every {$a}';
 $string['notice:bgimage'] = 'Background image';
-$string['notice:bgimage_help'] = 'Upload an image to be displayed as the background of the notice modal. The image will cover the entire modal content area.';
+$string['notice:bgimage_help'] = 'Upload an image for the dialogue. What it becomes depends on the layout: the Classic, Full screen and Card layouts show it as a faint background behind the whole dialogue, the Hero image layout shows it as a band across the top with the title over it. The Video and Carousel layouts fill that band themselves and do not use it.';
 $string['notice:cohort'] = 'Cohort';
 $string['notice:cohort:all'] = 'All users';
 $string['notice:content'] = 'Content';
@@ -207,6 +223,7 @@ $string['notice:insistence'] = 'Insistence';
 $string['notice:insistence:acknowledge'] = 'Must acknowledge';
 $string['notice:insistence:blocking'] = 'Blocking';
 $string['notice:insistence:informational'] = 'Informational';
+$string['notice:insistence:notforlayout'] = 'The {$a} layout has no room for the acknowledgement box. Choose another layout, or a lower insistence.';
 $string['notice:insistence_help'] = 'How hard the notice is to get past, and what the reader may do instead of accepting it.
 
 Informational: the reader can dismiss it, including by clicking outside it, and the dismissal is
@@ -228,6 +245,18 @@ $string['notice:notice'] = 'Notice';
 $string['notice:pathmatch:anywhere'] = 'Anywhere on the site';
 $string['notice:perpetual'] = 'Is perpetual';
 $string['notice:perpetual_help'] = 'When set to yes, the notice will always be displayed (unless disabled). If set to no, a date and time range for the notice must be specified';
+$string['notice:position'] = 'Position on the screen';
+$string['notice:position:bottom'] = 'Bottom';
+$string['notice:position:bottomend'] = 'Bottom end';
+$string['notice:position:bottomstart'] = 'Bottom start';
+$string['notice:position:center'] = 'Centre';
+$string['notice:position:notforlayout'] = 'The {$a} layout cannot sit in a corner. Choose the centre, the top or the bottom.';
+$string['notice:position:top'] = 'Top';
+$string['notice:position:topend'] = 'Top end';
+$string['notice:position:topstart'] = 'Top start';
+$string['notice:position_help'] = 'Where the dialogue sits. Start and end follow the reading direction: start is the left in a left-to-right language and the right in a right-to-left one.
+
+The four corners are for the Card layout alone; a wider dialogue sits centred or against the top or bottom edge. The Full screen layout covers the screen and has no position.';
 $string['notice:preview'] = 'Preview the modal';
 $string['notice:reqcourse'] = 'Requires course completion';
 $string['notice:reqcourse:thiscourse'] = 'This course';
@@ -237,15 +266,47 @@ $string['notice:resetinterval'] = 'Reset every';
 $string['notice:resetinterval_help'] = 'The notice will be displayed to user again once the specified period elapses.';
 $string['notice:scope:thiscourse'] = 'This notice appears only on this course\'s pages, to anyone who can open them. Add a role or cohort rule to narrow it further; category, theme and course format filters do not apply.';
 $string['notice:scope:thiscourse:label'] = 'Reach';
+$string['notice:slide'] = 'Slide';
+$string['notice:slide:add'] = 'Add {$a} slides';
+$string['notice:slide:both'] = 'A slide shows an image or a video, not both. Remove one of them.';
+$string['notice:slide:caption'] = 'Caption';
+$string['notice:slide:delete'] = 'Remove slide';
+$string['notice:slide:image'] = 'Image';
+$string['notice:slide:video'] = 'Video link';
+$string['notice:slides:required'] = 'A carousel needs at least {$a} slides, each with an image, a video link or a caption.';
 $string['notice:status'] = 'Status';
 $string['notice:status:draft'] = 'Draft';
 $string['notice:status:live'] = 'Active';
+$string['notice:template'] = 'Layout';
+$string['notice:template:card'] = 'Card';
+$string['notice:template:carousel'] = 'Carousel';
+$string['notice:template:classic'] = 'Classic';
+$string['notice:template:fullscreen'] = 'Full screen';
+$string['notice:template:hero'] = 'Hero image';
+$string['notice:template:video'] = 'Video';
+$string['notice:template_help'] = 'The shape of the dialogue the reader sees. Every layout is a real dialogue: it dims the page behind it, keeps the keyboard inside it and is announced as a dialogue by a screen reader, whatever its size.
+
+Classic: a header, the content and a footer. What every notice was before layouts existed.
+
+Hero image: the uploaded image as a band across the top, with the title over it.
+
+Full screen: covers the whole window, for long texts such as a policy the reader must scroll through. It has no position.
+
+Card: a compact box, usually in a corner, for a short message with one action. It has no room for the acknowledgement box, so it cannot be Must acknowledge.
+
+Video: a player built from the video link in place of the image band. The site\'s multimedia filter decides what plays.
+
+Carousel: one image or video per slide, with arrows and a caption, from the slides below.';
 $string['notice:title'] = 'Title';
 $string['notice:validity'] = 'Validity';
 $string['notice:validity:current'] = 'Current';
 $string['notice:validity:expired'] = 'Expired';
 $string['notice:validity:permanent'] = 'Permanent';
 $string['notice:validity:scheduled'] = 'Scheduled';
+$string['notice:videourl'] = 'Video link';
+$string['notice:videourl:invalid'] = 'Enter a full web address, starting with http:// or https://.';
+$string['notice:videourl:required'] = 'The Video layout needs a video link.';
+$string['notice:videourl_help'] = 'A link to the video: a YouTube or Vimeo page, or a direct link to an MP4 or WebM file. The site\'s multimedia filter builds the player, so what plays is whatever the site\'s media players allow; a link they do not handle is shown as a link. The video never starts by itself.';
 $string['notification:nodeleteallowed'] = 'Notice deletion is not allowed';
 $string['notification:noticedoesnotexist'] = 'The notice does not exist';
 $string['notification:noupdateallowed'] = 'Notice update is not allowed';

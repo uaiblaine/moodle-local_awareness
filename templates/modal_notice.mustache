@@ -43,7 +43,11 @@
 <div class="modal moodle-has-zindex" data-region="modal-container" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="{{uniqid}}-modal-title">
     <div class="modal-dialog awareness modal-lg {{$classes}}{{/classes}}" role="document" data-region="modal" tabindex="0">
         <div class="modal-content shadow-lg border-0 rounded">
-            <div class="modal-header bg-light border-bottom-0 {{$headerclasses}}{{headerclasses}}{{/headerclasses}}" data-region="header">
+            {{!
+                No bg-* or border-* utility on the header or the footer: Bootstrap 5 generates those
+                with !important, which the layouts' own chrome in styles.css could never outbid.
+            }}
+            <div class="modal-header {{$headerclasses}}{{headerclasses}}{{/headerclasses}}" data-region="header">
                 {{$header}}
                     <h5 id="{{uniqid}}-modal-title" class="modal-title" data-region="title">{{$title}}{{title}}{{/title}}</h5>
                     <button id="awareness-closebtn" type="button" class="btn-close" data-action="close" aria-label="{{#cleanstr}}closebuttontitle{{/cleanstr}}">
@@ -51,12 +55,23 @@
                     </button>
                 {{/header}}
             </div>
+            {{!
+                The media band the hero, video and carousel layouts draw: the background image as a
+                band, the player the multimedia filter built, or the slides. Hidden until a layout
+                fills it, by modal_notice.js; the header stays where it is in every layout because it
+                holds the dialogue's name and its close button.
+            }}
+            <div class="la-media" data-region="media" hidden>
+                <div class="la-media-band" data-region="band"></div>
+                <div class="la-media-video" data-region="video"></div>
+                <div class="la-media-carousel" data-region="carousel"></div>
+            </div>
             <div class="modal-body px-4 py-3" data-region="body">
                 {{$body}}
                     {{{body}}}
                 {{/body}}
             </div>
-            <div class="modal-footer bg-white border-top-0 d-flex justify-content-between align-items-center px-4 pb-4" data-region="footer">
+            <div class="modal-footer d-flex justify-content-between align-items-center px-4 pb-4" data-region="footer">
                 {{$footer}}
                      <div class="form-check d-none" id="awareness-ack-container">
                         <input type="checkbox" class="form-check-input" id="awareness-modal-ackcheckbox">

@@ -6,6 +6,70 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### A notice chooses its layout, its place on the screen and its entrance (version 2026090402)
+
+**Every notice used to be the same dialogue: a header, a body and a footer, centred, arriving with
+no motion.** An author now chooses a layout (`classic`, `hero`, `fullscreen`, `card`, `video`,
+`carousel`), a position (centre, top, bottom, and the four corners for the card) and an entrance
+animation (`none`, `fade`, `slide`, `zoom`, `spring`). The choices are three columns on the notice
+with defaults equal to what every existing notice already renders as, so the upgrade changes nothing
+a reader can see. The vocabularies live on the persistent (`awareness::TEMPLATES`, `POSITIONS`,
+`ANIMATIONS`) and its `choices` gate is the one server-side check on every write path — the PARAM
+types only say which characters may appear, and a misspelt layout is made of legal letters.
+
+**The video layout takes an external link, never an upload.** `videourl` is rendered through the
+site's multimedia filter, so YouTube, Vimeo and a plain MP4/WebM link all play in whatever player the
+site has enabled, and a link the site does not support stays a link.
+
+**The carousel's slides are rows, not a bullet list read back out of the content.** A new table,
+`local_awareness_slides`, holds one row per slide — an image in the `slidemedia` file area keyed by
+the slide's own id, or a video link, plus a plain-text caption — in order. Parsing `<ul><li>` out of
+the editor was assessed and rejected: it had no author-facing schema, nothing validated it at save
+time, and every bullet list already written would have been silently reinterpreted the moment a
+notice switched layout. The assessment, with the measurements behind each decision, is in
+`docs/MODAL-LAYOUTS-FEASIBILITY.md`; the approved prototype is `docs/mockups/notice-layouts.html`.
+
+**The dialogue owns every class it wears, and re-applies every one of them per notice.** The
+Bootstrap 4 polyfill gate is a body class four plugin pages add; the notice dialogue is injected on
+every page, so it can never carry the gate and no Bootstrap 5 utility may appear in it — layouts,
+positions, entrances and the carousel are `la-*` classes with hand-written CSS, ungated. The queue
+reuses one dialogue and core's `show()` is a no-op on a visible one, so the entrance is played by
+the plugin after every `show()`, `modal-lg` is toggled by hand (the template bakes it in), and a
+notice of another shape is carried by that replayed entrance — it starts from nothing and arrives as
+the new notice — while hiding stays in the one place it always was, when the queue is empty.
+`hide()` now stops whatever was playing; core's only toggles classes. Reduced
+motion collapses every entrance to a fade, the Behat site gets none, and the refused-click shake —
+which had shipped with no guard — gets both. `center` is a real centre now: a notice that sat where
+Bootstrap places a dialogue by default, against the top, sits vertically centred.
+
+**The carousel is the plugin's own.** Bootstrap's transition classes are applied by its JavaScript
+and are named differently on 4.5 and 5.2, so there is no markup that works on both; `amd/src/carousel.js`
+is ~100 lines with no jQuery, the WAI-ARIA carousel pattern, arrow keys that follow the reading
+direction, media paused when a slide is left, and no rotation of its own. Inactive slides carry the
+`hidden` attribute, so what a test sees is what a reader sees.
+
+**Both previews open the real dialogue, rendered by the server.** The editor's preview used to hand
+the editor's raw HTML to a plain `core/modal_cancel`; with a video, slides and a layout that stopped
+being "the thing that ships", because the multimedia filter runs in PHP and the slides are rows the
+form has not saved yet. Two read-only web services — `local_awareness_preview_notice`, which renders
+the form's fields from the author's own draft areas, and `local_awareness_render_notice`, for the
+manage list — return the same payload the reader's queue receives, built by one class
+(`local\notice_payload`) so the three services cannot drift. The manage list no longer carries each
+notice's rendered content in a data attribute. Inside the preview the exits destroy the dialogue and
+record nothing, and the document listener each dialogue registers is taken off with it.
+
+**The form refuses what the layout cannot carry, on the field the author can act on.** A card has no
+room for the acknowledgement box, a corner is the card's alone, the video layout needs an absolute
+`http(s)` link, a carousel needs two slides with something on them, and a slide is an image or a
+video, not both. `hideIf` hides the position for a fullscreen dialogue and the video link for every
+other layout, but hiding does not stop a value travelling, so every rule lives in `extra_validation()`
+— the persistent form's `validation()` is `final`. The appearance section opens on edit only for a
+choice away from the defaults; the stored columns are never empty, so "holds a value" had to learn
+what a default is. Detectors for `rounded-1..5`, `sticky-bottom` and `modal-fullscreen*` join the
+Bootstrap compatibility test, and a motion contract test pins the two guards, the vocabulary
+coverage of the stylesheet, the header staying in every layout, and the JavaScript's copies of the
+vocabulary.
+
 ### The course editor: a course author reaches their notices from the course (version 2026090401)
 
 **Everything a course author can reach, in one change**, because the foundation showed the pieces

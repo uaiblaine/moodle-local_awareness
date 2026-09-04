@@ -71,6 +71,7 @@ comments and this document — is in English, per the fleet standard.
 |------|--------|
 | [`mockups/manage-notices.html`](mockups/manage-notices.html) | Manage notices (`managenotice.php`) — page shell renders first and the list arrives over AJAX; name search, Status filter (active / draft / **has conflict**), validity filter, 25 per page, summary tiles computed over the filtered set, per-row action menu, empty and no-result states |
 | [`mockups/edit-notice.html`](mockups/edit-notice.html) | Edit notice (`editnotice.php`) — single content column, every section an accordion with expand/collapse all, 1/2/3-column field grids, audience estimate after the rules it results from, preview in a modal, actions in core's sticky footer |
+| [`mockups/notice-layouts.html`](mockups/notice-layouts.html) | The notice dialogue's layouts, positions and entrances — a stage with a Boost page under the dialogue and every combination of layout × position × animation × insistence, the gallery of layouts, how the "Modal appearance" section renders them, the validity matrix, and the queue transition between two shapes. Approved 2026-09-04 with the decisions recorded in [`MODAL-LAYOUTS-FEASIBILITY.md`](MODAL-LAYOUTS-FEASIBILITY.md) |
 
 The mockups link to each other the way the real pages flow.
 

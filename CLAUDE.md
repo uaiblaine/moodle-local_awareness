@@ -189,6 +189,55 @@ Behat site fails every scenario on the same core locator and looks like your bug
   scopes; a rival outside the scope is described, never named. A course-notice role needs
   enrolment or `moodle/course:view` beside `managecourse`.
 
+- **The dialogue's layout, position and entrance are `la-*` classes with hand-written CSS, and
+  nothing in it may be a Bootstrap 5 utility.** `bootstrap::mark_page()` gates the BS4 polyfill on
+  a body class four plugin pages add; the dialogue is injected on every page by the hook, so the
+  gate can never reach it — `modal-fullscreen`, `rounded-3`, `sticky-bottom`, `visually-hidden`
+  are dead on 4.5 there with no repair path (`fw-bold` was the first casualty). Specificity is not
+  the problem: `.awareness.la-x` (0,2,0) beats every core rule on `.modal-dialog`; what cannot be
+  beaten is a BS5 `bg-*`/`border-*` utility, generated with `!important`, so the template carries
+  none. The vocabularies live on the persistent (`awareness::TEMPLATES`, `POSITIONS`,
+  `ANIMATIONS`, `positions_for()`, `accepts_acknowledgement()`) and its `choices` gate is the one
+  server-side check — the PARAM types only constrain the character set. `notice_form.js` and
+  `modal_notice.js` carry hand copies of the corners and the sized/compact layouts;
+  `tests/local/motion_contract_test.php` pins them against the persistent.
+
+- **The queue reuses one dialogue, and core's `show()` returns early on a visible one.** So nothing
+  core emits fires for the second notice onward: the entrance is `setAnimation()` after every
+  `show()` (reflow trick, class dropped on `animationend`), `modal-lg` is toggled by `setTemplate()`
+  because the template bakes it in and `configure({large: true})` is a no-op against it, and a
+  notice of another shape is carried by that replayed entrance — `modal.hide()` stays in the one
+  place `async_contract_test` pins, when the queue is empty. `ModalNotice.prototype.hide`
+  stops media — core's only toggles classes — and `destroy` takes off the namespaced document
+  keydown listener each dialogue registers. `setMedia()` fills the band through
+  `Templates.replaceNodeContents()`, which already announces the new nodes to the filters; that
+  announcement is what makes `media_videojs/loader` — on every page — initialise a player it did
+  not render, and announcing twice initialises twice.
+
+- **Slides are rows, read before `sanitise_data()` runs.** `helper::sanitise_data()` keeps only the
+  notice's own columns, so the repeated `slide_*` arrays are lifted out first by `slide_rows()` and
+  saved after by `process_slides()`, keyed by the hidden `slide_id`. A repeated file picker's draft id
+  is read from `$data->slide_image[$i]`, never through `file_get_submitted_draft_itemid()`, which
+  cannot address a repeated element and returns false with a developer warning. A slide's image is
+  keyed by the **slide** id in filearea `slidemedia`; `lib.php` resolves the slide to its notice
+  before the audience gate, and `slide::delete_for_notice()` takes the files while the rows still
+  say which ids exist.
+
+- **Every rule the layout imposes lives in `extra_validation()`.** `\core\form\persistent::validation()`
+  is `final`; `hideIf` hides a field without stopping its value; a client rule never posts the form.
+  `apply_layout_rules()` on the save path sets what a hidden field would have carried (centre for
+  fullscreen, no link outside the video layout). `set_optional_section_state()` is default-aware:
+  the appearance columns are never empty, so "holds a value" means "differs from the default", or
+  the section opens on every edit.
+
+- **Three services hand a notice to the dialogue, and one class builds all three.**
+  `local\notice_payload::build()` and `::structure()` are used by `get_notices`, `preview_notice`
+  (the editor's, from the author's draft areas) and `render_notice` (the manage list's). A field
+  added to `build()` without `structure()` is stripped by `clean_returnvalue()` in silence, and
+  `tests/external/notice_external_test.php` pins the exact key set. The video link is wrapped in a
+  real anchor before `format_text()` — the multimedia filter embeds nothing from a bare URL — and the
+  captions are `PARAM_RAW` on the way out, escaped once by the template's double stash.
+
 ## Testing notes
 
 - **Test metadata stays in docblocks (`@covers`, `@dataProvider`) while 405 is

@@ -110,4 +110,24 @@ $functions = [
         'loginrequired' => true,
         'ajax' => true,
     ],
+
+    'local_awareness_preview_notice' => [
+        'classname' => 'local_awareness\\external\\preview_notice',
+        'methodname' => 'execute',
+        'description' => 'Render the notice the editor currently holds, as the reader would get it',
+        'type' => 'read',
+        'capabilities' => 'local/awareness:manage',
+        'loginrequired' => true,
+        'ajax' => true,
+    ],
+
+    'local_awareness_render_notice' => [
+        'classname' => 'local_awareness\\external\\render_notice',
+        'methodname' => 'execute',
+        'description' => 'Render one saved notice for the manage list preview',
+        'type' => 'read',
+        'capabilities' => 'local/awareness:viewreports',
+        'loginrequired' => true,
+        'ajax' => true,
+    ],
 ];

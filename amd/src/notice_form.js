@@ -88,6 +88,62 @@ define([], function() {
     };
 
     // ───────────────────────────────────────────
+    // Layout → position logic
+    // ───────────────────────────────────────────
+
+    var LAYOUT_SELECTORS = {
+        LAYOUT_RADIOS: 'input[name="template"]',
+        POSITION_RADIOS: 'input[name="position"]'
+    };
+
+    /*
+     * The four corners are the card's alone. Mirrors awareness::POSITIONS_CORNER and
+     * awareness::positions_for(); this file cannot reach PHP, and the server refuses the
+     * combination anyway - this only stops the author picking what the save would bounce.
+     */
+    var CORNERS = ['top-start', 'top-end', 'bottom-start', 'bottom-end'];
+    var CORNER_LAYOUT = 'card';
+    var FALLBACK_POSITION = 'center';
+
+    var syncPositions = function() {
+        var checked = document.querySelector(LAYOUT_SELECTORS.LAYOUT_RADIOS + ':checked');
+        var cornersAllowed = Boolean(checked) && checked.value === CORNER_LAYOUT;
+        var displaced = false;
+        document.querySelectorAll(LAYOUT_SELECTORS.POSITION_RADIOS).forEach(function(radio) {
+            if (CORNERS.indexOf(radio.value) === -1) {
+                return;
+            }
+            radio.disabled = !cornersAllowed;
+            if (!cornersAllowed && radio.checked) {
+                radio.checked = false;
+                displaced = true;
+            }
+        });
+        if (displaced) {
+            var fallback = document.querySelector(LAYOUT_SELECTORS.POSITION_RADIOS + '[value="' + FALLBACK_POSITION + '"]');
+            if (fallback) {
+                fallback.checked = true;
+            }
+        }
+    };
+
+    var bindLayout = function() {
+        var radios = document.querySelectorAll(LAYOUT_SELECTORS.LAYOUT_RADIOS);
+        if (!radios.length) {
+            return false;
+        }
+        radios.forEach(function(radio) {
+            if (radio.getAttribute('data-awareness-bound') === '1') {
+                return;
+            }
+            radio.setAttribute('data-awareness-bound', '1');
+            radio.addEventListener('change', syncPositions);
+        });
+        syncPositions();
+        return true;
+    };
+
+    // ───────────────────────────────────────────
     // Helpers
     // ───────────────────────────────────────────
 
@@ -608,6 +664,8 @@ define([], function() {
 
     return {
         init: function() {
+            // The layout radios are plain form markup, present from the first paint.
+            bindLayout();
             var competencyBound = initCompetencyFilter();
 
             if (bind() && competencyBound) {
@@ -625,6 +683,7 @@ define([], function() {
                 }
 
                 var observer = new MutationObserver(function() {
+                    bindLayout();
                     var courseBound = bind();
                     competencyBound = initCompetencyFilter() || competencyBound;
                     if (courseBound && competencyBound) {

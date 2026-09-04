@@ -115,6 +115,26 @@ final class schema_test extends \advanced_testcase {
      *
      * @return void
      */
+    /**
+     * The slides table is read by notice, in order, and that is the index it carries.
+     */
+    public function test_the_slides_table_is_read_by_notice_in_order(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $indexes = $DB->get_indexes('local_awareness_slides');
+        $this->assertNotEmpty($indexes, 'no index found on local_awareness_slides — the read is broken');
+
+        $columnsets = array_values(array_map(static fn(array $i): array => $i['columns'], $indexes));
+        $this->assertContains(['noticeid', 'sortorder'], $columnsets, 'no (noticeid, sortorder) index on local_awareness_slides');
+
+        $columns = $DB->get_columns('local_awareness_slides');
+        foreach (['noticeid', 'sortorder', 'videourl', 'caption', 'usermodified', 'timecreated', 'timemodified'] as $column) {
+            $this->assertArrayHasKey($column, $columns, "local_awareness_slides has no {$column} column");
+        }
+    }
+
     public function test_the_view_action_is_an_integer(): void {
         global $DB;
 

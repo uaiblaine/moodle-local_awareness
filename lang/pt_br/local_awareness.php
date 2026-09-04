@@ -68,6 +68,13 @@ $string['button:notnow'] = 'Agora não';
 $string['cachedef_enabled_notices'] = 'Lista de alertas habilitados';
 $string['cachedef_notice_view'] = 'Lista de alertas visualizados';
 $string['cachedef_site_user_count'] = 'Contagem de usuários do site, que decide se a estimativa de público roda de forma interativa';
+$string['carousel:choose'] = 'Escolher um slide';
+$string['carousel:goto'] = 'Ir para o slide {$a}';
+$string['carousel:label'] = 'Carrossel';
+$string['carousel:next'] = 'Próximo slide';
+$string['carousel:previous'] = 'Slide anterior';
+$string['carousel:slide'] = 'Slide';
+$string['carousel:slideof'] = 'Slide {$a->index} de {$a->total}';
 $string['collision:badge'] = 'Concorrência';
 $string['collision:badgetooltip'] = 'Este alerta repetível alcança as mesmas páginas que: {$a}. Como apenas um alerta é exibido por vez, eles vão se revezar interrompendo as mesmas pessoas.';
 $string['collision:live'] = 'Atenção: este alerta repetível alcança as mesmas páginas que: {$a}. Como apenas um alerta é exibido por vez, eles vão se revezar interrompendo as mesmas pessoas.';
@@ -94,7 +101,7 @@ $string['editor:preview:empty'] = 'Este aviso ainda não tem conteúdo.';
 $string['editor:preview:title'] = 'Pré-visualização';
 $string['editor:saved'] = 'Salvo em {$a}';
 $string['editor:section:appearance'] = 'Aparência do modal';
-$string['editor:section:appearance:desc'] = 'Tamanho e ajuste visual da janela exibida.';
+$string['editor:section:appearance:desc'] = 'Layout, posição na tela, entrada e tamanho da janela do aviso.';
 $string['editor:section:audience'] = 'Público-alvo';
 $string['editor:section:audience:desc'] = 'Para quem o aviso será exibido. Os filtros se combinam com E (interseção).';
 $string['editor:section:behavior'] = 'Comportamento';
@@ -178,6 +185,15 @@ $string['messageprovider:audience_estimate_ready'] = 'Estimativa de público con
 $string['modal:checkboxtext'] = 'Li e compreendi o alerta.';
 $string['notice:activefrom'] = 'Ativo desde';
 $string['notice:activefrom_help'] = 'Data e hora a partir da qual a mensagem estará ativa.';
+$string['notice:animation'] = 'Animação de entrada';
+$string['notice:animation:fade'] = 'Esmaecer';
+$string['notice:animation:none'] = 'Nenhuma';
+$string['notice:animation:slide'] = 'Deslizar';
+$string['notice:animation:spring'] = 'Mola';
+$string['notice:animation:zoom'] = 'Ampliar';
+$string['notice:animation_help'] = 'Como o diálogo chega à tela. Deslizar parte da borda mais próxima da posição; um diálogo centralizado desce do topo.
+
+Quem pediu movimento reduzido ao dispositivo vê um esmaecer simples, seja qual for a escolha aqui.';
 $string['notice:audience'] = 'Público-alvo';
 $string['notice:audience:cohorts'] = 'Coortes: {$a}';
 $string['notice:audience:computed'] = 'Calculado em {$a}';
@@ -192,7 +208,7 @@ $string['notice:behaviour'] = 'Comportamento';
 $string['notice:behaviour:none'] = 'Sem comportamento especial';
 $string['notice:behaviour:repeat'] = 'Repete a cada {$a}';
 $string['notice:bgimage'] = 'Imagem de fundo';
-$string['notice:bgimage_help'] = 'Envie uma imagem para ser exibida como plano de fundo do modal de alerta. A imagem cobrirá toda a área de conteúdo do modal.';
+$string['notice:bgimage_help'] = 'Envie uma imagem para o diálogo. O que ela vira depende do layout: Clássico, Tela cheia e Cartão a mostram como um fundo suave atrás de todo o diálogo; Destaque a mostra como uma faixa no topo, com o título por cima. Vídeo e Carrossel preenchem essa faixa por conta própria e não a usam.';
 $string['notice:cohort'] = 'Coorte';
 $string['notice:cohort:all'] = 'Todos os usuários';
 $string['notice:content'] = 'Conteúdo';
@@ -206,6 +222,7 @@ $string['notice:insistence'] = 'Insistência';
 $string['notice:insistence:acknowledge'] = 'Exige reconhecimento';
 $string['notice:insistence:blocking'] = 'Bloqueante';
 $string['notice:insistence:informational'] = 'Informativo';
+$string['notice:insistence:notforlayout'] = 'O layout {$a} não tem espaço para a caixa de confirmação. Escolha outro layout, ou uma insistência menor.';
 $string['notice:insistence_help'] = 'O quanto o alerta é difícil de ultrapassar, e o que o leitor pode fazer em vez de aceitá-lo.
 
 Informativo: o leitor pode dispensá-lo, inclusive clicando fora dele, e a dispensa é registrada.
@@ -226,6 +243,18 @@ $string['notice:notice'] = 'Alerta';
 $string['notice:pathmatch:anywhere'] = 'Em todo o site';
 $string['notice:perpetual'] = 'É perpétuo';
 $string['notice:perpetual_help'] = 'Quando definido como sim, o alerta sempre será exibido (a menos que desabilitado). Se definido como não, um intervalo de data e hora deve ser especificado.';
+$string['notice:position'] = 'Posição na tela';
+$string['notice:position:bottom'] = 'Rodapé';
+$string['notice:position:bottomend'] = 'Rodapé, fim';
+$string['notice:position:bottomstart'] = 'Rodapé, início';
+$string['notice:position:center'] = 'Centro';
+$string['notice:position:notforlayout'] = 'O layout {$a} não cabe num canto. Escolha o centro, o topo ou o rodapé.';
+$string['notice:position:top'] = 'Topo';
+$string['notice:position:topend'] = 'Topo, fim';
+$string['notice:position:topstart'] = 'Topo, início';
+$string['notice:position_help'] = 'Onde o diálogo fica. Início e fim seguem a direção de leitura: início é a esquerda numa língua escrita da esquerda para a direita e a direita numa língua escrita da direita para a esquerda.
+
+Os quatro cantos são só do layout Cartão; um diálogo mais largo fica centralizado ou encostado no topo ou no rodapé. O layout Tela cheia cobre a tela e não tem posição.';
 $string['notice:preview'] = 'Pré-visualizar o modal';
 $string['notice:reqcourse'] = 'Requer conclusão do curso';
 $string['notice:reqcourse:thiscourse'] = 'Este curso';
@@ -235,15 +264,47 @@ $string['notice:resetinterval'] = 'Redefinir a cada';
 $string['notice:resetinterval_help'] = 'O alerta será exibido ao usuário novamente após o período especificado.';
 $string['notice:scope:thiscourse'] = 'Este alerta aparece apenas nas páginas deste curso, para quem consegue abri-las. Adicione uma regra de papel ou de coorte para restringir mais; filtros de categoria, tema e formato de curso não se aplicam.';
 $string['notice:scope:thiscourse:label'] = 'Alcance';
+$string['notice:slide'] = 'Slide';
+$string['notice:slide:add'] = 'Adicionar {$a} slides';
+$string['notice:slide:both'] = 'Um slide mostra uma imagem ou um vídeo, não os dois. Remova um deles.';
+$string['notice:slide:caption'] = 'Legenda';
+$string['notice:slide:delete'] = 'Remover slide';
+$string['notice:slide:image'] = 'Imagem';
+$string['notice:slide:video'] = 'Link do vídeo';
+$string['notice:slides:required'] = 'Um carrossel precisa de pelo menos {$a} slides, cada um com uma imagem, um link de vídeo ou uma legenda.';
 $string['notice:status'] = 'Status';
 $string['notice:status:draft'] = 'Rascunho';
 $string['notice:status:live'] = 'Ativo';
+$string['notice:template'] = 'Layout';
+$string['notice:template:card'] = 'Cartão';
+$string['notice:template:carousel'] = 'Carrossel';
+$string['notice:template:classic'] = 'Clássico';
+$string['notice:template:fullscreen'] = 'Tela cheia';
+$string['notice:template:hero'] = 'Destaque';
+$string['notice:template:video'] = 'Vídeo';
+$string['notice:template_help'] = 'A forma do diálogo que o leitor vê. Todo layout é um diálogo de verdade: escurece a página atrás, mantém o teclado dentro dele e é anunciado como diálogo pelo leitor de tela, seja qual for o tamanho.
+
+Clássico: cabeçalho, conteúdo e rodapé. O que todo aviso era antes dos layouts.
+
+Destaque: a imagem enviada como faixa no topo, com o título por cima.
+
+Tela cheia: cobre a janela inteira, para textos longos como uma política que o leitor precisa rolar. Não tem posição.
+
+Cartão: uma caixa compacta, em geral num canto, para uma mensagem curta com uma ação. Não tem espaço para a caixa de confirmação, então não pode ser Exige reconhecimento.
+
+Vídeo: um player montado a partir do link do vídeo no lugar da faixa de imagem. O filtro multimídia do site decide o que toca.
+
+Carrossel: uma imagem ou um vídeo por slide, com setas e legenda, a partir dos slides abaixo.';
 $string['notice:title'] = 'Título';
 $string['notice:validity'] = 'Vigência';
 $string['notice:validity:current'] = 'Vigente';
 $string['notice:validity:expired'] = 'Expirado';
 $string['notice:validity:permanent'] = 'Permanente';
 $string['notice:validity:scheduled'] = 'Agendado';
+$string['notice:videourl'] = 'Link do vídeo';
+$string['notice:videourl:invalid'] = 'Informe um endereço completo, começando com http:// ou https://.';
+$string['notice:videourl:required'] = 'O layout Vídeo precisa de um link de vídeo.';
+$string['notice:videourl_help'] = 'Um link para o vídeo: uma página do YouTube ou do Vimeo, ou um link direto para um arquivo MP4 ou WebM. O filtro multimídia do site monta o player, então toca o que os players do site permitem; um link que eles não tratam aparece como link. O vídeo nunca começa sozinho.';
 $string['notification:nodeleteallowed'] = 'Exclusão de alerta não permitida';
 $string['notification:noticedoesnotexist'] = 'O alerta não existe';
 $string['notification:noupdateallowed'] = 'Atualização de alerta não permitida';

@@ -1,0 +1,33 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_awareness/slide_image
+
+    The image of one carousel slide. The caption doubles as the alternative text, so a slide the
+    author described is described to a screen reader too; an undescribed one is decorative.
+
+    Context variables required for this template:
+      * url - the pluginfile URL of the slide's image
+      * alt - the slide's caption, plain text, possibly empty
+
+    Example context (json):
+    {
+        "url": "https://example.com/pluginfile.php/1/local_awareness/slidemedia/7/lab.jpg",
+        "alt": "The new computer lab in block C"
+    }
+}}
+<img src="{{url}}" alt="{{alt}}" class="la-slide-image">
