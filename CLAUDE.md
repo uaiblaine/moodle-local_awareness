@@ -238,6 +238,23 @@ Behat site fails every scenario on the same core locator and looks like your bug
   real anchor before `format_text()` — the multimedia filter embeds nothing from a bare URL — and the
   captions are `PARAM_RAW` on the way out, escaped once by the template's double stash.
 
+- **Core puts a grouped radio INSIDE its label, and `.d-flex` is `!important`.**
+  `element-radio-inline.mustache` (4.5 and 5.2 alike) renders `<label><input type="radio"> label</label>`,
+  so a rule written `input:checked + label` matches nothing; the layout picker's states read
+  `input:checked + .la-layout-option`, the sibling the radio actually has, and a position label is
+  found with `label:has(input...)`, which core's own Boost stylesheet uses on both branches. The
+  group wraps its children in a `fieldset` before the `.d-flex`, whose `display: flex !important` no
+  plugin rule can beat: the position grid is flex geometry (fixed cells, a container three cells
+  wide, margins on the centre cell, radios emitted in reading order by `notice_form::POSITION_GRID`),
+  never `display: grid` on that element. `tests/form/picker_render_test.php` pins the markup;
+  `motion_contract_test` pins the selectors and refuses `display` on any Bootstrap display utility.
+
+- **A dev site that upgraded mid-change never registers a web service added afterwards.**
+  `external_functions` is refreshed only when `$plugin->version` rises; a stack already at the bumped
+  version when `db/services.php` gained a function keeps its old list, and the AJAX call dies with
+  `invalidrecord` from `external_function_info()`. Fix in place from a CLI script with
+  `external_update_descriptions('local_awareness')`, or bump the version again.
+
 ## Testing notes
 
 - **Test metadata stays in docblocks (`@covers`, `@dataProvider`) while 405 is

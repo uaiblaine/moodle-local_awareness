@@ -47,6 +47,14 @@ class notice_form extends \core\form\persistent {
     /** @var int A carousel starts with this many empty slides, and adds this many per click. */
     public const SLIDES_MIN = 2;
 
+    /**
+     * The positions in the reading order of the 3x3 grid the stylesheet draws: the top row, the
+     * centre, the bottom row. awareness::POSITIONS puts the default first, which is right for a
+     * vocabulary and wrong for a grid, where a screen reader would announce the centre before the
+     * corner it sits under. Same set as awareness::POSITIONS; picker_render_test pins that.
+     */
+    public const POSITION_GRID = ['top-start', 'top', 'top-end', 'center', 'bottom-start', 'bottom', 'bottom-end'];
+
     /** @var array Fields to remove from the persistent validation. */
     protected static $foreignfields = [
         // The layout picker's group names, and the repeated slide rows: none is a column.
@@ -504,13 +512,13 @@ class notice_form extends \core\form\persistent {
         $mform->setDefault('template', awareness::TEMPLATES[0]);
 
         /*
-         * Position: the seven anchors as radios, which the stylesheet lays out as the 3x3 grid they
-         * are. A fullscreen dialogue has no position, so the field is hidden for it; the corners
-         * belong to the card alone, and notice_form.js greys them for every other layout while
-         * extra_validation() refuses them for good.
+         * Position: the seven anchors as radios, emitted in the reading order of the 3x3 grid the
+         * stylesheet lays them out as. A fullscreen dialogue has no position, so the field is
+         * hidden for it; the corners belong to the card alone, and notice_form.js greys them for
+         * every other layout while extra_validation() refuses them for good.
          */
         $positions = [];
-        foreach (awareness::POSITIONS as $position) {
+        foreach (self::POSITION_GRID as $position) {
             $positions[] = $mform->createElement('radio', 'position', '', self::position_label($position), $position);
         }
         $mform->addGroup($positions, 'positiongroup', get_string('notice:position', 'local_awareness'), '', false);

@@ -6,6 +6,29 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The chosen layout is marked, and the positions sit in their grid (version 2026090403)
+
+**The layout picker showed no mark on the chosen layout.** Core renders a grouped radio as
+`<label><input> ...</label>`, the input inside its label, on 4.5 and 5.2 alike, and the picker's
+state rules were written `input:checked + label`, which matches nothing in that markup. With the
+radio itself hidden behind the thumbnail, nothing distinguished the chosen layout from the rest.
+The rules now read the sibling the radio actually has (`+ .la-layout-option`): the chosen card gets
+a brand border, a ring and a tinted fill, and keyboard focus keeps its own outline. The position
+radios were meant to sit in a 3x3 grid and never did, twice over: the rule missed the `fieldset`
+core puts around a group, and it set `display: grid` on core's `.d-flex`, whose display is
+`!important` on both branches, a declaration the plugin, which may not write `!important`, can
+never win. The grid is flex geometry now, and the form emits the seven anchors in reading order
+(top row, centre, bottom row), so what a screen reader announces is the order a sighted reader
+sees. Two contracts pin the defect class: a rendered-form test asserts the option is the radio's
+next sibling inside its label, and the stylesheet test refuses any state rule reaching for a label
+after a radio, and any `display` set on a Bootstrap display utility.
+
+**Preview died with `invalidrecord` on a site that had upgraded during development.** Not a code
+change: `external_functions` is refreshed only when the plugin version rises, so a site already at
+2026090402 before `db/services.php` gained `local_awareness_preview_notice` and
+`local_awareness_render_notice` never registered them. A site upgrading from any earlier version
+gets them; this bump re-registers them on one that upgraded mid-way.
+
 ### A notice chooses its layout, its place on the screen and its entrance (version 2026090402)
 
 **Every notice used to be the same dialogue: a header, a body and a footer, centred, arriving with
