@@ -61,6 +61,13 @@ class behat_local_awareness extends behat_base {
             $noticeinfo['timeend'] = $noticeinfo['timeend'] ?? 0;
             $noticeinfo['forcelogout'] = $noticeinfo['forcelogout'] ?? 0;
 
+            // A scenario names a course by shortname; the row carries its id. An empty cell is the site.
+            if (!empty($noticeinfo['course'])) {
+                $noticeinfo['courseid'] = $DB->get_field('course', 'id', ['shortname' => $noticeinfo['course']], MUST_EXIST);
+            }
+            unset($noticeinfo['course']);
+            $noticeinfo['courseid'] = $noticeinfo['courseid'] ?? 0;
+
             /*
              * A scenario may say `insistence` and mean the level an author would choose, rather
              * than spell out the two columns it is stored in. The mapping is the same one

@@ -188,7 +188,7 @@ final class picker_contract_test extends \basic_testcase {
 
         $inline = [];
         foreach ($found[1] as $index => $attribute) {
-            if ($attribute === 'data-contextid') {
+            if ($attribute === 'data-contextid' || $attribute === 'data-courseid') {
                 continue;
             }
             if (!str_starts_with($found[2][$index], '\' . s(get')) {

@@ -83,3 +83,42 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
 
     send_stored_file($file, null, 0, $forcedownload, $options);
 }
+
+/**
+ * Add the course's notices to its navigation for the people who may author or report on them.
+ *
+ * @param navigation_node $navigation The course settings node.
+ * @param stdClass $course The course.
+ * @param context $context The course context.
+ */
+function local_awareness_extend_navigation_course(navigation_node $navigation, stdClass $course, context $context): void {
+    /*
+     * Core hands this callback the SITE course too: settings_navigation's CONTEXT_MODULE branch
+     * calls load_course_settings() with no site guard, so every activity on the front page reaches
+     * here with course id 1. The site has no course scope — its notices live in Site administration
+     * — and author_scope::course() refuses the site course by design, so this returns before it is
+     * asked. It has to be the first statement.
+     */
+    if ((int) $course->id <= SITEID) {
+        return;
+    }
+
+    // The manage page opens for either verb: the reports capability alone gets a read-only list, from
+    // which each notice's two reports are reached. A link is shown only where its page will open.
+    $scope = \local_awareness\local\author_scope::course((int) $course->id);
+    if (
+        !\local_awareness\helper::require_author($scope, 'manage', false)
+        && !\local_awareness\helper::require_author($scope, 'viewreports', false)
+    ) {
+        return;
+    }
+
+    $navigation->add(
+        get_string('coursenotices', 'local_awareness'),
+        new moodle_url('/local/awareness/managenotice.php', ['courseid' => $course->id]),
+        navigation_node::TYPE_SETTING,
+        null,
+        'localawareness',
+        new pix_icon('i/settings', '')
+    );
+}

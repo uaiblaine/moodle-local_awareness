@@ -482,6 +482,60 @@ final class author_scope_test extends \advanced_testcase {
     }
 
     /**
+     * A page request resolves to the notice's scope when there is a notice, else to the URL's course, else the site.
+     *
+     * The notice wins over the URL — a course URL naming a site notice is the site — and the site
+     * course, or nothing, is the site. All four shapes in one test, so a for_request() that
+     * ignored either argument reddens.
+     */
+    public function test_a_request_resolves_to_the_notice_s_scope_or_the_url_s_course(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $coursenotice = $generator->create_notice(['courseid' => $course->id]);
+        $sitenotice = $generator->create_notice();
+
+        $this->assertSame(
+            (int) $course->id,
+            author_scope::for_request(null, (int) $course->id)->get_courseid(),
+            'the URL\'s course'
+        );
+        $this->assertTrue(author_scope::for_request(null, 0)->is_site(), 'no course is the site');
+        $this->assertTrue(author_scope::for_request(null, SITEID)->is_site(), 'the site course is the site');
+        $this->assertSame(
+            (int) $course->id,
+            author_scope::for_request($coursenotice, (int) $other->id)->get_courseid(),
+            'the notice wins'
+        );
+        $this->assertTrue(
+            author_scope::for_request($sitenotice, (int) $course->id)->is_site(),
+            'a site notice is the site whatever the URL says'
+        );
+    }
+
+    /**
+     * The cohorts a form may offer: every cohort for the site, only the course's wired ones for a course.
+     *
+     * The same set apply() narrows to, so the picker never shows what the save would drop.
+     */
+    public function test_the_cohorts_a_form_may_offer_follow_the_scope(): void {
+        global $DB;
+
+        $course = $this->getDataGenerator()->create_course();
+        $wired = $this->getDataGenerator()->create_cohort();
+        $unwired = $this->getDataGenerator()->create_cohort();
+        $studentroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+        enrol_get_plugin('cohort')->add_instance($course, ['customint1' => $wired->id, 'roleid' => $studentroleid]);
+
+        $site = author_scope::site()->cohort_options();
+        $this->assertArrayHasKey((int) $wired->id, $site);
+        $this->assertArrayHasKey((int) $unwired->id, $site);
+
+        $mine = author_scope::course((int) $course->id)->cohort_options();
+        $this->assertSame([(int) $wired->id], array_keys($mine));
+    }
+
+    /**
      * A scope knows the context its decisions are taken in.
      *
      * Against a real generated course, so the lookup is a real one; and both scopes in one test,

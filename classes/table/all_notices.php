@@ -50,6 +50,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /** @var array Criteria hashes with a job in flight, for this page of rows. */
     protected $inflight = [];
 
+    /** @var array Course names for the course notices on this page, keyed by course id; site mode only. */
+    private array $coursenames = [];
+
     /**
      * all_notices constructor.
      *
@@ -101,13 +104,15 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * The context the dynamic-table web service validates against.
      *
-     * Derived here rather than accepted as a parameter: notices are a site-level thing, and a
-     * context id arriving from the client is a context the client chose.
+     * Derived from the scope, never accepted as a parameter: a context id arriving from the client
+     * is a context the client chose. The scope comes from the filterset, which is the one thing the
+     * AJAX refresh rebuilds the table from — so this, has_capability() and the query cannot decide
+     * for different lists.
      *
      * @return \context
      */
     public function get_context(): \context {
-        return \context_system::instance();
+        return $this->scope()->context();
     }
 
     /**
@@ -116,7 +121,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @return bool
      */
     public function has_capability(): bool {
-        return helper::require_author(author_scope::site(), 'manage', false);
+        $scope = $this->scope();
+
+        return helper::require_author($scope, 'manage', false) || helper::require_author($scope, 'viewreports', false);
     }
 
     /**
@@ -125,7 +132,44 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @return void
      */
     public function guess_base_url(): void {
-        $this->baseurl = new moodle_url('/local/awareness/managenotice.php');
+        $this->baseurl = $this->page_url('/local/awareness/managenotice.php');
+    }
+
+    /**
+     * The scope this list is for: the course in the filterset, or the site.
+     *
+     * An absent filterset is the site — the shape the dynamic-table contract test constructs and
+     * the shape every site-mode caller has always used. The site course and below read as the site.
+     *
+     * @return author_scope
+     */
+    private function scope(): author_scope {
+        $filterset = $this->get_filterset();
+        if ($filterset !== null && $filterset->has_filter('courseid')) {
+            $values = $filterset->get_filter('courseid')->get_filter_values();
+            $courseid = (int) reset($values);
+            if ($courseid > SITEID) {
+                return author_scope::course($courseid);
+            }
+        }
+
+        return author_scope::site();
+    }
+
+    /**
+     * A plugin page URL that keeps the list's scope.
+     *
+     * @param string $path The page.
+     * @param array $params Its parameters.
+     * @return moodle_url
+     */
+    private function page_url(string $path, array $params = []): moodle_url {
+        $scope = $this->scope();
+        if (!$scope->is_site()) {
+            $params['courseid'] = $scope->get_courseid();
+        }
+
+        return new moodle_url($path, $params);
     }
 
     /**
@@ -208,6 +252,20 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             $this->rawdata[] = new awareness(0, $record);
         }
 
+        // The site list shows which course a course notice belongs to; one query for the page.
+        $this->coursenames = [];
+        if ($this->scope()->is_site()) {
+            $courseids = [];
+            foreach ($this->rawdata ?? [] as $notice) {
+                if ((int) $notice->get('courseid') > 0) {
+                    $courseids[(int) $notice->get('courseid')] = true;
+                }
+            }
+            if (!empty($courseids)) {
+                $this->coursenames = $DB->get_records_list('course', 'id', array_keys($courseids), '', 'id, fullname');
+            }
+        }
+
         /*
          * Resolved once for the whole page of rows rather than per row, which would re-read every
          * repeating notice for each line of the table.
@@ -216,7 +274,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
          * notices at all reaches this with nothing. The manage page is exactly where a site with no
          * notices starts.
          */
-        $this->clashtitles = collision::clash_titles_for($this->rawdata ?? []);
+        $this->clashtitles = collision::clash_titles_for($this->rawdata ?? [], $this->scope());
         // Same shape as the line above: one query for the page, not one per row in col_audience().
         $this->inflight = audience_job::in_flight_hashes();
 
@@ -275,10 +333,10 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             echo $OUTPUT->render_from_template('local_awareness/manage/empty', [
                 'message' => get_string('manage:empty:none', 'local_awareness'),
                 'showcreate' => true,
-                'createurl' => (new moodle_url(
+                'createurl' => $this->page_url(
                     '/local/awareness/editnotice.php',
                     ['noticeid' => 0, 'sesskey' => sesskey()]
-                ))->out(false),
+                )->out(false),
                 'createlabel' => get_string('notice:create', 'local_awareness'),
             ]);
         }
@@ -332,6 +390,13 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             return [implode(' AND ', $wheres), $params];
         }
 
+        // The list's scope: a course page lists that course's notices and nothing else.
+        $scope = $this->scope();
+        if (!$scope->is_site()) {
+            $wheres[] = 'courseid = :courseid';
+            $params['courseid'] = $scope->get_courseid();
+        }
+
         if ($filterset->has_filter('name')) {
             $values = $filterset->get_filter('name')->get_filter_values();
             $needle = trim((string) reset($values));
@@ -358,7 +423,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 $wheres[] = 'enabled = :statusdraft';
                 $params['statusdraft'] = 0;
             } else if ($status === all_notices_filterset::STATUS_CLASH) {
-                $ids = collision::clashing_ids();
+                $ids = collision::clashing_ids($this->scope());
                 if (empty($ids)) {
                     // No notice competes: an empty IN () is not portable, so say so directly.
                     $wheres[] = '1 = 0';
@@ -411,8 +476,8 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         global $OUTPUT;
 
         $id = (int) $awareness->get('id');
-        $action = static function (string $name) use ($id): moodle_url {
-            return new moodle_url('/local/awareness/editnotice.php', [
+        $action = function (string $name) use ($id): moodle_url {
+            return $this->page_url('/local/awareness/editnotice.php', [
                 'noticeid' => $id,
                 'action' => $name,
                 'sesskey' => sesskey(),
@@ -429,6 +494,16 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
          */
         $menu = new \core\output\action_menu();
         $menu->set_kebab_trigger(get_string('actions'));
+
+        /*
+         * A reports-only viewer gets the two reports and the preview, and none of the verbs: the
+         * page opened for the reports capability, and a link to an action the seam would refuse
+         * is a link to an error. Decided per row rather than once, because a course list can be
+         * read by a viewer who may author the site's notices and not the course's.
+         */
+        if (!helper::require_author(author_scope::of($awareness), 'manage', false)) {
+            return $this->report_only_actions($awareness, $menu);
+        }
 
         $primary = [
             ['edit', get_string('edit'), 't/edit'],
@@ -488,6 +563,51 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 new \pix_icon($icon, ''),
                 $label
             ));
+        }
+
+        return $OUTPUT->render($menu);
+    }
+
+    /**
+     * The actions a reports-only viewer gets: the preview, and the two reports where rows can exist.
+     *
+     * @param awareness $awareness The notice.
+     * @param \core\output\action_menu $menu The menu, with its trigger already set.
+     * @return string
+     */
+    private function report_only_actions(awareness $awareness, \core\output\action_menu $menu): string {
+        global $OUTPUT;
+
+        $id = (int) $awareness->get('id');
+        $previewlabel = get_string('notice:preview', 'local_awareness');
+        $menu->add_primary_action(new \core\output\action_menu\link_primary(
+            new moodle_url('#'),
+            new \pix_icon('i/preview', ''),
+            $previewlabel,
+            [
+                'title' => $previewlabel,
+                'aria-label' => $previewlabel,
+                'class' => 'local-awareness-action notice-preview',
+                'data-noticecontent' => helper::render_content($awareness),
+            ]
+        ));
+
+        // The same gate col_actions() applies: informational notices record nothing to report on.
+        if ($awareness->get_insistence() >= awareness::INSISTENCE_BLOCKING) {
+            $reports = [
+                ['acknowledged_report', get_string('report:button:ack', 'local_awareness')],
+                ['dismissed_report', get_string('report:button:dis', 'local_awareness')],
+            ];
+            foreach ($reports as [$name, $label]) {
+                $menu->add_secondary_action(new \core\output\action_menu\link_secondary(
+                    $this->page_url(
+                        '/local/awareness/editnotice.php',
+                        ['noticeid' => $id, 'action' => $name, 'sesskey' => sesskey()]
+                    ),
+                    new \pix_icon('i/report', ''),
+                    $label
+                ));
+            }
         }
 
         return $OUTPUT->render($menu);
@@ -718,10 +838,30 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
          */
         $path = trim((string) $awareness->get('pathmatch'));
 
+        // On the site list a course notice says which course it belongs to; a course list needs no chip.
+        $course = null;
+        $courseid = (int) $awareness->get('courseid');
+        if ($courseid > 0 && $this->scope()->is_site()) {
+            if (isset($this->coursenames[$courseid])) {
+                $name = format_string(
+                    $this->coursenames[$courseid]->fullname,
+                    true,
+                    ['context' => \context_course::instance($courseid, IGNORE_MISSING) ?: \context_system::instance()]
+                );
+                $course = [
+                    'name' => get_string('manage:scope:course', 'local_awareness', $name),
+                    'url' => (new moodle_url('/course/view.php', ['id' => $courseid]))->out(false),
+                ];
+            } else {
+                $course = ['name' => get_string('manage:scope:orphan', 'local_awareness'), 'url' => ''];
+            }
+        }
+
         return $OUTPUT->render_from_template('local_awareness/manage/cell_title', [
             'title' => $title,
             'titleplain' => $title,
             'where' => $path !== '' ? $path : get_string('notice:pathmatch:anywhere', 'local_awareness'),
+            'course' => $course,
         ]);
     }
 }

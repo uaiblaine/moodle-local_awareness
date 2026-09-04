@@ -16,13 +16,21 @@
     * title (string) — the filtered notice title, safe HTML
     * titleplain (string) — the same title for the tooltip attribute
     * where (string) — the raw path pattern, or the "anywhere" sentence
+    * course (object, optional) — on the site list, the course a course notice belongs to:
+      name (string, already a sentence) and url (string, empty when the course is gone)
 
     Example context (json):
     {
         "title": "Scheduled maintenance",
         "titleplain": "Scheduled maintenance",
-        "where": "/course/view.php%"
+        "where": "/course/view.php%",
+        "course": {"name": "Course: Astronomy 101", "url": "https://example.com/course/view.php?id=2"}
     }
 }}
 <span class="local-awareness-celltitle" title="{{titleplain}}">{{{title}}}</span>
 <span class="local-awareness-subline" title="{{where}}">{{where}}</span>
+{{#course}}
+    <span class="local-awareness-subline local-awareness-scope">
+        {{#url}}<a href="{{url}}">{{name}}</a>{{/url}}{{^url}}{{name}}{{/url}}
+    </span>
+{{/course}}

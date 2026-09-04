@@ -74,6 +74,16 @@ class notice_form extends \core\form\persistent {
 
         // Needed throughout: several sections pre-load defaults from the saved notice.
         $persistent = $this->get_persistent();
+        /*
+         * The scope the form writes under decides what it offers. Under a course scope the fields
+         * the scope FORCES (the course, the role context) and FORBIDS (category, theme, format) are
+         * not rendered at all — a field the author cannot change is not a field — and the pickers
+         * the scope RESTRICTS offer only what the scope admits, so nothing the form shows is
+         * something the save would refuse or quietly drop. extra_validation() applies the same
+         * scope, so what slips past the form is still caught with a message on the field.
+         */
+        $scope = $this->scope();
+        $coursemode = !$scope->is_site();
 
         // Content.
         $mform->addElement('header', 'header_content', get_string('editor:section:content', 'local_awareness'));
@@ -184,19 +194,29 @@ class notice_form extends \core\form\persistent {
         );
         $mform->setExpanded('header_audience', true);
 
-        // Context / Filter fields.
-        $mform->addElement(
-            'select',
-            'filter_role_context',
-            get_string('filter_role_context', 'local_awareness'),
-            [
-                0 => get_string('all', 'local_awareness'),
-                CONTEXT_SYSTEM => get_string('filter_role_context:system', 'local_awareness'),
-                CONTEXT_COURSECAT => get_string('filter_role_context:category', 'local_awareness'),
-                CONTEXT_COURSE => get_string('filter_role_context:course', 'local_awareness'),
-            ]
-        );
-        $mform->setDefault('filter_role_context', 0);
+        if ($coursemode) {
+            // Where the notice reaches is the course, said once here rather than as five absent fields.
+            $mform->addElement(
+                'static',
+                'scope_line',
+                get_string('notice:scope:thiscourse:label', 'local_awareness'),
+                get_string('notice:scope:thiscourse', 'local_awareness')
+            );
+        } else {
+            // Context / Filter fields. Forced to the course under a course scope, so not offered there.
+            $mform->addElement(
+                'select',
+                'filter_role_context',
+                get_string('filter_role_context', 'local_awareness'),
+                [
+                    0 => get_string('all', 'local_awareness'),
+                    CONTEXT_SYSTEM => get_string('filter_role_context:system', 'local_awareness'),
+                    CONTEXT_COURSECAT => get_string('filter_role_context:category', 'local_awareness'),
+                    CONTEXT_COURSE => get_string('filter_role_context:course', 'local_awareness'),
+                ]
+            );
+            $mform->setDefault('filter_role_context', 0);
+        }
 
         $filterroledefaults = [];
         if ($persistent && $persistent->get('id') > 0 && !empty($persistent->get('filtervalues'))) {
@@ -230,7 +250,7 @@ class notice_form extends \core\form\persistent {
             'autocomplete',
             'cohorts',
             get_string('notice:cohort', 'local_awareness'),
-            helper::built_cohorts_options(),
+            $scope->cohort_options(),
             ['noselectionstring' => get_string('notice:cohort:all', 'local_awareness'), 'multiple' => true, 'id' => 'id_cohorts']
         );
 
@@ -246,19 +266,32 @@ class notice_form extends \core\form\persistent {
             }
         }
 
-        $mform->addElement(
-            'autocomplete',
-            'reqcourse',
-            get_string('notice:reqcourse', 'local_awareness'),
-            $reqcourseoptions,
-            [
-                'multiple' => false,
-                'ajax' => 'local_awareness/course_search',
-                'noselectionstring' => get_string('booleanformat:false', 'local_awareness'),
-                'showSuggestions' => false,
-                'placeholder' => get_string('course_search_placeholder', 'local_awareness'),
-            ]
-        );
+        if ($coursemode) {
+            // The scope restricts the required course to this one or none: a plain choice, no search.
+            $mform->addElement(
+                'select',
+                'reqcourse',
+                get_string('notice:reqcourse', 'local_awareness'),
+                [
+                    0 => get_string('booleanformat:false', 'local_awareness'),
+                    $scope->get_courseid() => get_string('notice:reqcourse:thiscourse', 'local_awareness'),
+                ]
+            );
+        } else {
+            $mform->addElement(
+                'autocomplete',
+                'reqcourse',
+                get_string('notice:reqcourse', 'local_awareness'),
+                $reqcourseoptions,
+                [
+                    'multiple' => false,
+                    'ajax' => 'local_awareness/course_search',
+                    'noselectionstring' => get_string('booleanformat:false', 'local_awareness'),
+                    'showSuggestions' => false,
+                    'placeholder' => get_string('course_search_placeholder', 'local_awareness'),
+                ]
+            );
+        }
         $mform->setType('reqcourse', PARAM_INT);
         $mform->addHelpButton('reqcourse', 'notice:reqcourse', 'local_awareness');
         $mform->setDefault('reqcourse', 0);
@@ -281,7 +314,8 @@ class notice_form extends \core\form\persistent {
             $mform->addElement(
                 'html',
                 '<div id="awareness-competency-filter" class="mb-3"
-                    data-contextid="' . (int) \context_system::instance()->id . '"
+                    data-contextid="' . (int) $scope->context()->id . '"
+                    data-courseid="' . (int) $scope->get_courseid() . '"
                     data-proficient-label="' . s(get_string('filter_competency_proficient', 'local_awareness')) . '"
                     data-yes-label="' . s(get_string('booleanformat:true', 'local_awareness')) . '"
                     data-no-label="' . s(get_string('booleanformat:false', 'local_awareness')) . '"
@@ -336,6 +370,17 @@ class notice_form extends \core\form\persistent {
         $mform->addHelpButton('pathmatch', 'pathmatch', 'local_awareness');
 
         // Fields moved to header_audience.
+
+        /*
+         * The four page filters below are the site scope's. Under a course scope the course is
+         * forced and the other three are forbidden, so none of them is rendered: the static line
+         * in the audience section says what the notice reaches instead.
+         */
+        if ($coursemode) {
+            $this->define_appearance($mform);
+
+            return;
+        }
 
         // Category.
         $mform->addElement(
@@ -402,6 +447,26 @@ class notice_form extends \core\form\persistent {
             ]
         );
 
+        $this->define_appearance($mform);
+    }
+
+    /**
+     * The scope this form writes under: from the page, or the site.
+     *
+     * @return author_scope
+     */
+    private function scope(): author_scope {
+        $scope = $this->_customdata['scope'] ?? null;
+
+        return $scope instanceof author_scope ? $scope : author_scope::site();
+    }
+
+    /**
+     * The appearance section, the same under both scopes.
+     *
+     * @param \MoodleQuickForm $mform The form.
+     */
+    private function define_appearance(\MoodleQuickForm $mform): void {
         // Modal appearance.
         $mform->addElement('header', 'header_appearance', get_string('editor:section:appearance', 'local_awareness'));
         $mform->addElement(
@@ -496,7 +561,7 @@ class notice_form extends \core\form\persistent {
      * @return array Additional errors, keyed by element name.
      */
     protected function extra_validation($data, $files, array &$errors) {
-        $result = author_scope::site()->apply((array) $data);
+        $result = $this->scope()->apply((array) $data);
 
         $extra = [];
         foreach ($result->problem_fields() as $field) {

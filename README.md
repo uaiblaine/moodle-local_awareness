@@ -121,6 +121,18 @@ This enables custom report composition with filters, columns, export, and reuse 
 - Targeted runs: `mdl phpunit m501 local_awareness`, `mdl behat m501 @local_awareness`.
 - For release automation, tags matching `v*` trigger the Moodle Plugin Release workflow.
 
+## Course notices
+
+A notice can belong to a course. Grant `local/awareness:managecourse` in the course to whoever may
+author its notices, and `local/awareness:viewreportscourse` to whoever may read their reports;
+neither has a default archetype. The holder also needs to be enrolled, or to hold
+`moodle/course:view`, because the pages live inside the course and `require_login()` is a gate of
+its own. A course notice appears only on its course's pages, to anyone who can open them — guests
+included where the course allows guest access — so add a role or cohort rule to narrow it further;
+category, theme and course-format filters do not apply to it, and it does not travel with a course
+backup. A holder of `viewreportscourse` alone sees the course's list read-only, with the two reports
+of each notice and nothing to create or change.
+
 ## Contributing
 
 Issues and pull requests are welcome:

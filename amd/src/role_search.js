@@ -7,6 +7,20 @@
  */
 
 define(['core/ajax', 'jquery'], function(Ajax, $) {
+
+    /**
+     * The course the editor writes for, read once from the editor root; 0 for the site.
+     *
+     * Every web service the editor calls takes it, so that a course author's requests are gated and
+     * scoped as a course author's rather than refused at the site.
+     *
+     * @returns {number}
+     */
+    var courseId = function() {
+        var root = document.querySelector('[data-region="la-editor"]');
+        return root ? (parseInt(root.getAttribute('data-courseid'), 10) || 0) : 0;
+    };
+
     var transport = function(selector, query, callback, failure) {
         var contextSelect = $('#id_filter_role_context');
         var contextLevel = contextSelect.length ? contextSelect.val() : 0;
@@ -15,7 +29,8 @@ define(['core/ajax', 'jquery'], function(Ajax, $) {
             methodname: 'local_awareness_search_roles',
             args: {
                 query: query,
-                contextlevel: parseInt(contextLevel, 10) || 0
+                contextlevel: parseInt(contextLevel, 10) || 0,
+                courseid: courseId()
             }
         };
 

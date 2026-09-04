@@ -188,6 +188,19 @@ define([
     }
 
     /**
+     * The course the editor writes for, read once from the editor root; 0 for the site.
+     *
+     * Every web service the editor calls takes it, so that a course author's requests are gated and
+     * scoped as a course author's rather than refused at the site.
+     *
+     * @returns {number}
+     */
+    var courseId = function() {
+        var root = document.querySelector('[data-region="la-editor"]');
+        return root ? (parseInt(root.getAttribute('data-courseid'), 10) || 0) : 0;
+    };
+
+    /**
      * Write the reach value text.
      *
      * @param {string} text The value to display.
@@ -337,7 +350,7 @@ define([
 
         Ajax.call([{
             methodname: 'local_awareness_get_estimate',
-            args: {jobid: jobid}
+            args: {jobid: jobid, courseid: courseId()}
         }])[0].then(function(response) {
             if (mine !== state.sequence) {
                 return null;
@@ -510,7 +523,7 @@ define([
 
         Ajax.call([{
             methodname: 'local_awareness_estimate_audience',
-            args: {criteria: json}
+            args: {criteria: json, courseid: courseId()}
         }])[0].then(function(response) {
             if (mine !== state.sequence) {
                 return null;

@@ -17,6 +17,7 @@
 namespace local_awareness\table;
 
 use core_table\local\filter\filterset;
+use core_table\local\filter\integer_filter;
 use core_table\local\filter\string_filter;
 
 /**
@@ -74,6 +75,13 @@ class all_notices_filterset extends filterset {
             'name' => string_filter::class,
             'status' => string_filter::class,
             'validity' => string_filter::class,
+            /*
+             * The course the list is for, or absent for the site. It travels in the filterset and
+             * not as a page parameter because the dynamic-table web service rebuilds the table from
+             * the filterset alone: the scope has to be wherever the context and the capability are
+             * decided from, or a refresh over AJAX would decide them for a different list.
+             */
+            'courseid' => integer_filter::class,
         ];
     }
 

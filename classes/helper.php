@@ -1563,6 +1563,30 @@ class helper {
     }
 
     /**
+     * The notice a page names, as the current user may act on it, or null for a new one.
+     *
+     * Two refusals, one answer. A notice that does not exist and a notice outside the caller's
+     * authority both come back as "no such notice": under a course scope the page's own gate has
+     * already been passed for the URL's course, so an answer that differed between the two — a
+     * redirect for one, a permission error for the other — would tell a course author whether an
+     * id names a notice in someone else's course, or at the site, by trying it. The page redirects
+     * to its list with the missing-notice message in both cases.
+     *
+     * @param int $noticeid The id from the request; 0 means a new notice.
+     * @param string $verb The authoring verb the page is about to perform.
+     * @return awareness|null The notice, or null for a new one.
+     * @throws \moodle_exception notification:noticedoesnotexist, for a missing notice and for one outside the caller's authority.
+     */
+    public static function resolve_notice_as_author(int $noticeid, string $verb): ?awareness {
+        $notice = self::resolve_notice($noticeid);
+        if ($notice !== null && !self::require_author(author_scope::of($notice), $verb, false)) {
+            throw new \moodle_exception('notification:noticedoesnotexist', 'local_awareness');
+        }
+
+        return $notice;
+    }
+
+    /**
      * Whether the current user may be served a notice's attachments.
      *
      * The gate local_awareness_pluginfile() stands behind, kept here so it can be tested without

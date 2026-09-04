@@ -178,9 +178,16 @@ Behat site fails every scenario on the same core locator and looks like your bug
   Course deletion purges through the `before_course_deleted` hook —
   the `course_deleted` event fires after the course and its context are gone — via
   `helper::purge_notice()`, which is not a verb and asks nothing; `delete_notice()` is the verb.
-  **The course editor is the next change, as one unit:** navigation, dual-mode pages, the form,
-  and the five author web services taking `courseid`; separately they ship a reachable, broken
-  editor (measured against the estimator's auto-trigger and the pickers' gates).
+  **The course editor** (phase 31) is where a course scope becomes reachable: the navigation
+  callback (guarded for the site course, which core hands it on front-page activity pages), the
+  two pages in course mode with `author_scope::for_request()` turning the URL into a scope — the
+  URL's scope gated BEFORE the notice is resolved, the notice's scope winning after — the manage
+  table reading its scope from the filterset (absent filterset → the site), the form reading its
+  scope from customdata (absent → the site) and rendering only what the scope admits, and the five
+  editor web services taking `courseid`, gating on it and answering inside it. The per-rule chips
+  are withheld at the READ for a course scope, because jobs are shared by criteria hash across
+  scopes; a rival outside the scope is described, never named. A course-notice role needs
+  enrolment or `moodle/course:view` beside `managecourse`.
 
 ## Testing notes
 

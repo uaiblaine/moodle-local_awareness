@@ -49,6 +49,7 @@ class estimate_audience extends external_api {
                 'JSON object of audience and context criteria',
                 VALUE_REQUIRED
             ),
+            'courseid' => new external_value(PARAM_INT, 'course the editor is scoped to, 0 for the site', VALUE_DEFAULT, 0),
         ]);
     }
 
@@ -62,20 +63,27 @@ class estimate_audience extends external_api {
      * path remains, because there the cost is real.
      *
      * @param string $criteria JSON-encoded criteria object
+     * @param int $courseid The course the editor is scoped to, 0 for the site.
      * @return array
-     * @throws \invalid_parameter_exception When the criteria name something the site does not have.
+     * @throws \invalid_parameter_exception When the criteria name something the scope does not admit.
      */
-    public static function execute(string $criteria): array {
+    public static function execute(string $criteria, int $courseid = 0): array {
         global $USER;
 
         $params = self::validate_parameters(
             self::execute_parameters(),
-            ['criteria' => $criteria]
+            ['criteria' => $criteria, 'courseid' => $courseid]
         );
 
-        $syscontext = \context_system::instance();
-        self::validate_context($syscontext);
-        helper::require_author(author_scope::site(), 'manage');
+        /*
+         * The scope the caller is writing under, from the courseid the editor sends: the site when
+         * absent. Validated as a context — which also requires login to the course — and then gated
+         * the way every author-side entry point is, so a course author's editor works and a caller
+         * naming a course they do not hold is refused before anything is read.
+         */
+        $scope = author_scope::for_request(null, (int) $params['courseid']);
+        self::validate_context($scope->context());
+        helper::require_author($scope, 'manage');
 
         $raw = json_decode($params['criteria'], true);
         if (!is_array($raw)) {
@@ -92,10 +100,10 @@ class estimate_audience extends external_api {
          * bounds whatever it did not read, and runs AFTER it so that a legitimate cohort is never
          * cut off for sitting behind a run of ids the scope was about to drop anyway.
          */
-        $scoped = author_scope::site()->apply($raw);
+        $scoped = $scope->apply($raw);
         if (!$scoped->is_clean()) {
             throw new \invalid_parameter_exception(
-                'criteria name something the site does not have: ' . implode(', ', $scoped->problem_fields())
+                'criteria name something the scope does not admit: ' . implode(', ', $scoped->problem_fields())
             );
         }
         $raw = helper::cap_criteria_lists($scoped->criteria());

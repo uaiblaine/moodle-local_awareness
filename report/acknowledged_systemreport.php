@@ -36,15 +36,15 @@ require_login();
 
 $context = context_system::instance();
 
-// Resolved before the gate, because the gate depends on whose notice it is. resolve_notice() refuses
-// an id that names nothing with the editor's own message and answers null only for an id of zero,
-// which is refused the same way here. The report itself stays in the system context in every
-// scope: its rows are already one notice's, and it decides its viewer the same way.
-$awareness = helper::resolve_notice($noticeid);
+// Resolved and gated in one call, because the gate depends on whose notice it is, and a notice
+// that is not this viewer's to report on is refused exactly as one that does not exist: the same
+// message, so an id cannot be probed for existence across scopes. An id of zero is refused the
+// same way. The report itself stays in the system context in every scope: its rows are already
+// one notice's, and it decides its viewer the same way.
+$awareness = helper::resolve_notice_as_author($noticeid, 'viewreports');
 if (!$awareness) {
     throw new moodle_exception('notification:noticedoesnotexist', 'local_awareness');
 }
-helper::require_author(author_scope::of($awareness), 'viewreports');
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/awareness/report/acknowledged_systemreport.php', ['noticeid' => $noticeid]));
@@ -69,7 +69,8 @@ $report = system_report_factory::create(
 );
 echo $report->output();
 
-$backurl = new moodle_url('/local/awareness/managenotice.php');
+$scope = author_scope::of($awareness);
+$backurl = new moodle_url('/local/awareness/managenotice.php', $scope->is_site() ? [] : ['courseid' => $scope->get_courseid()]);
 echo $OUTPUT->render_from_template('local_awareness/manage/backlink', ['url' => $backurl->out(false)]);
 
 echo $OUTPUT->footer();

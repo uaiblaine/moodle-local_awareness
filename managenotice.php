@@ -30,10 +30,35 @@ use core_table\local\filter\string_filter;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\output\manage_page;
+use core_table\local\filter\integer_filter;
 use local_awareness\table\all_notices;
 use local_awareness\table\all_notices_filterset;
-admin_externalpage_setup('local_awareness_managenotice');
-helper::require_author(author_scope::site(), 'manage');
+
+/*
+ * Two modes, one page. With no course the list is Site administration's, as it has always been.
+ * With a course it is that course's: reached from the course navigation, laid out inside the
+ * course, gated in the course context, and listing that course's notices only. The scope is the
+ * page's whole difference; the table reads it from its filterset, so the AJAX refresh sees the
+ * same list. author_scope::for_request() is what turns the raw parameter into a scope.
+ */
+$courseid = optional_param('courseid', 0, PARAM_INT);
+$scope = author_scope::for_request(null, $courseid);
+$scopeparams = $scope->is_site() ? [] : ['courseid' => $scope->get_courseid()];
+if ($scope->is_site()) {
+    admin_externalpage_setup('local_awareness_managenotice');
+} else {
+    $course = get_course($scope->get_courseid());
+    require_login($course);
+    $PAGE->set_context($scope->context());
+    $PAGE->set_pagelayout('incourse');
+    $PAGE->set_title(get_string('coursenotices', 'local_awareness'));
+    $PAGE->set_heading(format_string($course->fullname, true, ['context' => $scope->context()]));
+}
+// Either verb opens the list; what the list offers — a create button, the write actions — is the
+// manage verb's, and the table and the page each ask for it themselves rather than being told.
+if (!helper::require_author($scope, 'manage', false)) {
+    helper::require_author($scope, 'viewreports');
+}
 
 $page = optional_param('page', 0, PARAM_INT);
 
@@ -57,12 +82,12 @@ $thispage = '/local/awareness/managenotice.php';
 $editnotice = '/local/awareness/editnotice.php';
 
 \local_awareness\local\bootstrap::mark_page();
-$PAGE->set_url(new moodle_url($thispage));
+$PAGE->set_url(new moodle_url($thispage, $scopeparams));
 $PAGE->requires->js_call_amd('local_awareness/preview', 'init');
 // Core owns the paging links and the refresh of the table region; the plugin only feeds it filters.
 $PAGE->requires->js_call_amd('core_table/dynamic', 'init');
 
-$table = new all_notices('all_notices_table', new moodle_url($thispage), $page);
+$table = new all_notices('all_notices_table', new moodle_url($thispage, $scopeparams), $page);
 
 $filterset = new all_notices_filterset();
 $filterset->set_join_type(filter::JOINTYPE_ALL);
@@ -71,13 +96,16 @@ foreach ($filtervalues as $name => $value) {
         $filterset->add_filter(new string_filter($name, filter::JOINTYPE_ANY, [$value]));
     }
 }
+if (!$scope->is_site()) {
+    $filterset->add_filter(new integer_filter('courseid', filter::JOINTYPE_ANY, [$scope->get_courseid()]));
+}
 $table->set_filterset($filterset);
 
 $output = $PAGE->get_renderer('local_awareness');
 $tablehtml = $output->render($table);
 
-$newnoticeurl = new moodle_url($editnotice, ['noticeid' => 0, 'sesskey' => sesskey()]);
+$newnoticeurl = new moodle_url($editnotice, ['noticeid' => 0, 'sesskey' => sesskey()] + $scopeparams);
 
 echo $output->header();
-echo $output->render_manage_page(new manage_page($tablehtml, $newnoticeurl->out(false), $filtervalues));
+echo $output->render_manage_page(new manage_page($tablehtml, $newnoticeurl->out(false), $filtervalues, $scope));
 echo $output->footer();
