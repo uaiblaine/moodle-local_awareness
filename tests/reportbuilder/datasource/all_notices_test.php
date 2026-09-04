@@ -20,10 +20,8 @@ namespace local_awareness\reportbuilder\datasource;
 
 defined('MOODLE_INTERNAL') || die();
 
-global $CFG;
-require_once("{$CFG->dirroot}/reportbuilder/tests/helpers.php");
+require_once(__DIR__ . '/datasource_testcase.php');
 
-use core_reportbuilder\tests\core_reportbuilder_testcase;
 use core_reportbuilder_generator;
 use local_awareness\reportbuilder\datasource\all_notices;
 
@@ -36,7 +34,7 @@ use local_awareness\reportbuilder\datasource\all_notices;
  *
  * @covers \local_awareness\reportbuilder\datasource\all_notices
  */
-final class all_notices_test extends core_reportbuilder_testcase {
+final class all_notices_test extends datasource_testcase {
     /**
      * Test default datasource.
      */

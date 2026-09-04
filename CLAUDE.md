@@ -175,6 +175,19 @@ Behat site fails every scenario on the same core locator and looks like your bug
 - **`core_competency\api::is_enabled()` reads `get_config('core_competency',
   'enabled')`**, not `$CFG->enablecompetencies`. Setting the `$CFG` flag in a
   test leaves it returning true and sends the test down the wrong branch.
+- **The datasource tests extend `tests/reportbuilder/datasource/datasource_testcase.php`, not
+  core's testcase directly.** Core memoises a report's active elements behind a `microtime(true)`
+  comparison, and the aggregation stress helper asserts exactly one deprecation `debugging()` per
+  fetch (this plugin has one deprecated column). A second reading not strictly later than the
+  first — a backwards step, measured on the Docker Desktop VM: steps of up to 4.4 ms, seventeen in
+  twenty-five minutes while CI legs ran — makes the memo miss on all four calls a fetch makes, and
+  the helper sees four. The base class rebrackets each fetch so
+  the memo is clock-independent and checks the fetch used the stored elements. Keep new datasource
+  tests on it, and keep the deprecated column: the stress test's whole point is that it runs.
+  Two things that would have saved an hour: a debugging-count failure already prints every message
+  with its backtrace, and `mdl ci --matrix` keeps a failed leg's log under `$TMPDIR/mdlci-matrix-*`
+  — read it before theorising. And never time a suite on the dev stack to judge a CI cost: m501
+  runs it about 13 times slower than the runner (developer debug, Xdebug loaded).
 - **Mutation-test every new test**, and revert the mutation from a *file copy* —
   `git checkout --` restores from HEAD and silently discards uncommitted work
   alongside the mutation.
