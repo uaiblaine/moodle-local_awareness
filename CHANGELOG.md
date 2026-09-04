@@ -56,6 +56,34 @@ selected over a site-wide table, and the context and the row set have to move to
 wiring PR. The collision decision for a course author is written into
 `docs/SCOPE-VALIDATOR-FEASIBILITY.md`.
 
+### The datasource stress tests no longer depend on the clock
+
+**`link_history_test::test_stress_datasource` failed once, on one leg of a local matrix, with
+"Failed asserting that 4 matches expected 1".** Core's aggregation stress helper asserts that one
+content fetch emits exactly one `debugging()` call per deprecated column — this plugin has one,
+`notice:forcelogout` — and that call is emitted every time `datasource::get_active_columns()`
+rebuilds its memo. The memo is reused only while its build time is later than the moment the
+report's elements were last modified, both `microtime(true)` readings taken milliseconds apart;
+a fetch reaches the method four times. So whenever the second reading is not strictly later than
+the first — a backwards step, or an equal read under contention — every call rebuilds and the
+assertion sees four. Reproduced by forcing the memo to miss:
+exactly four, all the same message — and the failed leg's own log, kept by `mdl ci --matrix`,
+shows the four identical messages with a backtrace into each call site. Measured: the Docker
+Desktop VM's wall clock, watched against its monotonic clock for twenty-five minutes while the CI
+legs ran, stepped seventeen times, up to 4.4 ms backwards; on the dev stack the first rebuild
+follows the update by under a millisecond and the last by a few, so a step of that size covers the
+window. Nothing in the plugin is wrong, and nothing in a test can steady the environment's clock.
+
+The five datasource tests now extend `tests/reportbuilder/datasource/datasource_testcase.php`,
+which brackets every content fetch: the report instance is rebuilt fresh, the "last modified"
+stamp is set below any possible build time, and afterwards the columns and conditions the fetch
+used are checked against the database rows — so the stamp cannot validate a memo that was never
+rebuilt. Core's assertion is untouched and still runs, and so does the column stress helper's, which
+has the same exposure; a forced clock step now yields one call, and with the step forced, removing
+either half of the bracket turns the tests red. Under a well-behaved clock the stamp looks inert,
+which is exactly why the flake was rare. The control costs two assertions per fetch, about 1800
+fetches a suite, some 15 % of the suite's time on the CI runner.
+
 ### Every audience field is checked on the way in (version 2026090300)
 
 **Nothing validated ten of the eleven audience and context fields a notice carries.** Three of
