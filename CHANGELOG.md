@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### A required course that no longer exists withholds its notice
+
+**A notice requiring completion of a course showed to everyone, for ever, the day that course was
+deleted.** "Show until they have completed course X" was read as "show unless X is recorded
+complete", and a deleted course records nothing: the display path skipped the course it could not
+find and left the notice in — its own comment said so — the write-path gate fell through to true,
+and the audience estimator's `NOT EXISTS` over `{course_completions}` went vacuously true because
+deleting a course purges those rows, so the estimate grew to the whole site. Every other rule in
+this plugin withholds a notice whose referent it cannot resolve; this one now does too, on all
+three paths.
+
+There is deliberately no `course_deleted` observer clearing the field: clearing it would widen
+the audience, which is the outcome being fixed, and an observer can be missed — a course deleted
+while the plugin was absent, a restore — where the three consumers cannot. The editor already
+drops the dead course on the next edit and the author scope refuses it on save, so the notice
+returns when an author says what it should require now. `tests/reqcourse_missing_course_test.php`
+pins the three paths, each beside a notice whose course still exists and is incomplete, which
+keeps showing and keeps counting, and each read before the deletion as well.
+
 ### One gate for every author, and an id that names nothing is refused (version 2026090301)
 
 **A save posted against a notice that no longer existed created a new one.** `editnotice.php` read
