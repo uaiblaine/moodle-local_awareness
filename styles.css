@@ -717,9 +717,23 @@
     flex: 1 1 100%;
 }
 
-.local-awareness-editor #fgroup_id_templategroup .form-check,
-.local-awareness-editor #fgroup_id_templategroup > .col-md-9 > .d-flex > span {
-    margin: 0 0.5rem 0.5rem 0;
+/*
+ * Core renders each radio of a group as <label><input> ...</label>, on 4.5 and 5.2 alike
+ * (element-radio-inline.mustache): the input sits INSIDE its label, and the option template is
+ * the input's next sibling. So the label is the card, the input is hidden, and every state rule
+ * reads "+ .la-layout-option", the sibling the input actually has. The first version read
+ * "+ label", which matched nothing in that markup: with the radio hidden, the chosen layout
+ * showed no mark at all. tests/form/picker_render_test.php pins the markup and
+ * motion_contract_test the selectors.
+ */
+.local-awareness-editor #fgroup_id_templategroup fieldset > .d-flex {
+    gap: 0.5rem;
+}
+
+.local-awareness-editor #fgroup_id_templategroup label {
+    display: inline-flex;
+    padding: 0;
+    cursor: pointer;
 }
 
 .local-awareness-editor input[name="template"] {
@@ -729,13 +743,6 @@
     margin: -1px;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
-}
-
-.local-awareness-editor input[name="template"] + label {
-    display: inline-flex;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
 }
 
 .la-layout-option {
@@ -750,14 +757,24 @@
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--la-ink);
+    transition: border-color 0.12s, box-shadow 0.12s, background-color 0.12s;
 }
 
-.local-awareness-editor input[name="template"]:checked + label .la-layout-option {
+.la-layout-option:hover {
+    border-color: var(--la-ink-muted);
+}
+
+.local-awareness-editor input[name="template"]:checked + .la-layout-option {
     border-color: var(--la-brand);
-    box-shadow: 0 0 0 2px var(--la-brand-soft);
+    background: var(--la-brand-soft);
+    box-shadow: 0 0 0 2px var(--la-brand);
 }
 
-.local-awareness-editor input[name="template"]:focus-visible + label .la-layout-option {
+.local-awareness-editor input[name="template"]:checked + .la-layout-option .la-layout-name {
+    color: var(--la-brand);
+}
+
+.local-awareness-editor input[name="template"]:focus-visible + .la-layout-option {
     outline: 3px solid var(--la-brand);
     outline-offset: 2px;
 }
@@ -879,28 +896,32 @@
 }
 
 /*
- * The seven anchors as the 3x3 grid they are; the two side-middle cells are empty because the
- * vocabulary has no such position. The radios keep their own labels and focus rings.
+ * The seven anchors as the 3x3 grid they are, the two side-middle cells empty because the
+ * vocabulary has no such position. Two core rules decide the shape, both !important on 4.5 and
+ * 5.2 and so beyond any plugin rule (the plugin may not write !important): the container is
+ * core's .d-flex, display: flex, so the grid is flex geometry rather than display: grid; and
+ * every cell is a .fitem inside it, margin .1rem .25rem .1rem 0, so the cell pitch is
+ * 8rem + 0.25rem + the gap, and nothing here sets a margin. Three cells per row inside a
+ * container just wide enough for three, the form emitting the radios in reading order
+ * (notice_form::POSITION_GRID), and the centre cell taking a whole row with its content padded
+ * over to the middle column. A label is found through the radio it holds with :has(), which
+ * core's own Boost stylesheet uses on both branches. The radios keep their own focus rings.
  */
-.local-awareness-editor #fgroup_id_positiongroup > .col-md-9 > .d-flex {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(6rem, 8rem));
+.local-awareness-editor #fgroup_id_positiongroup fieldset > .d-flex {
+    max-width: calc(3 * (8rem + 0.25rem) + 2 * 0.35rem + 1px);
     gap: 0.35rem;
 }
 
-.local-awareness-editor #fgroup_id_positiongroup > .col-md-9 > .d-flex > span {
-    margin: 0;
+.local-awareness-editor #fgroup_id_positiongroup label {
+    flex: 0 0 8rem;
 }
 
-.local-awareness-editor input[name="position"][value="center"] {
-    grid-column: 2;
+.local-awareness-editor #fgroup_id_positiongroup label:has(input[value="center"]) {
+    flex-basis: 100%;
+    padding-left: calc(8rem + 0.25rem + 0.35rem);
 }
 
-.local-awareness-editor #fgroup_id_positiongroup > .col-md-9 > .d-flex > span:nth-child(4) {
-    grid-column: 2;
-}
-
-.local-awareness-editor input[name="position"]:disabled + label {
+.local-awareness-editor #fgroup_id_positiongroup label:has(input:disabled) {
     opacity: 0.45;
     cursor: not-allowed;
 }

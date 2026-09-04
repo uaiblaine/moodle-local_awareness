@@ -357,6 +357,66 @@ final class all_notices_test extends \advanced_testcase {
     }
 
     /**
+     * The group line names the notice's groups, and resolves every name on the page in one read.
+     *
+     * Same shape as the cohort line below, and the same reason: a name per row per group would put
+     * the page's cost on the size of the course rather than on what is on screen. A group deleted
+     * since the notice was saved keeps its place as an id, so the row still says something is
+     * named — the control for that is the second notice, whose group is real.
+     *
+     * @covers \local_awareness\table\all_notices::group_line
+     */
+    public function test_the_group_line_names_the_groups_and_reads_them_once(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course();
+        $red = $this->getDataGenerator()->create_group(['courseid' => $course->id, 'name' => 'Red team']);
+        $gone = $this->getDataGenerator()->create_group(['courseid' => $course->id, 'name' => 'Doomed']);
+        $goneid = (int) $gone->id;
+        groups_delete_group($gone);
+
+        $named = $this->notice([
+            'title' => 'Named',
+            'courseid' => (int) $course->id,
+            'filtervalues' => json_encode(['filter_groups' => [(int) $red->id]]),
+        ]);
+        $this->notice([
+            'title' => 'Orphaned',
+            'courseid' => (int) $course->id,
+            'filtervalues' => json_encode(['filter_groups' => [$goneid]]),
+        ]);
+        $plain = $this->notice(['title' => 'Plain']);
+
+        $table = new all_notices('probe', new \moodle_url('/local/awareness/managenotice.php'));
+        $table->set_filterset(new all_notices_filterset());
+        $table->query_db(all_notices::PER_PAGE, false);
+
+        $render = new \ReflectionMethod(all_notices::class, 'group_line');
+        $render->setAccessible(true);
+
+        $before = $DB->perf_get_reads();
+        $lines = [];
+        foreach ($table->rawdata as $notice) {
+            $lines[$notice->get('title')] = $render->invoke($table, $notice);
+        }
+        $reads = $DB->perf_get_reads() - $before;
+
+        $this->assertSame(
+            [get_string('notice:audience:groups', 'local_awareness', 'Red team'), 'Red team'],
+            $lines['Named']
+        );
+        $this->assertSame('#' . $goneid, $lines['Orphaned'][1], 'a deleted group keeps its place as an id');
+        $this->assertSame(['', ''], $lines['Plain'], 'a notice naming no group has no line');
+        $this->assertLessThanOrEqual(
+            3,
+            $reads,
+            'the names are resolved once for the page, not once per row'
+        );
+        $this->assertNotNull($named->get('id'));
+    }
+
+    /**
      * One page of rows resolves the cohort option list once, not once per cohort reference.
      *
      * built_cohorts_options() wraps cohort_get_all_cohorts(0, 0) — a COUNT plus an unbounded scan

@@ -23,7 +23,8 @@ This repository is currently maintained and evolved under the Awareness directio
 - Three levels of insistence: informational, blocking, and must-acknowledge.
 - A named exit at every level, so a reader can always decline. At the two insistent levels the decline is recorded and the notice is shown again; an informational notice is dismissed once and stays dismissed.
 - Audience targeting by cohort, role (optionally scoped to a course or category),
-  course category, course, course format, theme, and competency rules.
+  course category, course, course format, theme, competency rules and, for a course
+  notice, the course's groups.
 - An audience estimate in the editor, computed asynchronously, showing the reach of the
   rules as they are edited.
 - Optional requirement to complete a selected course before the notice stops appearing.
@@ -128,9 +129,12 @@ author its notices, and `local/awareness:viewreportscourse` to whoever may read 
 neither has a default archetype. The holder also needs to be enrolled, or to hold
 `moodle/course:view`, because the pages live inside the course and `require_login()` is a gate of
 its own. A course notice appears only on its course's pages, to anyone who can open them — guests
-included where the course allows guest access — so add a role or cohort rule to narrow it further;
-category, theme and course-format filters do not apply to it, and it does not travel with a course
-backup. A holder of `viewreportscourse` alone sees the course's list read-only, with the two reports
+included where the course allows guest access — so add a role, cohort or group rule to narrow it
+further; category, theme and course-format filters do not apply to it, and it does not travel with a
+course backup. Groups follow the course's group mode the way Moodle applies it everywhere else: in
+separate groups mode an author without `moodle/site:accessallgroups` may address only their own
+groups and sees only the notices aimed at them; in visible groups mode, or with that capability, any
+group of the course. A holder of `viewreportscourse` alone sees the course's list read-only, with the two reports
 of each notice and nothing to create or change.
 
 ## Contributing

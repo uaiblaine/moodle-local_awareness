@@ -19,6 +19,7 @@ namespace local_awareness\table;
 use local_awareness\audience\notice_audience;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
+use local_awareness\local\group_scope;
 use local_awareness\local\collision;
 use local_awareness\persistent\audience_job;
 use local_awareness\persistent\awareness;
@@ -46,6 +47,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
     /** @var array|null Cohort id to name, resolved once for the whole page of rows. */
     protected $cohortnames = null;
+
+    /** @var array|null Names of every group a row on this page targets, id => name, read once per page. */
+    protected $groupnames = null;
 
     /** @var array Criteria hashes with a job in flight, for this page of rows. */
     protected $inflight = [];
@@ -369,6 +373,50 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     }
 
     /**
+     * A predicate excluding the notices whose groups the current user may not reach, or nothing.
+     *
+     * The candidates are the rows naming a group at all, found by a LIKE on the JSON column for
+     * the one key group_scope spells; a row without it cannot be excluded. Each candidate is then
+     * decided by group_scope for its own course, memoised per course, so a page of notices in one
+     * course asks the group question once. A site notice cannot name a group and is never excluded,
+     * so a site administrator keeps hold of a row that was written by hand.
+     *
+     * @param author_scope $scope The list's scope.
+     * @return array [sql, params], the sql empty when nothing is excluded.
+     */
+    protected function unreachable_notices_sql(author_scope $scope): array {
+        global $DB;
+
+        $where = $DB->sql_like('filtervalues', ':grpkey');
+        $params = ['grpkey' => '%' . $DB->sql_like_escape('"' . group_scope::FIELD . '"') . '%'];
+        if (!$scope->is_site()) {
+            $where .= ' AND courseid = :grpcourseid';
+            $params['grpcourseid'] = $scope->get_courseid();
+        }
+        $candidates = $DB->get_records_select(awareness::TABLE, $where, $params, '', 'id, courseid, filtervalues');
+
+        $excluded = [];
+        $reach = [];
+        foreach ($candidates as $record) {
+            $courseid = (int) $record->courseid;
+            $targets = group_scope::decode($record->filtervalues);
+            if ($targets === [] || $courseid <= SITEID) {
+                continue;
+            }
+            $reach[$courseid] ??= group_scope::for_author(author_scope::course($courseid));
+            if (!$reach[$courseid]->admits($targets)) {
+                $excluded[] = (int) $record->id;
+            }
+        }
+        if ($excluded === []) {
+            return ['', []];
+        }
+        [$insql, $inparams] = $DB->get_in_or_equal($excluded, SQL_PARAMS_NAMED, 'grpx', false);
+
+        return ["id {$insql}", $inparams];
+    }
+
+    /**
      * Turn the filterset into a WHERE clause and its parameters.
      *
      * Every filter is a SQL predicate, never a post-query array_filter. Narrowing the rows after
@@ -395,6 +443,19 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         if (!$scope->is_site()) {
             $wheres[] = 'courseid = :courseid';
             $params['courseid'] = $scope->get_courseid();
+        }
+
+        /*
+         * Notices whose groups this viewer may not reach are not listed: in separate groups mode
+         * without moodle/site:accessallgroups, a notice aimed only at other groups is not theirs to
+         * know about, which is what the mode means. Decided in SQL like every other narrowing here,
+         * so the pager stays honest: the ids are found first, from the few rows naming a group at
+         * all, and excluded by id.
+         */
+        [$unreachablesql, $unreachableparams] = $this->unreachable_notices_sql($scope);
+        if ($unreachablesql !== '') {
+            $wheres[] = $unreachablesql;
+            $params += $unreachableparams;
         }
 
         if ($filterset->has_filter('name')) {
@@ -752,6 +813,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         }
 
         [$cohortline, $cohortlist] = $this->cohort_line($awareness);
+        [$groupline, $grouplist] = $this->group_line($awareness);
 
         return $OUTPUT->render_from_template('local_awareness/manage/cell_audience', [
             'pending' => ($state === notice_audience::STATE_PENDING),
@@ -764,6 +826,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             'hascohorts' => ($cohortlist !== ''),
             'cohortline' => $cohortline,
             'cohortlist' => $cohortlist,
+            'hasgroups' => ($grouplist !== ''),
+            'groupline' => $groupline,
+            'grouplist' => $grouplist,
         ]);
     }
 
@@ -809,6 +874,48 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         $list = implode(', ', $names);
 
         return [get_string('notice:audience:cohorts', 'local_awareness', $list), $list];
+    }
+
+    /**
+     * The group restriction of a course notice, as a muted line under the audience count.
+     *
+     * Same shape as cohort_line(), and resolved once for the page for the same reason: the names
+     * of every group any row on the page names are read in one statement the first time a row
+     * asks, and formatted in their course's context.
+     *
+     * @param awareness $awareness The notice.
+     * @return array [line, list] — both empty when the notice names no group.
+     */
+    protected function group_line(awareness $awareness): array {
+        global $DB;
+
+        $targets = group_scope::targeted($awareness);
+        if ($targets === []) {
+            return ['', ''];
+        }
+
+        if ($this->groupnames === null) {
+            $ids = [];
+            foreach ($this->rawdata ?? [] as $row) {
+                foreach (group_scope::targeted($row) as $id) {
+                    $ids[$id] = true;
+                }
+            }
+            $this->groupnames = [];
+            foreach ($DB->get_records_list('groups', 'id', array_keys($ids), '', 'id, name, courseid') as $group) {
+                $context = \context_course::instance((int) $group->courseid, IGNORE_MISSING) ?: \context_system::instance();
+                $this->groupnames[(int) $group->id] = format_string($group->name, true, ['context' => $context]);
+            }
+        }
+
+        $names = [];
+        foreach ($targets as $id) {
+            // A group deleted since the notice was saved is shown by its id, so the row still says something is named.
+            $names[] = $this->groupnames[$id] ?? '#' . $id;
+        }
+        $list = implode(', ', $names);
+
+        return [get_string('notice:audience:groups', 'local_awareness', $list), $list];
     }
 
     /**

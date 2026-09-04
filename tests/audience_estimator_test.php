@@ -197,6 +197,89 @@ final class audience_estimator_test extends \advanced_testcase {
     }
 
     /**
+     * A group rule counts the group's members, hidden groups included, and intersects with the rest.
+     *
+     * The hidden group is the control for visibility: its member is counted although nobody may
+     * see the group, because delivery is membership. The cohort is the control for intersection: a
+     * union would answer 3 and a dropped rule 2, so 1 can only be both rules applied.
+     */
+    public function test_estimate_counts_group_members_whatever_the_visibility(): void {
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $shown = $generator->create_group(['courseid' => $course->id]);
+        $hidden = $generator->create_group(['courseid' => $course->id, 'visibility' => GROUPS_VISIBILITY_NONE]);
+        $cohort = $generator->create_cohort();
+
+        $u1 = $generator->create_and_enrol($course, 'student');
+        $u2 = $generator->create_and_enrol($course, 'student');
+        $u3 = $generator->create_and_enrol($course, 'student'); // Enrolled, in no group.
+        $generator->create_group_member(['groupid' => $shown->id, 'userid' => $u1->id]);
+        $generator->create_group_member(['groupid' => $hidden->id, 'userid' => $u2->id]);
+        cohort_add_member($cohort->id, $u1->id);
+        cohort_add_member($cohort->id, $u3->id);
+
+        $groups = [(int) $shown->id, (int) $hidden->id];
+        $result = (new estimator())->estimate(['filter_groups' => $groups]);
+        $this->assertSame(2, $result['count']);
+        $this->assertSame('filter_groups', $result['breakdown'][0]['key']);
+        $this->assertSame(2, $result['breakdown'][0]['count']);
+
+        $both = (new estimator())->estimate(['cohorts' => [(int) $cohort->id], 'filter_groups' => $groups]);
+        $this->assertSame(1, $both['count']);
+        $this->assertEqualsCanonicalizing(['cohorts', 'filter_groups'], array_column($both['breakdown'], 'key'));
+
+        // Normalised like every other id list: sorted, distinct, positive.
+        $this->assertSame(
+            ['filter_groups' => [3, 9]],
+            estimator::normalise(['filter_groups' => ['9', 3, '3', 0, -2]])
+        );
+    }
+
+    /**
+     * A chip counts its own rule alone, so the group chip can exceed the total, exactly as the cohort's does.
+     *
+     * Group membership outlives an ACTIVE enrolment — a suspended user keeps their groups, and the
+     * audience wants an active one — so a chip that answers "how many match this rule" is larger
+     * here than the rule's share of the audience. That is the breakdown's documented contract, not
+     * a defect, and the cohort chip in the same run is the control: it reads the same way over the
+     * same person, so nothing may "fix" one of them alone.
+     */
+    public function test_a_chip_counts_its_own_rule_alone_as_the_cohort_chip_does(): void {
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $group = $generator->create_group(['courseid' => $course->id]);
+
+        $enrolled = $generator->create_and_enrol($course, 'student');
+        $suspended = $generator->create_and_enrol($course, 'student', null, 'manual', 0, 0, ENROL_USER_SUSPENDED);
+        $generator->create_group_member(['groupid' => $group->id, 'userid' => $enrolled->id]);
+        $generator->create_group_member(['groupid' => $group->id, 'userid' => $suspended->id]);
+        // The control: a suspended enrolment keeps the group membership, which is what makes the
+        // two questions differ at all. Unenrolling would not do — core clears the groups with it.
+        $this->assertContains(
+            (int) $group->id,
+            helper::user_group_ids((int) $course->id, (int) $suspended->id),
+            'the control failed: the suspended member is no longer in the group'
+        );
+
+        $cohort = $generator->create_cohort();
+        cohort_add_member($cohort->id, $enrolled->id);
+        cohort_add_member($cohort->id, $suspended->id);
+
+        $criteria = [
+            'filter_course' => [(int) $course->id],
+            'filter_groups' => [(int) $group->id],
+            'cohorts' => [(int) $cohort->id],
+        ];
+        $result = (new estimator())->estimate($criteria);
+        $chips = array_column($result['breakdown'], 'count', 'key');
+
+        $this->assertSame(1, $result['count'], 'only the active enrolment is in the audience');
+        $this->assertSame(1, $chips['filter_course'], 'the course rule is the one that wants an active enrolment');
+        $this->assertSame(2, $chips['filter_groups'], 'the group rule alone is membership');
+        $this->assertSame(2, $chips['cohorts'], 'and the cohort rule alone reads the same way over the same person');
+    }
+
+    /**
      * Audience rules combine by INTERSECTION: only the user matching both is counted.
      *
      * Three users make the two failure modes distinguishable — a union would answer 3 and a

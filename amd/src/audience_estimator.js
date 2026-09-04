@@ -123,6 +123,7 @@ define([
             'audience:rule:filter_category',
             'audience:rule:filter_course',
             'audience:rule:filter_format',
+            'audience:rule:filter_groups',
             'audience:rule:filter_theme',
             'audience:rule:filter_competency_rules',
             'audience:state:wholesite'
@@ -153,6 +154,7 @@ define([
                     filter_category: byKey['audience:rule:filter_category'],
                     filter_course: byKey['audience:rule:filter_course'],
                     filter_format: byKey['audience:rule:filter_format'],
+                    filter_groups: byKey['audience:rule:filter_groups'],
                     filter_theme: byKey['audience:rule:filter_theme'],
                     filter_competency_rules: byKey['audience:rule:filter_competency_rules']
                 },

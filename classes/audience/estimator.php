@@ -58,6 +58,7 @@ class estimator {
         'reqcourse',
         'filter_category',
         'filter_course',
+        'filter_groups',
         'filter_format',
         'filter_competency_rules',
     ];
@@ -103,6 +104,11 @@ class estimator {
         $courses = self::sanitise_int_list($raw['filter_course'] ?? []);
         if (!empty($courses)) {
             $out['filter_course'] = $courses;
+        }
+
+        $groups = self::sanitise_int_list($raw['filter_groups'] ?? []);
+        if (!empty($groups)) {
+            $out['filter_groups'] = $groups;
         }
 
         $formats = self::sanitise_string_list($raw['filter_format'] ?? []);
@@ -359,6 +365,24 @@ class estimator {
             $cm = 'cm' . $suffix;
             $where[] = "EXISTS (SELECT 1 FROM {cohort_members} {$cm}
                                   WHERE {$cm}.userid = u.id AND {$cm}.cohortid {$insql})";
+            $params += $inparams;
+        }
+
+        if ($applies('filter_groups')) {
+            /*
+             * Membership, whatever the group's visibility: a member of a hidden group is still a
+             * member, and helper::user_in_notice_groups() delivers on the same terms. The groups
+             * name their own course, so this stands on its own; under a course scope the forced
+             * filter_course adds the enrolment test through course_scope_sql() below.
+             */
+            [$insql, $inparams] = $DB->get_in_or_equal(
+                array_map('intval', $criteria['filter_groups']),
+                SQL_PARAMS_NAMED,
+                'grp' . $suffix
+            );
+            $gm = 'gm' . $suffix;
+            $where[] = "EXISTS (SELECT 1 FROM {groups_members} {$gm}
+                                  WHERE {$gm}.userid = u.id AND {$gm}.groupid {$insql})";
             $params += $inparams;
         }
 

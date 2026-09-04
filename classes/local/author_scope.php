@@ -64,6 +64,10 @@ use local_awareness\persistent\awareness;
  *    so it does not silently empty for a non-editing teacher. Safe only together with the two
  *    rules above.
  *  - filter_competency_rules is RESTRICTED to the competencies linked to the course.
+ *  - filter_groups is RESTRICTED to the groups the author may target in the course, decided the
+ *    way core decides it for an activity (group_scope): every participation group in visible
+ *    groups mode or with moodle/site:accessallgroups, the author's own groups in separate groups
+ *    mode without it. It is FORBIDDEN at the site, which has no course and so no groups.
  *
  * Cohorts are narrowed silently in both scopes, keeping the precedent helper::allowed_cohorts()
  * set: the pickers only ever offer allowed cohorts, so a disallowed id is a hand-made request, and
@@ -117,6 +121,7 @@ final class author_scope {
         'filter_theme' => ['site' => self::RULE_EXISTS, 'course' => self::RULE_FORBID],
         'reqcourse' => ['site' => self::RULE_EXISTS, 'course' => self::RULE_RESTRICT],
         'cohorts' => ['site' => self::RULE_RESTRICT, 'course' => self::RULE_RESTRICT],
+        'filter_groups' => ['site' => self::RULE_FORBID, 'course' => self::RULE_RESTRICT],
         'filter_role' => ['site' => self::RULE_EXISTS, 'course' => self::RULE_RESTRICT],
         'filter_competency_rules' => ['site' => self::RULE_EXISTS, 'course' => self::RULE_RESTRICT],
         'pathmatch' => ['site' => self::RULE_LEAVE, 'course' => self::RULE_LEAVE],
@@ -397,6 +402,22 @@ final class author_scope {
                 $allowed = array_values(array_intersect($allowed, $this->enrolled_cohort_ids()));
             }
             $out['cohorts'] = self::bounded($allowed);
+        }
+
+        // Groups: none at the site; in a course, only the groups the author may target.
+        if (array_key_exists('filter_groups', $criteria)) {
+            $ids = self::bounded(self::int_list($criteria['filter_groups']));
+            if ($this->is_site()) {
+                $out['filter_groups'] = [];
+                if (!empty($ids)) {
+                    $problems['filter_groups'] = self::PROBLEM_FORBIDDEN;
+                }
+            } else {
+                $out['filter_groups'] = group_scope::for_author($this)->narrow($ids);
+                if (count($out['filter_groups']) !== count($ids)) {
+                    $problems['filter_groups'] = self::PROBLEM_OUTSIDE;
+                }
+            }
         }
 
         // Roles.

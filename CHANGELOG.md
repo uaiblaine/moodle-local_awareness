@@ -6,6 +6,66 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### A course notice can be aimed at groups, on Moodle's own terms (version 2026090404)
+
+**A course notice may now name the groups it is for.** A `Groups` picker joins the audience
+section of the course editor, stored as `filter_groups` inside the notice's filter payload like
+every rule since cohorts, and only members of a named group receive the notice: the delivery path
+and the write-path gate both read membership from `{groups_members}` through core's per-user cache,
+hidden groups included, because a member of a hidden group is still a member. The audience estimate
+counts the same membership and names the groups in its chip, the manage list shows them under the
+audience count beside the cohorts, and a notice naming no group reaches everyone in the course as
+before.
+
+**Who may address a group is decided the way core decides it, not by the plugin.** A new
+`local\group_scope` lifts `groups_get_activity_allowed_groups()` to the course: in visible groups
+mode, or with `moodle/site:accessallgroups` in the course, every participation group; in separate
+groups mode without the capability, only the groups the author belongs to; with groups switched
+off, no picker at all, as core's own group menus disappear. The author scope RESTRICTS the field in a
+course and FORBIDS it at the site, which has no course and so no groups, so a hand-made request
+naming another group is refused on the field, not narrowed in silence.
+
+**And separate groups mean separate notices.** A teacher confined to their own groups neither sees
+nor changes a notice aimed only at other groups: the manage list excludes it in SQL, from the few
+rows naming a group at all, so the pager stays honest; the editor, the two reports and the manage
+list's preview answer "no such notice" for it, the same answer a notice outside the caller's course
+gets, so an id cannot be probed across groups any more than across courses; and every action —
+enable, disable, reset, delete, update — refuses it naming `moodle/site:accessallgroups`, which is
+what would open it. A manager who can access all groups does all of this, as in every other part of
+Moodle.
+
+**What an author may target and who may reach a stored notice are two questions, and only the
+second one is about separation.** Targeting is the picker's set. Reaching is refused only by
+separate groups, and only over groups that still exist and still participate — a group deleted
+after the notice was written, or one core will not let participate, confines nobody. The other way
+round, deleting a group would have hidden the notices naming it from every single person, leaving
+the one row that needs fixing as the one nobody could see; that is the trap `author_scope::exists()`
+already avoids for a deleted course, and it is avoided here for the same reason. Groupings are not
+part of this: a notice names groups, and a grouping is picked by naming its groups.
+
+### The chosen layout is marked, and the positions sit in their grid (version 2026090403)
+
+**The layout picker showed no mark on the chosen layout.** Core renders a grouped radio as
+`<label><input> ...</label>`, the input inside its label, on 4.5 and 5.2 alike, and the picker's
+state rules were written `input:checked + label`, which matches nothing in that markup. With the
+radio itself hidden behind the thumbnail, nothing distinguished the chosen layout from the rest.
+The rules now read the sibling the radio actually has (`+ .la-layout-option`): the chosen card gets
+a brand border, a ring and a tinted fill, and keyboard focus keeps its own outline. The position
+radios were meant to sit in a 3x3 grid and never did, twice over: the rule missed the `fieldset`
+core puts around a group, and it set `display: grid` on core's `.d-flex`, whose display is
+`!important` on both branches, a declaration the plugin, which may not write `!important`, can
+never win. The grid is flex geometry now, and the form emits the seven anchors in reading order
+(top row, centre, bottom row), so what a screen reader announces is the order a sighted reader
+sees. Two contracts pin the defect class: a rendered-form test asserts the option is the radio's
+next sibling inside its label, and the stylesheet test refuses any state rule reaching for a label
+after a radio, and any `display` set on a Bootstrap display utility.
+
+**Preview died with `invalidrecord` on a site that had upgraded during development.** Not a code
+change: `external_functions` is refreshed only when the plugin version rises, so a site already at
+2026090402 before `db/services.php` gained `local_awareness_preview_notice` and
+`local_awareness_render_notice` never registered them. A site upgrading from any earlier version
+gets them; this bump re-registers them on one that upgraded mid-way.
+
 ### A notice chooses its layout, its place on the screen and its entrance (version 2026090402)
 
 **Every notice used to be the same dialogue: a header, a body and a footer, centred, arriving with

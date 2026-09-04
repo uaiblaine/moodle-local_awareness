@@ -551,6 +551,76 @@ final class notice_form_test extends \advanced_testcase {
     }
 
     /**
+     * The values a form's group picker offers, or null when the form has no picker.
+     *
+     * @param notice_form $form The form.
+     * @return int[]|null
+     */
+    private function offered_groups(notice_form $form): ?array {
+        $property = new \ReflectionProperty(\moodleform::class, '_form');
+        $property->setAccessible(true);
+        $mform = $property->getValue($form);
+        if (!$mform->elementExists('filter_groups')) {
+            return null;
+        }
+        $values = [];
+        foreach ($mform->getElement('filter_groups')->_options as $option) {
+            $values[] = (int) $option['attr']['value'];
+        }
+        sort($values);
+
+        return $values;
+    }
+
+    /**
+     * The group picker offers exactly what the author may reach, and only while groups are in use.
+     *
+     * Separate groups: a teacher without accessallgroups is offered their own group, an editing
+     * teacher every group. Groups off: no picker, unless the notice already names groups, so an
+     * author can see and clear what a notice names rather than lose it to a field that is not there.
+     * The site form never has the picker.
+     */
+    public function test_the_group_picker_offers_the_author_s_reach_and_only_while_groups_are_in_use(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course(['groupmode' => SEPARATEGROUPS, 'groupmodeforce' => 1]);
+        $red = $generator->create_group(['courseid' => $course->id]);
+        $blue = $generator->create_group(['courseid' => $course->id]);
+        $teacher = $generator->create_and_enrol($course, 'teacher');
+        $editor = $generator->create_and_enrol($course, 'editingteacher');
+        $generator->create_group_member(['groupid' => $red->id, 'userid' => $teacher->id]);
+        $scope = author_scope::course((int) $course->id);
+        $every = [(int) $red->id, (int) $blue->id];
+        sort($every);
+
+        $this->setUser($teacher);
+        $form = new notice_form(null, ['persistent' => null, 'id' => 0, 'scope' => $scope]);
+        $this->assertSame([(int) $red->id], $this->offered_groups($form));
+
+        $this->setUser($editor);
+        $form = new notice_form(null, ['persistent' => null, 'id' => 0, 'scope' => $scope]);
+        $this->assertSame($every, $this->offered_groups($form));
+        $site = new notice_form(null, ['persistent' => null, 'id' => 0]);
+        $this->assertNull($this->offered_groups($site), 'the site has no groups');
+
+        $DB->set_field('course', 'groupmode', NOGROUPS, ['id' => $course->id]);
+        $form = new notice_form(null, ['persistent' => null, 'id' => 0, 'scope' => $scope]);
+        $this->assertNull($this->offered_groups($form));
+
+        $notice = new awareness(0, (object) [
+            'title' => 'Briefing',
+            'content' => '<p>Body</p>',
+            'courseid' => (int) $course->id,
+            'filtervalues' => json_encode(['filter_groups' => [(int) $red->id]]),
+        ]);
+        $notice->create();
+        $form = new notice_form(null, ['persistent' => $notice, 'id' => (int) $notice->get('id'), 'scope' => $scope]);
+        $this->assertSame($every, $this->offered_groups($form), 'a notice naming groups keeps its picker with groups off');
+    }
+
+    /**
      * The competency picker is handed the course context, from which only 'parents' reaches a framework.
      *
      * Frameworks live at the system or a category context, never at a course, so a listing that

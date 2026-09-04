@@ -18,6 +18,7 @@ namespace local_awareness\form;
 
 use local_awareness\helper;
 use local_awareness\local\author_scope;
+use local_awareness\local\group_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
 
@@ -47,13 +48,21 @@ class notice_form extends \core\form\persistent {
     /** @var int A carousel starts with this many empty slides, and adds this many per click. */
     public const SLIDES_MIN = 2;
 
+    /**
+     * The positions in the reading order of the 3x3 grid the stylesheet draws: the top row, the
+     * centre, the bottom row. awareness::POSITIONS puts the default first, which is right for a
+     * vocabulary and wrong for a grid, where a screen reader would announce the centre before the
+     * corner it sits under. Same set as awareness::POSITIONS; picker_render_test pins that.
+     */
+    public const POSITION_GRID = ['top-start', 'top', 'top-end', 'center', 'bottom-start', 'bottom', 'bottom-end'];
+
     /** @var array Fields to remove from the persistent validation. */
     protected static $foreignfields = [
         // The layout picker's group names, and the repeated slide rows: none is a column.
         'templategroup', 'positiongroup', 'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
         'slide_id', 'slide_repeats', 'slide_add', 'slide_delete', 'slide_delete-hidden',
         'insistence', 'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
-        'filter_course', 'filter_format', 'filter_theme', 'filter_competency_rules',
+        'filter_course', 'filter_groups', 'filter_format', 'filter_theme', 'filter_competency_rules',
         'filter_competency_requireall', 'bgimage',
     ];
 
@@ -269,6 +278,29 @@ class notice_form extends \core\form\persistent {
         );
 
         $mform->setDefault('cohorts', 0);
+
+        /*
+         * Groups, for a course notice. The picker offers exactly what the author may target,
+         * decided the way core decides it for an activity: the course's group mode and
+         * moodle/site:accessallgroups, through group_scope. It is offered only while groups are in
+         * use, as core's own group menus are, except that a notice already naming groups keeps its
+         * field whatever the mode, so the author can see and clear what it names. The save narrows
+         * what the scope refuses and extra_validation() reports it on this field.
+         */
+        if ($coursemode) {
+            $groups = group_scope::for_author($scope);
+            $targeted = ($persistent && $persistent->get('id') > 0) ? group_scope::targeted($persistent) : [];
+            if ($groups->offered() || $targeted !== []) {
+                $mform->addElement(
+                    'autocomplete',
+                    'filter_groups',
+                    get_string('notice:groups', 'local_awareness'),
+                    $groups->options(),
+                    ['noselectionstring' => get_string('notice:groups:all', 'local_awareness'), 'multiple' => true]
+                );
+                $mform->addHelpButton('filter_groups', 'notice:groups', 'local_awareness');
+            }
+        }
 
         // AJAX autocomplete for course requirement.
         // Only pre-load the currently selected course (if editing), not all courses.
@@ -504,13 +536,13 @@ class notice_form extends \core\form\persistent {
         $mform->setDefault('template', awareness::TEMPLATES[0]);
 
         /*
-         * Position: the seven anchors as radios, which the stylesheet lays out as the 3x3 grid they
-         * are. A fullscreen dialogue has no position, so the field is hidden for it; the corners
-         * belong to the card alone, and notice_form.js greys them for every other layout while
-         * extra_validation() refuses them for good.
+         * Position: the seven anchors as radios, emitted in the reading order of the 3x3 grid the
+         * stylesheet lays them out as. A fullscreen dialogue has no position, so the field is
+         * hidden for it; the corners belong to the card alone, and notice_form.js greys them for
+         * every other layout while extra_validation() refuses them for good.
          */
         $positions = [];
-        foreach (awareness::POSITIONS as $position) {
+        foreach (self::POSITION_GRID as $position) {
             $positions[] = $mform->createElement('radio', 'position', '', self::position_label($position), $position);
         }
         $mform->addGroup($positions, 'positiongroup', get_string('notice:position', 'local_awareness'), '', false);
@@ -935,6 +967,8 @@ class notice_form extends \core\form\persistent {
                 return get_string('scope:problem:filter_course', 'local_awareness');
             case 'filter_format':
                 return get_string('scope:problem:filter_format', 'local_awareness');
+            case 'filter_groups':
+                return get_string('scope:problem:filter_groups', 'local_awareness');
             case 'filter_role':
                 return get_string('scope:problem:filter_role', 'local_awareness');
             case 'filter_role_context':

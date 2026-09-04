@@ -216,4 +216,62 @@ final class motion_contract_test extends \basic_testcase {
         preg_match_all("/'([a-z]+)'/", $compact[1], $values);
         $this->assertSame(['card'], $values[1], 'the card is the one layout narrower than the large dialogue');
     }
+
+    /**
+     * The picker's state rules read the sibling core actually renders.
+     *
+     * A grouped radio is <label><input> ...</label> (element-radio-inline.mustache, 4.5 and 5.2):
+     * the option template is the input's next sibling and the label is its parent. So the only
+     * combinator that reaches the option from the radio's state is "+ .la-layout-option", and a
+     * rule written "+ label" is dead, which is how the chosen layout shipped with no mark at all.
+     * The markup half of this contract is tests/form/picker_render_test.php.
+     */
+    public function test_the_picker_state_rules_read_the_radios_next_sibling(): void {
+        $states = [];
+        foreach (array_keys($this->rules($this->css())) as $selector) {
+            foreach (explode(',', $selector) as $part) {
+                $part = trim($part);
+                if (preg_match('/input\[name="(template|position)"\][^\s+~]*\s*[+~]\s*label\b/', $part)) {
+                    $this->fail("{$part} reaches for a label after the radio; core puts the radio inside its label");
+                }
+                if (preg_match('/input\[name="template"\]:(checked|focus-visible)/', $part)) {
+                    $states[] = $part;
+                    $this->assertMatchesRegularExpression(
+                        '/:(checked|focus-visible)\s*\+\s*\.la-layout-option/',
+                        $part,
+                        'a picker state rule does not read the option as the radio\'s next sibling'
+                    );
+                }
+            }
+        }
+
+        $this->assertGreaterThanOrEqual(2, count($states), 'the picker has no state rules at all; the scan is blind');
+    }
+
+    /**
+     * No rule sets display on one of Bootstrap's display utilities.
+     *
+     * .d-flex is display: flex !important on both branches, and the plugin may not write !important
+     * (stylelint), so such a declaration can never win: the position grid was display: grid on
+     * core's .d-flex and never applied. Any layout change on such an element goes on its children
+     * or on its own geometry (width, gap), never on its display.
+     */
+    public function test_no_rule_sets_display_on_a_bootstrap_display_utility(): void {
+        $utilities = 0;
+        $offenders = [];
+        foreach ($this->rules($this->css()) as $selector => $declarations) {
+            foreach (explode(',', $selector) as $part) {
+                if (!preg_match('/\.d-(flex|inline-flex|block|inline-block|inline|none|grid)$/', trim($part))) {
+                    continue;
+                }
+                $utilities++;
+                if (preg_match('/(^|;)\s*display\s*:/', $declarations)) {
+                    $offenders[] = trim($part);
+                }
+            }
+        }
+
+        $this->assertGreaterThanOrEqual(1, $utilities, 'no rule targets a display utility; the scan is blind');
+        $this->assertSame([], $offenders, 'these rules set display on an element whose display core declares !important');
+    }
 }

@@ -238,6 +238,38 @@ Behat site fails every scenario on the same core locator and looks like your bug
   real anchor before `format_text()` — the multimedia filter embeds nothing from a bare URL — and the
   captions are `PARAM_RAW` on the way out, escaped once by the template's double stash.
 
+- **Core puts a grouped radio INSIDE its label, and `.d-flex` is `!important`.**
+  `element-radio-inline.mustache` (4.5 and 5.2 alike) renders `<label><input type="radio"> label</label>`,
+  so a rule written `input:checked + label` matches nothing; the layout picker's states read
+  `input:checked + .la-layout-option`, the sibling the radio actually has, and a position label is
+  found with `label:has(input...)`, which core's own Boost stylesheet uses on both branches. The
+  group wraps its children in a `fieldset` before the `.d-flex`, whose `display: flex !important` no
+  plugin rule can beat: the position grid is flex geometry (fixed cells, a container three cells
+  wide, margins on the centre cell, radios emitted in reading order by `notice_form::POSITION_GRID`),
+  never `display: grid` on that element. `tests/form/picker_render_test.php` pins the markup;
+  `motion_contract_test` pins the selectors and refuses `display` on any Bootstrap display utility.
+
+- **Groups are a course rule, decided by core's own group rules, and reach is a gate of its own.**
+  `local\group_scope` lifts `groups_get_activity_allowed_groups()` to the course (visible mode or
+  `moodle/site:accessallgroups` → every participation group; separate mode without it → the author's
+  own; `NOGROUPS` → nothing offered, nothing refused). The scope table RESTRICTS `filter_groups` in a
+  course and FORBIDS it at the site. Delivery is MEMBERSHIP, not visibility — `helper::user_group_ids()`
+  reads `groups_get_user_groups(..., includehidden: true)`, because `groups_get_all_groups()` filters
+  by what the CURRENT user may see and would drop a member of a hidden group. Reach is enforced in
+  four places that must stay in step: `resolve_notice_as_author()` (pages), `require_group_reach()`
+  (the five action methods), the pluginfile author branch, and `all_notices::unreachable_notices_sql()`
+  (the list, in SQL from a LIKE on the JSON key). `tests/group_audience_test.php` pins all four.
+  `narrow()` and `admits()` answer DIFFERENT questions — what may be SAVED, and who may REACH what
+  is saved — and only the second is about separation: a deleted group, a non-participation group and
+  the site scope confine nobody, or deleting a group would hide the notices naming it from everyone
+  including the administrator who has to fix them.
+
+- **A dev site that upgraded mid-change never registers a web service added afterwards.**
+  `external_functions` is refreshed only when `$plugin->version` rises; a stack already at the bumped
+  version when `db/services.php` gained a function keeps its old list, and the AJAX call dies with
+  `invalidrecord` from `external_function_info()`. Fix in place from a CLI script with
+  `external_update_descriptions('local_awareness')`, or bump the version again.
+
 ## Testing notes
 
 - **Test metadata stays in docblocks (`@covers`, `@dataProvider`) while 405 is

@@ -54,6 +54,8 @@ class rule_describer {
                 return self::join(self::course_names(self::ids($values)));
             case 'filter_format':
                 return self::join(self::plugin_names('format', (array) $values));
+            case 'filter_groups':
+                return self::join(self::group_names(self::ids($values)));
             case 'filter_theme':
                 return self::join(self::plugin_names('theme', (array) $values));
             default:
@@ -145,6 +147,33 @@ class rule_describer {
                 $record->fullname,
                 true,
                 ['context' => \context_course::instance($record->id, IGNORE_MISSING) ?: \context_system::instance()]
+            );
+        }
+        return $names;
+    }
+
+    /**
+     * Resolve group ids to their formatted names.
+     *
+     * @param array $ids
+     * @return string[]
+     */
+    private static function group_names(array $ids): array {
+        global $DB;
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'grp');
+        $records = $DB->get_records_select('groups', "id {$insql}", $params, 'name ASC', 'id, name, courseid');
+
+        $names = [];
+        foreach ($records as $record) {
+            $names[] = format_string(
+                $record->name,
+                true,
+                ['context' => \context_course::instance($record->courseid, IGNORE_MISSING) ?: \context_system::instance()]
             );
         }
         return $names;
