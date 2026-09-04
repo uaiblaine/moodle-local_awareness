@@ -17,6 +17,7 @@
 namespace local_awareness\local;
 
 use core\hook\output\before_footer_html_generation;
+use core_course\hook\before_course_deleted;
 use local_awareness\helper;
 
 /**
@@ -45,6 +46,27 @@ class hook_callbacks {
      * unknown layout loads the module, it never suppresses it.
      */
     public const EXCLUDED_LAYOUTS = ['maintenance', 'print', 'redirect', 'embedded', 'popup', 'secure'];
+
+    /**
+     * Purge a course's notices before the course goes.
+     *
+     * This hook and not the course_deleted event: by the time that event fires the course row and
+     * its context are already gone, and an observer resolving either throws inside a catch the
+     * event manager keeps to itself — the purge would fail silently on exactly the courses that
+     * have notices. The hook runs first, with everything still in place. Hook dispatch has no catch
+     * of its own, so this one has: a fault here must not make a course undeletable, and whatever
+     * it leaves behind is refused by author_scope::exists() rather than read as the site.
+     *
+     * @param before_course_deleted $hook The hook being dispatched.
+     */
+    public static function before_course_deleted(before_course_deleted $hook): void {
+        $courseid = (int) $hook->course->id;
+        try {
+            helper::purge_course_notices($courseid);
+        } catch (\Throwable $exception) {
+            debugging("local_awareness could not purge the notices of course {$courseid}: " . $exception->getMessage());
+        }
+    }
 
     /**
      * Load the notice module when something could be shown on this page.

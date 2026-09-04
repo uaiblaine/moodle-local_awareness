@@ -59,23 +59,12 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
     }
 
     /*
-     * A file URL carries a notice id and nothing about where the reader came from, so the audience
-     * is resolved the same way the web-service writes resolve it. That covers the enabled flag,
-     * the start of the scheduling window, the cohort list and the role rule — the legs that used
-     * to be missing here, which meant the attachments of a cohort-targeted notice were readable by
-     * any authenticated user who guessed the id.
-     *
-     * It deliberately does NOT cover the page-dependent rules in check_filters() — category,
-     * course, format, theme, competency — because those need a page URL this request has not got,
-     * exactly as documented on is_notice_available_to_user(). This gate is therefore PARTIAL by
-     * construction, and saying so here is the point: a later reader must not "simplify" it against
-     * a guarantee it never made.
-     *
-     * Managers bypass it so the editor and the manage table can still render an unpublished
-     * notice, which is the case the old enabled-only test existed for.
+     * The gate itself lives in helper::may_serve_files_of(), where it can be tested without serving
+     * a file; what it covers, and what it deliberately does not, is written there. It used to be
+     * enabled-only, which left the attachments of a cohort-targeted notice readable by any
+     * authenticated user who guessed the id.
      */
-    $ismanager = \local_awareness\helper::require_author(\local_awareness\local\author_scope::site(), 'manage', false);
-    if (!$ismanager && !\local_awareness\helper::is_notice_available_to_user($notice)) {
+    if (!\local_awareness\helper::may_serve_files_of($notice)) {
         return false;
     }
 

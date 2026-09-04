@@ -242,4 +242,71 @@ final class systemreports_test extends \advanced_testcase {
         // Precondition: the fixture really does carry the character under test.
         $this->assertStringContainsString('&', $notice->get('title'));
     }
+
+    /**
+     * The report is decided in the notice's own scope, read from its own parameter.
+     *
+     * A course reports holder reads their course's notice and is refused another course's and the
+     * site's — and is refused the site's notice even when the report is created in THEIR course's
+     * context, because the retrieve web service takes context and parameters from the client and
+     * the parameter is the only one that names the rows.
+     *
+     * @dataProvider report_provider
+     * @param string $class The system report class.
+     */
+    public function test_the_report_is_decided_in_the_notice_s_own_scope(string $class): void {
+        $this->resetAfterTest();
+
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $notices = [
+            'mine' => $generator->create_notice(['courseid' => $mine->id]),
+            'theirs' => $generator->create_notice(['courseid' => $other->id]),
+            'site' => $generator->create_notice(),
+        ];
+
+        $user = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:viewreportscourse', CAP_ALLOW, $roleid, \context_course::instance($mine->id)->id, true);
+        role_assign($roleid, $user->id, \context_course::instance($mine->id)->id);
+        $this->setUser($user);
+
+        $this->assertInstanceOf($class, $this->make_report($class, $notices['mine']), 'the course reports holder reads their own');
+
+        /*
+         * manager::get_report_from_persistent() caches the instance per report row and user, and the
+         * row is keyed on source and context, not on parameters — so without a reset the second
+         * report in the same context is the first one again, carrying the first notice id. One report
+         * per request in production; several in one test.
+         */
+        $refused = 0;
+        foreach (['theirs', 'site'] as $key) {
+            \core_reportbuilder\manager::reset_caches();
+            try {
+                $this->make_report($class, $notices[$key]);
+            } catch (report_access_exception $e) {
+                $refused++;
+            }
+        }
+        \core_reportbuilder\manager::reset_caches();
+        try {
+            system_report_factory::create(
+                $class,
+                \context_course::instance($mine->id),
+                'local_awareness',
+                '',
+                0,
+                ['noticeid' => $notices['site']->get('id')]
+            );
+        } catch (report_access_exception $e) {
+            $refused++;
+        }
+        $this->assertSame(
+            3,
+            $refused,
+            'another course\'s notice, a site notice, and a site notice behind the course\'s context are all refused'
+        );
+    }
 }

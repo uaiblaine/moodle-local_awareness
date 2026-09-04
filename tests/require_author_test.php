@@ -127,24 +127,69 @@ final class require_author_test extends \advanced_testcase {
     }
 
     /**
-     * The reports verb reads its own capability, and a course author has none for it yet.
+     * The reports verb reads its own capability, at the site and in a course.
      *
-     * Reading reports is the personal-data verb and is deliberately not folded into manage; a
-     * course-level reports capability is a decision for the foundation PR, and until it exists
-     * only the site capability, inherited, opens a course's reports.
+     * Three users in one test: the site reports capability opens every scope and no manage verb;
+     * the course reports capability opens the reports of its own course only, and nothing else;
+     * and managecourse opens no report at all. Each refusal sits beside a pass for the same user,
+     * so a map that pointed the course reports verb at managecourse, or at nothing, reddens.
      */
     public function test_the_reports_verb_reads_its_own_capability(): void {
-        $course = $this->getDataGenerator()->create_course();
-        $scope = author_scope::course((int) $course->id);
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $scope = author_scope::course((int) $mine->id);
 
         $this->user_with('local/awareness:viewreports', \context_system::instance());
         $this->assertTrue(helper::require_author(author_scope::site(), 'viewreports', false));
-        $this->assertTrue(helper::require_author($scope, 'viewreports', false));
+        $this->assertTrue(helper::require_author($scope, 'viewreports', false), 'the site capability inherits into a course');
         $this->assertFalse(helper::require_author(author_scope::site(), 'manage', false), 'viewreports must not grant manage');
 
-        $this->user_with('local/awareness:managecourse', \context_course::instance($course->id));
+        $this->user_with('local/awareness:viewreportscourse', \context_course::instance($mine->id));
+        $this->assertTrue(helper::require_author($scope, 'viewreports', false), 'the course reports capability opens its course');
+        $this->assertFalse(helper::require_author(author_scope::course((int) $other->id), 'viewreports', false), 'and no other');
+        $this->assertFalse(helper::require_author(author_scope::site(), 'viewreports', false), 'nor the site');
+        $this->assertFalse(helper::require_author($scope, 'manage', false), 'viewreportscourse must not open manage');
+
+        $this->user_with('local/awareness:managecourse', \context_course::instance($mine->id));
         $this->assertTrue(helper::require_author($scope, 'manage', false));
         $this->assertFalse(helper::require_author($scope, 'viewreports', false), 'managecourse must not open the reports');
+    }
+
+    /**
+     * A scope whose course is gone refuses a course author, not fatally, and leaves the site manager a way out.
+     *
+     * The course and its context are deleted behind the plugin's back, the way a deletion that
+     * ran with the plugin uninstalled leaves things. The course author who passed a moment before
+     * is the control: the refusal has to come from the course being gone, and it has to be a
+     * refusal — without the existence check ahead of the context, this test errors on a missing
+     * record instead of asserting anything. The site manager still passes, at the system context,
+     * so an orphan can be disabled or deleted rather than sitting in the table for ever.
+     */
+    public function test_a_scope_whose_course_is_gone_refuses_the_author_and_not_the_site_manager(): void {
+        global $DB;
+
+        $course = $this->getDataGenerator()->create_course();
+        $scope = author_scope::course((int) $course->id);
+        $author = $this->user_with('local/awareness:managecourse', \context_course::instance($course->id));
+        $this->assertTrue(helper::require_author($scope, 'manage', false), 'the author passes while the course exists');
+        $this->assertTrue($scope->exists());
+
+        $DB->delete_records('context', ['contextlevel' => CONTEXT_COURSE, 'instanceid' => $course->id]);
+        $DB->delete_records('course', ['id' => $course->id]);
+        \context_helper::reset_caches();
+        accesslib_clear_all_caches_for_unit_testing();
+
+        $this->assertFalse($scope->exists());
+        $this->setUser($author);
+        $this->assertFalse(helper::require_author($scope, 'manage', false), 'the author is refused once the course is gone');
+        $this->assertFalse(helper::require_author($scope, 'viewreports', false));
+
+        $this->user_with('local/awareness:manage', \context_system::instance());
+        $this->assertTrue(helper::require_author($scope, 'manage', false), 'the site capability may still act on an orphan');
+
+        $this->setUser($author);
+        $this->expectException(\required_capability_exception::class);
+        helper::require_author($scope, 'manage');
     }
 
     /**

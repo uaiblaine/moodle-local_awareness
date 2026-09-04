@@ -30,4 +30,9 @@ $callbacks = [
         'callback' => \local_awareness\local\hook_callbacks::class . '::before_footer_html_generation',
         'priority' => 0,
     ],
+    [
+        'hook' => \core_course\hook\before_course_deleted::class,
+        'callback' => \local_awareness\local\hook_callbacks::class . '::before_course_deleted',
+        'priority' => 0,
+    ],
 ];

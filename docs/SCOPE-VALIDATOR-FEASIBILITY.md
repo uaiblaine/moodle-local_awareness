@@ -19,6 +19,22 @@ against?**
 > the validator, is `classes/local/author_scope.php`; the failure policy follows the recommendation
 > below (form error, web-service exception, cohorts silent). The other sub-decisions in section 4
 > stay open until the PR that needs them.
+>
+> **Decision (2026-09-04):** a course-level reports capability, `local/awareness:viewreportscourse`,
+> declared with PR 3. And PR 3 was **recut** after an adversarial review of its design: it ships the
+> foundation and nothing a user can reach — the column, `author_scope::of()` and `exists()`, the
+> capability, every verb deciding in the notice's scope, ownership pinned on write, the purge on the
+> `before_course_deleted` hook (not the `course_deleted` event, which fires after the course and its
+> context are gone), the file gate and both reports by the notice's scope. The navigation entry and
+> the dual-mode pages listed under PR 3 in section 3 move to PR 4 together with the form and the
+> five author web services, because alone they hand a course author a link to an editor whose
+> estimator, pickers and collision warning fail at the site gate. Also decided there: ownership is
+> immutable, the notice's scope governs a site manager editing a course notice, an orphaned course
+> notice is refused to course authors and never read as the site but stays deletable by the site
+> capability at the system context, a published course notice's files need access to its course,
+> the reports keep the system context and
+> decide from their `noticeid` parameter, the purge honours `cleanup_deleted_notice` and never
+> `allow_delete`, and backup carries no notices.
 
 ## The question
 
@@ -255,6 +271,11 @@ unhandled, so the rule table should be asserted complete against `estimator::AUD
 anyone is granted anything; the foundation PR becomes wiring with the policy settled.
 
 ### The order it implies
+
+> Superseded in part by the 2026-09-04 decision block at the top: PR 3 shipped the purge on the
+> `before_course_deleted` hook, not a `db/events.php` observer, and both system reports deciding in
+> the notice's scope; the navigation entry, the dual-mode pages, the form and the five author web
+> services are PR 4, together. The list below is kept as written.
 
 1. **PR 1 — the validator.** `author_scope` with both branches and the corrected table; existence
    checks in both write paths (ahead of `sanitise_data()`, which cannot see the fields) and in

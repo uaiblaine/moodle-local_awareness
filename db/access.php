@@ -71,4 +71,17 @@ $capabilities = [
         'riskbitmask' => RISK_XSS,
         'archetypes' => [],
     ],
+    /*
+     * The reports of a course's notices name the course's users and carry their email and idnumber,
+     * so this is RISK_PERSONAL like its site-level sibling. It opens only the reports of notices
+     * that belong to the course it is held in — the reports resolve the notice first and decide in
+     * ITS scope — and it opens nothing else: it does not manage, and managecourse does not read
+     * reports. No archetype, by the same decision as managecourse.
+     */
+    'local/awareness:viewreportscourse' => [
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_COURSE,
+        'riskbitmask' => RISK_PERSONAL,
+        'archetypes' => [],
+    ],
 ];

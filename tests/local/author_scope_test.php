@@ -461,6 +461,27 @@ final class author_scope_test extends \advanced_testcase {
     }
 
     /**
+     * A stored notice resolves to the scope it was written under.
+     *
+     * Three rows in one test — no course, the site course, a real course — so an of() that always
+     * answered either scope reddens, and the site course is pinned as the site rather than as a
+     * course scope that no capability could ever be held in.
+     */
+    public function test_a_stored_notice_resolves_to_the_scope_it_was_written_under(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+
+        $this->assertTrue(author_scope::of($generator->create_notice())->is_site(), 'no course is the site');
+        $sitecourse = $generator->create_notice(['courseid' => SITEID]);
+        $this->assertTrue(author_scope::of($sitecourse)->is_site(), 'the site course is the site');
+
+        $scope = author_scope::of($generator->create_notice(['courseid' => $course->id]));
+        $this->assertFalse($scope->is_site());
+        $this->assertSame((int) $course->id, $scope->get_courseid());
+        $this->assertSame(\context_course::instance($course->id)->id, $scope->context()->id);
+    }
+
+    /**
      * A scope knows the context its decisions are taken in.
      *
      * Against a real generated course, so the lookup is a real one; and both scopes in one test,

@@ -58,7 +58,7 @@ class helper {
      */
     private const VERB_CAPABILITIES = [
         'manage' => ['site' => 'local/awareness:manage', 'course' => 'local/awareness:managecourse'],
-        'viewreports' => ['site' => 'local/awareness:viewreports', 'course' => null],
+        'viewreports' => ['site' => 'local/awareness:viewreports', 'course' => 'local/awareness:viewreportscourse'],
     ];
 
     /**
@@ -85,7 +85,14 @@ class helper {
     /**
      * Create new notice
      *
+     * The scope is who the notice is written AS, and it becomes the notice's own: the course it
+     * will belong to, or the site. It defaults to the site, which fails closed — a course author
+     * does not hold the site capability — and it is pinned onto the row here, after the scope has
+     * had its say on the audience fields, so that ownership and reach cannot diverge and nothing a
+     * caller put in $data can choose the owner.
+     *
      * @param \stdClass $data form data
+     * @param author_scope|null $scope Who the notice is written as; the site when not given.
      * @return string The audience-estimate state the new notice was left in — see
      *                {@see \local_awareness\audience\notice_audience}. Returned rather than
      *                signalled, because only the caller knows whether there is a user to tell.
@@ -93,12 +100,15 @@ class helper {
      * @throws \dml_exception
      * @throws \core\invalid_persistent_exception
      * @throws \required_capability_exception
-     * @throws \invalid_parameter_exception When a value names something the site does not have.
+     * @throws \invalid_parameter_exception When a value names something that does not exist, or is forbidden or
+     *                                      outside the notice's scope.
      */
-    public static function create_new_notice(\stdClass $data): string {
-        self::require_author(author_scope::site(), 'manage');
+    public static function create_new_notice(\stdClass $data, ?author_scope $scope = null): string {
+        $scope = $scope ?? author_scope::site();
+        self::require_author($scope, 'manage');
 
-        self::apply_author_scope($data, author_scope::site());
+        self::apply_author_scope($data, $scope);
+        $data->courseid = $scope->get_courseid();
 
         // Create new notice.
         self::sanitise_data($data);
@@ -134,10 +144,12 @@ class helper {
      * @throws \core\invalid_persistent_exception
      * @throws \dml_exception
      * @throws \required_capability_exception
-     * @throws \invalid_parameter_exception When a value names something the site does not have.
+     * @throws \invalid_parameter_exception When a value names something that does not exist, or is forbidden or
+     *                                      outside the notice's scope.
      */
     public static function update_notice(awareness $awareness, \stdClass $data): string {
-        self::require_author(author_scope::site(), 'manage');
+        $scope = author_scope::of($awareness);
+        self::require_author($scope, 'manage');
 
         /*
          * The setting, enforced where the write happens. It used to be consulted only in
@@ -150,7 +162,14 @@ class helper {
             return \local_awareness\audience\notice_audience::STATE_NONE;
         }
 
-        self::apply_author_scope($data, author_scope::site());
+        self::apply_author_scope($data, $scope);
+        /*
+         * Ownership is immutable, and it is pinned rather than trusted: sanitise_data() keeps any
+         * key that is a property, so a courseid in the submission would otherwise re-home the notice
+         * to whatever the client sent, judged against the OLD owner's capability. Moving a notice is
+         * a verb of its own with a check in both contexts, if it is ever wanted; it is not an edit.
+         */
+        $data->courseid = (int) $awareness->get('courseid');
 
         self::sanitise_data($data);
         awareness::update_notice_data($awareness, $data);
@@ -351,7 +370,7 @@ class helper {
      * @return void
      */
     public static function reset_notice(awareness $notice): void {
-        self::require_author(author_scope::site(), 'manage');
+        self::require_author(author_scope::of($notice), 'manage');
         try {
             $notice = new awareness($notice->get('id'));
             $notice->update();
@@ -381,7 +400,7 @@ class helper {
      * @return void
      */
     public static function enable_notice(awareness $notice): void {
-        self::require_author(author_scope::site(), 'manage');
+        self::require_author(author_scope::of($notice), 'manage');
         try {
             $notice->set('enabled', 1);
             $notice->update();
@@ -411,7 +430,7 @@ class helper {
      * @return void
      */
     public static function disable_notice(awareness $notice): void {
-        self::require_author(author_scope::site(), 'manage');
+        self::require_author(author_scope::of($notice), 'manage');
         try {
             $notice->set('enabled', 0);
             $notice->update();
@@ -431,17 +450,57 @@ class helper {
     }
 
     /**
-     * Delete a notice
+     * Delete a notice: the verb an author invokes.
+     *
+     * The gate and the setting live here, and only here; what a deletion does is purge_notice().
      *
      * @param awareness $notice
      * @return void
      */
     public static function delete_notice(awareness $notice): void {
-        self::require_author(author_scope::site(), 'manage');
+        self::require_author(author_scope::of($notice), 'manage');
         if (!get_config('local_awareness', 'allow_delete')) {
             return;
         }
 
+        self::purge_notice($notice);
+    }
+
+    /**
+     * Purge every notice a course owns, because the course is going.
+     *
+     * Called from the before_course_deleted hook, where nobody is "the author": the person deleting
+     * the course may hold no notice capability at all, and the allow_delete setting governs whether a
+     * human may press Delete, not whether a course can stop existing. So this asks no question and
+     * honours no setting except cleanup_deleted_notice, exactly as a manual delete does past its gate.
+     *
+     * @param int $courseid The course being deleted.
+     * @return int How many notices went.
+     */
+    public static function purge_course_notices(int $courseid): int {
+        if ($courseid <= 0) {
+            return 0;
+        }
+        $notices = awareness::get_records(['courseid' => $courseid]);
+        foreach ($notices as $notice) {
+            self::purge_notice($notice);
+        }
+
+        return count($notices);
+    }
+
+    /**
+     * Remove a notice and everything that hangs off it, asking nothing about who is asking.
+     *
+     * Not a verb: the two callers are delete_notice(), which has already gated and consulted its
+     * setting, and purge_course_notices(), which runs where there is no author to gate. The event is
+     * logged in the system context whatever the notice's scope, so the audit trail of a deletion does
+     * not fork by how it happened, and the files go with the row, not with the optional cleanup.
+     *
+     * @param awareness $notice
+     * @return void
+     */
+    private static function purge_notice(awareness $notice): void {
         $oldid = $notice->get('id');
         $notice->delete();
         $params = [
@@ -1454,8 +1513,8 @@ class helper {
      *
      * The site capability is checked in the scope's own context, so a system-level assignment
      * inherits down and a site manager may act on a course's notice. The course capability is
-     * checked only for a course scope, and only where the verb has one: the reports verb has no
-     * course-level capability yet, so a course author reads no report until one is declared.
+     * checked only for a course scope: managecourse for the manage verb, viewreportscourse for
+     * the reports verb, so a course author reads only the reports of their course's notices.
      *
      * @param author_scope $scope Who the caller is acting as.
      * @param string $verb One of the keys of VERB_CAPABILITIES.
@@ -1468,9 +1527,28 @@ class helper {
         if (!isset(self::VERB_CAPABILITIES[$verb])) {
             throw new \coding_exception("Unknown authoring verb '{$verb}'");
         }
-        $context = $scope->context();
         $sitecapability = self::VERB_CAPABILITIES[$verb]['site'];
         $coursecapability = self::VERB_CAPABILITIES[$verb]['course'];
+
+        /*
+         * Asked BEFORE the context is resolved: a course scope whose course is gone has no context
+         * to resolve, and context_course::instance() would throw a missing-record error where a
+         * refusal is owed. Nobody holds anything in a context that no longer exists, so a course
+         * author is refused — and the notice is never read as the site, which would publish an
+         * orphaned course notice site-wide. The one way out is the site capability at the system
+         * context: without it an orphan could never be disabled or deleted through the plugin and
+         * its files never removed, the exact state a manual delete was once fixed to end. Its
+         * forced course filter keeps it from displaying meanwhile.
+         */
+        if (!$scope->exists()) {
+            $allowed = has_capability($sitecapability, \context_system::instance());
+            if (!$allowed && $throw) {
+                throw new \required_capability_exception(\context_system::instance(), $sitecapability, 'nopermissions', '');
+            }
+
+            return $allowed;
+        }
+        $context = $scope->context();
 
         $allowed = has_capability($sitecapability, $context);
         if (!$allowed && !$scope->is_site() && $coursecapability !== null) {
@@ -1482,6 +1560,51 @@ class helper {
         }
 
         return $allowed;
+    }
+
+    /**
+     * Whether the current user may be served a notice's attachments.
+     *
+     * The gate local_awareness_pluginfile() stands behind, kept here so it can be tested without
+     * serving a file. A file URL carries a notice id and nothing about where the reader came from,
+     * so the audience is resolved the way the web-service writes resolve it: the enabled flag, the
+     * start of the window, the cohort list and the role rule. It deliberately does NOT cover the
+     * page-dependent rules in check_filters() — category, course, format, theme, competency — which
+     * need a page URL this request has not got, exactly as documented on
+     * is_notice_available_to_user(); this gate is PARTIAL by construction.
+     *
+     * Managers bypass it so the editor and the manage table can render an unpublished notice, and
+     * "manager" is decided in the notice's own scope: a course author reaches the unpublished files
+     * of their course's notices and nobody else's; a site manager, inheriting down, reaches them all.
+     * Everyone else needs access to a course notice's course before the audience is even consulted.
+     *
+     * @param awareness $notice The notice whose files are asked for.
+     * @return bool
+     */
+    public static function may_serve_files_of(awareness $notice): bool {
+        global $DB;
+
+        $scope = author_scope::of($notice);
+        if (self::require_author($scope, 'manage', false)) {
+            return true;
+        }
+
+        /*
+         * A course notice's files are for people in that course. The display path enforces this
+         * through the forced filter_course inside filtervalues, which this request cannot evaluate
+         * — but courseid is a column on the row already loaded, so the same question is asked here
+         * the same way check_filters() asks it: can_access_course() with active enrolments only,
+         * which also admits guest access where the course allows it, exactly as display does. A
+         * notice whose course is gone serves nothing to anyone but the site manager above.
+         */
+        if (!$scope->is_site()) {
+            $course = $DB->get_record('course', ['id' => $scope->get_courseid()]);
+            if (!$course || !can_access_course($course, null, '', true)) {
+                return false;
+            }
+        }
+
+        return self::is_notice_available_to_user($notice);
     }
 
     /**

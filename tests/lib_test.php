@@ -41,6 +41,7 @@ require_once($CFG->dirroot . '/local/awareness/lib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
  * @covers ::local_awareness_pluginfile
+ * @covers \local_awareness\helper::may_serve_files_of
  */
 final class lib_test extends \advanced_testcase {
     /**
@@ -320,5 +321,163 @@ final class lib_test extends \advanced_testcase {
             [$notice->get('id'), 'policy.txt'],
             false
         ));
+    }
+
+    /**
+     * Three unpublished notices, one per scope, each with an attachment.
+     *
+     * @param \stdClass $mine The author's course.
+     * @param \stdClass $other Another course.
+     * @return awareness[] Keyed mine, theirs, site.
+     */
+    private function unpublished_notices_with_files(\stdClass $mine, \stdClass $other): array {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $notices = [
+            'mine' => $generator->create_notice(['enabled' => 0, 'courseid' => $mine->id]),
+            'theirs' => $generator->create_notice(['enabled' => 0, 'courseid' => $other->id]),
+            'site' => $generator->create_notice(['enabled' => 0]),
+        ];
+        foreach ($notices as $key => $notice) {
+            get_file_storage()->create_file_from_string([
+                'contextid' => \context_system::instance()->id,
+                'component' => 'local_awareness',
+                'filearea' => 'content',
+                'itemid' => $notice->get('id'),
+                'filepath' => '/',
+                'filename' => 'policy.txt',
+            ], "the policy of {$key}");
+        }
+
+        return $notices;
+    }
+
+    /**
+     * The manager bypass is decided in the notice's own scope: a course author reaches only their course's files.
+     *
+     * Asked at the seam the callback stands behind, so no file has to be served; and asked through
+     * the callback too, with the file in place, for the two refusals — a refusal that were not one
+     * would reach send_stored_file() rather than return the strict false asserted.
+     */
+    public function test_a_course_author_reaches_only_their_own_course_s_unpublished_files(): void {
+        $this->resetAfterTest();
+
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $notices = $this->unpublished_notices_with_files($mine, $other);
+
+        $user = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:managecourse', CAP_ALLOW, $roleid, \context_course::instance($mine->id)->id, true);
+        role_assign($roleid, $user->id, \context_course::instance($mine->id)->id);
+        $this->setUser($user);
+
+        $this->assertTrue(helper::may_serve_files_of($notices['mine']), 'their own course\'s unpublished file');
+        $this->assertFalse(helper::may_serve_files_of($notices['theirs']), 'another course\'s unpublished file is refused');
+        $this->assertFalse(helper::may_serve_files_of($notices['site']), 'a site notice\'s unpublished file is refused');
+
+        foreach (['theirs', 'site'] as $key) {
+            $this->assertFalse(local_awareness_pluginfile(
+                null,
+                null,
+                \context_system::instance(),
+                'content',
+                [$notices[$key]->get('id'), 'policy.txt'],
+                false
+            ), "the callback refuses {$key} with the file in place");
+        }
+    }
+
+    /**
+     * The same course author reaches their own course's unpublished file through the real callback too.
+     *
+     * With the file deleted first, the callback falls out at its get_file() miss below the gate;
+     * with the gate refusing, it would fall out above it — the same false, which is why the seam
+     * carries the positive assertion and this only keeps the file's own discipline of proving each
+     * scope's path through local_awareness_pluginfile().
+     */
+    public function test_a_course_author_s_own_file_passes_the_real_callback(): void {
+        $this->resetAfterTest();
+
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $notices = $this->unpublished_notices_with_files($mine, $other);
+
+        $user = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:managecourse', CAP_ALLOW, $roleid, \context_course::instance($mine->id)->id, true);
+        role_assign($roleid, $user->id, \context_course::instance($mine->id)->id);
+        $this->setUser($user);
+
+        get_file_storage()->get_file(
+            \context_system::instance()->id,
+            'local_awareness',
+            'content',
+            $notices['mine']->get('id'),
+            '/',
+            'policy.txt'
+        )->delete();
+
+        $this->assertFalse(local_awareness_pluginfile(
+            null,
+            null,
+            \context_system::instance(),
+            'content',
+            [$notices['mine']->get('id'), 'policy.txt'],
+            false
+        ));
+    }
+
+    /**
+     * A published course notice's files are for people in the course.
+     *
+     * Two authenticated users, neither an author, neither in a cohort or role the notice names —
+     * so the audience legs admit both — and only the enrolled one is served. The site notice beside
+     * it is the control: it admits both, so the refusal is the course's and not the audience's.
+     */
+    public function test_a_published_course_notice_s_files_need_access_to_its_course(): void {
+        $this->resetAfterTest();
+
+        $course = $this->getDataGenerator()->create_course();
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $coursenotice = $generator->create_notice(['courseid' => $course->id]);
+        $sitenotice = $generator->create_notice();
+
+        $enrolled = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($enrolled->id, $course->id);
+        $outsider = $this->getDataGenerator()->create_user();
+
+        $this->setUser($enrolled);
+        $this->assertTrue(helper::may_serve_files_of($coursenotice), 'an enrolled user is served the course notice\'s files');
+        $this->assertTrue(helper::may_serve_files_of($sitenotice));
+
+        $this->setUser($outsider);
+        $this->assertFalse(helper::may_serve_files_of($coursenotice), 'a user outside the course is refused its notice\'s files');
+        $this->assertTrue(
+            helper::may_serve_files_of($sitenotice),
+            'and is served the site notice\'s, so the refusal is the course\'s'
+        );
+    }
+
+    /**
+     * A site manager, inheriting down, reaches every unpublished notice's files; a plain user none.
+     */
+    public function test_a_site_manager_reaches_every_unpublished_file_and_a_plain_user_none(): void {
+        $this->resetAfterTest();
+
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $notices = $this->unpublished_notices_with_files($mine, $other);
+
+        $this->login_as_manager();
+        foreach ($notices as $key => $notice) {
+            $this->assertTrue(helper::may_serve_files_of($notice), "the site manager reaches {$key}");
+        }
+
+        $this->setUser($this->getDataGenerator()->create_user());
+        foreach ($notices as $key => $notice) {
+            $this->assertFalse(helper::may_serve_files_of($notice), "a plain user is refused {$key}, unpublished");
+        }
     }
 }
