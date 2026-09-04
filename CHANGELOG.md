@@ -6,6 +6,50 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### A notice can belong to a course, and nothing a user can reach knows it yet (version 2026090400)
+
+**The foundation for course-scoped notices, and only that.** `local_awareness.courseid` (int, NOT
+NULL, default 0, foreign key to `course`) says which course a notice belongs to; 0 is the site,
+which is what every existing row has always meant, so the upgrade backfills nothing.
+`author_scope::of($notice)` is the one way that column is read, and every verb that acts ON a
+notice — update, enable, disable, reset, delete, the file gate, both reports — now decides in the
+notice's own scope rather than at the site: a course author reaches their course's notices and
+nobody else's, and a site manager, whose capability inherits down, reaches them all, inside the
+course's rules. Ownership is set by the scope at creation and pinned on every write, never read
+from the submission: `sanitise_data()` keeps any key that is a property, and `courseid` is one now.
+Moving a notice between scopes is not an edit; if it is ever wanted it is a verb of its own.
+
+**`local/awareness:viewreportscourse` is declared**, `CONTEXT_COURSE`, `RISK_PERSONAL`, no
+archetype, and the reports verb maps to it: a holder reads the acknowledgement and dismissal
+reports of their course's notices and nothing else. The two system reports decide from their own
+`noticeid` parameter and never from the context they were created in — the retrieve web service
+takes both from the client — and they keep the system context in every scope.
+
+**Deleting a course purges its notices**, their files and, under `cleanup_deleted_notice`, their
+history, exactly as a manual delete does past its gate — and past no gate: the purge runs from the
+`before_course_deleted` hook, where the person deleting the course may hold no notice capability
+and `allow_delete` says nothing, because that setting governs whether a human may press Delete.
+That hook and not the `course_deleted` event, whose observer would find the course and its context
+already gone and fail inside a catch the event manager keeps to itself. A fault in the purge is
+caught and reported rather than making a course undeletable; whatever it leaves behind is refused
+to every course author, because `author_scope::exists()` is asked before any context is resolved,
+and only the site capability at the system context may still disable or delete it — an orphaned
+course notice is never read as the site, and never immortal either. A course notice's files, once
+it is published, are served only to people who can access its course: `courseid` is a column on the
+row the file gate has already loaded, so the question `check_filters()` asks with the page is asked
+here the same way, `can_access_course()` with active enrolments only.
+
+**What this deliberately does not ship: anything a user can reach.** No navigation entry, no course
+mode on the manage or editor pages, no `courseid` on the five author-side web services, no form that
+knows its scope. The feasibility document listed the navigation entry and the dual-mode pages here,
+and the adversarial review of this cut showed why they cannot come alone: the editor's estimator,
+both pickers and the collision warning are gated at the site scope, so a course author granted the
+capability and handed a link would reach an editor whose central features fail. They land together,
+as the course editor, in the next change — with the note that a course-notice role needs enrolment
+or `moodle/course:view` beside `managecourse`, because `require_login($course)` is a gate of its own.
+Backup and restore carry no notices, as `tool_monitor` carries no rules; said here so it is a
+decision on the record.
+
 ### A required course that no longer exists withholds its notice
 
 **A notice requiring completion of a course showed to everyone, for ever, the day that course was

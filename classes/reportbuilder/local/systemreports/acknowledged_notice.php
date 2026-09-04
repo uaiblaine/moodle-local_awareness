@@ -28,6 +28,7 @@ use lang_string;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
+use local_awareness\persistent\awareness;
 use local_awareness\reportbuilder\local\entities\acknowledgement;
 use moodle_url;
 use pix_icon;
@@ -136,6 +137,18 @@ class acknowledged_notice extends system_report {
      * @return bool
      */
     protected function can_view(): bool {
-        return helper::require_author(author_scope::site(), 'viewreports', false);
+        /*
+         * Decided from the report's own noticeid parameter and never from the context it was created
+         * in: the retrieve web service takes both from the client, and a course-level reports holder
+         * could otherwise read any notice's report by pairing their course's context with someone
+         * else's notice id. The rows are already per notice, so this is the only scope that can be
+         * right — and the report keeps the system context in every mode for the same reason.
+         */
+        $notice = awareness::get_record(['id' => $this->get_parameter('noticeid', 0, PARAM_INT)]);
+        if (!$notice) {
+            return false;
+        }
+
+        return helper::require_author(author_scope::of($notice), 'viewreports', false);
     }
 }

@@ -59,6 +59,7 @@ $string['audience:title'] = 'Estimativa de público';
 $string['awareness:manage'] = 'Gerenciar alertas do site';
 $string['awareness:managecourse'] = 'Gerenciar alertas em um curso';
 $string['awareness:viewreports'] = 'Visualizar relatórios de alertas';
+$string['awareness:viewreportscourse'] = 'Visualizar relatórios de alertas em um curso';
 $string['booleanformat:false'] = 'Não';
 $string['booleanformat:true'] = 'Sim';
 $string['button:accept'] = 'Aceitar';

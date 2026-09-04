@@ -35,15 +35,21 @@ $noticeid = required_param('noticeid', PARAM_INT);
 require_login();
 
 $context = context_system::instance();
-helper::require_author(author_scope::site(), 'viewreports');
 
-// Validate the notice exists.
-$notice = $DB->get_record('local_awareness', ['id' => $noticeid], '*', MUST_EXIST);
+// Resolved before the gate, because the gate depends on whose notice it is. resolve_notice() refuses
+// an id that names nothing with the editor's own message and answers null only for an id of zero,
+// which is refused the same way here. The report itself stays in the system context in every
+// scope: its rows are already one notice's, and it decides its viewer the same way.
+$awareness = helper::resolve_notice($noticeid);
+if (!$awareness) {
+    throw new moodle_exception('notification:noticedoesnotexist', 'local_awareness');
+}
+helper::require_author(author_scope::of($awareness), 'viewreports');
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/awareness/report/acknowledged_systemreport.php', ['noticeid' => $noticeid]));
-$PAGE->set_title(get_string('report:acknowledged', 'local_awareness', $notice->title));
-$PAGE->set_heading(get_string('report:acknowledged', 'local_awareness', $notice->title));
+$PAGE->set_title(get_string('report:acknowledged', 'local_awareness', $awareness->get('title')));
+$PAGE->set_heading(get_string('report:acknowledged', 'local_awareness', $awareness->get('title')));
 $PAGE->set_pagelayout('report');
 // The Bootstrap 4 polyfill in styles.css is gated on the body class this adds, so a page that
 // omits it renders unstyled on 4.5 while every static gate stays green.

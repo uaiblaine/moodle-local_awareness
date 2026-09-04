@@ -163,10 +163,24 @@ Behat site fails every scenario on the same core locator and looks like your bug
   production caller until the `courseid` column exists; do not "clean it up" as dead code, and do
   not wire it without reading `docs/SCOPE-VALIDATOR-FEASIBILITY.md`. Likewise
   `helper::require_author($scope, $verb)` is the only place a plugin capability is checked — every
-  page, verb, web service and report passes through it with the site scope today — and
-  `local/awareness:managecourse` is declared so its course branch is testable, with no archetype
-  and nothing that grants it yet. `helper::resolve_notice()` is how a page turns an id into a
-  notice; it fails closed, because the editor's create-or-update branch once keyed on "not found".
+  page, verb, web service and report passes through it — the pages and web services with the
+  site scope, every verb that acts ON a notice with `author_scope::of($notice)`, the notice's own
+  scope read from its `courseid`. `local/awareness:managecourse` and `viewreportscourse` are
+  declared with no archetype and nothing grants them yet; nothing in production constructs a
+  course scope except `of()` on a stored row, and no page can store one. `helper::resolve_notice()`
+  is how a page turns an id into a notice; it fails closed, because the editor's create-or-update
+  branch once keyed on "not found". Ownership is pinned on every write path and never read from
+  the submission; a course whose row is gone makes `author_scope::exists()` false, and
+  `require_author()` asks that before it resolves a context, so an orphan is refused to course
+  authors, not fatal, not promoted to the site, and still deletable by the site capability at the
+  system context. `helper::may_serve_files_of()` is the file gate: author bypass in the notice's
+  scope, then course access for a course notice, then the audience.
+  Course deletion purges through the `before_course_deleted` hook —
+  the `course_deleted` event fires after the course and its context are gone — via
+  `helper::purge_notice()`, which is not a verb and asks nothing; `delete_notice()` is the verb.
+  **The course editor is the next change, as one unit:** navigation, dual-mode pages, the form,
+  and the five author web services taking `courseid`; separately they ship a reachable, broken
+  editor (measured against the estimator's auto-trigger and the pickers' gates).
 
 ## Testing notes
 

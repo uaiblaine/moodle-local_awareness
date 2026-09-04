@@ -168,4 +168,36 @@ final class schema_test extends \advanced_testcase {
             'the action did not come back as the integer it went in as'
         );
     }
+
+    /**
+     * A notice's course is a NOT NULL column defaulting to the site, with the index its foreign key builds.
+     *
+     * The default is what makes the upgrade need no backfill: every row written before the column
+     * existed reads as a site notice because 0 is what the column says when nothing was said.
+     *
+     * @return void
+     */
+    public function test_a_notice_carries_its_course_and_defaults_to_the_site(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $columns = $DB->get_columns('local_awareness');
+        $this->assertNotEmpty($columns, 'no column found on local_awareness — the read is broken');
+        $this->assertArrayHasKey('courseid', $columns, 'local_awareness has no courseid column');
+        $this->assertTrue((bool) $columns['courseid']->not_null, 'courseid must be NOT NULL');
+        $this->assertSame('0', (string) $columns['courseid']->default_value, 'courseid must default to 0, the site');
+
+        // The foreign key exists only as the index Moodle builds for it; matched on columns, never on the name.
+        $columnsets = array_values(array_map(static fn(array $i): array => $i['columns'], $DB->get_indexes('local_awareness')));
+        $this->assertContains(['courseid'], $columnsets, 'no index on local_awareness.courseid');
+
+        // And the persistent writes it: a row created without saying carries 0, one that says keeps it.
+        $course = $this->getDataGenerator()->create_course();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $site = $generator->create_notice();
+        $mine = $generator->create_notice(['courseid' => $course->id]);
+        $this->assertSame(0, (int) $DB->get_field('local_awareness', 'courseid', ['id' => $site->get('id')]));
+        $this->assertSame((int) $course->id, (int) $DB->get_field('local_awareness', 'courseid', ['id' => $mine->get('id')]));
+    }
 }

@@ -17,6 +17,7 @@
 namespace local_awareness\local;
 
 use local_awareness\helper;
+use local_awareness\persistent\awareness;
 
 /**
  * Who a notice is being written AS, and what that lets it target.
@@ -165,6 +166,27 @@ final class author_scope {
     }
 
     /**
+     * The scope a stored notice belongs to.
+     *
+     * The one way a notice's scope is read. A course notice carries its course id and a site notice
+     * carries 0, and every gate that acts ON a notice asks here rather than testing the column, so
+     * the answer cannot drift between callers. A notice whose course has since been deleted still
+     * resolves to the course scope it was written under, and helper::require_author() asks exists()
+     * before it resolves a context, because the context is gone too: a course author is refused and
+     * only the site capability, at the system context, may still act — to delete or disable it —
+     * rather than the notice being quietly promoted to the site. The before_course_deleted hook is
+     * what makes that case rare.
+     *
+     * @param awareness $notice The notice.
+     * @return self
+     */
+    public static function of(awareness $notice): self {
+        $courseid = (int) $notice->get('courseid');
+
+        return $courseid > SITEID ? self::course($courseid) : self::site();
+    }
+
+    /**
      * Whether this is the site scope.
      *
      * @return bool
@@ -180,6 +202,26 @@ final class author_scope {
      */
     public function get_courseid(): int {
         return $this->courseid;
+    }
+
+    /**
+     * Whether what this scope names still exists.
+     *
+     * Always, for the site. For a course, whether its row is still there: a notice can outlive its
+     * course when the deletion ran with the plugin uninstalled, at the database, or past the purge's
+     * own catch, and the scope it resolves to then has no context to be decided in. Callers ask this
+     * before context(), which would throw a missing-record error where a refusal is owed.
+     *
+     * @return bool
+     */
+    public function exists(): bool {
+        global $DB;
+
+        if ($this->is_site()) {
+            return true;
+        }
+
+        return $DB->record_exists('course', ['id' => $this->courseid]);
     }
 
     /**

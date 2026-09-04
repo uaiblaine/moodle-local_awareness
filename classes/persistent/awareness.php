@@ -78,6 +78,11 @@ class awareness extends persistent {
      */
     protected static function define_properties() {
         return [
+            'courseid' => [
+                'type' => PARAM_INT,
+                'null' => NULL_NOT_ALLOWED,
+                'default' => 0,
+            ],
             'title' => [
                 'type' => PARAM_RAW_TRIMMED,
                 'null' => NULL_NOT_ALLOWED,

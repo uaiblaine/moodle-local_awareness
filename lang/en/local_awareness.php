@@ -60,6 +60,7 @@ $string['audience:title'] = 'Audience estimate';
 $string['awareness:manage'] = 'Manage site notice';
 $string['awareness:managecourse'] = 'Manage notices in a course';
 $string['awareness:viewreports'] = 'View awareness reports';
+$string['awareness:viewreportscourse'] = 'View notice reports in a course';
 $string['booleanformat:false'] = 'No';
 $string['booleanformat:true'] = 'Yes';
 $string['button:accept'] = 'Accept';

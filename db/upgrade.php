@@ -356,5 +356,27 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026082402, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026090400) {
+        /*
+         * A notice may now belong to a course. 0 is the site, which is what every existing row has
+         * always meant, so there is no backfill: the default says it. The foreign key is the index
+         * Moodle builds for it and nothing more — core enforces no referential integrity — and the
+         * before_course_deleted hook (hook_callbacks::before_course_deleted) is what keeps the
+         * column true when a course goes.
+         */
+        $table = new xmldb_table('local_awareness');
+        $field = new xmldb_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'id');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $index = new xmldb_index('courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']);
+        if (!$dbman->index_exists($table, $index)) {
+            $key = new xmldb_key('courseid', XMLDB_KEY_FOREIGN, ['courseid'], 'course', ['id']);
+            $dbman->add_key($table, $key);
+        }
+
+        upgrade_plugin_savepoint(true, 2026090400, 'local', 'awareness');
+    }
+
     return true;
 }
