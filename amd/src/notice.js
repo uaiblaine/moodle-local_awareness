@@ -81,8 +81,6 @@ define(
 
                         modal.setNoticeId(nextnotice.id);
                         modal.setInsistence(nextnotice.insistence);
-                        modal.setBackgroundImage(nextnotice.bgimageurl || '');
-                        modal.setModalSize(nextnotice.modal_width || '', nextnotice.modal_height || '');
 
                         // Event listener for close button.
                         modal.getModal().on('click', modal.getCloseButtonSelector(), function() {
@@ -103,19 +101,38 @@ define(
                             $(modal.getAcceptButtonID()).attr('disabled', !ischecked);
                         });
 
+                        /*
+                         * Shown BEFORE it is dressed. show() is what attaches the dialogue to the
+                         * document, and the video.js loader finds the player it is told about by
+                         * id, in the document: a band filled while the dialogue was still detached
+                         * gave it an id that named nothing, and no player.
+                         */
                         modal.show();
+                        return modal.setAppearance(nextnotice);
+                    })
+                    .then(function() {
+                        modal.setAnimation(nextnotice.animation);
                         modal.getModal().focus();
                         return null;
-                    }).catch(Notification.exception);
+                    })
+                    .catch(Notification.exception);
             } else {
+                /*
+                 * The dialogue is dressed in place, whatever its next shape: core's hide() and
+                 * show() run in the same frame here, so nothing between them would ever be painted,
+                 * and the entrance the caller replays after show() is what carries a change of
+                 * shape - it starts from nothing and arrives as the new notice. An author who chose
+                 * no entrance chose no motion at all, including here. Hiding stays in exactly one
+                 * place, when the queue is empty, which async_contract_test pins.
+                 */
                 // Update with new details.
                 modal.setTitle(nextnotice.title);
                 modal.setBody(nextnotice.content);
                 modal.setNoticeId(nextnotice.id);
                 modal.setInsistence(nextnotice.insistence);
-                modal.setBackgroundImage(nextnotice.bgimageurl || '');
-                modal.setModalSize(nextnotice.modal_width || '', nextnotice.modal_height || '');
+                modal.setAppearance(nextnotice).catch(Notification.exception);
                 modal.show();
+                modal.setAnimation(nextnotice.animation);
                 modal.getModal().focus();
             }
         };

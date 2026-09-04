@@ -41,6 +41,87 @@ class awareness extends persistent {
     const INSISTENCE_ACKNOWLEDGE = 2;
 
     /**
+     * Dialogue layouts an author may choose. The first is the column default, and it is what every
+     * notice written before layouts existed renders as: the header, body and footer it always had.
+     *
+     * One source for the form, the web service, the JavaScript mirror and the tests; the columns
+     * only hold the choice, and the persistent's `choices` gate is what keeps them inside it.
+     */
+    public const TEMPLATES = ['classic', 'hero', 'fullscreen', 'card', 'video', 'carousel'];
+
+    /** Positions on the screen. start/end are logical, so a corner flips under RTL. */
+    public const POSITIONS = ['center', 'top', 'bottom', 'top-start', 'top-end', 'bottom-start', 'bottom-end'];
+
+    /** The positions every layout accepts; the corners are for the card alone. */
+    public const POSITIONS_EDGE = ['center', 'top', 'bottom'];
+
+    /** The four corners, where only a card is small enough to sit. */
+    public const POSITIONS_CORNER = ['top-start', 'top-end', 'bottom-start', 'bottom-end'];
+
+    /** Entrance animations. slide takes its direction from the position; all collapse under reduced motion. */
+    public const ANIMATIONS = ['none', 'fade', 'slide', 'zoom', 'spring'];
+
+    /**
+     * The positions a layout may take.
+     *
+     * A fullscreen dialogue covers the screen, so it has no position; a card is compact enough for
+     * a corner; everything else sits centred or against the top or bottom edge, where a wide box
+     * still reads as one. The form offers these and extra_validation() refuses the rest, because a
+     * value the CSS has no rule for renders as centred and the stored choice would then lie.
+     *
+     * @param string $template One of TEMPLATES.
+     * @return string[] A subset of POSITIONS.
+     */
+    public static function positions_for(string $template): array {
+        if ($template === 'fullscreen') {
+            return ['center'];
+        }
+        if ($template === 'card') {
+            return self::POSITIONS;
+        }
+
+        return self::POSITIONS_EDGE;
+    }
+
+    /**
+     * Whether a layout can carry the acknowledgement checkbox.
+     *
+     * The footer is one shared block: the checkbox row beside the buttons. A card's footer is a
+     * single line of one button and has no room for it, so a card cannot be Must acknowledge -
+     * offering the level would render an insistence the reader cannot satisfy.
+     *
+     * @param string $template One of TEMPLATES.
+     * @return bool
+     */
+    public static function accepts_acknowledgement(string $template): bool {
+        return $template !== 'card';
+    }
+
+    /**
+     * Whether a layout is drawn from the dedicated video field rather than the content editor.
+     *
+     * @param string $template One of TEMPLATES.
+     * @return bool
+     */
+    public static function uses_video(string $template): bool {
+        return $template === 'video';
+    }
+
+    /**
+     * Whether a layout shows the uploaded background image.
+     *
+     * The video and carousel layouts fill their media band from the video field and the slides;
+     * a background behind that would be two competing surfaces, so the field is hidden for them
+     * and a stored file is ignored.
+     *
+     * @param string $template One of TEMPLATES.
+     * @return bool
+     */
+    public static function uses_bgimage(string $template): bool {
+        return !in_array($template, ['video', 'carousel'], true);
+    }
+
+    /**
      * How insistent this notice is, as one ordered value.
      *
      * Derived rather than stored, so there is no third copy of the truth to drift from the two
@@ -157,6 +238,39 @@ class awareness extends persistent {
             ],
             'modal_height' => [
                 'type' => PARAM_RAW,
+                'null' => NULL_ALLOWED,
+                'default' => null,
+            ],
+            /*
+             * The three choices are gated by `choices`, not by the PARAM type: PARAM_ALPHA and
+             * PARAM_ALPHAEXT only say which characters may appear, and a misspelt layout is made
+             * of perfectly legal letters. `choices` is the one server-side gate on every write path.
+             */
+            'template' => [
+                'type' => PARAM_ALPHA,
+                'null' => NULL_NOT_ALLOWED,
+                'default' => 'classic',
+                'choices' => self::TEMPLATES,
+            ],
+            'position' => [
+                // PARAM_ALPHAEXT, because the corners carry a hyphen.
+                'type' => PARAM_ALPHAEXT,
+                'null' => NULL_NOT_ALLOWED,
+                'default' => 'center',
+                'choices' => self::POSITIONS,
+            ],
+            'animation' => [
+                'type' => PARAM_ALPHA,
+                'null' => NULL_NOT_ALLOWED,
+                'default' => 'none',
+                'choices' => self::ANIMATIONS,
+            ],
+            /*
+             * PARAM_URL accepts a scheme-less value, which the browser would then resolve relative
+             * to the page; the form's extra_validation() is where http(s) is demanded.
+             */
+            'videourl' => [
+                'type' => PARAM_URL,
                 'null' => NULL_ALLOWED,
                 'default' => null,
             ],

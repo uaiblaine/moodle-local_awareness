@@ -19,6 +19,7 @@ namespace local_awareness\form;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
+use local_awareness\persistent\slide;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -43,8 +44,14 @@ class notice_form extends \core\form\persistent {
      * filter_data_for_persistent() removes only these names, and from_record() then drops anything
      * that is not a property anyway — but the next reader should not have to derive that.
      */
+    /** @var int A carousel starts with this many empty slides, and adds this many per click. */
+    public const SLIDES_MIN = 2;
+
     /** @var array Fields to remove from the persistent validation. */
     protected static $foreignfields = [
+        // The layout picker's group names, and the repeated slide rows: none is a column.
+        'templategroup', 'positiongroup', 'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
+        'slide_id', 'slide_repeats', 'slide_add', 'slide_delete', 'slide_delete-hidden',
         'insistence', 'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
         'filter_course', 'filter_format', 'filter_theme', 'filter_competency_rules',
         'filter_competency_requireall', 'bgimage',
@@ -128,6 +135,13 @@ class notice_form extends \core\form\persistent {
             ]
         );
         $mform->addHelpButton('bgimage', 'notice:bgimage', 'local_awareness');
+        // The video and carousel layouts fill their media band themselves; a background behind it
+        // would be two competing surfaces, so the field is not offered for them.
+        foreach (awareness::TEMPLATES as $template) {
+            if (!awareness::uses_bgimage($template)) {
+                $mform->hideIf('bgimage', 'template', 'eq', $template);
+            }
+        }
 
         // Display.
         $mform->addElement('header', 'header_behavior', get_string('editor:section:behavior', 'local_awareness'));
@@ -476,6 +490,61 @@ class notice_form extends \core\form\persistent {
             get_string('editor:section:appearance:desc', 'local_awareness')
         );
 
+        /*
+         * Layout: one radio per layout, each labelled with a schematic thumbnail and its name, so
+         * the choice is seen rather than deciphered from a select. The radios share the name the
+         * column has; the group name is what the help button and the dependencies hang off.
+         */
+        $layouts = [];
+        foreach (awareness::TEMPLATES as $template) {
+            $layouts[] = $mform->createElement('radio', 'template', '', self::layout_label($template), $template);
+        }
+        $mform->addGroup($layouts, 'templategroup', get_string('notice:template', 'local_awareness'), '', false);
+        $mform->addHelpButton('templategroup', 'notice:template', 'local_awareness');
+        $mform->setDefault('template', awareness::TEMPLATES[0]);
+
+        /*
+         * Position: the seven anchors as radios, which the stylesheet lays out as the 3x3 grid they
+         * are. A fullscreen dialogue has no position, so the field is hidden for it; the corners
+         * belong to the card alone, and notice_form.js greys them for every other layout while
+         * extra_validation() refuses them for good.
+         */
+        $positions = [];
+        foreach (awareness::POSITIONS as $position) {
+            $positions[] = $mform->createElement('radio', 'position', '', self::position_label($position), $position);
+        }
+        $mform->addGroup($positions, 'positiongroup', get_string('notice:position', 'local_awareness'), '', false);
+        $mform->addHelpButton('positiongroup', 'notice:position', 'local_awareness');
+        $mform->setDefault('position', awareness::POSITIONS[0]);
+        $mform->hideIf('positiongroup', 'template', 'eq', 'fullscreen');
+
+        $mform->addElement(
+            'select',
+            'animation',
+            get_string('notice:animation', 'local_awareness'),
+            self::animation_options()
+        );
+        $mform->addHelpButton('animation', 'notice:animation', 'local_awareness');
+        $mform->setDefault('animation', awareness::ANIMATIONS[0]);
+
+        /*
+         * The video layout's link. Deliberately no file picker: the site's media players decide what
+         * a link plays, and an upload would make the plugin a video host with a file area, a byte-range
+         * path and a size cap of its own to carry.
+         */
+        $mform->addElement(
+            'url',
+            'videourl',
+            get_string('notice:videourl', 'local_awareness'),
+            ['size' => 60],
+            ['usefilepicker' => false]
+        );
+        $mform->setType('videourl', PARAM_URL);
+        $mform->addHelpButton('videourl', 'notice:videourl', 'local_awareness');
+        $mform->hideIf('videourl', 'template', 'neq', 'video');
+
+        $this->define_slides($mform);
+
         $mform->addElement('text', 'modal_width', get_string('notice:modal_width', 'local_awareness'));
         $mform->setType('modal_width', PARAM_RAW);
         $mform->addHelpButton('modal_width', 'notice:modal_width', 'local_awareness');
@@ -507,7 +576,20 @@ class notice_form extends \core\form\persistent {
         $this->set_optional_section_state('header_filters', [
             'pathmatch', 'filter_category', 'filter_course', 'filter_format', 'filter_theme',
         ]);
-        $this->set_optional_section_state('header_appearance', ['modal_width', 'modal_height']);
+        /*
+         * The appearance fields are never empty - every notice stores a layout - so "holds a value"
+         * has to mean "holds something other than the default", or the section would open on every
+         * edit of every notice and the collapse would be decoration.
+         */
+        $this->set_optional_section_state(
+            'header_appearance',
+            ['modal_width', 'modal_height', 'template', 'position', 'animation', 'videourl'],
+            [
+                'template' => awareness::TEMPLATES[0],
+                'position' => awareness::POSITIONS[0],
+                'animation' => awareness::ANIMATIONS[0],
+            ]
+        );
 
         $buttonarray = [];
 
@@ -570,7 +652,267 @@ class notice_form extends \core\form\persistent {
             $extra[$element] = self::problem_message($field);
         }
 
+        return $extra + $this->validate_layout($data);
+    }
+
+    /**
+     * The rules that tie the layout to the other choices, each refused with its reason.
+     *
+     * hideIf hides a field; it does not stop the value travelling, and a client rule never posts
+     * the form. So the combinations the picker cannot express are refused here, on the field the
+     * author can act on: a card has no room for the acknowledgement box, a corner is the card's
+     * alone, the video layout needs a link, and a carousel needs slides to turn.
+     *
+     * @param \stdClass $data The submitted data.
+     * @return array Element name => message.
+     */
+    private function validate_layout(\stdClass $data): array {
+        $extra = [];
+        $template = (string) ($data->template ?? awareness::TEMPLATES[0]);
+
+        if (
+            (int) ($data->insistence ?? awareness::INSISTENCE_INFORMATIONAL) >= awareness::INSISTENCE_ACKNOWLEDGE
+            && !awareness::accepts_acknowledgement($template)
+        ) {
+            $extra['insistence'] = get_string('notice:insistence:notforlayout', 'local_awareness', self::layout_name($template));
+        }
+
+        $position = (string) ($data->position ?? awareness::POSITIONS[0]);
+        if ($template !== 'fullscreen' && !in_array($position, awareness::positions_for($template), true)) {
+            $extra['positiongroup'] = get_string('notice:position:notforlayout', 'local_awareness', self::layout_name($template));
+        }
+
+        if (awareness::uses_video($template)) {
+            $problem = self::video_link_problem((string) ($data->videourl ?? ''), true);
+            if ($problem !== null) {
+                $extra['videourl'] = $problem;
+            }
+        }
+
+        if ($template === 'carousel') {
+            $extra += $this->validate_slides($data);
+        }
+
         return $extra;
+    }
+
+    /**
+     * What is wrong with a video link, or null when nothing is.
+     *
+     * PARAM_URL lets a scheme-less value through, and the browser would then resolve it against
+     * the page it is on; only an absolute http(s) link plays.
+     *
+     * @param string $url The submitted link, trimmed here.
+     * @param bool $required Whether an empty link is itself a problem.
+     * @return string|null The message to show, or null.
+     */
+    private static function video_link_problem(string $url, bool $required): ?string {
+        $url = trim($url);
+        if ($url === '') {
+            return $required ? get_string('notice:videourl:required', 'local_awareness') : null;
+        }
+        if (!preg_match('~^https?://~i', $url) || clean_param($url, PARAM_URL) !== $url) {
+            return get_string('notice:videourl:invalid', 'local_awareness');
+        }
+
+        return null;
+    }
+
+    /**
+     * The carousel's slides: at least two with something on them, and no slide asked to be both.
+     *
+     * The draft ids are read from the submitted arrays, never through
+     * file_get_submitted_draft_itemid(), which cannot address a repeated element.
+     *
+     * @param \stdClass $data The submitted data.
+     * @return array Element name => message.
+     */
+    private function validate_slides(\stdClass $data): array {
+        $extra = [];
+        $present = 0;
+        $captions = (array) ($data->slide_caption ?? []);
+        $links = (array) ($data->slide_videourl ?? []);
+        $drafts = (array) ($data->slide_image ?? []);
+
+        $indexes = array_keys($captions + $links + $drafts);
+        sort($indexes);
+        foreach ($indexes as $i) {
+            $caption = trim((string) ($captions[$i] ?? ''));
+            $link = trim((string) ($links[$i] ?? ''));
+            $draftid = (int) ($drafts[$i] ?? 0);
+            $hasimage = $draftid > 0 && (int) file_get_draft_area_info($draftid)['filecount'] > 0;
+
+            if ($link !== '') {
+                $problem = self::video_link_problem($link, false);
+                if ($problem !== null) {
+                    $extra["slide_videourl[{$i}]"] = $problem;
+                } else if ($hasimage) {
+                    $extra["slide_videourl[{$i}]"] = get_string('notice:slide:both', 'local_awareness');
+                }
+            }
+            if ($caption !== '' || $link !== '' || $hasimage) {
+                $present++;
+            }
+        }
+
+        if ($present < self::SLIDES_MIN) {
+            $extra['templategroup'] = get_string('notice:slides:required', 'local_awareness', self::SLIDES_MIN);
+        }
+
+        return $extra;
+    }
+
+    /**
+     * The slide rows: a repeated group of image, link and caption, hidden unless the layout is the carousel.
+     *
+     * A carousel starts with SLIDES_MIN empty rows and grows by that many per click; a row left
+     * entirely empty is not a slide and is not saved. The Delete button is core's no-submit
+     * repeat-deletion, so removing a slide never posts the form.
+     *
+     * @param \MoodleQuickForm $mform The form.
+     * @return void
+     */
+    private function define_slides(\MoodleQuickForm $mform): void {
+        global $CFG;
+
+        $repeats = max(self::SLIDES_MIN, count($this->existing_slides()));
+
+        $elements = [
+            $mform->createElement('static', 'slide_no', get_string('notice:slide', 'local_awareness')),
+            $mform->createElement(
+                'filepicker',
+                'slide_image',
+                get_string('notice:slide:image', 'local_awareness'),
+                null,
+                ['maxbytes' => $CFG->maxbytes, 'accepted_types' => ['image'], 'maxfiles' => 1]
+            ),
+            $mform->createElement(
+                'url',
+                'slide_videourl',
+                get_string('notice:slide:video', 'local_awareness'),
+                ['size' => 60],
+                ['usefilepicker' => false]
+            ),
+            $mform->createElement('text', 'slide_caption', get_string('notice:slide:caption', 'local_awareness'), ['size' => 60]),
+            $mform->createElement('hidden', 'slide_id', 0),
+            $mform->createElement('submit', 'slide_delete', get_string('notice:slide:delete', 'local_awareness'), [], false),
+        ];
+        $hide = ['hideif' => ['template', 'neq', 'carousel']];
+        $options = [
+            'slide_no' => ['default' => '{no}'] + $hide,
+            'slide_image' => $hide,
+            'slide_videourl' => ['type' => PARAM_URL] + $hide,
+            'slide_caption' => ['type' => PARAM_TEXT] + $hide,
+            'slide_id' => ['type' => PARAM_INT],
+            'slide_delete' => $hide,
+        ];
+        $this->repeat_elements(
+            $elements,
+            $repeats,
+            $options,
+            'slide_repeats',
+            'slide_add',
+            self::SLIDES_MIN,
+            get_string('notice:slide:add', 'local_awareness', '{no}'),
+            true,
+            'slide_delete'
+        );
+        $mform->hideIf('slide_add', 'template', 'neq', 'carousel');
+    }
+
+    /**
+     * The slides the notice being edited already has, in order; none for a new notice.
+     *
+     * @return slide[]
+     */
+    private function existing_slides(): array {
+        $noticeid = (int) $this->get_persistent()->get('id');
+
+        return $noticeid > 0 ? slide::for_notice($noticeid) : [];
+    }
+
+    /**
+     * The layout radio's label: a thumbnail and the name, from the plugin's own template.
+     *
+     * @param string $template One of awareness::TEMPLATES.
+     * @return string HTML.
+     */
+    private static function layout_label(string $template): string {
+        global $OUTPUT;
+
+        return $OUTPUT->render_from_template('local_awareness/editor/layout_option', [
+            'template' => $template,
+            'name' => self::layout_name($template),
+        ]);
+    }
+
+    /**
+     * A layout's name, from a literal string id per value.
+     *
+     * @param string $template One of awareness::TEMPLATES.
+     * @return string
+     * @throws \coding_exception For a layout with no name, so a value added to the vocabulary cannot ship unnamed.
+     */
+    public static function layout_name(string $template): string {
+        switch ($template) {
+            case 'classic':
+                return get_string('notice:template:classic', 'local_awareness');
+            case 'hero':
+                return get_string('notice:template:hero', 'local_awareness');
+            case 'fullscreen':
+                return get_string('notice:template:fullscreen', 'local_awareness');
+            case 'card':
+                return get_string('notice:template:card', 'local_awareness');
+            case 'video':
+                return get_string('notice:template:video', 'local_awareness');
+            case 'carousel':
+                return get_string('notice:template:carousel', 'local_awareness');
+            default:
+                throw new \coding_exception("No name for the layout '{$template}'");
+        }
+    }
+
+    /**
+     * A position's name, from a literal string id per value.
+     *
+     * @param string $position One of awareness::POSITIONS.
+     * @return string
+     * @throws \coding_exception For a position with no name.
+     */
+    public static function position_label(string $position): string {
+        switch ($position) {
+            case 'center':
+                return get_string('notice:position:center', 'local_awareness');
+            case 'top':
+                return get_string('notice:position:top', 'local_awareness');
+            case 'bottom':
+                return get_string('notice:position:bottom', 'local_awareness');
+            case 'top-start':
+                return get_string('notice:position:topstart', 'local_awareness');
+            case 'top-end':
+                return get_string('notice:position:topend', 'local_awareness');
+            case 'bottom-start':
+                return get_string('notice:position:bottomstart', 'local_awareness');
+            case 'bottom-end':
+                return get_string('notice:position:bottomend', 'local_awareness');
+            default:
+                throw new \coding_exception("No name for the position '{$position}'");
+        }
+    }
+
+    /**
+     * The animation select's options, one literal string id per value.
+     *
+     * @return array Value => name, in vocabulary order.
+     */
+    public static function animation_options(): array {
+        return [
+            'none' => get_string('notice:animation:none', 'local_awareness'),
+            'fade' => get_string('notice:animation:fade', 'local_awareness'),
+            'slide' => get_string('notice:animation:slide', 'local_awareness'),
+            'zoom' => get_string('notice:animation:zoom', 'local_awareness'),
+            'spring' => get_string('notice:animation:spring', 'local_awareness'),
+        ];
     }
 
     /**
@@ -674,9 +1016,10 @@ class notice_form extends \core\form\persistent {
      *
      * @param string $header Name of the header element.
      * @param array $fields Field names the section owns.
+     * @param array $defaults Field name => the value that means "not chosen", for columns that are never empty.
      * @return void
      */
-    protected function set_optional_section_state(string $header, array $fields): void {
+    protected function set_optional_section_state(string $header, array $fields, array $defaults = []): void {
         $mform =& $this->_form;
         $persistent = $this->get_persistent();
 
@@ -691,6 +1034,11 @@ class notice_form extends \core\form\persistent {
                 $value = $filters[$field] ?? null;
                 if ($value === null && \local_awareness\persistent\awareness::has_property($field)) {
                     $value = $persistent->get($field);
+                }
+                // A column with a default is "used" only away from it: a stored 'classic' is
+                // the absence of a choice, not a choice the author needs to see.
+                if (array_key_exists($field, $defaults) && $value === $defaults[$field]) {
+                    continue;
                 }
                 if (is_array($value) ? !empty($value) : trim((string) $value) !== '') {
                     $used = true;
@@ -749,6 +1097,41 @@ class notice_form extends \core\form\persistent {
          * in; helper::sanitise_data() writes it back out to those columns on the way out.
          */
         $data->insistence = $this->get_persistent()->get_insistence();
+
+        /*
+         * A new notice arrives with a fade; a saved one keeps what it stored, 'none' included.
+         * The column default stays 'none' so the upgrade changes nothing a reader sees, and only
+         * the empty form suggests motion. Pinned by a test: editing an old notice must not drift it.
+         */
+        if ($noticeid <= 0) {
+            $data->animation = 'fade';
+        }
+
+        /*
+         * One draft area per existing slide, so its picker shows the image it has. The draft id is
+         * read from the submitted array directly: file_get_submitted_draft_itemid() cannot address
+         * a repeated element, and returns false with a developer warning when asked to.
+         */
+        $submitted = optional_param_array('slide_image', [], PARAM_INT);
+        $data->slide_image = [];
+        $data->slide_videourl = [];
+        $data->slide_caption = [];
+        $data->slide_id = [];
+        foreach ($this->existing_slides() as $i => $slide) {
+            $draftid = (int) ($submitted[$i] ?? 0);
+            file_prepare_draft_area(
+                $draftid,
+                \context_system::instance()->id,
+                'local_awareness',
+                slide::FILEAREA,
+                (int) $slide->get('id'),
+                ['maxfiles' => 1, 'accepted_types' => ['image']]
+            );
+            $data->slide_image[$i] = $draftid;
+            $data->slide_videourl[$i] = (string) $slide->get('videourl');
+            $data->slide_caption[$i] = (string) $slide->get('caption');
+            $data->slide_id[$i] = (int) $slide->get('id');
+        }
 
         // Unpack filter values.
         if (!empty($data->filtervalues)) {

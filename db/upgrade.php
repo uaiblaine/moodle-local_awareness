@@ -378,5 +378,45 @@ function xmldb_local_awareness_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026090400, 'local', 'awareness');
     }
 
+    if ($oldversion < 2026090402) {
+        /*
+         * A notice chooses its layout, its place on the screen and its entrance. The defaults are
+         * what every existing notice already renders as - the classic dialogue, centred, arriving
+         * with no animation - so this step changes nothing a reader can see. The vocabularies live
+         * on the persistent (awareness::TEMPLATES and friends); the columns only hold the choice.
+         */
+        $table = new xmldb_table('local_awareness');
+        $fields = [
+            new xmldb_field('template', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'classic', 'outsideclick'),
+            new xmldb_field('position', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'center', 'template'),
+            new xmldb_field('animation', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'none', 'position'),
+            new xmldb_field('videourl', XMLDB_TYPE_CHAR, '1333', null, null, null, null, 'animation'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+
+        // The carousel's slides: one row per slide, media keyed by the slide id in filearea slidemedia.
+        $table = new xmldb_table('local_awareness_slides');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('noticeid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('sortorder', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('videourl', XMLDB_TYPE_CHAR, '1333', null, null, null, null);
+        $table->add_field('caption', XMLDB_TYPE_TEXT, null, null, null, null, null);
+        $table->add_field('usermodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_key('noticeid', XMLDB_KEY_FOREIGN, ['noticeid'], 'local_awareness', ['id']);
+        $table->add_index('notice_order', XMLDB_INDEX_NOTUNIQUE, ['noticeid', 'sortorder']);
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(true, 2026090402, 'local', 'awareness');
+    }
+
     return true;
 }

@@ -1,0 +1,63 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_awareness/notice/carousel
+
+    The carousel layout's band: one slide shown at a time, arrows, one dot per slide and a
+    polite status line for assistive technology. Follows the WAI-ARIA carousel pattern - a region
+    with a role description, slides as groups, plain buttons for the picker - and never rotates
+    by itself. Rendered by modal_notice.js from the web service payload and driven by
+    local_awareness/carousel; inactive slides carry the hidden attribute, so what a test sees is
+    what the reader sees.
+
+    Context variables required for this template:
+      * total - the number of slides
+      * slides - a list of slides, each with type (image, video or text), html (the rendered media,
+        trusted, from helper::render_slides()), caption (plain text), index (from 0), number
+        (from 1) and first (true on the first slide only)
+
+    Example context (json):
+    {
+        "total": 2,
+        "slides": [
+            {"type": "image", "html": "<img src=\"lab.png\" alt=\"The lab\" class=\"la-slide-image\">", "caption": "The lab", "index": 0, "number": 1, "first": true},
+            {"type": "text", "html": "", "caption": "Just words", "index": 1, "number": 2, "first": false}
+        ]
+    }
+}}
+<div class="la-carousel" role="region" aria-roledescription="{{#cleanstr}}carousel:label, local_awareness{{/cleanstr}}" aria-label="{{#cleanstr}}carousel:label, local_awareness{{/cleanstr}}" data-region="carousel-root" data-total="{{total}}">
+    <div class="la-carousel-track" data-region="carousel-track">
+        {{#slides}}
+            <div class="la-carousel-slide la-carousel-slide--{{type}}" role="group" aria-roledescription="{{#cleanstr}}carousel:slide, local_awareness{{/cleanstr}}" aria-label="{{#cleanstr}}carousel:slideof, local_awareness, { "index": "{{number}}", "total": "{{total}}" }{{/cleanstr}}" data-region="carousel-slide" data-index="{{index}}" {{^first}}hidden{{/first}}>
+                <div class="la-carousel-media">{{{html}}}</div>
+                {{#caption}}<p class="la-carousel-caption">{{caption}}</p>{{/caption}}
+            </div>
+        {{/slides}}
+    </div>
+    <button type="button" class="la-carousel-arrow la-carousel-arrow--prev" id="awareness-carousel-prev" data-action="carousel-prev" aria-label="{{#cleanstr}}carousel:previous, local_awareness{{/cleanstr}}">
+        <span aria-hidden="true">&lsaquo;</span>
+    </button>
+    <button type="button" class="la-carousel-arrow la-carousel-arrow--next" id="awareness-carousel-next" data-action="carousel-next" aria-label="{{#cleanstr}}carousel:next, local_awareness{{/cleanstr}}">
+        <span aria-hidden="true">&rsaquo;</span>
+    </button>
+    <div class="la-carousel-dots" role="group" aria-label="{{#cleanstr}}carousel:choose, local_awareness{{/cleanstr}}" data-region="carousel-dots">
+        {{#slides}}
+            <button type="button" class="la-carousel-dot" data-action="carousel-goto" data-index="{{index}}" aria-label="{{#cleanstr}}carousel:goto, local_awareness, {{number}}{{/cleanstr}}" {{#first}}aria-current="true"{{/first}}></button>
+        {{/slides}}
+    </div>
+    <p class="la-offscreen" aria-live="polite" data-region="carousel-status">{{#str}}carousel:slideof, local_awareness, { "index": "1", "total": "{{total}}" }{{/str}}</p>
+</div>

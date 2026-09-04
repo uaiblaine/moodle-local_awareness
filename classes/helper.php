@@ -25,6 +25,7 @@ use local_awareness\persistent\noticelink;
 use local_awareness\persistent\linkhistory;
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\noticeview;
+use local_awareness\persistent\slide;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -109,6 +110,9 @@ class helper {
 
         self::apply_author_scope($data, $scope);
         $data->courseid = $scope->get_courseid();
+        self::apply_layout_rules($data);
+        // Read before sanitise_data(), which keeps only the notice's own columns.
+        $slides = self::slide_rows($data);
 
         // Create new notice.
         self::sanitise_data($data);
@@ -119,6 +123,7 @@ class helper {
 
         // Process background image.
         self::process_bgimage($awareness);
+        self::process_slides($awareness, $slides);
 
         // Log created event.
         $params = [
@@ -170,6 +175,9 @@ class helper {
          * a verb of its own with a check in both contexts, if it is ever wanted; it is not an edit.
          */
         $data->courseid = (int) $awareness->get('courseid');
+        self::apply_layout_rules($data);
+        // Read before sanitise_data(), which keeps only the notice's own columns.
+        $slides = self::slide_rows($data);
 
         self::sanitise_data($data);
         awareness::update_notice_data($awareness, $data);
@@ -179,6 +187,7 @@ class helper {
 
         // Process background image.
         self::process_bgimage($awareness);
+        self::process_slides($awareness, $slides);
 
         // Log updated event.
         $params = [
@@ -288,6 +297,118 @@ class helper {
         }
 
         // Cohorts, and every other audience field, were already narrowed by apply_author_scope().
+    }
+
+    /**
+     * The choices a layout makes for the author, applied on every write path.
+     *
+     * hideIf hides a field without stopping its value; these are the values a hidden field would
+     * have carried. A fullscreen dialogue has no position, so it is centred whatever the radio
+     * said; a link only the video layout reads is dropped rather than stored out of sight, because
+     * a value the form will not show is a value the author cannot correct.
+     *
+     * @param \stdClass $data The submitted data.
+     */
+    private static function apply_layout_rules(\stdClass $data): void {
+        $template = (string) ($data->template ?? awareness::TEMPLATES[0]);
+        if ($template === 'fullscreen') {
+            $data->position = 'center';
+        }
+        if (!awareness::uses_video($template)) {
+            $data->videourl = null;
+        } else if (isset($data->videourl)) {
+            $data->videourl = trim((string) $data->videourl);
+        }
+    }
+
+    /**
+     * The slide rows the form submitted, lifted out of the data before it is sanitised.
+     *
+     * sanitise_data() keeps only the notice's own columns, and the slides are not columns of the
+     * notice; read them first, save them after.
+     *
+     * @param \stdClass $data The submitted data, before sanitise_data() strips what is not a column.
+     * @return \stdClass The four slide arrays, each keyed by row index.
+     */
+    public static function slide_rows(\stdClass $data): \stdClass {
+        $rows = new \stdClass();
+        foreach (['slide_caption', 'slide_videourl', 'slide_image', 'slide_id'] as $field) {
+            $rows->$field = isset($data->$field) ? (array) $data->$field : [];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Reconcile the carousel's slides with the repeated rows the form submitted.
+     *
+     * Rows are matched to existing slides by their hidden id; a row with an id the notice does not
+     * own becomes a new slide rather than an edit of somebody else's. A row with no image, no link
+     * and no caption is not a slide and is not saved; an existing slide whose row is gone is
+     * deleted with its file. The draft ids are read from the submitted array: the core helper
+     * cannot address a repeated file picker.
+     *
+     * @param awareness $awareness The saved notice.
+     * @param \stdClass $rows The slide rows, as slide_rows() read them.
+     */
+    public static function process_slides(awareness $awareness, \stdClass $rows): void {
+        $noticeid = (int) $awareness->get('id');
+        $existing = [];
+        foreach (slide::for_notice($noticeid) as $slide) {
+            $existing[(int) $slide->get('id')] = $slide;
+        }
+
+        $captions = (array) ($rows->slide_caption ?? []);
+        $links = (array) ($rows->slide_videourl ?? []);
+        $drafts = (array) ($rows->slide_image ?? []);
+        $ids = (array) ($rows->slide_id ?? []);
+
+        $indexes = array_keys($captions + $links + $drafts);
+        sort($indexes);
+
+        $keep = [];
+        $sortorder = 0;
+        $fs = get_file_storage();
+        $contextid = \context_system::instance()->id;
+        foreach ($indexes as $i) {
+            $caption = trim((string) ($captions[$i] ?? ''));
+            $link = trim((string) ($links[$i] ?? ''));
+            $draftid = (int) ($drafts[$i] ?? 0);
+            $hasimage = $draftid > 0 && (int) file_get_draft_area_info($draftid)['filecount'] > 0;
+            if ($caption === '' && $link === '' && !$hasimage) {
+                continue;
+            }
+
+            $id = (int) ($ids[$i] ?? 0);
+            $slide = isset($existing[$id]) ? $existing[$id] : new slide(0, (object) ['noticeid' => $noticeid]);
+            $slide->set('sortorder', $sortorder++);
+            $slide->set('videourl', $link === '' ? null : $link);
+            $slide->set('caption', $caption === '' ? null : $caption);
+            if ($slide->get('id') > 0) {
+                $slide->update();
+            } else {
+                $slide->create();
+            }
+            $keep[(int) $slide->get('id')] = true;
+
+            if ($draftid > 0) {
+                file_save_draft_area_files(
+                    $draftid,
+                    $contextid,
+                    'local_awareness',
+                    slide::FILEAREA,
+                    (int) $slide->get('id'),
+                    ['maxfiles' => 1, 'accepted_types' => ['image']]
+                );
+            }
+        }
+
+        foreach ($existing as $id => $slide) {
+            if (!isset($keep[$id])) {
+                $fs->delete_area_files($contextid, 'local_awareness', slide::FILEAREA, $id);
+                $slide->delete();
+            }
+        }
     }
 
     /**
@@ -522,6 +643,8 @@ class helper {
         foreach (['content', 'bgimage'] as $filearea) {
             $fs->delete_area_files(\context_system::instance()->id, 'local_awareness', $filearea, $oldid);
         }
+        // The slides' images are keyed by slide id, not notice id, so the slides take their own files.
+        slide::delete_for_notice((int) $oldid);
 
         if (!get_config('local_awareness', 'cleanup_deleted_notice')) {
             return;
@@ -1942,6 +2065,97 @@ class helper {
             'noclean' => true,
             'context' => \context_system::instance(),
         ]);
+    }
+
+    /**
+     * The video layout's player, as the reader gets it.
+     *
+     * @param awareness $notice The notice.
+     * @return string HTML; empty when the notice has no link.
+     */
+    public static function render_video(awareness $notice): string {
+        return self::render_media_link((string) $notice->get('videourl'));
+    }
+
+    /**
+     * A media link rendered by the site's multimedia filter.
+     *
+     * The link is wrapped in a real anchor first, because the filter embeds nothing from a bare
+     * URL: its early return looks for a closing anchor, video or audio tag. Whatever the filter
+     * makes of it - a video.js player for a file, an iframe for YouTube or Vimeo, or the link
+     * itself when the site's players do not handle it - is what ships. Nothing here builds a
+     * player by hand, so the site's own player configuration governs, on every branch.
+     *
+     * @param string $url The link, as stored.
+     * @return string HTML; empty for an empty link.
+     */
+    public static function render_media_link(string $url): string {
+        global $OUTPUT;
+
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        $anchor = $OUTPUT->render_from_template('local_awareness/media_link', ['url' => $url]);
+
+        return format_text($anchor, FORMAT_HTML, [
+            'noclean' => true,
+            'context' => \context_system::instance(),
+        ]);
+    }
+
+    /**
+     * The carousel's slides as the dialogue renders them, in order.
+     *
+     * A builder over stored rows rather than a parser over the content: each slide already says
+     * what it is. Image slides carry a pluginfile URL keyed by the slide id; video slides carry
+     * the player the multimedia filter built; the caption is plain text, rendered through
+     * format_string() with escaping off because the template's double stash escapes it once.
+     *
+     * @param awareness $notice The notice.
+     * @return array[] Each entry has type (image|video|text), html and caption.
+     */
+    public static function render_slides(awareness $notice): array {
+        $context = \context_system::instance();
+        $slides = [];
+        foreach (slide::for_notice((int) $notice->get('id')) as $slide) {
+            $caption = format_string((string) $slide->get('caption'), true, ['context' => $context, 'escape' => false]);
+            $type = $slide->get_mediatype();
+            $html = '';
+            if ($type === slide::MEDIA_IMAGE) {
+                $file = $slide->get_image();
+                $url = \moodle_url::make_pluginfile_url(
+                    $file->get_contextid(),
+                    $file->get_component(),
+                    $file->get_filearea(),
+                    $file->get_itemid(),
+                    $file->get_filepath(),
+                    $file->get_filename()
+                );
+                $html = self::render_image_slide($url->out(false), $caption);
+            } else if ($type === slide::MEDIA_VIDEO) {
+                $html = self::render_media_link((string) $slide->get('videourl'));
+            }
+            $slides[] = ['type' => $type, 'html' => $html, 'caption' => $caption];
+        }
+
+        return $slides;
+    }
+
+    /**
+     * An image slide's media, from the plugin's own template.
+     *
+     * Shared by the saved-notice path and the editor's preview, which hands over a draft URL.
+     *
+     * @param string $url The image URL.
+     * @param string $alt The caption, which doubles as the alternative text.
+     * @return string HTML.
+     */
+    public static function render_image_slide(string $url, string $alt): string {
+        global $OUTPUT;
+
+        return $OUTPUT->render_from_template('local_awareness/slide_image', ['url' => $url, 'alt' => $alt]);
     }
 
     /**

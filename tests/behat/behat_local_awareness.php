@@ -96,6 +96,45 @@ class behat_local_awareness extends behat_base {
     }
 
     /**
+     * Creates carousel slides for notices that already exist, named by title.
+     *
+     * The image column names a placeholder file written into the slide's own area, keyed by the
+     * slide id as the plugin keys it; the area name is spelled out because this file is loaded
+     * before config.php and cannot read the persistent's constant at that point.
+     *
+     * @Given the following site notice slides exist
+     * @param TableNode $slidedata notice (a title), sortorder, videourl, caption, image.
+     */
+    public function the_following_site_notice_slides_exist(TableNode $slidedata): void {
+        global $DB;
+
+        foreach ($slidedata->getHash() as $row) {
+            $noticeid = $DB->get_field('local_awareness', 'id', ['title' => $row['notice']], MUST_EXIST);
+            $now = time();
+            $slideid = $DB->insert_record('local_awareness_slides', (object) [
+                'noticeid' => $noticeid,
+                'sortorder' => (int) ($row['sortorder'] ?? 0),
+                'videourl' => ($row['videourl'] ?? '') !== '' ? $row['videourl'] : null,
+                'caption' => ($row['caption'] ?? '') !== '' ? $row['caption'] : null,
+                'usermodified' => 2,
+                'timecreated' => $now,
+                'timemodified' => $now,
+            ]);
+
+            if (!empty($row['image'])) {
+                get_file_storage()->create_file_from_string([
+                    'contextid' => \context_system::instance()->id,
+                    'component' => 'local_awareness',
+                    'filearea' => 'slidemedia',
+                    'itemid' => $slideid,
+                    'filepath' => '/',
+                    'filename' => $row['image'],
+                ], 'not really an image');
+            }
+        }
+    }
+
+    /**
      * Delete a notice behind an open page, the way another administrator would.
      *
      * @Given the site notice :title has been deleted

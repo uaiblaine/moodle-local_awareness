@@ -45,7 +45,7 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
         return false;
     }
 
-    if (!in_array($filearea, ['content', 'bgimage'])) {
+    if (!in_array($filearea, ['content', 'bgimage', \local_awareness\persistent\slide::FILEAREA])) {
         return false;
     }
 
@@ -53,7 +53,17 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
 
     $itemid = (int) array_shift($args);
 
-    $notice = \local_awareness\persistent\awareness::get_record(['id' => $itemid]);
+    // A slide's image is keyed by the slide id; the gate below is still the notice's.
+    $noticeid = $itemid;
+    if ($filearea === \local_awareness\persistent\slide::FILEAREA) {
+        $slide = \local_awareness\persistent\slide::get_record(['id' => $itemid]);
+        if (!$slide) {
+            return false;
+        }
+        $noticeid = (int) $slide->get('noticeid');
+    }
+
+    $notice = \local_awareness\persistent\awareness::get_record(['id' => $noticeid]);
     if (!$notice) {
         return false;
     }

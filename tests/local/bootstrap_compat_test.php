@@ -89,6 +89,14 @@ final class bootstrap_compat_test extends \basic_testcase {
             '/\\bratio(-[0-9]+x[0-9]+)?\\b/' => 'ratio*',
             '/\\bvr\\b/' => 'vr',
             '/\\bfst-normal\\b/' => 'fst-normal',
+            /*
+             * The three the layouts reached for first, measured absent from 4.5's compiled Boost
+             * and Boost Union sheets (0 rules each) and present on 5.2: rounded-1..5 (Bootstrap 4
+             * has rounded-lg only), sticky-bottom, and modal-fullscreen with its -down variants.
+             */
+            '/\\brounded-[1-5]\\b/' => 'rounded-*',
+            '/\\bsticky-bottom\\b/' => 'sticky-bottom',
+            '/\\bmodal-fullscreen(-[a-z]{2,3}-down)?\\b/' => 'modal-fullscreen*',
         ];
     }
 

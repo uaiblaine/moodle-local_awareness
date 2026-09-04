@@ -521,9 +521,11 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         }
 
         /*
-         * Preview posts nothing: it opens the stored content in a modal, and preview.js binds to
-         * .notice-preview reading data-noticecontent. It used to be a "View" link in a column of
-         * its own, which cost a whole column for one link.
+         * Preview writes nothing: preview.js reads the notice id off .notice-preview, asks the
+         * render_notice service for the notice as the reader gets it, and opens it in the real
+         * dialogue. The row used to carry the rendered content in a data attribute for a plain
+         * dialogue that knew nothing of layouts; it used to be a "View" link in a column of its
+         * own before that, which cost a whole column for one link.
          */
         $previewlabel = get_string('notice:preview', 'local_awareness');
         $menu->add_primary_action(new \core\output\action_menu\link_primary(
@@ -534,7 +536,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 'title' => $previewlabel,
                 'aria-label' => $previewlabel,
                 'class' => 'local-awareness-action notice-preview',
-                'data-noticecontent' => helper::render_content($awareness),
+                'data-noticeid' => (int) $awareness->get('id'),
             ]
         ));
 
@@ -588,7 +590,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 'title' => $previewlabel,
                 'aria-label' => $previewlabel,
                 'class' => 'local-awareness-action notice-preview',
-                'data-noticecontent' => helper::render_content($awareness),
+                'data-noticeid' => (int) $awareness->get('id'),
             ]
         ));
 

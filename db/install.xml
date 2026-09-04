@@ -28,6 +28,10 @@
         <FIELD NAME="modal_width" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="Custom modal width (e.g. 600px, 80%, 50vw)"/>
         <FIELD NAME="modal_height" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="Custom modal height (e.g. 400px, 70%, 50vh)"/>
         <FIELD NAME="outsideclick" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Allow dismissing notice by clicking outside the modal: 1 - YES, 0 - NO"/>
+        <FIELD NAME="template" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="classic" SEQUENCE="false" COMMENT="Dialogue layout; one of awareness::TEMPLATES. The default is the header, body and footer every notice had before layouts existed."/>
+        <FIELD NAME="position" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="center" SEQUENCE="false" COMMENT="Where the dialogue sits on the screen; one of awareness::POSITIONS. start/end are logical, so they flip under RTL."/>
+        <FIELD NAME="animation" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="none" SEQUENCE="false" COMMENT="Entrance animation; one of awareness::ANIMATIONS. Collapses to none when the reader prefers reduced motion."/>
+        <FIELD NAME="videourl" TYPE="char" LENGTH="1333" NOTNULL="false" SEQUENCE="false" COMMENT="External video link for the video layout. Rendered through the site's multimedia filter, never embedded by hand."/>
         <FIELD NAME="audiencecount" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Last computed audience size, denormalised from the jobs table so the manage list reads a column."/>
         <FIELD NAME="audiencecomputed" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Unix timestamp the audience size was computed at."/>
         <FIELD NAME="audiencehash" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false" COMMENT="Criteria hash the audience size was computed from; differs from the notice's current hash when the stored size is stale."/>
@@ -36,6 +40,25 @@
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
         <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
       </KEYS>
+    </TABLE>
+    <TABLE NAME="local_awareness_slides" COMMENT="Carousel slides of a notice, in order. Each carries one media - an image in filearea slidemedia keyed by the slide id, or an external video link - and a caption.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="noticeid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The notice this slide belongs to."/>
+        <FIELD NAME="sortorder" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Display order within the notice, from 0."/>
+        <FIELD NAME="videourl" TYPE="char" LENGTH="1333" NOTNULL="false" SEQUENCE="false" COMMENT="External video link, when the slide is a video. Empty for an image or text slide."/>
+        <FIELD NAME="caption" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Plain-text caption shown under the media."/>
+        <FIELD NAME="usermodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="noticeid" TYPE="foreign" FIELDS="noticeid" REFTABLE="local_awareness" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="notice_order" UNIQUE="false" FIELDS="noticeid, sortorder"/>
+      </INDEXES>
     </TABLE>
     <TABLE NAME="local_awareness_ack" COMMENT="Notice Interaction">
       <FIELDS>

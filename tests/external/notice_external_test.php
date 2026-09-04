@@ -800,13 +800,18 @@ final class notice_external_test extends \advanced_testcase {
         $payload = reset($notices);
 
         $expected = [
+            'animation',
             'bgimageurl',
             'content',
             'id',
             'insistence',
             'modal_height',
             'modal_width',
+            'position',
+            'slides',
+            'template',
             'title',
+            'videohtml',
         ];
         $actual = array_keys($payload);
         sort($actual);
