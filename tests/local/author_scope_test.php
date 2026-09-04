@@ -391,9 +391,10 @@ final class author_scope_test extends \advanced_testcase {
         $site = author_scope::site();
         $course = author_scope::course(2);
         foreach (array_keys(author_scope::RULES) as $field) {
+            // FORBID at the site is for a field that has no meaning without a course: the groups.
             $this->assertContains(
                 $site->rule_for($field),
-                [author_scope::RULE_EXISTS, author_scope::RULE_RESTRICT, author_scope::RULE_LEAVE],
+                [author_scope::RULE_EXISTS, author_scope::RULE_RESTRICT, author_scope::RULE_LEAVE, author_scope::RULE_FORBID],
                 $field
             );
             $this->assertContains(
@@ -402,6 +403,51 @@ final class author_scope_test extends \advanced_testcase {
                 $field
             );
         }
+    }
+
+    /**
+     * Groups are forbidden at the site, and narrowed in a course to what the author may reach.
+     *
+     * The author's reach is core's rule: separate groups without moodle/site:accessallgroups keeps
+     * a teacher to their own groups, and the administrator is the control that every group is a
+     * legal target for someone. The refusal is reported, not silent: the picker only ever offers
+     * what the scope admits, so a value outside it is a hand-made request.
+     */
+    public function test_groups_are_forbidden_at_the_site_and_narrowed_to_the_author_s_reach_in_a_course(): void {
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course(['groupmode' => SEPARATEGROUPS, 'groupmodeforce' => 1]);
+        $red = $generator->create_group(['courseid' => $course->id]);
+        $blue = $generator->create_group(['courseid' => $course->id]);
+        $teacher = $generator->create_and_enrol($course, 'teacher');
+        $generator->create_group_member(['groupid' => $red->id, 'userid' => $teacher->id]);
+        $submitted = ['filter_groups' => [(int) $red->id, (int) $blue->id]];
+
+        /*
+         * The declared verb and what apply() does, asserted together. apply() decides in its own
+         * branch and never reads the table, so a table saying one thing while the code does another
+         * is invisible without this: rule_for() is public, and a caller reading it would be misled.
+         * Found by mutation — flipping the site's verb to LEAVE passed the whole suite.
+         */
+        $this->assertSame(author_scope::RULE_FORBID, author_scope::site()->rule_for('filter_groups'));
+        $this->assertSame(
+            author_scope::RULE_RESTRICT,
+            author_scope::course((int) $course->id)->rule_for('filter_groups')
+        );
+
+        $site = author_scope::site()->apply($submitted);
+        $this->assertSame([], $site->criteria()['filter_groups']);
+        $this->assertSame(['filter_groups' => author_scope::PROBLEM_FORBIDDEN], $site->problems());
+
+        $this->setUser($teacher);
+        $narrowed = author_scope::course((int) $course->id)->apply($submitted);
+        $this->assertSame([(int) $red->id], $narrowed->criteria()['filter_groups']);
+        $this->assertSame(['filter_groups' => author_scope::PROBLEM_OUTSIDE], $narrowed->problems());
+
+        $own = author_scope::course((int) $course->id)->apply(['filter_groups' => [(int) $red->id]]);
+        $this->assertTrue($own->is_clean());
+
+        $this->setAdminUser();
+        $this->assertTrue(author_scope::course((int) $course->id)->apply($submitted)->is_clean());
     }
 
     /**

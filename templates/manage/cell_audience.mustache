@@ -22,6 +22,9 @@
     * hascohorts (bool) — whether a cohort restriction line is shown
     * cohortline (string) — that line
     * cohortlist (string) — the plain list, used as the title attribute
+    * hasgroups - whether the notice names groups
+    * groupline - the sentence naming them
+    * grouplist - the names alone, for the title
 
     Example context (json):
     {
@@ -34,7 +37,10 @@
         "stale": true,
         "hascohorts": true,
         "cohortline": "Cohorts: First years",
-        "cohortlist": "First years"
+        "cohortlist": "First years",
+        "hasgroups": true,
+        "groupline": "Groups: Red team",
+        "grouplist": "Red team"
     }
 }}
 {{#pending}}
@@ -51,5 +57,8 @@
         {{#hascohorts}}
             <span class="local-awareness-subline" title="{{cohortlist}}">{{cohortline}}</span>
         {{/hascohorts}}
+        {{#hasgroups}}
+            <span class="local-awareness-subline" title="{{grouplist}}">{{groupline}}</span>
+        {{/hasgroups}}
     {{/never}}
 {{/pending}}

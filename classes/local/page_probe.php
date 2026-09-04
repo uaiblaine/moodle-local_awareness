@@ -262,7 +262,7 @@ final class page_probe {
             }
         }
 
-        // Role, competency and course-access rules cost queries; they always admit here.
+        // Role, competency, group and course-access rules cost queries; they always admit here.
         return true;
     }
 }

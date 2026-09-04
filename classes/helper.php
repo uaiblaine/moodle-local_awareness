@@ -17,6 +17,7 @@
 namespace local_awareness;
 
 use local_awareness\local\author_scope;
+use local_awareness\local\group_scope;
 use local_awareness\local\page_probe;
 use local_awareness\local\role_scope;
 use local_awareness\local\window;
@@ -155,6 +156,7 @@ class helper {
     public static function update_notice(awareness $awareness, \stdClass $data): string {
         $scope = author_scope::of($awareness);
         self::require_author($scope, 'manage');
+        self::require_group_reach($awareness);
 
         /*
          * The setting, enforced where the write happens. It used to be consulted only in
@@ -244,6 +246,7 @@ class helper {
             'filter_role',
             'filter_category',
             'filter_course',
+            'filter_groups',
             'filter_format',
             'filter_theme',
             'filter_competency_rules',
@@ -492,6 +495,7 @@ class helper {
      */
     public static function reset_notice(awareness $notice): void {
         self::require_author(author_scope::of($notice), 'manage');
+        self::require_group_reach($notice);
         try {
             $notice = new awareness($notice->get('id'));
             $notice->update();
@@ -522,6 +526,7 @@ class helper {
      */
     public static function enable_notice(awareness $notice): void {
         self::require_author(author_scope::of($notice), 'manage');
+        self::require_group_reach($notice);
         try {
             $notice->set('enabled', 1);
             $notice->update();
@@ -552,6 +557,7 @@ class helper {
      */
     public static function disable_notice(awareness $notice): void {
         self::require_author(author_scope::of($notice), 'manage');
+        self::require_group_reach($notice);
         try {
             $notice->set('enabled', 0);
             $notice->update();
@@ -580,6 +586,7 @@ class helper {
      */
     public static function delete_notice(awareness $notice): void {
         self::require_author(author_scope::of($notice), 'manage');
+        self::require_group_reach($notice);
         if (!get_config('local_awareness', 'allow_delete')) {
             return;
         }
@@ -721,6 +728,89 @@ class helper {
         global $DB;
 
         return array_map('intval', $DB->get_fieldset_select('cohort_members', 'cohortid', 'userid = ?', [$userid]));
+    }
+
+    /**
+     * The groups of a course the user belongs to, hidden ones included.
+     *
+     * groups_get_user_groups() reads core's per-user cache, so the cost is one statement for every
+     * course the user is in and nothing after. includehidden is set because delivery is membership
+     * and must not depend on who is asking: without it the answer runs through
+     * core_group\visibility::sql_group_visibility_where(), which keeps a MEMBERS group only while
+     * the id being asked about is the CURRENT user's, so the same user would be in the audience
+     * when they load the page and out of it when anything else resolved them. Nothing on the
+     * reading side shows a group's name, so no visibility rule is being bypassed by saying yes.
+     *
+     * @param int $courseid The course.
+     * @param int $userid The user.
+     * @return int[] Group ids.
+     */
+    public static function user_group_ids(int $courseid, int $userid): array {
+        $groups = groups_get_user_groups($courseid, $userid, true);
+
+        return array_map('intval', $groups[0] ?? []);
+    }
+
+    /**
+     * Whether a user is in the audience a notice's group rule names.
+     *
+     * True when the notice names no group. A notice naming groups with no course to find them in
+     * reaches nobody, as every rule whose referent cannot be resolved does.
+     *
+     * @param awareness $notice The notice.
+     * @param int $userid The user.
+     * @return bool
+     */
+    public static function user_in_notice_groups(awareness $notice, int $userid): bool {
+        $targets = group_scope::targeted($notice);
+        if ($targets === []) {
+            return true;
+        }
+        $courseid = (int) $notice->get('courseid');
+        if ($courseid <= SITEID) {
+            return false;
+        }
+
+        return array_intersect($targets, self::user_group_ids($courseid, $userid)) !== [];
+    }
+
+    /**
+     * Whether a user may act on a notice as far as its groups go.
+     *
+     * Core's own rule, through group_scope: in separate groups mode without
+     * moodle/site:accessallgroups, a notice aimed only at groups the current user is not in is not
+     * theirs to see or change. Every other case admits, a notice naming no group first of all.
+     *
+     * @param awareness $notice The notice.
+     * @return bool
+     */
+    public static function may_reach_groups(awareness $notice): bool {
+        $targets = group_scope::targeted($notice);
+        if ($targets === []) {
+            return true;
+        }
+
+        return group_scope::for_author(author_scope::of($notice))->admits($targets);
+    }
+
+    /**
+     * Refuse an action on a notice whose groups the current user may not reach.
+     *
+     * The capability named is the one that would open it: the author holds the plugin's own, or
+     * require_author() would have refused first.
+     *
+     * @param awareness $notice The notice.
+     * @throws \required_capability_exception
+     */
+    private static function require_group_reach(awareness $notice): void {
+        if (!self::may_reach_groups($notice)) {
+            throw new \required_capability_exception(
+                author_scope::of($notice)->context(),
+                'moodle/site:accessallgroups',
+                'nopermissions',
+                ''
+            );
+        }
     }
 
     /**
@@ -956,6 +1046,7 @@ class helper {
         $usernotices = $notices;
         if (!empty($notices)) {
             $checkcohorts = false;
+            $checkgroups = false;
             $checkcompletion = false;
 
             foreach ($notices as $id => $notice) {
@@ -983,6 +1074,9 @@ class helper {
                 if (!empty($notice->get('cohorts'))) {
                     $checkcohorts = true;
                 }
+                if (group_scope::targeted($notice) !== []) {
+                    $checkgroups = true;
+                }
                 if ($notice->get('reqcourse') > 0) {
                     $checkcompletion = true;
                 }
@@ -994,6 +1088,20 @@ class helper {
                 foreach ($notices as $notice) {
                     $cohorts = array_map('intval', $notice->get('cohorts'));
                     if (!empty($cohorts) && !array_intersect($cohorts, $usercohorts)) {
+                        unset($usernotices[$notice->get('id')]);
+                    }
+                }
+            }
+
+            /*
+             * Filter out notices by group. A course notice may name groups of its own course, and
+             * the reader must belong to one of them. Not hoisted like the cohorts above because
+             * groups_get_user_groups() already answers from core's per-user cache, one read for
+             * every course the user is in; the loop costs a statement once, not once per notice.
+             */
+            if ($checkgroups) {
+                foreach ($notices as $notice) {
+                    if (!self::user_in_notice_groups($notice, (int) $USER->id)) {
                         unset($usernotices[$notice->get('id')]);
                     }
                 }
@@ -1099,7 +1207,8 @@ class helper {
      *   audience half on its own, and local_awareness_pluginfile() uses it that way, having no
      *   delivery to point at; that gate stays partial by construction. The role rule is applied
      *   below through user_matches_role_filter(), with the whole filters array so a course- or
-     *   category-scoped rule keeps its scope.
+     *   category-scoped rule keeps its scope. The group rule is applied too: a course notice's
+     *   groups are its own course's, so no page is needed to find them.
      *
      * @param awareness $notice Notice.
      * @return bool
@@ -1124,6 +1233,10 @@ class helper {
         // got. A malformed or scalar payload leaves the rule unapplied, exactly as it does there.
         $filters = json_decode((string) $notice->get('filtervalues'), true);
         if (is_array($filters) && !self::user_matches_role_filter($filters)) {
+            return false;
+        }
+
+        if (!self::user_in_notice_groups($notice, (int) $USER->id)) {
             return false;
         }
 
@@ -1705,6 +1818,11 @@ class helper {
         if ($notice !== null && !self::require_author(author_scope::of($notice), $verb, false)) {
             throw new \moodle_exception('notification:noticedoesnotexist', 'local_awareness');
         }
+        // The same answer for a notice aimed only at groups the caller may not reach: under separate
+        // groups that notice is not theirs to know about, and the list never showed it.
+        if ($notice !== null && !self::may_reach_groups($notice)) {
+            throw new \moodle_exception('notification:noticedoesnotexist', 'local_awareness');
+        }
 
         return $notice;
     }
@@ -1732,7 +1850,7 @@ class helper {
         global $DB;
 
         $scope = author_scope::of($notice);
-        if (self::require_author($scope, 'manage', false)) {
+        if (self::require_author($scope, 'manage', false) && self::may_reach_groups($notice)) {
             return true;
         }
 

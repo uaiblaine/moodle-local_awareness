@@ -18,6 +18,7 @@ namespace local_awareness\form;
 
 use local_awareness\helper;
 use local_awareness\local\author_scope;
+use local_awareness\local\group_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
 
@@ -61,7 +62,7 @@ class notice_form extends \core\form\persistent {
         'templategroup', 'positiongroup', 'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
         'slide_id', 'slide_repeats', 'slide_add', 'slide_delete', 'slide_delete-hidden',
         'insistence', 'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
-        'filter_course', 'filter_format', 'filter_theme', 'filter_competency_rules',
+        'filter_course', 'filter_groups', 'filter_format', 'filter_theme', 'filter_competency_rules',
         'filter_competency_requireall', 'bgimage',
     ];
 
@@ -277,6 +278,29 @@ class notice_form extends \core\form\persistent {
         );
 
         $mform->setDefault('cohorts', 0);
+
+        /*
+         * Groups, for a course notice. The picker offers exactly what the author may target,
+         * decided the way core decides it for an activity: the course's group mode and
+         * moodle/site:accessallgroups, through group_scope. It is offered only while groups are in
+         * use, as core's own group menus are, except that a notice already naming groups keeps its
+         * field whatever the mode, so the author can see and clear what it names. The save narrows
+         * what the scope refuses and extra_validation() reports it on this field.
+         */
+        if ($coursemode) {
+            $groups = group_scope::for_author($scope);
+            $targeted = ($persistent && $persistent->get('id') > 0) ? group_scope::targeted($persistent) : [];
+            if ($groups->offered() || $targeted !== []) {
+                $mform->addElement(
+                    'autocomplete',
+                    'filter_groups',
+                    get_string('notice:groups', 'local_awareness'),
+                    $groups->options(),
+                    ['noselectionstring' => get_string('notice:groups:all', 'local_awareness'), 'multiple' => true]
+                );
+                $mform->addHelpButton('filter_groups', 'notice:groups', 'local_awareness');
+            }
+        }
 
         // AJAX autocomplete for course requirement.
         // Only pre-load the currently selected course (if editing), not all courses.
@@ -943,6 +967,8 @@ class notice_form extends \core\form\persistent {
                 return get_string('scope:problem:filter_course', 'local_awareness');
             case 'filter_format':
                 return get_string('scope:problem:filter_format', 'local_awareness');
+            case 'filter_groups':
+                return get_string('scope:problem:filter_groups', 'local_awareness');
             case 'filter_role':
                 return get_string('scope:problem:filter_role', 'local_awareness');
             case 'filter_role_context':

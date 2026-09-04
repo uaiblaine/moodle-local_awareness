@@ -249,6 +249,21 @@ Behat site fails every scenario on the same core locator and looks like your bug
   never `display: grid` on that element. `tests/form/picker_render_test.php` pins the markup;
   `motion_contract_test` pins the selectors and refuses `display` on any Bootstrap display utility.
 
+- **Groups are a course rule, decided by core's own group rules, and reach is a gate of its own.**
+  `local\group_scope` lifts `groups_get_activity_allowed_groups()` to the course (visible mode or
+  `moodle/site:accessallgroups` → every participation group; separate mode without it → the author's
+  own; `NOGROUPS` → nothing offered, nothing refused). The scope table RESTRICTS `filter_groups` in a
+  course and FORBIDS it at the site. Delivery is MEMBERSHIP, not visibility — `helper::user_group_ids()`
+  reads `groups_get_user_groups(..., includehidden: true)`, because `groups_get_all_groups()` filters
+  by what the CURRENT user may see and would drop a member of a hidden group. Reach is enforced in
+  four places that must stay in step: `resolve_notice_as_author()` (pages), `require_group_reach()`
+  (the five action methods), the pluginfile author branch, and `all_notices::unreachable_notices_sql()`
+  (the list, in SQL from a LIKE on the JSON key). `tests/group_audience_test.php` pins all four.
+  `narrow()` and `admits()` answer DIFFERENT questions — what may be SAVED, and who may REACH what
+  is saved — and only the second is about separation: a deleted group, a non-participation group and
+  the site scope confine nobody, or deleting a group would hide the notices naming it from everyone
+  including the administrator who has to fix them.
+
 - **A dev site that upgraded mid-change never registers a web service added afterwards.**
   `external_functions` is refreshed only when `$plugin->version` rises; a stack already at the bumped
   version when `db/services.php` gained a function keeps its old list, and the AJAX call dies with

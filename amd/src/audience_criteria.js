@@ -41,6 +41,7 @@ define([], function() {
         'reqcourse',
         'filter_category',
         'filter_course',
+        'filter_groups',
         'filter_format',
         'filter_competency_rules'
     ];
@@ -200,6 +201,16 @@ define([], function() {
             });
         if (courses.length) {
             criteria.filter_course = courses;
+        }
+
+        var groups = readMultiValue('filter_groups').map(function(v) {
+            return parseInt(v, 10);
+        })
+            .filter(function(v) {
+                return v > 0;
+            });
+        if (groups.length) {
+            criteria.filter_groups = groups;
         }
 
         var formats = readMultiValue('filter_format').filter(function(v) {
