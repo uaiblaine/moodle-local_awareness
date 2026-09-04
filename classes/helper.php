@@ -835,18 +835,25 @@ class helper {
                     }
                 }
 
-                // One answer per course, not per notice. A course that no longer exists simply has
-                // no entry, which leaves its notices shown — the behaviour of the guarded fetch
-                // this replaces.
-                $iscomplete = [];
+                /*
+                 * One answer per course, not per notice. A course that no longer exists has no
+                 * entry, and a notice requiring it is withheld: the rule asks "has this user
+                 * finished that course?", which has no answer once the course is gone, and every
+                 * other rule in this plugin withholds a notice whose referent it cannot resolve.
+                 * This used to read the other way — "no entry leaves its notices shown" — which
+                 * turned a completion gate into a notice for everyone, for ever, the day its
+                 * course was deleted. is_notice_available_to_user() and the estimator's predicate
+                 * make the same choice; keep the three in step.
+                 */
+                $pending = [];
                 foreach ($DB->get_records_list('course', 'id', array_keys($requiredids)) as $course) {
                     $completion = new \completion_info($course);
-                    $iscomplete[(int) $course->id] = $completion->is_course_complete($USER->id);
+                    $pending[(int) $course->id] = !$completion->is_course_complete($USER->id);
                 }
 
                 foreach ($notices as $notice) {
                     $required = (int) $notice->get('reqcourse');
-                    if ($required > 0 && !empty($iscomplete[$required])) {
+                    if ($required > 0 && empty($pending[$required])) {
                         unset($usernotices[$notice->get('id')]);
                     }
                 }
@@ -939,11 +946,15 @@ class helper {
         }
 
         if ($notice->get('reqcourse') > 0) {
-            if ($course = $DB->get_record('course', ['id' => $notice->get('reqcourse')])) {
-                $completion = new \completion_info($course);
-                if ($completion->is_course_complete($USER->id)) {
-                    return false;
-                }
+            // A required course that no longer exists withholds the notice, exactly as the
+            // completion block in collect_user_notices() does; the reasoning is written there.
+            $course = $DB->get_record('course', ['id' => $notice->get('reqcourse')]);
+            if (!$course) {
+                return false;
+            }
+            $completion = new \completion_info($course);
+            if ($completion->is_course_complete($USER->id)) {
+                return false;
             }
         }
 
