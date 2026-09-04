@@ -167,17 +167,40 @@ final class group_scope_test extends \advanced_testcase {
     }
 
     /**
-     * Groups switched off offer nothing, and refuse nothing: separation is what the mode turns off.
+     * The group mode switched off still offers every group, and confines nobody.
+     *
+     * The mode governs how ACTIVITIES separate participants; it does not decide whether a course
+     * has groups or whether a notice may address one. This is the shape of a real site: on the dev
+     * server the three courses with the most groups — 300, 30 and 9 — all sit at NOGROUPS, and an
+     * earlier version of offered() read the mode and hid the picker on every one of them. The
+     * teacher here is the one the mode WOULD confine if it were separate, which is what makes the
+     * first assertion mean something.
      */
-    public function test_groups_switched_off_offer_nothing_but_refuse_nothing(): void {
+    public function test_the_group_mode_switched_off_still_offers_every_group(): void {
         $this->set_groupmode(NOGROUPS);
         $this->setUser($this->teacher);
         $scope = group_scope::for_author(author_scope::course((int) $this->course->id));
 
-        $this->assertFalse($scope->offered());
+        $this->assertTrue($scope->offered(), 'a course with groups offers them whatever its mode');
         $this->assertFalse($scope->is_restricted());
         $this->assertEqualsCanonicalizing([(int) $this->blue->id, (int) $this->red->id], $scope->allowed_ids());
         $this->assertTrue($scope->admits([(int) $this->blue->id]));
+    }
+
+    /**
+     * A course with no groups at all offers no picker, whatever its mode.
+     *
+     * The other half of the rule, and the control for the test above: what decides the picker is
+     * whether there is anything to pick.
+     */
+    public function test_a_course_with_no_groups_offers_no_picker(): void {
+        $empty = $this->getDataGenerator()->create_course(['groupmode' => SEPARATEGROUPS]);
+        $this->setAdminUser();
+
+        $scope = group_scope::for_author(author_scope::course((int) $empty->id));
+        $this->assertTrue($scope->applies());
+        $this->assertSame([], $scope->allowed_ids());
+        $this->assertFalse($scope->offered());
     }
 
     /**

@@ -576,11 +576,10 @@ final class notice_form_test extends \advanced_testcase {
      * The group picker offers exactly what the author may reach, and only while groups are in use.
      *
      * Separate groups: a teacher without accessallgroups is offered their own group, an editing
-     * teacher every group. Groups off: no picker, unless the notice already names groups, so an
-     * author can see and clear what a notice names rather than lose it to a field that is not there.
-     * The site form never has the picker.
+     * teacher every group. The course's group mode does not gate the field — only having groups to
+     * offer does. The site form never has the picker.
      */
-    public function test_the_group_picker_offers_the_author_s_reach_and_only_while_groups_are_in_use(): void {
+    public function test_the_group_picker_offers_the_author_s_reach(): void {
         global $DB;
 
         $this->resetAfterTest();
@@ -605,9 +604,19 @@ final class notice_form_test extends \advanced_testcase {
         $site = new notice_form(null, ['persistent' => null, 'id' => 0]);
         $this->assertNull($this->offered_groups($site), 'the site has no groups');
 
+        /*
+         * The mode is not what decides the picker: it governs how activities separate participants,
+         * and a course can hold hundreds of groups with the mode left at "No groups", which is how
+         * core ships it. Gating on the mode hid the picker on every real course on the dev site.
+         */
         $DB->set_field('course', 'groupmode', NOGROUPS, ['id' => $course->id]);
         $form = new notice_form(null, ['persistent' => null, 'id' => 0, 'scope' => $scope]);
-        $this->assertNull($this->offered_groups($form));
+        $this->assertSame($every, $this->offered_groups($form), 'the group mode does not hide the picker');
+
+        // What does decide it is having something to pick.
+        $bare = $generator->create_course();
+        $form = new notice_form(null, ['persistent' => null, 'id' => 0, 'scope' => author_scope::course((int) $bare->id)]);
+        $this->assertNull($this->offered_groups($form), 'a course with no groups offers no picker');
 
         $notice = new awareness(0, (object) [
             'title' => 'Briefing',
@@ -617,7 +626,7 @@ final class notice_form_test extends \advanced_testcase {
         ]);
         $notice->create();
         $form = new notice_form(null, ['persistent' => $notice, 'id' => (int) $notice->get('id'), 'scope' => $scope]);
-        $this->assertSame($every, $this->offered_groups($form), 'a notice naming groups keeps its picker with groups off');
+        $this->assertSame($every, $this->offered_groups($form), 'a notice naming groups keeps its picker');
     }
 
     /**

@@ -250,9 +250,12 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `motion_contract_test` pins the selectors and refuses `display` on any Bootstrap display utility.
 
 - **Groups are a course rule, decided by core's own group rules, and reach is a gate of its own.**
-  `local\group_scope` lifts `groups_get_activity_allowed_groups()` to the course (visible mode or
-  `moodle/site:accessallgroups` → every participation group; separate mode without it → the author's
-  own; `NOGROUPS` → nothing offered, nothing refused). The scope table RESTRICTS `filter_groups` in a
+  `local\group_scope` lifts `groups_get_activity_allowed_groups()` to the course (separate mode
+  without `moodle/site:accessallgroups` → the author's own participation groups; anything else →
+  every one of them). **The group MODE does not gate the picker** — it governs how activities
+  separate participants, and a course can hold hundreds of groups at `NOGROUPS`, which is how core
+  ships it; gating on it hid the field on every real course on the dev site. What gates the picker
+  is having a group to offer. The scope table RESTRICTS `filter_groups` in a
   course and FORBIDS it at the site. Delivery is MEMBERSHIP, not visibility — `helper::user_group_ids()`
   reads `groups_get_user_groups(..., includehidden: true)`, because `groups_get_all_groups()` filters
   by what the CURRENT user may see and would drop a member of a hidden group. Reach is enforced in

@@ -157,13 +157,18 @@ final class group_scope {
     /**
      * Whether a form should offer the group picker at all.
      *
-     * Groups in use, and at least one the user may target. The core group menus disappear from a
-     * course page in the same two cases.
+     * Whether the course HAS groups this user may address — not what its group mode is. The mode
+     * decides how ACTIVITIES separate participants, and a course can hold hundreds of groups with
+     * the mode left at "No groups", which is how core ships it; group management works there
+     * unchanged. An earlier version gated on the mode, by analogy with the activity group menus
+     * that do disappear, and hid the picker on every real course on the dev site — the three with
+     * the most groups, 300, 30 and 9, all sit at NOGROUPS. Separation is still the mode's business
+     * and is is_restricted()'s alone.
      *
      * @return bool
      */
     public function offered(): bool {
-        return $this->applies() && $this->groupmode() !== NOGROUPS && $this->allowed_ids() !== [];
+        return $this->applies() && $this->allowed_ids() !== [];
     }
 
     /**

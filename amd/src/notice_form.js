@@ -426,6 +426,8 @@ define([], function() {
                 framework: container.getAttribute('data-picker-framework') || 'Framework',
                 search: container.getAttribute('data-picker-search') || 'Search',
                 noFrameworks: container.getAttribute('data-picker-noframeworks') || 'No frameworks available.',
+                noCourseLinked: container.getAttribute('data-picker-nocourselinked')
+                    || 'This course has no competencies linked to it.',
                 noCompetencies: container.getAttribute('data-picker-nocompetencies') || 'No competencies found.',
                 loading: container.getAttribute('data-picker-loading') || 'Loading...',
                 loadError: container.getAttribute('data-picker-loaderror')
@@ -484,8 +486,16 @@ define([], function() {
                             });
                         }
                         if (!frameworks || !frameworks.length) {
+                            /*
+                             * Under a course scope the filter above keeps only the frameworks
+                             * holding a competency LINKED TO THE COURSE, so an empty list there
+                             * almost always means the course has none — not that the site has no
+                             * frameworks. Saying the latter sends the author looking for the wrong
+                             * thing: reported from the browser, on a site with two frameworks and
+                             * no course linked to either.
+                             */
                             Notification.addNotification({
-                                message: escapeText(labels.noFrameworks),
+                                message: escapeText(courseid > 0 ? labels.noCourseLinked : labels.noFrameworks),
                                 type: 'warning'
                             });
                             return null;

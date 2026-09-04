@@ -371,6 +371,7 @@ class notice_form extends \core\form\persistent {
                     data-picker-framework="' . s(get_string('filter_competency_picker_framework', 'local_awareness')) . '"
                     data-picker-search="' . s(get_string('search')) . '"
                     data-picker-noframeworks="' . s(get_string('filter_competency_picker_noframeworks', 'local_awareness')) . '"
+                    data-picker-nocourselinked="' . s(get_string('filter_competency_picker_nocourselinked', 'local_awareness')) . '"
                     data-picker-nocompetencies="' . s(get_string('filter_competency_picker_nocompetencies', 'local_awareness')) . '"
                     data-picker-loading="' . s(get_string('loading', 'admin')) . '"
                     data-picker-loaderror="' . s(get_string('filter_competency_picker_loaderror', 'local_awareness')) . '"
