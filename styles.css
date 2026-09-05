@@ -605,6 +605,7 @@
  * "Cont/ent". An id cannot miss quietly: if a field is renamed the rule stops applying, and that
  * is visible immediately.
  */
+.local-awareness-editor .mform #fitem_id_title,
 .local-awareness-editor .mform #fitem_id_content,
 .local-awareness-editor .mform #fitem_id_bgimage,
 .local-awareness-editor .mform #fitem_id_timestart,
@@ -618,6 +619,32 @@
 .local-awareness-editor .mform #fitem_id_filter_theme,
 .local-awareness-editor .mform #fitem_id_filter_competency_label {
     flex: 1 1 100%;
+}
+
+/*
+ * The title is the notice, so it is written like one: the full row, and type at the size a reader
+ * will see it rather than the size of a setting. The border stays. The mockup this came from drew
+ * it borderless, and a borderless box in a form whose every other control has an edge reads as
+ * something you cannot type in — hierarchy is worth having, affordance is not worth trading for it.
+ */
+.local-awareness-editor .mform #id_title {
+    /*
+     * Core puts width: auto on a .form-control inside a .d-flex column — which every moodleform
+     * field column is — so widening the ROW left the input at its intrinsic 343px in a row of
+     * 1058. Measured on the rendered page, after the row rule was confirmed to be applying. The id
+     * carries enough specificity to settle it without !important, which this plugin may not write.
+     */
+    width: 100%;
+    font-size: 1.3rem;
+    line-height: 1.35;
+    padding: 0.5rem 0.7rem;
+    height: auto;
+    font-weight: 600;
+    color: var(--la-ink);
+}
+
+.local-awareness-editor .mform #fitem_id_title .col-form-label {
+    font-size: 0.95rem;
 }
 
 /*

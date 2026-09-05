@@ -6,6 +6,26 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The editor is read in the order the author decides things (version 2026090408)
+
+**Scheduling used to sit second.** The sections ran content, behaviour, audience, appearance — so a
+reset interval and an expiry date stood between the author and the audience they were choosing.
+Behaviour is the last decision, so it is the last section: what it says, who gets it, how it looks,
+when it runs. The order is the order `definition()` adds the headers in and nothing else recorded
+it, so a test now pins it under both scopes — a reordering is a design change, and one that happens
+by accident should fail.
+
+**The title is written like a title.** It was a 343px box carrying the same weight as "Modal
+height"; it now takes the row and is set at the size a reader will see it, forming one writing
+surface with the content editor below. The border stays: the mockup this came from drew it
+borderless, and a borderless box in a form whose every other control has an edge reads as something
+you cannot type in. Two measurements were needed rather than one — widening the ROW left the input
+at its intrinsic width, because core puts `width: auto` on a `.form-control` inside the `.d-flex`
+column every moodleform field sits in.
+
+The other half of that mockup — two fields to a row, labels above rather than beside — was already
+shipped, and is left alone.
+
 ### The appearance section shows the choice instead of describing it (version 2026090407)
 
 **Three controls in that section asked visual questions and answered them with text.**

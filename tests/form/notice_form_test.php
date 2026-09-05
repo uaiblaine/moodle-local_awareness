@@ -551,6 +551,48 @@ final class notice_form_test extends \advanced_testcase {
     }
 
     /**
+     * The sections are read in the order the author decides things.
+     *
+     * What it says, who gets it, how it looks, when it runs. Behaviour used to sit second, which
+     * put a reset interval and an expiry date between the author and the audience they were
+     * choosing; it is the last decision, so it is the last section. The order is the order
+     * definition() adds the headers in and nothing else records it, so it is pinned here — a
+     * reordering is a design change, and one that happens by accident should fail.
+     *
+     * The course form is the same list without the display restrictions, which a course notice
+     * does not have: its page reach is written by the scope.
+     */
+    public function test_the_sections_come_in_the_order_the_author_decides_things(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $PAGE->set_url('/local/awareness/editnotice.php');
+        $course = $this->getDataGenerator()->create_course();
+
+        $headers = function (notice_form $form): array {
+            preg_match_all('/id="id_header_([a-z]+)"/', $form->render(), $found);
+
+            return array_values(array_filter($found[1], static function (string $name): bool {
+                return !str_ends_with($name, 'container');
+            }));
+        };
+
+        $this->assertSame(
+            ['content', 'audience', 'filters', 'appearance', 'behavior'],
+            $headers(new notice_form(null, ['persistent' => null, 'id' => 0]))
+        );
+        $this->assertSame(
+            ['content', 'audience', 'appearance', 'behavior'],
+            $headers(new notice_form(null, [
+                'persistent' => null,
+                'id' => 0,
+                'scope' => author_scope::course((int) $course->id),
+            ]))
+        );
+    }
+
+    /**
      * The values a form's group picker offers, or null when the form has no picker.
      *
      * @param notice_form $form The form.
