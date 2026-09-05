@@ -6,6 +6,29 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The appearance section shows the choice instead of describing it (version 2026090407)
+
+**Three controls in that section asked visual questions and answered them with text.**
+
+The layout picker's six thumbnails were 8.5rem wide and carried a name each, which is not enough to
+tell Hero from Video, and the sentence saying what a layout is *for* lived in the help text beside
+the group — read by whoever opens a help icon while comparing six thumbnails, which is nobody. Each
+card is wider now and carries that sentence.
+
+The position picker was seven radios reading "Top start", "Top", "Top end": phrases describing a
+place where a picture of one shows it. Each radio's label is now a cell of a drawn screen holding
+the shape the dialogue would take there, with the name carried offscreen — a radio with no visible
+text still needs its accessible name, in the plugin's own offscreen class, because
+`visually-hidden` is a Bootstrap 5 name and dead on 4.5 in an ungated surface. The geometry is
+unchanged and still flex rather than grid, for the reason written beside it: core's `.d-flex` is
+`display: flex !important` and no plugin rule can beat it.
+
+**And the field stops vanishing.** A fullscreen dialogue has no position, so the whole group used to
+be hidden by a server-side `hideIf` — a control that disappears reads as a fault, and leaves the
+author no way to learn that the choice stopped applying. The screen fills instead, the radios are
+disabled, and a note beside it says why. The note's text is rendered by the form and only unhidden
+by the module, so nothing writes user-facing text from script.
+
 ### A course notice fires on its course's main page, and stops asking where (version 2026090406)
 
 **The course editor's "Display restrictions" section held one field describing a reach the notice

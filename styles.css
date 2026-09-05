@@ -749,7 +749,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    width: 8.5rem;
+    width: 13.5rem;
     padding: 0.5rem;
     border: 1px solid var(--la-line);
     border-radius: 0.5rem;
@@ -896,6 +896,22 @@
 }
 
 /*
+ * The sentence that says what the layout is FOR, on the card where the choice is made. It was only
+ * ever in the help text beside the group, which nobody opens while comparing six thumbnails.
+ */
+.la-layout-desc {
+    font-size: 0.74rem;
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--la-ink-muted);
+    text-align: center;
+}
+
+.local-awareness-editor input[name="template"]:checked + .la-layout-option .la-layout-desc {
+    color: var(--la-ink);
+}
+
+/*
  * The seven anchors as the 3x3 grid they are, the two side-middle cells empty because the
  * vocabulary has no such position. Two core rules decide the shape, both !important on 4.5 and
  * 5.2 and so beyond any plugin rule (the plugin may not write !important): the container is
@@ -908,22 +924,137 @@
  * core's own Boost stylesheet uses on both branches. The radios keep their own focus rings.
  */
 .local-awareness-editor #fgroup_id_positiongroup fieldset > .d-flex {
-    max-width: calc(3 * (8rem + 0.25rem) + 2 * 0.35rem + 1px);
+    /*
+     * Three cells and their own margins, the two gaps, then the screen's padding and border —
+     * box-sizing is border-box, so the last two have to be added or the third cell wraps to a row
+     * of its own. The trailing 3px is the 1px border either side plus a pixel of slack: with the
+     * width exactly equal to the content, subpixel rounding still wraps it.
+     */
+    max-width: calc(3 * (8rem + 0.25rem) + 2 * 0.35rem + 1.2rem + 3px);
     gap: 0.35rem;
+    padding: 0.6rem;
+    border: 1px solid var(--la-line);
+    border-radius: 0.5rem;
+    background: var(--la-surface);
 }
 
 .local-awareness-editor #fgroup_id_positiongroup label {
     flex: 0 0 8rem;
+    cursor: pointer;
 }
 
+/*
+ * The centre takes a row of its own and puts its cell in the middle of it. Centring rather than
+ * padding the content over by a computed column: a padded label still lets the cell fill whatever
+ * is left, so the middle of the screen was drawn two columns wide.
+ */
 .local-awareness-editor #fgroup_id_positiongroup label:has(input[value="center"]) {
     flex-basis: 100%;
-    padding-left: calc(8rem + 0.25rem + 0.35rem);
+    display: flex;
+    justify-content: center;
+}
+
+.local-awareness-editor input[name="position"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+}
+
+/* One cell of the screen: the dialogue's silhouette where it would land. */
+.la-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 8rem;
+    height: 3.2rem;
+    border: 1px dashed var(--la-line);
+    border-radius: 0.3rem;
+    background: var(--la-paper);
+    transition: border-color 0.12s, background-color 0.12s;
+}
+
+.la-zone-shape {
+    width: 58%;
+    height: 46%;
+    border-radius: 0.2rem;
+    background: var(--la-line);
+}
+
+.la-zone-shape--small {
+    width: 38%;
+    height: 40%;
+}
+
+.la-zone:hover {
+    border-color: var(--la-brand);
+}
+
+.local-awareness-editor input[name="position"]:checked + .la-zone {
+    border-style: solid;
+    border-color: var(--la-brand);
+    background: var(--la-brand-soft);
+}
+
+.local-awareness-editor input[name="position"]:checked + .la-zone .la-zone-shape {
+    background: var(--la-brand);
+}
+
+.local-awareness-editor input[name="position"]:focus-visible + .la-zone {
+    outline: 3px solid var(--la-brand);
+    outline-offset: 2px;
 }
 
 .local-awareness-editor #fgroup_id_positiongroup label:has(input:disabled) {
     opacity: 0.45;
     cursor: not-allowed;
+}
+
+.local-awareness-editor #fgroup_id_positiongroup label:has(input:disabled) .la-zone:hover {
+    border-color: var(--la-line);
+}
+
+/*
+ * Full screen has no position, and the field used to vanish for it — which reads as a fault rather
+ * than as a rule. The screen fills instead, and the note beside it says why. notice_form.js adds
+ * the class and unhides the note; the covered screen is drawn here so no text is written by script.
+ */
+.local-awareness-editor .la-zone-note {
+    align-self: center;
+    font-size: 0.8rem;
+    color: var(--la-ink-muted);
+    max-width: 14rem;
+}
+
+.local-awareness-editor #fgroup_id_positiongroup.la-zones-covered fieldset > .d-flex {
+    border-color: var(--la-brand);
+    background: var(--la-brand-soft);
+}
+
+.local-awareness-editor .la-zones-covered .la-zone {
+    border-color: transparent;
+    background: transparent;
+}
+
+/*
+ * No cells at all while the layout covers the window. Filling each of them instead read as seven
+ * positions chosen, which is the opposite of what it means: the screen itself is the dialogue, so
+ * the screen is what is filled, and the cells only hold its shape open.
+ */
+.local-awareness-editor .la-zones-covered .la-zone-shape {
+    display: none;
+}
+
+/*
+ * Including the one still checked. Its own rule is more specific than the covered rule above — an
+ * attribute and a pseudo-class against two classes — so without this the chosen cell stayed drawn
+ * on a screen that is meant to read as one surface.
+ */
+.local-awareness-editor .la-zones-covered input[name="position"]:checked + .la-zone {
+    border-color: transparent;
+    background: transparent;
 }
 
 /* A slide's rows read as one group: the number, then its three fields, then the delete button. */

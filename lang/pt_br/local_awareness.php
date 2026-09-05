@@ -254,6 +254,7 @@ $string['notice:position:bottom'] = 'Rodapé';
 $string['notice:position:bottomend'] = 'Rodapé, fim';
 $string['notice:position:bottomstart'] = 'Rodapé, início';
 $string['notice:position:center'] = 'Centro';
+$string['notice:position:covered'] = 'A tela cheia ocupa a janela inteira, então não tem posição.';
 $string['notice:position:notforlayout'] = 'O layout {$a} não cabe num canto. Escolha o centro, o topo ou o rodapé.';
 $string['notice:position:top'] = 'Topo';
 $string['notice:position:topend'] = 'Topo, fim';
@@ -283,11 +284,17 @@ $string['notice:status:draft'] = 'Rascunho';
 $string['notice:status:live'] = 'Ativo';
 $string['notice:template'] = 'Layout';
 $string['notice:template:card'] = 'Cartão';
+$string['notice:template:card:desc'] = 'Compacto, normalmente em um canto. Não tem espaço para a caixa de confirmação.';
 $string['notice:template:carousel'] = 'Carrossel';
+$string['notice:template:carousel:desc'] = 'Uma imagem ou vídeo por slide, com setas e legenda.';
 $string['notice:template:classic'] = 'Clássico';
+$string['notice:template:classic:desc'] = 'Um cabeçalho, o conteúdo e um rodapé. O que todo aviso era antes dos layouts.';
 $string['notice:template:fullscreen'] = 'Tela cheia';
+$string['notice:template:fullscreen:desc'] = 'Ocupa a janela inteira, para um texto longo como uma política. Não tem posição.';
 $string['notice:template:hero'] = 'Destaque';
+$string['notice:template:hero:desc'] = 'A imagem enviada como faixa no topo, com o título sobre ela.';
 $string['notice:template:video'] = 'Vídeo';
+$string['notice:template:video:desc'] = 'Um player montado a partir do link de vídeo, no lugar da faixa de imagem.';
 $string['notice:template_help'] = 'A forma do diálogo que o leitor vê. Todo layout é um diálogo de verdade: escurece a página atrás, mantém o teclado dentro dele e é anunciado como diálogo pelo leitor de tela, seja qual for o tamanho.
 
 Clássico: cabeçalho, conteúdo e rodapé. O que todo aviso era antes dos layouts.

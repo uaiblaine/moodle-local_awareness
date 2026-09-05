@@ -24,14 +24,17 @@
     Context variables required for this template:
       * template - the layout key, one of awareness::TEMPLATES, used as a class suffix
       * name - the layout's name, already a translated string
+      * description - one line saying what the layout is for
 
     Example context (json):
     {
         "template": "hero",
-        "name": "Hero image"
+        "name": "Hero image",
+        "description": "The image as a band across the top, with the title over it."
     }
 }}
 <span class="la-layout-option la-layout-option--{{template}}">
     <span class="la-layout-thumb" aria-hidden="true"><span class="la-layout-thumb-box"></span></span>
     <span class="la-layout-name">{{name}}</span>
+    <span class="la-layout-desc">{{description}}</span>
 </span>

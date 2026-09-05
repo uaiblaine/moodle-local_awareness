@@ -93,7 +93,9 @@ define([], function() {
 
     var LAYOUT_SELECTORS = {
         LAYOUT_RADIOS: 'input[name="template"]',
-        POSITION_RADIOS: 'input[name="position"]'
+        POSITION_RADIOS: 'input[name="position"]',
+        POSITION_GROUP: '#fgroup_id_positiongroup',
+        POSITION_NOTE: '[data-region="la-position-note"]'
     };
 
     /*
@@ -105,16 +107,25 @@ define([], function() {
     var CORNER_LAYOUT = 'card';
     var FALLBACK_POSITION = 'center';
 
+    // The one layout that covers the window, and so has no position to pick.
+    var COVERED_LAYOUT = 'fullscreen';
+
     var syncPositions = function() {
         var checked = document.querySelector(LAYOUT_SELECTORS.LAYOUT_RADIOS + ':checked');
-        var cornersAllowed = Boolean(checked) && checked.value === CORNER_LAYOUT;
+        var layout = checked ? checked.value : '';
+        var cornersAllowed = layout === CORNER_LAYOUT;
+        /*
+         * Full screen covers the window, so it has no position at all. The group used to be hidden
+         * for it by a server-side hideIf, and a control that vanishes reads as a fault: the screen
+         * fills instead and the note says why. The stylesheet draws both states; nothing here
+         * writes text.
+         */
+        var covered = layout === COVERED_LAYOUT;
         var displaced = false;
         document.querySelectorAll(LAYOUT_SELECTORS.POSITION_RADIOS).forEach(function(radio) {
-            if (CORNERS.indexOf(radio.value) === -1) {
-                return;
-            }
-            radio.disabled = !cornersAllowed;
-            if (!cornersAllowed && radio.checked) {
+            var corner = CORNERS.indexOf(radio.value) !== -1;
+            radio.disabled = covered || (corner && !cornersAllowed);
+            if (corner && !cornersAllowed && radio.checked) {
                 radio.checked = false;
                 displaced = true;
             }
@@ -124,6 +135,15 @@ define([], function() {
             if (fallback) {
                 fallback.checked = true;
             }
+        }
+
+        var group = document.querySelector(LAYOUT_SELECTORS.POSITION_GROUP);
+        if (group) {
+            group.classList.toggle('la-zones-covered', covered);
+        }
+        var note = document.querySelector(LAYOUT_SELECTORS.POSITION_NOTE);
+        if (note) {
+            note.hidden = !covered;
         }
     };
 
