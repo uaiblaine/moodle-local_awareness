@@ -29,7 +29,6 @@
     * courseid (int) — the course the editor writes for, 0 for the site; the modules send it with
       every web-service call
     * helptitle (string), helpbody (raw — may include <b>)
-    * audience (object) — see audience_panel.mustache
 
     Example context (json):
     {
@@ -44,8 +43,7 @@
         "formhtml": "<form id=\"mform1\"><input type=\"text\"></form>",
         "courseid": 0,
         "helptitle": "Como funciona",
-        "helpbody": "Os filtros combinam por <b>interseção</b>.",
-        "audience": {}
+        "helpbody": "Os filtros combinam por <b>interseção</b>."
     }
 }}
 <div class="local-awareness-editor" data-region="la-editor" data-courseid="{{courseid}}">
@@ -82,8 +80,6 @@
             </div>
 
             {{{formhtml}}}
-
-            {{> local_awareness/editor/audience_panel }}
 
         </main>
     </div>

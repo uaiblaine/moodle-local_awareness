@@ -617,7 +617,12 @@
 .local-awareness-editor .mform #fitem_id_filter_course,
 .local-awareness-editor .mform #fitem_id_filter_format,
 .local-awareness-editor .mform #fitem_id_filter_theme,
-.local-awareness-editor .mform #fitem_id_filter_competency_label {
+.local-awareness-editor .mform #fitem_id_filter_competency_label,
+/*
+ * The estimate panel is rendered into the audience section now, so it is a child of the section's
+ * flex container rather than a block after the whole form. It spans, like the fields it answers.
+ */
+.local-awareness-editor .mform .fcontainer > .la-audience {
     flex: 1 1 100%;
 }
 
