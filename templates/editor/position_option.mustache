@@ -1,0 +1,41 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_awareness/editor/position_option
+
+    The label of one position radio in the notice editor: a cell of the screen the stylesheet
+    draws, holding the shape the dialogue would take there. The name is carried offscreen rather
+    than printed, because seven phrases describe a place where a picture of one shows it - and a
+    radio with no visible text still needs its accessible name. Rendered into the radio's label by
+    notice_form, which is why there is no input here.
+
+    Context variables required for this template:
+      * position - the position key, one of awareness::POSITIONS, used as a class suffix
+      * name - the position's name, already a translated string
+      * small - whether the dialogue drawn here is the narrow one a corner takes
+
+    Example context (json):
+    {
+        "position": "top-end",
+        "name": "Top end",
+        "small": true
+    }
+}}
+<span class="la-zone la-zone--{{position}}">
+    <span class="la-zone-shape {{#small}}la-zone-shape--small{{/small}}" aria-hidden="true"></span>
+    <span class="la-offscreen">{{name}}</span>
+</span>

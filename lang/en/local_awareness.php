@@ -256,6 +256,7 @@ $string['notice:position:bottom'] = 'Bottom';
 $string['notice:position:bottomend'] = 'Bottom end';
 $string['notice:position:bottomstart'] = 'Bottom start';
 $string['notice:position:center'] = 'Centre';
+$string['notice:position:covered'] = 'Full screen covers the window, so it has no position.';
 $string['notice:position:notforlayout'] = 'The {$a} layout cannot sit in a corner. Choose the centre, the top or the bottom.';
 $string['notice:position:top'] = 'Top';
 $string['notice:position:topend'] = 'Top end';
@@ -285,11 +286,17 @@ $string['notice:status:draft'] = 'Draft';
 $string['notice:status:live'] = 'Active';
 $string['notice:template'] = 'Layout';
 $string['notice:template:card'] = 'Card';
+$string['notice:template:card:desc'] = 'Compact, usually in a corner. It has no room for the acknowledgement box.';
 $string['notice:template:carousel'] = 'Carousel';
+$string['notice:template:carousel:desc'] = 'One image or video per slide, with arrows and a caption.';
 $string['notice:template:classic'] = 'Classic';
+$string['notice:template:classic:desc'] = 'A header, the content and a footer. What every notice was before layouts existed.';
 $string['notice:template:fullscreen'] = 'Full screen';
+$string['notice:template:fullscreen:desc'] = 'Covers the whole window, for a long text such as a policy. It has no position.';
 $string['notice:template:hero'] = 'Hero image';
+$string['notice:template:hero:desc'] = 'The uploaded image as a band across the top, with the title over it.';
 $string['notice:template:video'] = 'Video';
+$string['notice:template:video:desc'] = 'A player built from the video link, in place of the image band.';
 $string['notice:template_help'] = 'The shape of the dialogue the reader sees. Every layout is a real dialogue: it dims the page behind it, keeps the keyboard inside it and is announced as a dialogue by a screen reader, whatever its size.
 
 Classic: a header, the content and a footer. What every notice was before layouts existed.

@@ -59,7 +59,7 @@ class notice_form extends \core\form\persistent {
     /** @var array Fields to remove from the persistent validation. */
     protected static $foreignfields = [
         // The layout picker's group names, and the repeated slide rows: none is a column.
-        'templategroup', 'positiongroup', 'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
+        'templategroup', 'positiongroup', 'position_note', 'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
         'slide_id', 'slide_repeats', 'slide_add', 'slide_delete', 'slide_delete-hidden',
         'insistence', 'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
         'filter_course', 'filter_groups', 'filter_format', 'filter_theme', 'filter_competency_rules',
@@ -545,18 +545,33 @@ class notice_form extends \core\form\persistent {
 
         /*
          * Position: the seven anchors as radios, emitted in the reading order of the 3x3 grid the
-         * stylesheet lays them out as. A fullscreen dialogue has no position, so the field is
-         * hidden for it; the corners belong to the card alone, and notice_form.js greys them for
-         * every other layout while extra_validation() refuses them for good.
+         * stylesheet draws as a screen. Each radio's label is a cell of that screen holding the
+         * shape the dialogue would take, with the name offscreen — seven phrases describe a place,
+         * a picture of one shows it, and a radio with no visible text still needs its name.
+         *
+         * A fullscreen dialogue has no position, and the field used to be hidden outright for it.
+         * It stays, covered, with the note below saying why: a control that vanishes reads as a
+         * fault, and the author has no way to learn that the choice stopped applying. The corners
+         * belong to the card alone; notice_form.js greys what does not apply and
+         * extra_validation() refuses it for good.
          */
         $positions = [];
         foreach (self::POSITION_GRID as $position) {
             $positions[] = $mform->createElement('radio', 'position', '', self::position_label($position), $position);
         }
+        $positions[] = $mform->createElement(
+            'static',
+            'position_note',
+            '',
+            \html_writer::span(
+                get_string('notice:position:covered', 'local_awareness'),
+                'la-zone-note',
+                ['data-region' => 'la-position-note', 'hidden' => 'hidden']
+            )
+        );
         $mform->addGroup($positions, 'positiongroup', get_string('notice:position', 'local_awareness'), '', false);
         $mform->addHelpButton('positiongroup', 'notice:position', 'local_awareness');
         $mform->setDefault('position', awareness::POSITIONS[0]);
-        $mform->hideIf('positiongroup', 'template', 'eq', 'fullscreen');
 
         $mform->addElement(
             'select',
@@ -886,6 +901,7 @@ class notice_form extends \core\form\persistent {
         return $OUTPUT->render_from_template('local_awareness/editor/layout_option', [
             'template' => $template,
             'name' => self::layout_name($template),
+            'description' => self::layout_description($template),
         ]);
     }
 
@@ -916,6 +932,35 @@ class notice_form extends \core\form\persistent {
     }
 
     /**
+     * One line saying what a layout is for, shown on its card in the picker.
+     *
+     * The same sentences the help text carries, where the author is actually choosing: a help icon
+     * beside the group is not read while six thumbnails are being compared. Literal keys in a
+     * switch, never a built string id.
+     *
+     * @param string $template One of awareness::TEMPLATES.
+     * @return string
+     */
+    public static function layout_description(string $template): string {
+        switch ($template) {
+            case 'classic':
+                return get_string('notice:template:classic:desc', 'local_awareness');
+            case 'hero':
+                return get_string('notice:template:hero:desc', 'local_awareness');
+            case 'fullscreen':
+                return get_string('notice:template:fullscreen:desc', 'local_awareness');
+            case 'card':
+                return get_string('notice:template:card:desc', 'local_awareness');
+            case 'video':
+                return get_string('notice:template:video:desc', 'local_awareness');
+            case 'carousel':
+                return get_string('notice:template:carousel:desc', 'local_awareness');
+            default:
+                return '';
+        }
+    }
+
+    /**
      * A position's name, from a literal string id per value.
      *
      * @param string $position One of awareness::POSITIONS.
@@ -923,6 +968,26 @@ class notice_form extends \core\form\persistent {
      * @throws \coding_exception For a position with no name.
      */
     public static function position_label(string $position): string {
+        global $OUTPUT;
+
+        return $OUTPUT->render_from_template('local_awareness/editor/position_option', [
+            'position' => $position,
+            'name' => self::position_name($position),
+            'small' => in_array($position, awareness::POSITIONS_CORNER, true),
+        ]);
+    }
+
+    /**
+     * A position's name, in words.
+     *
+     * Kept apart from position_label(), which draws it: the picker shows the place rather than
+     * naming it, and the name goes offscreen for the radio's accessible name — but a message about
+     * a position still needs the words.
+     *
+     * @param string $position One of awareness::POSITIONS.
+     * @return string
+     */
+    public static function position_name(string $position): string {
         switch ($position) {
             case 'center':
                 return get_string('notice:position:center', 'local_awareness');

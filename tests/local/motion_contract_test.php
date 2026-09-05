@@ -218,6 +218,44 @@ final class motion_contract_test extends \basic_testcase {
     }
 
     /**
+     * The module knows which layout covers the screen, and only unhides the note the form wrote.
+     *
+     * The position field used to be hidden outright for a fullscreen layout by a server-side
+     * hideIf; it stays now, covered, and the module is what says so. Two things are pinned because
+     * nothing else reads them: the layout name, which is a hand copy of a vocabulary value the way
+     * the corners are, and that the note's TEXT comes from the form — a module writing user-facing
+     * prose is a string outside the language packs.
+     *
+     * @return void
+     */
+    public function test_the_module_covers_the_position_field_without_writing_its_words(): void {
+        $js = $this->read('amd/src/notice_form.js');
+
+        $this->assertMatchesRegularExpression(
+            "/COVERED_LAYOUT\s*=\s*'fullscreen'/",
+            $js,
+            'the module no longer names the layout that covers the screen'
+        );
+        $this->assertStringContainsString('la-zones-covered', $js, 'the covered state is never applied');
+        $this->assertStringContainsString('la-position-note', $js, 'the note is never revealed');
+
+        /*
+         * The note's words belong to the form; only its visibility is the module's business. Read
+         * with comments stripped, for the reason picker_contract_test states about its own scans: a
+         * comment explaining which sentence the module must NOT write would otherwise fail the
+         * assertion by quoting it.
+         */
+        $code = preg_replace('!/\*.*?\*/!s', '', $js);
+        $code = preg_replace('!^\s*//.*$!m', '', $code);
+        $this->assertStringNotContainsString('has no position', $code, 'the module writes the note\'s text itself');
+        $this->assertStringContainsString(
+            'notice:position:covered',
+            $this->read('classes/form/notice_form.php'),
+            'the form no longer renders the note'
+        );
+    }
+
+    /**
      * The picker's state rules read the sibling core actually renders.
      *
      * A grouped radio is <label><input> ...</label> (element-radio-inline.mustache, 4.5 and 5.2):

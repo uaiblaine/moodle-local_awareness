@@ -102,6 +102,61 @@ final class picker_render_test extends \advanced_testcase {
     }
 
     /**
+     * Every layout card carries the sentence that says what the layout is for.
+     *
+     * The sentences live in the help text too, where they are read by whoever opens a help icon
+     * while comparing six thumbnails — which is nobody. A card with an empty description would
+     * render as a silent gap, so the text itself is asserted, not just the element.
+     */
+    public function test_every_layout_card_carries_its_description(): void {
+        $this->resetAfterTest();
+        $xpath = $this->render();
+
+        foreach (awareness::TEMPLATES as $template) {
+            $nodes = $xpath->query(
+                '//span[contains(@class, "la-layout-option--' . $template . '")]//span[@class="la-layout-desc"]'
+            );
+            $this->assertSame(1, $nodes->length, "the {$template} card has no description element");
+            $this->assertNotSame('', trim($nodes->item(0)->textContent), "the {$template} description is empty");
+        }
+    }
+
+    /**
+     * A position radio is drawn as a cell of the screen, and keeps its name where a reader can hear it.
+     *
+     * The visible text is gone — seven phrases describe a place where a picture of one shows it —
+     * so the accessible name is the whole of what a screen reader has. The offscreen class is the
+     * plugin's own: visually-hidden is a Bootstrap 5 name and dead on 4.5 in this surface.
+     */
+    public function test_every_position_radio_is_a_drawn_cell_that_keeps_its_name(): void {
+        $this->resetAfterTest();
+        $xpath = $this->render();
+
+        foreach (notice_form::POSITION_GRID as $position) {
+            $radios = $xpath->query('//input[@type="radio"][@name="position"][@value="' . $position . '"]');
+            $this->assertSame(1, $radios->length, "no radio for the {$position} position");
+            $option = $this->next_element($radios->item(0));
+            $this->assertNotNull($option, "{$position}: nothing follows the radio");
+            $classes = preg_split('/\s+/', trim($option->getAttribute('class')));
+            $this->assertContains('la-zone', $classes, "{$position}: the cell is not the radio's next sibling");
+            $this->assertContains('la-zone--' . $position, $classes, "{$position}: the cell carries no position class");
+
+            $name = $xpath->query('.//span[@class="la-offscreen"]', $option);
+            $this->assertSame(1, $name->length, "{$position}: the name is not carried offscreen");
+            $this->assertSame(
+                notice_form::position_name($position),
+                trim($name->item(0)->textContent),
+                "{$position}: the offscreen name is not the position's own"
+            );
+        }
+
+        // The note that replaces the field vanishing for a fullscreen layout, present and hidden.
+        $note = $xpath->query('//span[@data-region="la-position-note"]');
+        $this->assertSame(1, $note->length, 'the covered-screen note is missing');
+        $this->assertTrue($note->item(0)->hasAttribute('hidden'), 'the note is shown before a layout asks for it');
+    }
+
+    /**
      * The position radios come in the reading order of the grid, and the grid is the whole vocabulary.
      */
     public function test_the_position_radios_come_in_the_reading_order_of_the_grid(): void {
