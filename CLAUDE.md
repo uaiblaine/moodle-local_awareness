@@ -267,6 +267,17 @@ Behat site fails every scenario on the same core locator and looks like your bug
   the site scope confine nobody, or deleting a group would hide the notices naming it from everyone
   including the administrator who has to fix them.
 
+- **A course notice's page reach is the scope's, not the author's.** `pathmatch` is FORCED to
+  `author_scope::COURSE_PATHMATCH` (`/course/view.php%` — the wildcard because the reader's page
+  arrives as path plus query) in a course and LEAVE at the site, and the course form renders no
+  display-restrictions section at all. Three consumers had to learn it: `apply_author_scope()` now
+  writes `pathmatch` back onto the record beside `cohorts` and `reqcourse` (it never had to before,
+  because no scope wrote it, and the first save stored null); `check_collision` and `editnotice.php`
+  ask the scope for the reach they compare, or a course author compares the empty pattern, which
+  overlaps everything; and `collision_warning.js` renders into `#fitem_id_scope_line` where the
+  page-reach field is absent. `get_estimate` withholds `context_only_filters` under a course scope
+  for the same reason it withholds the breakdown — it is the scope's value, not the author's.
+
 - **A dev site that upgraded mid-change never registers a web service added afterwards.**
   `external_functions` is refreshed only when `$plugin->version` rises; a stack already at the bumped
   version when `db/services.php` gained a function keeps its old list, and the AJAX call dies with

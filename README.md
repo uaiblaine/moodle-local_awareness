@@ -128,7 +128,7 @@ A notice can belong to a course. Grant `local/awareness:managecourse` in the cou
 author its notices, and `local/awareness:viewreportscourse` to whoever may read their reports;
 neither has a default archetype. The holder also needs to be enrolled, or to hold
 `moodle/course:view`, because the pages live inside the course and `require_login()` is a gate of
-its own. A course notice appears only on its course's pages, to anyone who can open them — guests
+its own. A course notice appears on its course's main page, to anyone who can open it — guests
 included where the course allows guest access — so add a role, cohort or group rule to narrow it
 further; category, theme and course-format filters do not apply to it, and it does not travel with a
 course backup. Groups follow the course's group mode the way Moodle applies it everywhere else: in

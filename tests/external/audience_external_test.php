@@ -159,6 +159,34 @@ final class audience_external_test extends \advanced_testcase {
     }
 
     /**
+     * The page reach a course scope forces does not reach the job, so it cannot fragment it.
+     *
+     * pathmatch is a context field: it never enters a predicate and never changes a count. Carried
+     * into the criteria it would still change their hash, and jobs are shared BY that hash — so the
+     * same question asked by a site manager and by a course author would stop being the same job,
+     * for no difference in the answer. The site half is the control: there the pattern is the
+     * author's own and it stays.
+     */
+    public function test_a_forced_page_reach_does_not_reach_the_job(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $this->setAdminUser();
+        set_config('audience_sync_limit', 0, 'local_awareness');
+
+        $site = estimate_audience::execute(json_encode(['pathmatch' => '/mod/quiz/view.php']));
+        $sitecriteria = json_decode(audience_job::get_record(['jobid' => $site['jobid']])->get('criteria'), true);
+        $this->assertSame('/mod/quiz/view.php', $sitecriteria['pathmatch']);
+
+        $incourse = estimate_audience::execute(json_encode(['pathmatch' => '/mod/quiz/view.php']), (int) $course->id);
+        $coursecriteria = json_decode(audience_job::get_record(['jobid' => $incourse['jobid']])->get('criteria'), true);
+        $this->assertArrayNotHasKey('pathmatch', $coursecriteria);
+
+        // And the job is the one a site manager asking the same audience question would get.
+        $twin = estimate_audience::execute(json_encode(['filter_course' => [(int) $course->id],
+            'filter_role_context' => CONTEXT_COURSE]));
+        $this->assertSame($twin['jobid'], $incourse['jobid'], 'the same question is the same job, whoever asks');
+    }
+
+    /**
      * On a site under the limit the answer is ready before the response is written.
      *
      * The empty adhoc queue is the half that matters: a job that came back ready because cron

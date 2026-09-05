@@ -266,6 +266,15 @@ class helper {
         }
         $data->filtervalues = json_encode($filters);
 
+        /*
+         * The three fields the scope may write that are columns of their own rather than keys of
+         * the JSON blob. pathmatch joined them when a course scope started writing the course's own
+         * main page: it had been LEAVE in both scopes, so it reached the row untouched and nothing
+         * here had to carry it, and the first save under the new rule stored null.
+         */
+        if (array_key_exists('pathmatch', $criteria)) {
+            $data->pathmatch = $criteria['pathmatch'];
+        }
         if (array_key_exists('cohorts', $criteria)) {
             $data->cohorts = $criteria['cohorts'];
         }

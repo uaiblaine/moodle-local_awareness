@@ -402,19 +402,26 @@ class notice_form extends \core\form\persistent {
             }
         }
 
-        // Display restrictions.
-        $mform->addElement('header', 'header_filters', get_string('editor:section:filters', 'local_awareness'));
-        $mform->addElement(
-            'static',
-            'header_filters_desc',
-            '',
-            get_string('editor:section:filters:desc', 'local_awareness')
-        );
+        /*
+         * Display restrictions, for a site notice only. Under a course scope this section held one
+         * field — the URL pattern — describing a reach a course notice does not have: it fires on
+         * its course's main page, which author_scope writes for it. A section whose only field is
+         * decided elsewhere is a section to remove, not to disable.
+         */
+        if (!$coursemode) {
+            $mform->addElement('header', 'header_filters', get_string('editor:section:filters', 'local_awareness'));
+            $mform->addElement(
+                'static',
+                'header_filters_desc',
+                '',
+                get_string('editor:section:filters:desc', 'local_awareness')
+            );
 
-        // Path Match.
-        $mform->addElement('text', 'pathmatch', get_string('pathmatch', 'local_awareness'));
-        $mform->setType('pathmatch', PARAM_RAW);
-        $mform->addHelpButton('pathmatch', 'pathmatch', 'local_awareness');
+            // Path Match.
+            $mform->addElement('text', 'pathmatch', get_string('pathmatch', 'local_awareness'));
+            $mform->setType('pathmatch', PARAM_RAW);
+            $mform->addHelpButton('pathmatch', 'pathmatch', 'local_awareness');
+        }
 
         // Fields moved to header_audience.
 
@@ -606,9 +613,12 @@ class notice_form extends \core\form\persistent {
          * preference to do it. Hiding a filter somebody set is worse than showing an empty section:
          * the author cannot act on what the page does not admit is there.
          */
-        $this->set_optional_section_state('header_filters', [
-            'pathmatch', 'filter_category', 'filter_course', 'filter_format', 'filter_theme',
-        ]);
+        if ($this->scope()->is_site()) {
+            // The course form has no display-restrictions section; asking about its state would throw.
+            $this->set_optional_section_state('header_filters', [
+                'pathmatch', 'filter_category', 'filter_course', 'filter_format', 'filter_theme',
+            ]);
+        }
         /*
          * The appearance fields are never empty - every notice stores a layout - so "holds a value"
          * has to mean "holds something other than the default", or the section would open on every

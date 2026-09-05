@@ -247,16 +247,20 @@ final class course_scope_external_test extends \advanced_testcase {
     public function test_a_rival_outside_the_scope_is_described_and_not_named(): void {
         $this->setAdminUser();
         $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
-        $generator->create_notice(['title' => 'Dashboard rival', 'pathmatch' => '/my/%', 'resetinterval' => WEEKSECS]);
+        /*
+         * The rivals reach everywhere, which overlaps whatever reach the caller is judged with.
+         * This test is about WHOSE NAME a course author may read, not about page reach, and pinning
+         * it to one pattern made it fail the day a course scope started writing its own: the
+         * author's side is now compared against the course's main page, which '/my/%' misses.
+         */
+        $generator->create_notice(['title' => 'Dashboard rival', 'resetinterval' => WEEKSECS]);
         $generator->create_notice([
             'title' => 'Other course rival',
-            'pathmatch' => '/my/%',
             'resetinterval' => WEEKSECS,
             'courseid' => $this->other->id,
         ]);
         $generator->create_notice([
             'title' => 'Own course rival',
-            'pathmatch' => '/my/%',
             'resetinterval' => WEEKSECS,
             'courseid' => $this->mine->id,
         ]);

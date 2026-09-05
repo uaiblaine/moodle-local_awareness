@@ -214,7 +214,9 @@ final class author_scope_test extends \advanced_testcase {
         $this->assertTrue($result->is_clean(), 'forcing a field is not a problem to report');
         $this->assertSame([(int) $mine->id], $result->criteria()['filter_course']);
         $this->assertSame(CONTEXT_COURSE, $result->criteria()['filter_role_context']);
-        $this->assertSame('/mod/%', $result->criteria()['pathmatch']);
+        // The page reach is forced too: a course notice fires on its course's main page, and the
+        // pattern the caller sent is overwritten rather than narrowed.
+        $this->assertSame(author_scope::COURSE_PATHMATCH, $result->criteria()['pathmatch']);
 
         // Forced even when nothing was submitted for them: an empty POST cannot reach the site.
         $result = $scope->apply([]);
@@ -256,7 +258,7 @@ final class author_scope_test extends \advanced_testcase {
         $this->assertSame([], $result->criteria()['filter_category']);
         $this->assertSame([], $result->criteria()['filter_format']);
         $this->assertSame([], $result->criteria()['filter_theme']);
-        $this->assertSame('/mod/quiz/%', $result->criteria()['pathmatch']);
+        $this->assertSame(author_scope::COURSE_PATHMATCH, $result->criteria()['pathmatch']);
 
         $result = $scope->apply([
             'filter_category' => [],
