@@ -152,61 +152,6 @@ class notice_form extends \core\form\persistent {
             }
         }
 
-        // Display.
-        $mform->addElement('header', 'header_behavior', get_string('editor:section:behavior', 'local_awareness'));
-        $mform->addElement(
-            'static',
-            'header_behavior_desc',
-            '',
-            get_string('editor:section:behavior:desc', 'local_awareness')
-        );
-        $mform->setExpanded('header_behavior', true);
-
-        $mform->addElement('selectyesno', 'enabled', get_string('notice:enable', 'local_awareness'));
-        $mform->setDefault('enabled', 1);
-
-        $mform->addElement('duration', 'resetinterval', get_string('notice:resetinterval', 'local_awareness'));
-        $mform->addHelpButton('resetinterval', 'notice:resetinterval', 'local_awareness');
-        $mform->setDefault('resetinterval', 0);
-
-        /*
-         * One question, three answers, where there used to be three yes/no questions whose eight
-         * combinations included two that made no sense together and one that did nothing. The
-         * author is choosing how insistent the notice is, and that is a single ordered decision;
-         * awareness::get_insistence() is where the levels are defined and mapped back to storage.
-         */
-        $mform->addElement(
-            'select',
-            'insistence',
-            get_string('notice:insistence', 'local_awareness'),
-            [
-                awareness::INSISTENCE_INFORMATIONAL => get_string('notice:insistence:informational', 'local_awareness'),
-                awareness::INSISTENCE_BLOCKING => get_string('notice:insistence:blocking', 'local_awareness'),
-                awareness::INSISTENCE_ACKNOWLEDGE => get_string('notice:insistence:acknowledge', 'local_awareness'),
-            ]
-        );
-        $mform->addHelpButton('insistence', 'notice:insistence', 'local_awareness');
-        $mform->setDefault('insistence', awareness::INSISTENCE_INFORMATIONAL);
-
-        $mform->addElement('selectyesno', 'perpetual', get_string('notice:perpetual', 'local_awareness'));
-        $mform->addHelpButton('perpetual', 'notice:perpetual', 'local_awareness');
-        $mform->setDefault('perpetual', 1);
-
-        /*
-         * Computed, not a literal: a hardcoded stopyear silently stops accepting dates once it
-         * arrives, and the whole non-perpetual scheduling path goes with it.
-         */
-        $stopyear = (int) date('Y') + 10;
-        $activeoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear];
-        $mform->addElement('date_time_selector', 'timestart', get_string('notice:activefrom', 'local_awareness'), $activeoptions);
-        $mform->addHelpButton('timestart', 'notice:activefrom', 'local_awareness');
-        $mform->hideIf('timestart', 'perpetual', 'eq', 1);
-
-        $expiryoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear, 'defaulttime' => time() + HOURSECS];
-        $mform->addElement('date_time_selector', 'timeend', get_string('notice:expiry', 'local_awareness'), $expiryoptions);
-        $mform->addHelpButton('timeend', 'notice:expiry', 'local_awareness');
-        $mform->hideIf('timeend', 'perpetual', 'eq', 1);
-
         // Audience.
         $mform->addElement('header', 'header_audience', get_string('editor:section:audience', 'local_awareness'));
         $mform->addElement(
@@ -432,6 +377,7 @@ class notice_form extends \core\form\persistent {
          */
         if ($coursemode) {
             $this->define_appearance($mform);
+            $this->define_behaviour($mform);
 
             return;
         }
@@ -502,6 +448,7 @@ class notice_form extends \core\form\persistent {
         );
 
         $this->define_appearance($mform);
+        $this->define_behaviour($mform);
     }
 
     /**
@@ -513,6 +460,73 @@ class notice_form extends \core\form\persistent {
         $scope = $this->_customdata['scope'] ?? null;
 
         return $scope instanceof author_scope ? $scope : author_scope::site();
+    }
+
+
+    /**
+     * How the notice behaves and when it runs — the last section, because it is the last decision.
+     *
+     * It used to sit second, between what the notice says and who gets it, which put "Reset every"
+     * and an expiry date between the author and the audience they were choosing. The order the
+     * sections are added in is the order they are read in, and this one is answered once the rest
+     * is settled: what it says, who gets it, how it looks, when it runs.
+     *
+     * @param \MoodleQuickForm $mform The form.
+     */
+    private function define_behaviour(\MoodleQuickForm $mform): void {
+        $mform->addElement('header', 'header_behavior', get_string('editor:section:behavior', 'local_awareness'));
+        $mform->addElement(
+            'static',
+            'header_behavior_desc',
+            '',
+            get_string('editor:section:behavior:desc', 'local_awareness')
+        );
+        $mform->setExpanded('header_behavior', true);
+
+        $mform->addElement('selectyesno', 'enabled', get_string('notice:enable', 'local_awareness'));
+        $mform->setDefault('enabled', 1);
+
+        $mform->addElement('duration', 'resetinterval', get_string('notice:resetinterval', 'local_awareness'));
+        $mform->addHelpButton('resetinterval', 'notice:resetinterval', 'local_awareness');
+        $mform->setDefault('resetinterval', 0);
+
+        /*
+         * One question, three answers, where there used to be three yes/no questions whose eight
+         * combinations included two that made no sense together and one that did nothing. The
+         * author is choosing how insistent the notice is, and that is a single ordered decision;
+         * awareness::get_insistence() is where the levels are defined and mapped back to storage.
+         */
+        $mform->addElement(
+            'select',
+            'insistence',
+            get_string('notice:insistence', 'local_awareness'),
+            [
+                awareness::INSISTENCE_INFORMATIONAL => get_string('notice:insistence:informational', 'local_awareness'),
+                awareness::INSISTENCE_BLOCKING => get_string('notice:insistence:blocking', 'local_awareness'),
+                awareness::INSISTENCE_ACKNOWLEDGE => get_string('notice:insistence:acknowledge', 'local_awareness'),
+            ]
+        );
+        $mform->addHelpButton('insistence', 'notice:insistence', 'local_awareness');
+        $mform->setDefault('insistence', awareness::INSISTENCE_INFORMATIONAL);
+
+        $mform->addElement('selectyesno', 'perpetual', get_string('notice:perpetual', 'local_awareness'));
+        $mform->addHelpButton('perpetual', 'notice:perpetual', 'local_awareness');
+        $mform->setDefault('perpetual', 1);
+
+        /*
+         * Computed, not a literal: a hardcoded stopyear silently stops accepting dates once it
+         * arrives, and the whole non-perpetual scheduling path goes with it.
+         */
+        $stopyear = (int) date('Y') + 10;
+        $activeoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear];
+        $mform->addElement('date_time_selector', 'timestart', get_string('notice:activefrom', 'local_awareness'), $activeoptions);
+        $mform->addHelpButton('timestart', 'notice:activefrom', 'local_awareness');
+        $mform->hideIf('timestart', 'perpetual', 'eq', 1);
+
+        $expiryoptions = ['startyear' => date("Y"), 'stopyear' => $stopyear, 'defaulttime' => time() + HOURSECS];
+        $mform->addElement('date_time_selector', 'timeend', get_string('notice:expiry', 'local_awareness'), $expiryoptions);
+        $mform->addHelpButton('timeend', 'notice:expiry', 'local_awareness');
+        $mform->hideIf('timeend', 'perpetual', 'eq', 1);
     }
 
     /**
