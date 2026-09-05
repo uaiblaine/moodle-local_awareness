@@ -30,7 +30,12 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
     var SELECTORS = {
         pathmatch: '#id_pathmatch',
         resetinterval: '#id_resetinterval_number',
-        slotHost: '#fitem_id_pathmatch',
+        /*
+         * Where the warning is written. The course form has no page-reach field, so the first of
+         * these is absent there and the Reach line takes it — which is the line that says where the
+         * notice fires, and so the right place to say what it will be competing with.
+         */
+        slotHost: '#fitem_id_pathmatch, #fitem_id_scope_line',
         noticeid: '#id_id'
     };
 
@@ -120,9 +125,6 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
      */
     var check = function() {
         var pathfield = document.querySelector(SELECTORS.pathmatch);
-        if (!pathfield) {
-            return;
-        }
 
         if (!repeats()) {
             // A notice shown once takes its turn and leaves, so it competes with nobody.
@@ -136,7 +138,8 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
             args: {
                 noticeid: state.noticeid,
                 courseid: courseId(),
-                pathmatch: pathfield.value,
+                // Empty where the form offers no field; the server's scope writes the real reach.
+                pathmatch: pathfield ? pathfield.value : '',
                 repeats: true
             }
         }])[0].then(function(response) {
@@ -169,11 +172,19 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
 
             var pathfield = document.querySelector(SELECTORS.pathmatch);
             var intervalfield = document.querySelector(SELECTORS.resetinterval);
-            if (!pathfield) {
+            /*
+             * The repeat interval alone is enough to watch. The course form has no page-reach field
+             * — its reach is written by the scope — and returning early on that used to switch the
+             * whole warning off for a course author, who needs it MORE: every course notice now
+             * aims at the same one page, so two repeating ones always compete.
+             */
+            if (!pathfield && !intervalfield) {
                 return;
             }
 
-            pathfield.addEventListener('input', schedule);
+            if (pathfield) {
+                pathfield.addEventListener('input', schedule);
+            }
             if (intervalfield) {
                 intervalfield.addEventListener('input', schedule);
                 intervalfield.addEventListener('change', schedule);

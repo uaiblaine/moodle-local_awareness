@@ -158,7 +158,8 @@ if ($formdata = $mform->get_data()) {
      */
     $clashes = \local_awareness\local\collision::clashes_for(
         (int) ($awareness ? $awareness->get('id') : 0),
-        $formdata->pathmatch ?? '',
+        // Through the scope, which writes the course's main page where the form offers no field.
+        (string) $scope->apply(['pathmatch' => $formdata->pathmatch ?? ''])->criteria()['pathmatch'],
         (int) ($formdata->resetinterval ?? 0)
     );
 

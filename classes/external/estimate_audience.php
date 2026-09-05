@@ -107,6 +107,17 @@ class estimate_audience extends external_api {
             );
         }
         $raw = helper::cap_criteria_lists($scoped->criteria());
+        if (!$scope->is_site()) {
+            /*
+             * The page reach a course scope FORCES is not part of the question being counted:
+             * pathmatch is a CONTEXT field, so it never enters a predicate, and carrying it here
+             * would change the criteria hash without changing a single number — fragmenting the
+             * shared job cache, whose whole point is that the same question is the same job whoever
+             * asks. The scope is already in the job, as the forced filter_course that get_estimate
+             * checks a job against.
+             */
+            unset($raw['pathmatch']);
+        }
 
         $normalised = estimator::normalise($raw);
         $hash = estimator::hash($normalised);

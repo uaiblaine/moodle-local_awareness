@@ -64,6 +64,13 @@ use local_awareness\persistent\awareness;
  *    so it does not silently empty for a non-editing teacher. Safe only together with the two
  *    rules above.
  *  - filter_competency_rules is RESTRICTED to the competencies linked to the course.
+ *  - pathmatch is FORCED to the course's own main page. A course notice cannot reach beyond its
+ *    course — filter_course is forced — so the free URL pattern only ever narrowed it further,
+ *    while its help text described a reach the notice does not have. Rather than offer a field
+ *    whose every honest answer is a subset of one page, the scope writes that page. The value is a
+ *    pattern the existing matcher already understands, so nothing else in the display path changes;
+ *    a page-type choice in the shape of a block's ("any course page" / "any course main page") is
+ *    the intended successor, and this is its first member.
  *  - filter_groups is RESTRICTED to the groups the author may target in the course, decided the
  *    way core decides it for an activity (group_scope): every participation group in visible
  *    groups mode or with moodle/site:accessallgroups, the author's own groups in separate groups
@@ -124,9 +131,19 @@ final class author_scope {
         'filter_groups' => ['site' => self::RULE_FORBID, 'course' => self::RULE_RESTRICT],
         'filter_role' => ['site' => self::RULE_EXISTS, 'course' => self::RULE_RESTRICT],
         'filter_competency_rules' => ['site' => self::RULE_EXISTS, 'course' => self::RULE_RESTRICT],
-        'pathmatch' => ['site' => self::RULE_LEAVE, 'course' => self::RULE_LEAVE],
+        'pathmatch' => ['site' => self::RULE_LEAVE, 'course' => self::RULE_FORCE],
         'filter_competency_requireall' => ['site' => self::RULE_LEAVE, 'course' => self::RULE_LEAVE],
     ];
+
+    /**
+     * Where a course notice fires: the course's own main page.
+     *
+     * The wildcard is not decoration. The reader's page arrives as path plus query
+     * (amd/src/notice.js sends location.pathname + location.search), so a course page reads as
+     * "/course/view.php?id=6" and an unanchored-at-the-end pattern is the only one that matches it —
+     * check_path_match() appends '$' to a pattern carrying no '%'.
+     */
+    public const COURSE_PATHMATCH = '/course/view.php%';
 
     /** The values filter_role_context may take; the form offers exactly these. */
     public const ROLE_CONTEXTS = [0, CONTEXT_SYSTEM, CONTEXT_COURSECAT, CONTEXT_COURSE];
@@ -459,7 +476,13 @@ final class author_scope {
             }
         }
 
-        // The pathmatch and the requireall switch are LEAVE in both scopes: nothing to do.
+        // Page reach: the site's is the author's to write; a course notice fires on its course's
+        // main page and the field is not offered, so this is written rather than corrected.
+        if (!$this->is_site()) {
+            $out['pathmatch'] = self::COURSE_PATHMATCH;
+        }
+
+        // The requireall switch is LEAVE in both scopes: nothing to do.
 
         return new scope_result($out, $problems);
     }

@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_awareness'; // Full name of the plugin (used for diagnostics).
-$plugin->version   = 2026090405;         // The current module version (Date: YYYYMMDDXX).
+$plugin->version   = 2026090406;         // The current module version (Date: YYYYMMDDXX).
 $plugin->release = 'v1.0';
 $plugin->requires = 2024100700;          // Requires Moodle 4.5 or later.
 $plugin->supported = [405, 502];  // Supported from Moodle 4.5 to 5.2.

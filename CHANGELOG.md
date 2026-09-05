@@ -6,6 +6,33 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### A course notice fires on its course's main page, and stops asking where (version 2026090406)
+
+**The course editor's "Display restrictions" section held one field describing a reach the notice
+does not have.** A course notice cannot leave its course — `filter_course` is forced — so every
+honest answer to the URL pattern was a subset of one course's pages, while the field's help text
+offered the whole site. The section is gone from the course form, and `author_scope` writes the
+course's own main page instead: FORCE for `pathmatch` under a course scope, LEAVE at the site,
+where the pattern is still the author's to write. The stored value is a pattern the existing
+matcher already understands, so nothing in the display path changed shape; the reader's page
+arrives as path plus query, which is why it carries a wildcard. A page-type choice in the shape of
+a block's — "any course page" against "any course main page" — is the intended successor, and this
+is its first member.
+
+Three things followed from it, each of which would have been a quiet defect. The save path had
+never written `pathmatch` back onto the record, because until now no scope wrote it, so the first
+save under the new rule stored null. The collision warning compares page reach, and a course
+author's editor would have compared the empty pattern — which overlaps everything — and warned
+about every repeating notice on the site; both the web service and the page now ask the scope for
+the reach rather than the form. And the warning itself rendered inside the field that no longer
+exists, so it moved to the Reach line, which is the line that says where the notice fires and the
+right place to say what it will compete with.
+
+**The audience estimate no longer hands a course author their own scope back.** The only context
+restriction a course notice can carry is the page it fires on, and the scope wrote that — reporting
+it as a restriction the author chose, spelled as a raw URL pattern, describes a choice they did not
+make in a language they did not use.
+
 ### The group picker appears where the groups are, and the competency picker says what is missing (version 2026090405)
 
 **The group mode was gating the picker, and it is the wrong question.** A course's group mode

@@ -89,9 +89,17 @@ class check_collision extends external_api {
         helper::require_author($scope, 'manage');
         $syscontext = \context_system::instance();
 
+        /*
+         * The reach compared is the one the save would store, not the one the client typed: under a
+         * course scope the field does not exist and the scope writes the course's main page, so a
+         * course author's editor would otherwise compare an empty pattern — which overlaps
+         * everything — and warn about every repeating notice on the site.
+         */
+        $reach = (string) $scope->apply(['pathmatch' => $params['pathmatch']])->criteria()['pathmatch'];
+
         $clashes = collision::clashes_for(
             (int) $params['noticeid'],
-            $params['pathmatch'],
+            $reach,
             !empty($params['repeats']) ? 1 : 0
         );
 
