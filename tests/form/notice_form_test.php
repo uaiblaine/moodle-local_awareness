@@ -551,6 +551,42 @@ final class notice_form_test extends \advanced_testcase {
     }
 
     /**
+     * The audience estimate is rendered inside the audience section, not after the whole form.
+     *
+     * It is the answer to that section's question, and it used to sit below the appearance and
+     * scheduling sections — so narrowing a rule meant scrolling past both to see what it did. The
+     * assertion is containment rather than order, because order alone would still pass if the
+     * panel merely moved up a section.
+     */
+    public function test_the_audience_estimate_sits_inside_the_audience_section(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $PAGE->set_url('/local/awareness/editnotice.php');
+
+        $html = (new notice_form(null, ['persistent' => null, 'id' => 0]))->render();
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        $panels = $xpath->query('//*[@data-region="la-audience"]');
+        $this->assertSame(1, $panels->length, 'the estimate panel is not in the form');
+
+        $inside = $xpath->query('//*[@id="id_header_audience"]//*[@data-region="la-audience"]');
+        $this->assertSame(1, $inside->length, 'the estimate is not inside the audience section');
+
+        // The control: it is not inside the section that used to follow it either.
+        $this->assertSame(
+            0,
+            $xpath->query('//*[@id="id_header_appearance"]//*[@data-region="la-audience"]')->length
+        );
+    }
+
+    /**
      * The sections are read in the order the author decides things.
      *
      * What it says, who gets it, how it looks, when it runs. Behaviour used to sit second, which

@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The audience estimate sits with the rules it estimates (version 2026090409)
+
+**The number describing the audience was rendered after the whole form.** An author narrowing a
+cohort or a role had to scroll past the appearance and scheduling sections to see what it did, and
+back up to change it again. The panel is the answer to the audience section's question, so the form
+renders it into that section — as markup, not by moving a rendered block with script, which is the
+mistake this editor already made once and paid for in fields that were focusable while painted
+nowhere.
+
+The context it needs was built inside `editor_page::export_for_template()`, which runs *after* the
+form has been rendered and handed to it, so it moved to its own `output\audience_panel`
+renderable that both sides can ask. A test pins containment rather than order: order alone would
+still pass if the panel merely moved up one section.
+
+This is what remains of the rail from the approved wireframe, and deliberately so — with the
+preview staying a modal, a fixed column holding one number and one button is width spent on
+nothing. The estimate belongs beside the fields that change it; the sticky footer keeps Save and
+Preview.
+
 ### The editor is read in the order the author decides things (version 2026090408)
 
 **Scheduling used to sit second.** The sections ran content, behaviour, audience, appearance — so a

@@ -17,7 +17,7 @@
 namespace local_awareness;
 
 use local_awareness\audience\live_mode;
-use local_awareness\output\editor_page;
+use local_awareness\output\audience_panel;
 
 /**
  * Tests for the interactive-estimate decision and what the editor does with it.
@@ -124,19 +124,24 @@ final class audience_live_mode_test extends \advanced_testcase {
     public function test_the_editor_switches_the_automatic_estimate_off_on_a_large_site(): void {
         global $PAGE;
 
-        $page = new editor_page(null, '<form id="x"></form>');
+        /*
+         * Asked of the panel rather than the page: the estimate is rendered into the audience
+         * section by the form now, and its context moved to its own renderable when it turned out
+         * editor_page builds its context AFTER the form has been rendered and handed to it.
+         */
+        $panel = new audience_panel(null);
         // The page renderer, not the DI container, which does not exist on 4.5.
         $renderer = $PAGE->get_renderer('core');
 
         set_config('audience_sync_limit', 100000, 'local_awareness');
         live_mode::reset_cache();
-        $small = $page->export_for_template($renderer);
+        $small = $panel->export_for_template($renderer);
         $this->assertTrue($small['audience']['autotrigger']);
         $this->assertSame(1, $small['audience']['auto']);
 
         set_config('audience_sync_limit', 1, 'local_awareness');
         live_mode::reset_cache();
-        $large = $page->export_for_template($renderer);
+        $large = $panel->export_for_template($renderer);
         $this->assertFalse($large['audience']['autotrigger']);
         $this->assertSame(0, $large['audience']['auto']);
     }

@@ -19,6 +19,7 @@ namespace local_awareness\form;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\local\group_scope;
+use local_awareness\output\audience_panel;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
 
@@ -70,7 +71,7 @@ class notice_form extends \core\form\persistent {
      * Form definition.
      */
     public function definition() {
-        global $CFG, $DB;
+        global $CFG, $DB, $OUTPUT;
         $mform =& $this->_form;
 
         /*
@@ -346,6 +347,21 @@ class notice_form extends \core\form\persistent {
                 }
             }
         }
+
+        /*
+         * The estimate, beside the rules it is an estimate of. It used to be rendered by the page
+         * after the whole form, so the number describing the audience sat below the appearance and
+         * scheduling sections and an author narrowing a rule scrolled past both to see what it did.
+         * Rendered here as markup rather than moved here by script: relocating a form's rows with
+         * JavaScript is the mistake this editor already made once.
+         */
+        $mform->addElement(
+            'html',
+            $OUTPUT->render_from_template(
+                'local_awareness/editor/audience_panel',
+                (new audience_panel($persistent))->export_for_template($OUTPUT)
+            )
+        );
 
         /*
          * Display restrictions, for a site notice only. Under a course scope this section held one
