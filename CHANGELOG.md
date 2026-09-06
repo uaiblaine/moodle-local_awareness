@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### A slide listed twice is refused (version 2026090412)
+
+Rows are matched to stored slides by their hidden id, so a request carrying the same id on two rows
+would write the same record twice — the later row winning, the earlier lost without a word — and
+delete, with its file, any slide the rows no longer named. Nothing in the editor produces such a
+request; a client that does, by hand or by a bug, is now refused rather than reconciled by guesswork.
+
+Twice, on purpose. The form refuses it on the row that repeats the id, for a carousel arriving from
+a browser. `helper::slide_rows()` refuses it again before the notice itself is written, whatever the
+layout, so a save that bypasses the form changes nothing at all, and `process_slides()` once more for a caller that built
+its rows some other way. Both refusals are pinned by tests that break each guard on its own.
+
 ### A slide can be moved, and the strip is numbered by place (version 2026090411)
 
 **The only way to change a carousel's order was to delete a slide and add it again**, uploading
