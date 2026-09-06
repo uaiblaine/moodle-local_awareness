@@ -1,0 +1,55 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_awareness/editor/slide_head
+
+    The heading row of one carousel slide in the notice editor: the slide's place in the strip, and
+    the three actions that rearrange it - move up, move down, remove. Each is a submit the form
+    treats as a no-submit button, the mechanism core's own repeat deletion uses: a press re-renders
+    the form with the rows rearranged and saves nothing, and the client hints on the button are the
+    ones core puts on its delete button, so a press is not stopped by client-side validation.
+    Rendered into a static element by notice_form, which registers the names; the number is the
+    slide's place on screen, not its row index. A disabled action is one the strip has no room for.
+
+    Context variables required for this template:
+      * heading - the slide's heading, already a translated string carrying its place
+      * actions - the three buttons, each with name, label, arialabel, disabled, focus, destructive
+
+    Example context (json):
+    {
+        "heading": "Slide 2",
+        "actions": [
+            {"name": "slide_moveup[1]", "label": "Move up", "arialabel": "Move up: slide 2",
+             "disabled": false, "focus": true, "destructive": false},
+            {"name": "slide_movedown[1]", "label": "Move down", "arialabel": "Move down: slide 2",
+             "disabled": true, "focus": false, "destructive": false},
+            {"name": "slide_delete[1]", "label": "Remove slide", "arialabel": "Remove slide 2",
+             "disabled": false, "focus": false, "destructive": true}
+        ]
+    }
+}}
+<span class="la-slide-head">
+    <span class="la-slide-head-number">{{heading}}</span>
+    <span class="la-slide-head-actions">
+        {{#actions}}
+        <input type="submit" name="{{name}}" value="{{label}}" aria-label="{{arialabel}}"
+            class="la-slide-action{{#destructive}} la-slide-action--remove{{/destructive}}"
+            data-no-submit="1" data-skip-validation="1" onclick="skipClientValidation = true;"
+            {{#disabled}}disabled="disabled"{{/disabled}} {{#focus}}autofocus="autofocus"{{/focus}}>
+        {{/actions}}
+    </span>
+</span>

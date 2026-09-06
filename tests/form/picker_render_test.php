@@ -195,6 +195,39 @@ final class picker_render_test extends \advanced_testcase {
     }
 
     /**
+     * Every slide's heading carries the three actions, no-submit like core's delete, and the ends of the strip are closed.
+     *
+     * The buttons sit in the heading's static row rather than in rows of their own, and they are
+     * named for the slide's place, so a screen reader hears which slide each one moves. On a fresh
+     * form nothing has moved, so nothing asks for the focus.
+     */
+    public function test_every_slide_heading_carries_the_three_actions_and_the_ends_are_closed(): void {
+        $this->resetAfterTest();
+        $xpath = $this->render();
+        $last = notice_form::SLIDES_MIN - 1;
+
+        foreach (['slide_moveup', 'slide_movedown', 'slide_delete'] as $action) {
+            $buttons = $xpath->query(
+                '//*[starts-with(@id, "fitem_id_slide_no_")]//input[@type="submit"][starts-with(@name, "' . $action . '")]'
+            );
+            $this->assertSame(notice_form::SLIDES_MIN, $buttons->length, "{$action} is not in every slide's heading");
+            foreach ($buttons as $button) {
+                $this->assertSame('1', $button->getAttribute('data-no-submit'), "{$action} submits the form");
+                $this->assertSame('1', $button->getAttribute('data-skip-validation'), "{$action} is stopped by client validation");
+            }
+        }
+
+        $button = static fn(string $name): \DOMElement => $xpath->query('//input[@name="' . $name . '"]')->item(0);
+        $this->assertTrue($button('slide_moveup[0]')->hasAttribute('disabled'), 'the first slide is offered a move up');
+        $this->assertTrue($button("slide_movedown[{$last}]")->hasAttribute('disabled'), 'the last slide is offered a move down');
+        $this->assertFalse($button('slide_movedown[0]')->hasAttribute('disabled'));
+        $this->assertFalse($button("slide_moveup[{$last}]")->hasAttribute('disabled'));
+        $this->assertSame('Move down: slide 1', $button('slide_movedown[0]')->getAttribute('aria-label'));
+        $this->assertSame('Remove slide ' . notice_form::SLIDES_MIN, $button("slide_delete[{$last}]")->getAttribute('aria-label'));
+        $this->assertSame(0, $xpath->query('//input[@autofocus]')->length, 'nothing moved, yet something asks for the focus');
+    }
+
+    /**
      * The position radios come in the reading order of the grid, and the grid is the whole vocabulary.
      */
     public function test_the_position_radios_come_in_the_reading_order_of_the_grid(): void {

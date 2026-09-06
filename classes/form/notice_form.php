@@ -62,7 +62,7 @@ class notice_form extends \core\form\persistent {
         // The layout picker's group names, and the repeated slide rows: none is a column.
         'templategroup', 'positiongroup', 'position_note', 'slide_media',
         'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
-        'slide_id', 'slide_repeats', 'slide_add', 'slide_delete', 'slide_delete-hidden',
+        'slide_id', 'slide_repeats', 'slide_add', 'slide_delete', 'slide_delete-hidden', 'slide_moveup', 'slide_movedown',
         'insistence', 'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
         'filter_course', 'filter_groups', 'filter_format', 'filter_theme', 'filter_competency_rules',
         'filter_competency_requireall', 'bgimage',
@@ -899,7 +899,15 @@ class notice_form extends \core\form\persistent {
          * has shipped unlabelled reachable fields once already; a border is not worth that.
          */
         $elements = [
-            // No label: the value IS the label — "Slide 1" — and a "Slide" caption above it says it twice.
+            /*
+             * The heading row: the slide's place, and the buttons that rearrange the strip. A
+             * static, because a static is the one element the whole row can be hidden through;
+             * its value is markup rendered by slide_head(), and the buttons in it post like any
+             * other — the form registers their names as no-submit below, which is exactly how
+             * core's own repeat deletion works. The value is set once the rows on screen are
+             * known, because the number is the slide's place, and the place is not the row index
+             * after a deletion left a gap or a move exchanged two rows.
+             */
             $mform->createElement('static', 'slide_no', ''),
             $mform->createElement(
                 'select',
@@ -926,18 +934,21 @@ class notice_form extends \core\form\persistent {
             ),
             $mform->createElement('text', 'slide_caption', get_string('notice:slide:caption', 'local_awareness'), ['size' => 60]),
             $mform->createElement('hidden', 'slide_id', 0),
-            $mform->createElement('submit', 'slide_delete', get_string('notice:slide:delete', 'local_awareness'), [], false),
         ];
         $hide = ['hideif' => ['template', 'neq', 'carousel']];
         $options = [
-            'slide_no' => ['default' => get_string('notice:slide:number', 'local_awareness', '{no}')] + $hide,
+            'slide_no' => $hide,
             'slide_media' => ['type' => PARAM_ALPHA, 'default' => slide::MEDIA_IMAGE] + $hide,
             'slide_image' => $hide,
             'slide_videourl' => ['type' => PARAM_URL] + $hide,
             'slide_caption' => ['type' => PARAM_TEXT] + $hide,
             'slide_id' => ['type' => PARAM_INT],
-            'slide_delete' => $hide,
         ];
+        /*
+         * The delete name is still handed to core although no element carries it: that is what
+         * keeps a removed row removed. Core reads the press by name, adds a hidden marker for the
+         * row and skips it on every render after, so a deleted row has no elements at all.
+         */
         $this->repeat_elements(
             $elements,
             $repeats,
@@ -949,6 +960,23 @@ class notice_form extends \core\form\persistent {
             true,
             'slide_delete'
         );
+
+        /*
+         * The rows on screen, in the order they are shown. Asked of the form rather than worked
+         * out again from the request, so this cannot disagree with what core has just rendered.
+         */
+        $shown = [];
+        for ($i = 0; $i < $repeats; $i++) {
+            if ($mform->elementExists("slide_no[{$i}]")) {
+                $shown[] = $i;
+            }
+        }
+        $moved = $this->move_slide($mform, $shown);
+        foreach ($shown as $position => $i) {
+            $mform->registerNoSubmitButton("slide_moveup[{$i}]");
+            $mform->registerNoSubmitButton("slide_movedown[{$i}]");
+            $mform->setDefault("slide_no[{$i}]", $this->slide_head($i, $position + 1, count($shown), $moved[$i] ?? null));
+        }
 
         /*
          * A slide carries an image or a link, never both. The pair used to sit open together and
@@ -963,6 +991,123 @@ class notice_form extends \core\form\persistent {
     }
 
     /**
+     * Honour a Move up or Move down press: the two rows exchange values, so the form re-renders in
+     * the new order and the save that follows stores it.
+     *
+     * The buttons are no-submit, like core's repeat deletion, so a press saves nothing. The values
+     * are exchanged through constants, which win over the submitted ones when the form renders;
+     * the rows keep their indexes, and process_slides() takes the order from the indexes, so the
+     * next save writes exactly what is on screen — no order column has to travel with the form.
+     * A press at an end of the strip changes nothing.
+     *
+     * @param \MoodleQuickForm $mform The form.
+     * @param array $shown The row indexes on screen, in the order they are shown.
+     * @return array The row index now holding the moved slide => 'up' or 'down'; empty when nothing moved.
+     */
+    private function move_slide(\MoodleQuickForm $mform, array $shown): array {
+        foreach ($shown as $position => $i) {
+            foreach (['up' => -1, 'down' => 1] as $direction => $step) {
+                if ($this->optional_param("slide_move{$direction}[{$i}]", '', PARAM_RAW) === '') {
+                    continue;
+                }
+                if (!isset($shown[$position + $step])) {
+                    return [];
+                }
+                $to = $shown[$position + $step];
+                $this->swap_slide_rows($mform, $i, $to);
+
+                return [$to => $direction];
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Exchange the values of two slide rows, so each renders with the other's slide.
+     *
+     * Everything a row carries moves with it, the hidden id included: a stored slide keeps its id,
+     * and with it the image filed under that id. The draft id moves too — the picker it renders in
+     * changes, the draft area does not. Each value is cleaned as its element's type cleans a
+     * submission, so a moved value is the one the row would have shown anyway.
+     *
+     * @param \MoodleQuickForm $mform The form.
+     * @param int $a One row index.
+     * @param int $b The other.
+     * @return void
+     */
+    private function swap_slide_rows(\MoodleQuickForm $mform, int $a, int $b): void {
+        $fields = [
+            'slide_media' => [PARAM_ALPHA, slide::MEDIA_IMAGE],
+            'slide_image' => [PARAM_INT, 0],
+            'slide_videourl' => [PARAM_URL, ''],
+            'slide_caption' => [PARAM_TEXT, ''],
+            'slide_id' => [PARAM_INT, 0],
+        ];
+        foreach ($fields as $field => [$type, $default]) {
+            $ofa = $this->optional_param("{$field}[{$a}]", $default, $type);
+            $ofb = $this->optional_param("{$field}[{$b}]", $default, $type);
+            $mform->setConstant("{$field}[{$a}]", $ofb);
+            $mform->setConstant("{$field}[{$b}]", $ofa);
+        }
+    }
+
+    /**
+     * The heading row of a slide: its place on screen, and the actions that rearrange the strip.
+     *
+     * The number is the slide's place, not its row index, so the strip reads 1, 2, 3 after a
+     * deletion left a gap in the indexes. The first slide cannot move up and the last cannot move
+     * down; those buttons are disabled rather than dropped, so every row keeps its shape. A slide
+     * that has just moved hands the focus to the same action in its new place — or to the other
+     * direction, when it reached an end — because the press re-renders the page, and a keyboard
+     * user moving a slide twice would otherwise start from the top after every press.
+     *
+     * @param int $i The row index.
+     * @param int $position The slide's place on screen, from 1.
+     * @param int $count How many slides are on screen.
+     * @param string|null $moved 'up' or 'down' when the slide was just moved that way; null otherwise.
+     * @return string HTML.
+     */
+    private function slide_head(int $i, int $position, int $count, ?string $moved): string {
+        global $OUTPUT;
+
+        $first = $position === 1;
+        $last = $position === $count;
+        $focusup = ($moved === 'up' && !$first) || ($moved === 'down' && $last && !$first);
+        $focusdown = ($moved === 'down' && !$last) || ($moved === 'up' && $first && !$last);
+
+        return $OUTPUT->render_from_template('local_awareness/editor/slide_head', [
+            'heading' => get_string('notice:slide:number', 'local_awareness', $position),
+            'actions' => [
+                [
+                    'name' => "slide_moveup[{$i}]",
+                    'label' => get_string('notice:slide:moveup', 'local_awareness'),
+                    'arialabel' => get_string('notice:slide:moveup:name', 'local_awareness', $position),
+                    'disabled' => $first,
+                    'focus' => $focusup,
+                    'destructive' => false,
+                ],
+                [
+                    'name' => "slide_movedown[{$i}]",
+                    'label' => get_string('notice:slide:movedown', 'local_awareness'),
+                    'arialabel' => get_string('notice:slide:movedown:name', 'local_awareness', $position),
+                    'disabled' => $last,
+                    'focus' => $focusdown,
+                    'destructive' => false,
+                ],
+                [
+                    'name' => "slide_delete[{$i}]",
+                    'label' => get_string('notice:slide:delete', 'local_awareness'),
+                    'arialabel' => get_string('notice:slide:delete:name', 'local_awareness', $position),
+                    'disabled' => false,
+                    'focus' => false,
+                    'destructive' => true,
+                ],
+            ],
+        ]);
+    }
+
+    /**
      * The slides the notice being edited already has, in order; none for a new notice.
      *
      * @return slide[]
@@ -971,6 +1116,41 @@ class notice_form extends \core\form\persistent {
         $noticeid = (int) $this->get_persistent()->get('id');
 
         return $noticeid > 0 ? slide::for_notice($noticeid) : [];
+    }
+
+    /**
+     * The stored slide behind each row of the form, keyed by row index.
+     *
+     * On a fresh edit that is the stored order. Once the form has been submitted the rows may have
+     * moved — a press on Move exchanges two rows, and the browser posts them back where they now
+     * are — so the pairing is read from the ids the rows carry: the id at row i names the slide
+     * row i holds, and a row whose id names no slide of this notice (a new row, or a removed one
+     * that posted nothing) has no stored slide behind it. Pairing by stored index instead put a
+     * row's draft area beside the slide stored at that index, which after a move is another slide;
+     * a submitted value outranks a default, so the pairing was discarded, but nothing should rely
+     * on being discarded.
+     *
+     * @return slide[] Keyed by row index.
+     */
+    private function slides_by_row(): array {
+        $existing = $this->existing_slides();
+        $ids = optional_param_array('slide_id', [], PARAM_INT);
+        if ($ids === []) {
+            return $existing;
+        }
+
+        $byid = [];
+        foreach ($existing as $slide) {
+            $byid[(int) $slide->get('id')] = $slide;
+        }
+        $rows = [];
+        foreach ($ids as $i => $id) {
+            if (isset($byid[(int) $id])) {
+                $rows[(int) $i] = $byid[(int) $id];
+            }
+        }
+
+        return $rows;
     }
 
     /**
@@ -1312,7 +1492,7 @@ class notice_form extends \core\form\persistent {
         $data->slide_caption = [];
         $data->slide_id = [];
         $data->slide_media = [];
-        foreach ($this->existing_slides() as $i => $slide) {
+        foreach ($this->slides_by_row() as $i => $slide) {
             $draftid = (int) ($submitted[$i] ?? 0);
             file_prepare_draft_area(
                 $draftid,

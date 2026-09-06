@@ -6,6 +6,45 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### A slide can be moved, and the strip is numbered by place (version 2026090411)
+
+**The only way to change a carousel's order was to delete a slide and add it again**, uploading
+its image a second time. Each slide's heading now carries Move up and Move down beside Remove, and
+the order on screen is the order the reader gets.
+
+**No order column, and no script.** The order was always the row order — the save path numbers the
+slides from the rows it receives — so what was missing was a way to change the rows. The two buttons
+are no-submit, the mechanism core's own repeat deletion uses: a press re-renders the form with the
+two rows' values exchanged, through constants, and saves nothing until the author does. Everything a
+row carries moves with it, the hidden id included, so a stored slide keeps its id and the image filed
+under it. A press at an end of the strip changes nothing, and those two buttons are disabled to say
+so.
+
+**The heading is the slide's place, not its row index.** Core numbers a repeated row by index, so a
+strip that had lost its second slide read 1, 3; it now reads 1, 2, and so do the buttons' accessible
+names. A moved slide hands the focus to the same action in its new place, because the press reloads
+the page and a keyboard user moving a slide twice would otherwise start from the top each time.
+
+Everything that reads the rows — validation by index, the preview reading them in document order,
+the reconciliation on save — is untouched: it sees rows in the order shown, which is the whole point.
+
+**The defaults pair each row with the slide it carries.** `get_default_data()` used to pair a row's
+draft area with the slide stored at that index, which after a move is another slide; a submitted
+value outranks a default, so the pairing was discarded rather than saved, but nothing should rely on
+being discarded. The pairing is now read from the ids the rows post, and a test pins it.
+
+**Enter no longer removes the first slide.** The form's default button — the first submit in the
+document — used to be the first row's Remove, so the Enter key in a text field deleted a slide,
+visible or hidden, and re-rendered. It is now the first row's Move up, which is disabled, and a form
+whose default button is disabled submits nothing implicitly. That is quieter, not right: Enter-to-save
+needs a submit before the slide rows, and is left as a decision.
+
+**Also: the rail's brand-coloured heading segment now paints.** It never had, since it was drawn:
+the rail rule excluded the Add button with `:not([id])`, which counts as a sixth step of specificity,
+and the heading's five-step rule lost to it on every row. The exclusion is now a reset rule of its
+own, after the heading's, and the measurement that found it — the heading row's `border-left-color`
+computed to the line colour — is the check to repeat on any change to those three rules.
+
 ### A slide says what it shows, and a slide is visibly one thing (version 2026090410)
 
 **Both media fields sat open at once**, although a slide can only carry one, and the author found

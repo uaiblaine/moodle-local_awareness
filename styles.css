@@ -1103,11 +1103,13 @@
  *
  * What is left is a rail, which survives the gap and still says where a slide begins and ends.
  */
-.local-awareness-editor .mform .fcontainer > .fitem[id^="fitem_id_slide_"]:not([id="fitem_id_slide_add"]) {
+.local-awareness-editor .mform .fcontainer > .fitem[id^="fitem_id_slide_"] {
     /*
      * Four classes and an attribute, deliberately: the two-up rule on .fcontainer > .fitem is
      * itself four classes, and at a tie the rail lost — it drew around half-width cells instead of
-     * around a slide's fields. The Add button is excluded by id; it belongs to no slide.
+     * around a slide's fields. The Add button, which belongs to no slide, is undone by the rule
+     * after the heading's rather than excluded here with :not(): the exclusion counted as a sixth
+     * step of specificity, and the heading's brand colour below, at five, never applied.
      */
     flex: 1 1 100%;
     border-left: 3px solid var(--la-line);
@@ -1120,7 +1122,29 @@
     padding-top: 1rem;
 }
 
+.local-awareness-editor .mform .fcontainer > .fitem[id="fitem_id_slide_add"] {
+    border-left: 0;
+    padding-left: 0;
+}
+
+/*
+ * The heading row holds the place and the three actions, number left and buttons right. The
+ * static's own box is a flex item of core's element cell, so it is told to take the whole cell
+ * first; the heading inside it is then free to push its actions to the far end.
+ */
 .local-awareness-editor .mform [id^="fitem_id_slide_no_"] .form-control-static {
+    flex: 1 1 100%;
+}
+
+.local-awareness-editor .mform .la-slide-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.local-awareness-editor .mform .la-slide-head-number {
+    margin-right: auto;
     font-weight: 600;
     font-size: 0.8rem;
     letter-spacing: 0.06em;
@@ -1128,8 +1152,17 @@
     color: var(--la-brand);
 }
 
-/* Delete is the slide's least-wanted action, so it does not look like its main one. */
-.local-awareness-editor .mform [id^="fitem_id_slide_delete_"] input[type="submit"] {
+.local-awareness-editor .mform .la-slide-head-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+/*
+ * Rearranging is the slide's least-wanted action, so none of the three looks like its main one.
+ * Remove alone turns red on hover; a disabled one is the end of the strip and says so by fading.
+ */
+.local-awareness-editor .mform .la-slide-action {
     background: transparent;
     border: 1px solid var(--la-line);
     color: var(--la-ink-muted);
@@ -1138,9 +1171,19 @@
     padding: 0.2rem 0.6rem;
 }
 
-.local-awareness-editor .mform [id^="fitem_id_slide_delete_"] input[type="submit"]:hover {
+.local-awareness-editor .mform .la-slide-action:hover:not([disabled]) {
+    border-color: var(--la-brand);
+    color: var(--la-brand);
+}
+
+.local-awareness-editor .mform .la-slide-action--remove:hover:not([disabled]) {
     border-color: var(--la-danger);
     color: var(--la-danger);
+}
+
+.local-awareness-editor .mform .la-slide-action[disabled] {
+    opacity: 0.45;
+    cursor: default;
 }
 
 /* Buttons */
