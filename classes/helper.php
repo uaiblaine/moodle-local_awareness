@@ -348,6 +348,21 @@ class helper {
             $rows->$field = isset($data->$field) ? (array) $data->$field : [];
         }
 
+        /*
+         * A slide shows one medium, and the form asks which. hideIf hides the other control
+         * without stopping its value, so the field the author did not choose is cleared here
+         * rather than saved behind their back — a link typed and then switched away from would
+         * otherwise reach the row and win, because a slide with a link is a video slide.
+         */
+        $media = isset($data->slide_media) ? (array) $data->slide_media : [];
+        foreach ($media as $i => $shows) {
+            if ($shows === slide::MEDIA_VIDEO) {
+                $rows->slide_image[$i] = 0;
+            } else {
+                $rows->slide_videourl[$i] = '';
+            }
+        }
+
         return $rows;
     }
 

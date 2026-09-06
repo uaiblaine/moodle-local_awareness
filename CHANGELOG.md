@@ -6,6 +6,30 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### A slide says what it shows, and a slide is visibly one thing (version 2026090410)
+
+**Both media fields sat open at once**, although a slide can only carry one, and the author found
+out which one counted by saving. Each slide now says what it shows — an image or a video — and only
+that control is offered. The choice is honoured on both paths: validation stops reading the
+abandoned field, and the save clears it rather than storing a link the author switched away from,
+which would have won, because a slide with a link is a video slide.
+
+The old refusal stands for any payload carrying no choice at all. Assuming one there would silently
+drop what was sent, which is worse than refusing it; what the picker changes is that an author can
+no longer reach that refusal.
+
+**And a slide is marked as one thing** — a rail down its rows and a heading on the first, where a
+dashed line used to be the only sign of where one ended.
+
+**Not a single card, and the reason is worth recording.** Two routes to one were tried and measured.
+Wrapping a slide's fields in a `group` makes it one row: `hideIf` and `setType` do reach a group's
+children, the delete button stays a no-submit server side, and the client hints core gives it can be
+restored by hand — but core renders a group's children **without their labels**, and two controls
+arrived on screen with none. This editor has shipped reachable unlabelled fields once already.
+Drawing one box across the rows instead fails on core's `.mb-3`, 16px of margin declared
+`!important`, which a plugin forbidden `!important` cannot close up. Both findings are in the
+stylesheet beside the rule they explain.
+
 ### The audience estimate sits with the rules it estimates (version 2026090409)
 
 **The number describing the audience was rendered after the whole form.** An author narrowing a
