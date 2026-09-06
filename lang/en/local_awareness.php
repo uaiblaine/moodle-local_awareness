@@ -211,11 +211,13 @@ $string['notice:audience:value'] = '~ {$a} users';
 $string['notice:behaviour'] = 'Behaviour';
 $string['notice:behaviour:none'] = 'No special behaviour';
 $string['notice:behaviour:repeat'] = 'Repeats every {$a}';
-$string['notice:bgimage'] = 'Background image';
-$string['notice:bgimage_help'] = 'Upload an image for the dialogue. What it becomes depends on the layout: the Classic, Full screen and Card layouts show it as a faint background behind the whole dialogue, the Hero image layout shows it as a band across the top with the title over it. The Video and Carousel layouts fill that band themselves and do not use it.';
+$string['notice:bgimage'] = 'Image';
+$string['notice:bgimage:required'] = 'The Image layout needs an image.';
+$string['notice:bgimage_help'] = 'Upload an image for the dialogue. What it becomes depends on the layout: the Classic, Minimal, Full screen and Card layouts show it as a faint background behind the whole dialogue, the Hero image layout as a band across the top with the title over it, the Split layout as a panel beside the text, and the Image layout shows the image alone and needs one. The Banner, Video and Carousel layouts do not use it.';
 $string['notice:cohort'] = 'Cohort';
 $string['notice:cohort:all'] = 'All users';
 $string['notice:content'] = 'Content';
+$string['notice:content_help'] = 'What the dialogue says. Optional for the Image layout, which shows the image alone: there, what you write is read to screen-reader users as the image\'s description and shown to nobody else.';
 $string['notice:create'] = 'Create new notice';
 $string['notice:delete'] = 'Delete notice';
 $string['notice:disable'] = 'Disable notice';
@@ -230,6 +232,7 @@ $string['notice:insistence:acknowledge'] = 'Must acknowledge';
 $string['notice:insistence:blocking'] = 'Blocking';
 $string['notice:insistence:informational'] = 'Informational';
 $string['notice:insistence:notforlayout'] = 'The {$a} layout has no room for the acknowledgement box. Choose another layout, or a lower insistence.';
+$string['notice:insistence:onlyinformational'] = 'The {$a} layout shows a close button and nothing else, so it can only be Informational.';
 $string['notice:insistence_help'] = 'How hard the notice is to get past, and what the reader may do instead of accepting it.
 
 Informational: the reader can dismiss it, including by clicking outside it, and the dismissal is
@@ -258,6 +261,7 @@ $string['notice:position:bottomstart'] = 'Bottom start';
 $string['notice:position:center'] = 'Centre';
 $string['notice:position:covered'] = 'Full screen covers the window, so it has no position.';
 $string['notice:position:notforlayout'] = 'The {$a} layout cannot sit in a corner. Choose the centre, the top or the bottom.';
+$string['notice:position:onlyedges'] = 'The {$a} layout is a strip against the top or the bottom edge. Choose one of the two.';
 $string['notice:position:top'] = 'Top';
 $string['notice:position:topend'] = 'Top end';
 $string['notice:position:topstart'] = 'Top start';
@@ -294,6 +298,8 @@ $string['notice:status'] = 'Status';
 $string['notice:status:draft'] = 'Draft';
 $string['notice:status:live'] = 'Active';
 $string['notice:template'] = 'Layout';
+$string['notice:template:banner'] = 'Banner';
+$string['notice:template:banner:desc'] = 'A one-line strip against the top or the bottom edge, with a close. Informational only.';
 $string['notice:template:card'] = 'Card';
 $string['notice:template:card:desc'] = 'Compact, usually in a corner. It has no room for the acknowledgement box.';
 $string['notice:template:carousel'] = 'Carousel';
@@ -304,6 +310,12 @@ $string['notice:template:fullscreen'] = 'Full screen';
 $string['notice:template:fullscreen:desc'] = 'Covers the whole window, for a long text such as a policy. It has no position.';
 $string['notice:template:hero'] = 'Hero image';
 $string['notice:template:hero:desc'] = 'The uploaded image as a band across the top, with the title over it.';
+$string['notice:template:image'] = 'Image';
+$string['notice:template:image:desc'] = 'The uploaded image alone, with a close button floating at its corner. Informational only.';
+$string['notice:template:minimal'] = 'Minimal';
+$string['notice:template:minimal:desc'] = 'A narrow box with no chrome: the title, the text and the buttons. No acknowledgement box.';
+$string['notice:template:split'] = 'Split';
+$string['notice:template:split:desc'] = 'The uploaded image as a panel beside the text.';
 $string['notice:template:video'] = 'Video';
 $string['notice:template:video:desc'] = 'A player built from the video link, in place of the image band.';
 $string['notice:template_help'] = 'The shape of the dialogue the reader sees. Every layout is a real dialogue: it dims the page behind it, keeps the keyboard inside it and is announced as a dialogue by a screen reader, whatever its size.
@@ -312,9 +324,17 @@ Classic: a header, the content and a footer. What every notice was before layout
 
 Hero image: the uploaded image as a band across the top, with the title over it.
 
+Split: the uploaded image as a panel beside the text; without an image the panel takes the site\'s colour.
+
+Minimal: a narrow box with no chrome, for a short message. It has no room for the acknowledgement box, so it cannot be Must acknowledge.
+
 Full screen: covers the whole window, for long texts such as a policy the reader must scroll through. It has no position.
 
 Card: a compact box, usually in a corner, for a short message with one action. It has no room for the acknowledgement box, so it cannot be Must acknowledge.
+
+Banner: a one-line strip against the top or the bottom edge, with the title, the first line of the text and a close. Informational only.
+
+Image: the uploaded image alone, with a close button floating at its corner. The title names it for screen readers and the text, if any, describes it; neither is shown. Informational only.
 
 Video: a player built from the video link in place of the image band. The site\'s multimedia filter decides what plays.
 

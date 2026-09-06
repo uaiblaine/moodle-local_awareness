@@ -72,7 +72,9 @@ final class layout_form_test extends \advanced_testcase {
         $method->setAccessible(true);
         $errors = [];
 
-        return $method->invokeArgs($form, [(object) ($data + ['title' => 'Policy update']), [], &$errors]);
+        $defaults = ['title' => 'Policy update', 'content' => ['text' => '<p>Read it.</p>', 'format' => FORMAT_HTML]];
+
+        return $method->invokeArgs($form, [(object) ($data + $defaults), [], &$errors]);
     }
 
     /**
@@ -160,7 +162,111 @@ final class layout_form_test extends \advanced_testcase {
                 ],
                 'templategroup',
             ],
+            'minimal cannot demand an acknowledgement' => [
+                ['template' => 'minimal', 'insistence' => awareness::INSISTENCE_ACKNOWLEDGE, 'position' => 'center'],
+                'insistence',
+            ],
+            'a banner cannot block' => [
+                ['template' => 'banner', 'insistence' => awareness::INSISTENCE_BLOCKING, 'position' => 'top'],
+                'insistence',
+            ],
+            'an image cannot block' => [
+                ['template' => 'image', 'insistence' => awareness::INSISTENCE_BLOCKING, 'position' => 'center', 'bgimage' => 0],
+                'insistence',
+            ],
+            'a banner cannot sit in the centre' => [
+                ['template' => 'banner', 'insistence' => 0, 'position' => 'center'],
+                'positiongroup',
+            ],
+            'an image needs an image' => [
+                ['template' => 'image', 'insistence' => 0, 'position' => 'center', 'bgimage' => 0],
+                'bgimage',
+            ],
+            'the text is required by every layout but the image' => [
+                [
+                    'template' => 'classic', 'insistence' => 0, 'position' => 'center',
+                    'content' => ['text' => '', 'format' => FORMAT_HTML],
+                ],
+                'content',
+            ],
         ];
+    }
+
+    /**
+     * The layouts that show a close and nothing else say so, and the one with no room for the box says that.
+     *
+     * Two messages, because the two refusals have different remedies: one asks for another layout
+     * or a lower level, the other says only Informational will do.
+     */
+    public function test_each_insistence_refusal_names_its_reason(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $errors = $this->validate($this->form(), [
+            'template' => 'image', 'insistence' => awareness::INSISTENCE_BLOCKING, 'bgimage' => 0,
+        ]);
+        $this->assertStringContainsString('only be Informational', $errors['insistence']);
+
+        $errors = $this->validate($this->form(), ['template' => 'card', 'insistence' => awareness::INSISTENCE_ACKNOWLEDGE]);
+        $this->assertStringContainsString('no room for the acknowledgement box', $errors['insistence']);
+
+        $errors = $this->validate($this->form(), ['template' => 'banner', 'insistence' => 0, 'position' => 'top-end']);
+        $this->assertStringContainsString('top or the bottom edge', $errors['positiongroup']);
+    }
+
+    /**
+     * The text carries its required marker for the layouts that need one, and not for the image.
+     *
+     * The marker comes from a rule the form adds once the layout is known, so it is asked of the
+     * rendered form: a fresh one is classic and marks the text; one submitted as the image layout
+     * does not, or the author would be told a field is mandatory that the save then accepts empty.
+     */
+    public function test_the_text_is_marked_required_for_every_layout_but_the_image(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $PAGE->set_url('/local/awareness/editnotice.php');
+        $property = new \ReflectionProperty(\moodleform::class, '_form');
+        $property->setAccessible(true);
+
+        $fresh = $this->form();
+        $fresh->render();
+        $this->assertTrue($property->getValue($fresh)->isElementRequired('content'), 'a classic notice does not mark its text');
+
+        notice_form::mock_submit(['template' => 'image', 'title' => 'Poster']);
+        $image = $this->form();
+        $image->render();
+        $this->assertFalse(
+            $property->getValue($image)->isElementRequired('content'),
+            'the image layout marks a text it does not need'
+        );
+        $_POST = [];
+    }
+
+    /**
+     * An image layout with an uploaded image and no text passes; the same with no image is refused.
+     *
+     * The picture is read from the draft area the picker posts, so the control is a draft area
+     * with nothing in it: a check that merely tested the draft id would let it through.
+     */
+    public function test_the_image_layout_needs_a_picture_and_no_text(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $form = $this->form();
+        $empty = ['text' => '', 'format' => FORMAT_HTML];
+
+        $this->assertSame([], $this->validate($form, [
+            'template' => 'image', 'insistence' => 0, 'position' => 'top',
+            'bgimage' => $this->draft_with_image(), 'content' => $empty,
+        ]));
+
+        $errors = $this->validate($form, [
+            'template' => 'image', 'insistence' => 0, 'position' => 'top',
+            'bgimage' => file_get_unused_draft_itemid(), 'content' => $empty,
+        ]);
+        $this->assertArrayHasKey('bgimage', $errors, 'an empty draft area passed as a picture');
+        $this->assertArrayNotHasKey('content', $errors, 'the image layout demanded a text');
     }
 
     /**
@@ -180,6 +286,15 @@ final class layout_form_test extends \advanced_testcase {
         ]));
         $this->assertSame([], $this->validate($form, [
             'template' => 'video', 'insistence' => 0, 'position' => 'top', 'videourl' => 'https://youtu.be/3b1aH9K0xQ4',
+        ]));
+        $this->assertSame([], $this->validate($form, [
+            'template' => 'banner', 'insistence' => 0, 'position' => 'bottom',
+        ]));
+        $this->assertSame([], $this->validate($form, [
+            'template' => 'minimal', 'insistence' => awareness::INSISTENCE_BLOCKING, 'position' => 'top',
+        ]));
+        $this->assertSame([], $this->validate($form, [
+            'template' => 'split', 'insistence' => awareness::INSISTENCE_ACKNOWLEDGE, 'position' => 'center',
         ]));
         $this->assertSame([], $this->validate($form, [
             'template' => 'carousel', 'insistence' => 0, 'position' => 'center',

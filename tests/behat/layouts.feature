@@ -43,6 +43,33 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     And ".awareness.la-tpl-video .video-js.vjs-paused" "css_element" should exist
 
   @javascript
+  Scenario: An image notice is the picture alone, and its close is what records the visit
+    Given the following site notices exist
+      | title  | content | template | bgimage    |
+      | Poster |         | image    | poster.png |
+    When I log in as "bilbo"
+    And I am on site homepage
+    # The picture, named by the title; no footer, so the header's close is the only exit.
+    Then "//img[contains(@class, 'la-image')][@alt='Poster']" "xpath_element" should exist
+    And ".awareness.la-tpl-image" "css_element" should exist
+    And "awareness-closebtn-footer" "button" should not be visible
+    When I click on "awareness-closebtn" "button"
+    Then I should see "You are logged in as Bilbo Baggins"
+    And I reload the page
+    And ".awareness.la-tpl-image" "css_element" should not exist
+
+  @javascript
+  Scenario: A banner is a strip against the edge it was given
+    Given the following site notices exist
+      | title  | content            | template | position |
+      | Strike | the library closes | banner   | bottom   |
+    When I log in as "bilbo"
+    And I am on site homepage
+    Then I should see "the library closes"
+    And ".awareness.la-tpl-banner.la-pos-bottom" "css_element" should exist
+    And ".awareness.modal-lg" "css_element" should not exist
+
+  @javascript
   Scenario: A carousel turns its slides one at a time
     Given the following site notices exist
       | title | content           | template |

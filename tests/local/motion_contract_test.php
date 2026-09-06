@@ -183,6 +183,82 @@ final class motion_contract_test extends \basic_testcase {
     }
 
     /**
+     * No rule sets, on an element of the dialogue template, a property one of that element's own
+     * utility classes already sets with !important.
+     *
+     * Bootstrap generates its utilities with !important on both branches, so such a declaration is
+     * dead whatever its specificity - and three had shipped before this test: a banner's and a
+     * fullscreen dialogue's border-radius against `rounded` (since dropped from the template), a
+     * card body's padding-top against `py-3`. The element-to-utility map is read from the template,
+     * so a utility added there is covered without touching this test.
+     */
+    public function test_no_rule_fights_a_utility_the_template_wears(): void {
+        $owners = [
+            'rounded' => ['border-radius'],
+            'border-0' => [
+                'border', 'border-top', 'border-right', 'border-bottom', 'border-left', 'border-width', 'border-style',
+            ],
+            'shadow-lg' => ['box-shadow'],
+            'd-flex' => ['display'],
+            'd-none' => ['display'],
+            'px-4' => [
+                'padding', 'padding-left', 'padding-right', 'padding-inline', 'padding-inline-start', 'padding-inline-end',
+            ],
+            'py-3' => ['padding', 'padding-top', 'padding-bottom', 'padding-block'],
+            'pb-4' => ['padding', 'padding-bottom', 'padding-block'],
+            'ms-2' => ['margin', 'margin-left', 'margin-inline-start'],
+            'ms-auto' => ['margin', 'margin-left', 'margin-inline-start'],
+            'justify-content-between' => ['justify-content'],
+            'align-items-center' => ['align-items'],
+        ];
+        $subjects = [
+            'modal-dialog', 'modal-content', 'modal-header', 'modal-title', 'btn-close', 'modal-body', 'modal-footer', 'form-check',
+        ];
+
+        // What each addressed element wears, read from the template.
+        preg_match_all('/<(?:div|button|h5|input)\b[^>]*\bclass="([^"]+)"/', $this->read('templates/modal_notice.mustache'), $tags);
+        $wears = [];
+        foreach ($tags[1] as $classes) {
+            $list = preg_split('/\s+/', trim(preg_replace('/\{\{.*?\}\}/', '', $classes)));
+            foreach ($subjects as $subject) {
+                if (in_array($subject, $list, true)) {
+                    $wears[$subject] = array_values(array_intersect($list, array_keys($owners)));
+                }
+            }
+        }
+        $this->assertContains('d-flex', $wears['modal-footer'] ?? [], 'the footer no longer wears d-flex; the map read nothing');
+        $unknown = array_diff(array_merge(...array_values($wears)), array_keys($owners));
+        $this->assertSame([], array_values($unknown), 'a utility on the template has no owner map entry');
+
+        $checked = 0;
+        $dead = [];
+        foreach ($this->rules($this->css()) as $group => $declarations) {
+            foreach (explode(',', $group) as $selector) {
+                $compounds = preg_split('/[\s>+~]+/', trim($selector));
+                $last = end($compounds);
+                if ($last === false || str_contains($last, '::')) {
+                    continue;
+                }
+                foreach ($wears as $subject => $utilities) {
+                    if (!preg_match('/\.' . preg_quote($subject, '/') . '(?![\w-])/', $last)) {
+                        continue;
+                    }
+                    $checked++;
+                    foreach ($utilities as $utility) {
+                        foreach ($owners[$utility] as $property) {
+                            if (preg_match('/(^|[;\s])' . preg_quote($property, '/') . '\s*:/', $declarations)) {
+                                $dead[] = "{$selector} sets {$property}, which {$utility} owns with !important";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        $this->assertGreaterThan(10, $checked, 'the scan reached almost no rule on the template\'s elements');
+        $this->assertSame([], $dead, "dead declarations:\n" . implode("\n", $dead));
+    }
+
+    /**
      * The JavaScript's own copies of the vocabulary agree with the persistent.
      *
      * notice_form.js cannot reach PHP, so it carries the corners and the corner layout by hand;
@@ -208,13 +284,52 @@ final class motion_contract_test extends \basic_testcase {
                 "modal_notice.js sizes a layout the persistent does not know: {$template}"
             );
         }
-        $this->assertNotContains('card', $values[1], 'a card sizes itself');
         $this->assertNotContains('fullscreen', $values[1], 'a fullscreen dialogue sizes itself');
+        // Sized is exactly what is neither compact nor the screen itself.
+        $this->assertEqualsCanonicalizing(
+            array_values(array_diff(awareness::TEMPLATES, awareness::COMPACT, ['fullscreen'])),
+            $values[1],
+            'the SIZED list does not partition the vocabulary with COMPACT and fullscreen'
+        );
 
         preg_match('/COMPACT: \[([^\]]+)\]/', $modaljs, $compact);
         $this->assertNotEmpty($compact, 'modal_notice.js no longer declares the COMPACT layouts.');
         preg_match_all("/'([a-z]+)'/", $compact[1], $values);
-        $this->assertSame(['card'], $values[1], 'the card is the one layout narrower than the large dialogue');
+        $this->assertEqualsCanonicalizing(awareness::COMPACT, $values[1], 'the COMPACT layouts differ from awareness::COMPACT');
+
+        preg_match('/BAND: \[([^\]]+)\]/', $modaljs, $band);
+        $this->assertNotEmpty($band, 'modal_notice.js no longer declares the BAND layouts.');
+        preg_match_all("/'([a-z]+)'/", $band[1], $values);
+        $this->assertEqualsCanonicalizing(awareness::BAND, $values[1], 'the BAND layouts differ from awareness::BAND');
+
+        // The strip: notice_form.js greys every position the banner cannot take.
+        $this->assertMatchesRegularExpression("/var STRIP_LAYOUT = 'banner'/", $formjs);
+        preg_match('/var STRIP_POSITIONS = \[([^\]]+)\]/', $formjs, $strip);
+        $this->assertNotEmpty($strip, 'notice_form.js no longer declares STRIP_POSITIONS.');
+        preg_match_all("/'([a-z-]+)'/", $strip[1], $values);
+        $this->assertSame(awareness::positions_for('banner'), $values[1]);
+
+        // The insistence ceilings: the highest level each layout honours, and nothing for the rest.
+        preg_match('/var INSISTENCE_CEILING = \{([^}]+)\}/', $formjs, $ceilings);
+        $this->assertNotEmpty($ceilings, 'notice_form.js no longer declares INSISTENCE_CEILING.');
+        preg_match_all('/([a-z]+): ([0-9])/', $ceilings[1], $pairs, PREG_SET_ORDER);
+        $listed = [];
+        foreach ($pairs as [, $template, $ceiling]) {
+            $listed[$template] = (int) $ceiling;
+        }
+        foreach (awareness::TEMPLATES as $template) {
+            $expected = max(awareness::insistence_levels_for($template));
+            if ($expected === awareness::INSISTENCE_ACKNOWLEDGE) {
+                $this->assertArrayNotHasKey($template, $listed, "{$template} honours every level and must not be capped");
+            } else {
+                $this->assertSame($expected, $listed[$template] ?? null, "{$template}'s ceiling differs from the persistent");
+            }
+        }
+        $this->assertSame(
+            [],
+            array_diff(array_keys($listed), awareness::TEMPLATES),
+            'a ceiling names a layout the persistent lacks'
+        );
     }
 
     /**

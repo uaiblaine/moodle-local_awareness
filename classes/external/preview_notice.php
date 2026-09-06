@@ -128,9 +128,20 @@ class preview_notice extends external_api {
 
         $context = \context_system::instance();
         $template = in_array($params['template'], awareness::TEMPLATES, true) ? $params['template'] : awareness::TEMPLATES[0];
+        /*
+         * A layout that IS its picture has nothing to preview until one is uploaded: the band would
+         * stay hidden and the dialogue collapse to a floating close. It previews as the classic
+         * until then, the way a value outside the vocabulary does; the save refuses it anyway.
+         */
+        $bgimageurl = awareness::uses_bgimage($template) ? self::draft_file_url((int) $params['bgimagedraftid']) : '';
+        if (awareness::requires_bgimage($template) && $bgimageurl === '') {
+            $template = awareness::TEMPLATES[0];
+        }
+        // A position the layout cannot take previews as its first: the centre for most, the top for a strip.
+        // A position the layout cannot take previews as its first: the centre for most, the top for a strip.
         $position = in_array($params['position'], awareness::positions_for($template), true)
             ? $params['position']
-            : awareness::POSITIONS[0];
+            : awareness::positions_for($template)[0];
         $animation = in_array($params['animation'], awareness::ANIMATIONS, true) ? $params['animation'] : awareness::ANIMATIONS[0];
         $level = max(awareness::INSISTENCE_INFORMATIONAL, min(awareness::INSISTENCE_ACKNOWLEDGE, (int) $params['insistence']));
 
@@ -138,10 +149,11 @@ class preview_notice extends external_api {
             'id' => 0,
             'title' => format_string($params['title'], true, ['context' => $context]),
             'content' => format_text($params['content'], FORMAT_HTML, ['noclean' => true, 'context' => $context]),
-            'insistence' => awareness::accepts_acknowledgement($template) ? $level : min($level, awareness::INSISTENCE_BLOCKING),
+            // Clamped to what the layout can honour, so the preview shows the dialogue the save would keep.
+            'insistence' => min($level, max(awareness::insistence_levels_for($template))),
             'modal_width' => $params['modalwidth'],
             'modal_height' => $params['modalheight'],
-            'bgimageurl' => awareness::uses_bgimage($template) ? self::draft_file_url((int) $params['bgimagedraftid']) : '',
+            'bgimageurl' => $bgimageurl,
             'template' => $template,
             'position' => $position,
             'animation' => $animation,

@@ -116,6 +116,15 @@ final class layout_payload_test extends \advanced_testcase {
         $classic = $this->payload();
         $this->assertStringContainsString('bg.png', $classic['bgimageurl']);
         $this->assertSame('', $classic['videohtml'], 'only the video layout renders the link');
+
+        // The image layout is the picture, so it ships the URL; the banner has no room for one.
+        $notice->set('template', 'image');
+        $notice->update();
+        $this->assertStringContainsString('bg.png', $this->payload()['bgimageurl'], 'the image layout withheld its picture');
+        $notice->set('template', 'banner');
+        $notice->set('position', 'top');
+        $notice->update();
+        $this->assertSame('', $this->payload()['bgimageurl'], 'the banner must not paint a background');
     }
 
     /**

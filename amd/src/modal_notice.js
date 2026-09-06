@@ -48,7 +48,8 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
 
         var TEMPLATES = {
             VIDEO: 'local_awareness/notice/video',
-            CAROUSEL: 'local_awareness/notice/carousel'
+            CAROUSEL: 'local_awareness/notice/carousel',
+            IMAGE: 'local_awareness/notice/image'
         };
 
         /**
@@ -64,10 +65,27 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
             FROM: 'la-from-',
             LARGE: 'modal-lg',
             NONE: 'none',
-            // The card is the one layout narrower than core's large dialogue.
-            COMPACT: ['card'],
+            // The layouts narrower than, or shaped unlike, core's large dialogue. Mirrors awareness::COMPACT.
+            COMPACT: ['card', 'minimal', 'banner', 'image'],
             // The layouts whose author-set width and height mean anything.
-            SIZED: ['classic', 'hero', 'video', 'carousel']
+            SIZED: ['classic', 'hero', 'video', 'carousel', 'split'],
+            // The layouts that paint the image in the band rather than as a cover. Mirrors awareness::BAND.
+            BAND: ['hero', 'split', 'image']
+        };
+
+        /**
+         * The text of a string that arrived as HTML.
+         *
+         * The title reaches the client already through format_string(), so its ampersands are
+         * entities; an alt attribute wants the text, which the template then escapes once. Parsed
+         * rather than unescaped by hand, and parsed into a document that runs nothing.
+         *
+         * @param {String} html The escaped string.
+         * @returns {String} Its text.
+         */
+        var textOf = function(html) {
+            var doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+            return doc.body ? doc.body.textContent : '';
         };
 
         /**
@@ -369,6 +387,17 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
             var dialog = this.getModal();
             swapClass(dialog, APPEARANCE.TEMPLATE, template);
             dialog.toggleClass(APPEARANCE.LARGE, APPEARANCE.COMPACT.indexOf(template) === -1);
+            /*
+             * The image layout keeps its text offscreen as the picture's description, and the
+             * dialogue has to say so or a screen reader hears the title twice and the text never.
+             * Every other layout reads its body as content, which describedby would double.
+             */
+            var bodyid = this.getBody().attr('id');
+            if (template === 'image' && bodyid) {
+                this.getRoot().attr('aria-describedby', bodyid);
+            } else {
+                this.getRoot().removeAttr('aria-describedby');
+            }
             this.template = template;
         };
 
@@ -452,11 +481,29 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
             stopMedia(media[0]);
             video.empty();
             carousel.empty();
+            band.empty();
             band.css('background-image', '');
 
-            if (notice.template === 'hero' && notice.bgimageurl) {
+            // The hero and the split paint the image behind the band; the split shows its panel
+            // even without one, in the site's colour, because a panel that comes and goes with
+            // the upload would move the text about.
+            if ((notice.template === 'hero' || notice.template === 'split') && notice.bgimageurl) {
                 band.css('background-image', 'url("' + notice.bgimageurl + '")');
                 shown = true;
+            }
+            if (notice.template === 'split') {
+                shown = true;
+            }
+
+            if (notice.template === 'image' && notice.bgimageurl) {
+                shown = true;
+                pending.push(Templates.render(TEMPLATES.IMAGE, {
+                    url: notice.bgimageurl,
+                    alt: textOf(notice.title)
+                }).then(function(html, js) {
+                    Templates.replaceNodeContents(band, html, js);
+                    return null;
+                }));
             }
 
             if (notice.template === 'video' && notice.videohtml) {
@@ -533,8 +580,8 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
             var sized = APPEARANCE.SIZED.indexOf(template) !== -1;
             this.setTemplate(template);
             this.setPosition(notice.position || 'center');
-            // The hero paints the image as a band in the media region, not as a cover behind everything.
-            this.setBackgroundImage(template === 'hero' ? '' : (notice.bgimageurl || ''));
+            // The band layouts paint the image in the media region, not as a cover behind everything.
+            this.setBackgroundImage(APPEARANCE.BAND.indexOf(template) !== -1 ? '' : (notice.bgimageurl || ''));
             this.setModalSize(sized ? (notice.modal_width || '') : '', sized ? (notice.modal_height || '') : '');
 
             return this.setMedia(notice);

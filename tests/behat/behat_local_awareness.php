@@ -83,7 +83,22 @@ class behat_local_awareness extends behat_base {
             }
             $noticeinfo['outsideclick'] = $noticeinfo['outsideclick'] ?? 1;
 
-            $DB->insert_record('local_awareness', $noticeinfo);
+            // An image column names a placeholder file for the notice's picture, keyed by the notice id.
+            $image = $noticeinfo['bgimage'] ?? '';
+            $noticeinfo['bgimage'] = $image !== '' ? 1 : 0;
+            $noticeid = $DB->insert_record('local_awareness', $noticeinfo);
+            if ($image !== '') {
+                get_file_storage()->create_file_from_string([
+                    'contextid' => \context_system::instance()->id,
+                    'component' => 'local_awareness',
+                    'filearea' => 'bgimage',
+                    'itemid' => $noticeid,
+                    'filepath' => '/',
+                    'filename' => $image,
+                ], base64_decode(
+                    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+                ));
+            }
         }
 
         /*
