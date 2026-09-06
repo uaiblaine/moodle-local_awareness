@@ -60,6 +60,34 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     And I should not see "the new computer lab"
 
   @javascript
+  Scenario: A slide moved up is the first one the reader gets
+    Given the following config values are set as admin:
+      | allow_update | 1 | local_awareness |
+    And the following site notices exist
+      | title | content           | template |
+      | News  | the semester news | carousel |
+    And the following site notice slides exist
+      | notice | sortorder | caption                | image   |
+      | News   | 0         | the new computer lab   | lab.png |
+      | News   | 1         | the library opens late |         |
+    And I log in as "admin"
+    # The notice reaches the administrator too, over the dashboard; it is in the way of the navigation.
+    And I click on "awareness-closebtn-footer" "button"
+    And I navigate to "Awareness > Manage" in site administration
+    And I click on "Edit" "link" in the "News" "table_row"
+    And I expand all fieldsets
+    # The press re-renders the form with the two rows exchanged; nothing is saved yet.
+    When I click on "slide_moveup[1]" "button"
+    Then the field with xpath "//input[@name='slide_caption[0]']" matches value "the library opens late"
+    And the field with xpath "//input[@name='slide_caption[1]']" matches value "the new computer lab"
+    When I press "Save changes"
+    And I log out
+    And I log in as "bilbo"
+    And I am on site homepage
+    Then I should see "the library opens late"
+    And I should not see "the new computer lab"
+
+  @javascript
   Scenario: The editor previews the layout the author picked, in the real dialogue
     Given I log in as "admin"
     And I navigate to "Awareness > Manage" in site administration
@@ -67,6 +95,8 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     And I set the field "Title" to "Scheduled maintenance"
     And I set the field "Content" to "The library closes at six."
     And I expand all fieldsets
+    # The slide rows, their heading's buttons included, belong to the carousel alone.
+    And "slide_moveup[0]" "button" should not be visible
     # The radio itself is clipped off-screen behind its card-shaped label; the label is what a person clicks.
     And I click on "Card" "text"
     And I click on "Preview" "button"
