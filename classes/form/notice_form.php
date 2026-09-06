@@ -60,7 +60,8 @@ class notice_form extends \core\form\persistent {
     /** @var array Fields to remove from the persistent validation. */
     protected static $foreignfields = [
         // The layout picker's group names, and the repeated slide rows: none is a column.
-        'templategroup', 'positiongroup', 'position_note', 'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
+        'templategroup', 'positiongroup', 'position_note', 'slide_media',
+        'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
         'slide_id', 'slide_repeats', 'slide_add', 'slide_delete', 'slide_delete-hidden',
         'insistence', 'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
         'filter_course', 'filter_groups', 'filter_format', 'filter_theme', 'filter_competency_rules',
@@ -821,13 +822,26 @@ class notice_form extends \core\form\persistent {
         $captions = (array) ($data->slide_caption ?? []);
         $links = (array) ($data->slide_videourl ?? []);
         $drafts = (array) ($data->slide_image ?? []);
+        $media = (array) ($data->slide_media ?? []);
 
         $indexes = array_keys($captions + $links + $drafts);
         sort($indexes);
         foreach ($indexes as $i) {
             $caption = trim((string) ($captions[$i] ?? ''));
-            $link = trim((string) ($links[$i] ?? ''));
-            $draftid = (int) ($drafts[$i] ?? 0);
+            /*
+             * The slide shows one medium, and the form asks which. hideIf hides the other control
+             * without stopping its value, so a link typed before switching to Image still arrives —
+             * read as "both" it would refuse a save the author had already corrected on screen. The
+             * choice decides, and the unchosen field is not read.
+             *
+             * Only when the choice is THERE. A payload that carries none is not a form the author
+             * corrected; assuming one would silently drop what they sent, which is worse than the
+             * refusal below. So the old rule still stands for it, and the picker's guarantee is
+             * that an author can no longer reach it.
+             */
+            $shows = $media[$i] ?? null;
+            $link = $shows === slide::MEDIA_IMAGE ? '' : trim((string) ($links[$i] ?? ''));
+            $draftid = $shows === slide::MEDIA_VIDEO ? 0 : (int) ($drafts[$i] ?? 0);
             $hasimage = $draftid > 0 && (int) file_get_draft_area_info($draftid)['filecount'] > 0;
 
             if ($link !== '') {
@@ -863,10 +877,39 @@ class notice_form extends \core\form\persistent {
     private function define_slides(\MoodleQuickForm $mform): void {
         global $CFG;
 
+        /*
+         * The repeat count, worked out the way repeat_elements() itself does — it reads the hidden
+         * counter and adds a batch when the Add button was pressed. Duplicated because the media
+         * gate below needs the indices and the method returns none; it must agree with
+         * lib/formslib.php::repeat_elements(), which is where the two lines come from.
+         */
         $repeats = max(self::SLIDES_MIN, count($this->existing_slides()));
+        $repeats = $this->optional_param('slide_repeats', $repeats, PARAM_INT);
+        if ($this->optional_param('slide_add', '', PARAM_TEXT)) {
+            $repeats += self::SLIDES_MIN;
+        }
 
+        /*
+         * One row per field, and the stylesheet draws a card ACROSS a slide's rows rather than
+         * around one. Wrapping the five in a group was tried and measured first, because a group
+         * is one row and would have made the card trivial: hideIf and setType do reach a group's
+         * children, and the delete button's client-side hints can be put back by hand. What ends
+         * it is that core renders a group's children WITHOUT THEIR LABELS — two of the three
+         * controls arrived on screen with no visible label and no programmatic one. This editor
+         * has shipped unlabelled reachable fields once already; a border is not worth that.
+         */
         $elements = [
-            $mform->createElement('static', 'slide_no', get_string('notice:slide', 'local_awareness')),
+            // No label: the value IS the label — "Slide 1" — and a "Slide" caption above it says it twice.
+            $mform->createElement('static', 'slide_no', ''),
+            $mform->createElement(
+                'select',
+                'slide_media',
+                get_string('notice:slide:media', 'local_awareness'),
+                [
+                    slide::MEDIA_IMAGE => get_string('notice:slide:media:image', 'local_awareness'),
+                    slide::MEDIA_VIDEO => get_string('notice:slide:media:video', 'local_awareness'),
+                ]
+            ),
             $mform->createElement(
                 'filepicker',
                 'slide_image',
@@ -887,7 +930,8 @@ class notice_form extends \core\form\persistent {
         ];
         $hide = ['hideif' => ['template', 'neq', 'carousel']];
         $options = [
-            'slide_no' => ['default' => '{no}'] + $hide,
+            'slide_no' => ['default' => get_string('notice:slide:number', 'local_awareness', '{no}')] + $hide,
+            'slide_media' => ['type' => PARAM_ALPHA, 'default' => slide::MEDIA_IMAGE] + $hide,
             'slide_image' => $hide,
             'slide_videourl' => ['type' => PARAM_URL] + $hide,
             'slide_caption' => ['type' => PARAM_TEXT] + $hide,
@@ -905,6 +949,16 @@ class notice_form extends \core\form\persistent {
             true,
             'slide_delete'
         );
+
+        /*
+         * A slide carries an image or a link, never both. The pair used to sit open together and
+         * the author found out which one counted by saving; the choice now hides the other, and
+         * the save reads only the chosen one — hideIf hides a control without stopping its value.
+         */
+        for ($i = 0; $i < $repeats; $i++) {
+            $mform->hideIf("slide_image[{$i}]", "slide_media[{$i}]", 'eq', slide::MEDIA_VIDEO);
+            $mform->hideIf("slide_videourl[{$i}]", "slide_media[{$i}]", 'eq', slide::MEDIA_IMAGE);
+        }
         $mform->hideIf('slide_add', 'template', 'neq', 'carousel');
     }
 
@@ -1257,6 +1311,7 @@ class notice_form extends \core\form\persistent {
         $data->slide_videourl = [];
         $data->slide_caption = [];
         $data->slide_id = [];
+        $data->slide_media = [];
         foreach ($this->existing_slides() as $i => $slide) {
             $draftid = (int) ($submitted[$i] ?? 0);
             file_prepare_draft_area(
@@ -1271,6 +1326,14 @@ class notice_form extends \core\form\persistent {
             $data->slide_videourl[$i] = (string) $slide->get('videourl');
             $data->slide_caption[$i] = (string) $slide->get('caption');
             $data->slide_id[$i] = (int) $slide->get('id');
+            /*
+             * A stored slide opens on the medium it carries. get_mediatype() answers text for a
+             * slide with neither, and the picker has no such choice — an empty slide is an image
+             * slide waiting for its image, which is what the default already is.
+             */
+            $data->slide_media[$i] = $slide->get_mediatype() === slide::MEDIA_VIDEO
+                ? slide::MEDIA_VIDEO
+                : slide::MEDIA_IMAGE;
         }
 
         // Unpack filter values.

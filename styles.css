@@ -1089,11 +1089,58 @@
     background: transparent;
 }
 
-/* A slide's rows read as one group: the number, then its three fields, then the delete button. */
-.local-awareness-editor .mform [id^="fitem_id_slide_no_"] {
+/*
+ * A slide is five form rows, marked as one by a rail down their left and a heading on the first.
+ *
+ * Not a continuous card, and that is a constraint rather than a choice. Two routes to one were
+ * tried and measured. Wrapping the fields in a GROUP makes a slide a single row — hideIf and
+ * setType do reach a group's children, and the delete button's client hints can be restored by
+ * hand — but core renders a group's children WITHOUT THEIR LABELS, and two controls arrived on
+ * screen unlabelled; this editor has shipped reachable unlabelled fields once already. Drawing one
+ * box across the rows instead fails on core's own `.mb-3`, which is 16px of margin declared
+ * !important, so the rows cannot be closed up and a background breaks into bands. Measured on the
+ * rendered page: margin-bottom 16px, padding-bottom 8px.
+ *
+ * What is left is a rail, which survives the gap and still says where a slide begins and ends.
+ */
+.local-awareness-editor .mform .fcontainer > .fitem[id^="fitem_id_slide_"]:not([id="fitem_id_slide_add"]) {
+    /*
+     * Four classes and an attribute, deliberately: the two-up rule on .fcontainer > .fitem is
+     * itself four classes, and at a tie the rail lost — it drew around half-width cells instead of
+     * around a slide's fields. The Add button is excluded by id; it belongs to no slide.
+     */
+    flex: 1 1 100%;
+    border-left: 3px solid var(--la-line);
+    padding-left: 0.9rem;
+    margin: 0;
+}
+
+.local-awareness-editor .mform .fcontainer > .fitem[id^="fitem_id_slide_no_"] {
+    border-left-color: var(--la-brand);
     padding-top: 1rem;
-    border-top: 1px dashed var(--la-line);
+}
+
+.local-awareness-editor .mform [id^="fitem_id_slide_no_"] .form-control-static {
     font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--la-brand);
+}
+
+/* Delete is the slide's least-wanted action, so it does not look like its main one. */
+.local-awareness-editor .mform [id^="fitem_id_slide_delete_"] input[type="submit"] {
+    background: transparent;
+    border: 1px solid var(--la-line);
+    color: var(--la-ink-muted);
+    border-radius: 0.3rem;
+    font-size: 0.78rem;
+    padding: 0.2rem 0.6rem;
+}
+
+.local-awareness-editor .mform [id^="fitem_id_slide_delete_"] input[type="submit"]:hover {
+    border-color: var(--la-danger);
+    color: var(--la-danger);
 }
 
 /* Buttons */

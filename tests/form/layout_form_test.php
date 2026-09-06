@@ -188,6 +188,41 @@ final class layout_form_test extends \advanced_testcase {
     }
 
     /**
+     * When the slide says what it shows, the other control is not read — on the way in or out.
+     *
+     * hideIf hides a control without stopping its value, so a link typed and then switched away
+     * from still arrives. Two halves are asserted because they are two code paths: validation must
+     * not refuse the save, and the save must not store the abandoned value. The last assertion is
+     * the control that the CHOICE is doing this and not some general leniency — the same payload
+     * without a choice is still refused.
+     */
+    public function test_the_slide_says_what_it_shows_and_the_other_control_is_not_read(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $draftid = $this->draft_with_image();
+
+        $chosen = [
+            'template' => 'carousel', 'insistence' => 0, 'position' => 'center',
+            'slide_media' => [slide::MEDIA_IMAGE, slide::MEDIA_VIDEO],
+            'slide_caption' => ['First', 'Second'],
+            // Each slide carries BOTH: the leftovers of a choice the author changed on screen.
+            'slide_videourl' => ['https://vimeo.com/123456', 'https://vimeo.com/654321'],
+            'slide_image' => [$draftid, $draftid],
+        ];
+        $this->assertSame([], $this->validate($this->form(), $chosen), 'the abandoned control was read');
+
+        $rows = helper::slide_rows((object) $chosen);
+        $this->assertSame('', $rows->slide_videourl[0], 'the image slide kept a link');
+        $this->assertSame(0, $rows->slide_image[1], 'the video slide kept a draft');
+        $this->assertSame($draftid, $rows->slide_image[0], 'the image slide lost its image');
+        $this->assertSame('https://vimeo.com/654321', $rows->slide_videourl[1], 'the video slide lost its link');
+
+        // The control: no choice, and the old refusal still stands.
+        unset($chosen['slide_media']);
+        $this->assertArrayHasKey('slide_videourl[0]', $this->validate($this->form(), $chosen));
+    }
+
+    /**
      * A slide asked to show both an image and a video is refused on its link, with the slide named.
      */
     public function test_a_slide_cannot_show_both_an_image_and_a_video(): void {

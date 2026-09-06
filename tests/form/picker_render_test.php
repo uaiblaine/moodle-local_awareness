@@ -157,6 +157,44 @@ final class picker_render_test extends \advanced_testcase {
     }
 
     /**
+     * Every control of a slide keeps its own row, and therefore its own label.
+     *
+     * The card is drawn ACROSS a slide's rows rather than around one. Wrapping them in a group was
+     * tried first and measured: hideIf and setType do reach a group's children, and the delete
+     * button's client hints can be restored by hand — but core renders a group's children WITHOUT
+     * THEIR LABELS, and two controls arrived on screen with no label at all. This is what would
+     * notice a return to that shape.
+     */
+    public function test_every_control_of_a_slide_keeps_its_own_row_and_label(): void {
+        $this->resetAfterTest();
+        $xpath = $this->render();
+
+        // Every control of a slide keeps its own row, and so its own label.
+        foreach (['slide_no', 'slide_media', 'slide_image', 'slide_videourl', 'slide_caption'] as $field) {
+            $this->assertSame(
+                notice_form::SLIDES_MIN,
+                $xpath->query('//*[starts-with(@id, "fitem_id_' . $field . '_")]')->length,
+                "{$field} is not one row per slide"
+            );
+        }
+
+        // The labels are the point: a group would have been one row and dropped them.
+        foreach (['slide_media', 'slide_videourl', 'slide_caption'] as $field) {
+            $this->assertGreaterThan(
+                0,
+                $xpath->query('//label[starts-with(@for, "id_' . $field . '_")]')->length,
+                "{$field} has no label element"
+            );
+        }
+
+        $deletes = $xpath->query('//input[@type="submit"][starts-with(@name, "slide_delete")]');
+        $this->assertSame(notice_form::SLIDES_MIN, $deletes->length, 'a slide has no delete button');
+        foreach ($deletes as $delete) {
+            $this->assertSame('1', $delete->getAttribute('data-no-submit'), 'the delete button submits the form');
+        }
+    }
+
+    /**
      * The position radios come in the reading order of the grid, and the grid is the whole vocabulary.
      */
     public function test_the_position_radios_come_in_the_reading_order_of_the_grid(): void {
