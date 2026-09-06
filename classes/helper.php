@@ -103,7 +103,7 @@ class helper {
      * @throws \core\invalid_persistent_exception
      * @throws \required_capability_exception
      * @throws \invalid_parameter_exception When a value names something that does not exist, or is forbidden or
-     *                                      outside the notice's scope.
+     *                                      outside the notice's scope, or the rows list a stored slide twice.
      */
     public static function create_new_notice(\stdClass $data, ?author_scope $scope = null): string {
         $scope = $scope ?? author_scope::site();
@@ -151,7 +151,7 @@ class helper {
      * @throws \dml_exception
      * @throws \required_capability_exception
      * @throws \invalid_parameter_exception When a value names something that does not exist, or is forbidden or
-     *                                      outside the notice's scope.
+     *                                      outside the notice's scope, or the rows list a stored slide twice.
      */
     public static function update_notice(awareness $awareness, \stdClass $data): string {
         $scope = author_scope::of($awareness);
@@ -341,12 +341,15 @@ class helper {
      *
      * @param \stdClass $data The submitted data, before sanitise_data() strips what is not a column.
      * @return \stdClass The four slide arrays, each keyed by row index.
+     * @throws \invalid_parameter_exception When the rows list a stored slide twice.
      */
     public static function slide_rows(\stdClass $data): \stdClass {
         $rows = new \stdClass();
         foreach (['slide_caption', 'slide_videourl', 'slide_image', 'slide_id'] as $field) {
             $rows->$field = isset($data->$field) ? (array) $data->$field : [];
         }
+        // Refused here, before the notice itself is written, so a bad request changes nothing at all.
+        self::refuse_repeated_slide_ids($rows->slide_id);
 
         /*
          * A slide shows one medium, and the form asks which. hideIf hides the other control
@@ -367,18 +370,43 @@ class helper {
     }
 
     /**
+     * Refuse rows that list one stored slide twice.
+     *
+     * Rows are matched to slides by their hidden id, so two rows carrying the same id would both
+     * write the same record: the later would win and the earlier would be lost without a word, and
+     * a slide the rows no longer named would be deleted with its file. No path through the editor
+     * produces such a request, so it is refused outright rather than reconciled by guesswork; the
+     * form refuses it first, on the row, for anyone who reaches it with a browser.
+     *
+     * @param array $ids The slide ids the rows carry, keyed by row index; 0 for a new slide.
+     * @return void
+     * @throws \invalid_parameter_exception When a stored slide is listed more than once.
+     */
+    public static function refuse_repeated_slide_ids(array $ids): void {
+        $stored = array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0);
+        if (count($stored) !== count(array_unique($stored))) {
+            throw new \invalid_parameter_exception('a slide is listed twice');
+        }
+    }
+
+    /**
      * Reconcile the carousel's slides with the repeated rows the form submitted.
      *
      * Rows are matched to existing slides by their hidden id; a row with an id the notice does not
-     * own becomes a new slide rather than an edit of somebody else's. A row with no image, no link
-     * and no caption is not a slide and is not saved; an existing slide whose row is gone is
+     * own becomes a new slide rather than an edit of somebody else's, and a row repeating an id
+     * already listed — this notice's or another's — is refused outright. A row with no image, no
+     * link and no caption is not a slide and is not saved; an existing slide whose row is gone is
      * deleted with its file. The draft ids are read from the submitted array: the core helper
      * cannot address a repeated file picker.
      *
      * @param awareness $awareness The saved notice.
      * @param \stdClass $rows The slide rows, as slide_rows() read them.
+     * @throws \invalid_parameter_exception When the rows list a stored slide twice.
      */
     public static function process_slides(awareness $awareness, \stdClass $rows): void {
+        // Refused again here, for a caller that built its rows without slide_rows().
+        self::refuse_repeated_slide_ids((array) ($rows->slide_id ?? []));
+
         $noticeid = (int) $awareness->get('id');
         $existing = [];
         foreach (slide::for_notice($noticeid) as $slide) {

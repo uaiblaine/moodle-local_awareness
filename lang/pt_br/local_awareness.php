@@ -285,6 +285,7 @@ $string['notice:slide:movedown:name'] = 'Mover para baixo: slide {$a}';
 $string['notice:slide:moveup'] = 'Mover para cima';
 $string['notice:slide:moveup:name'] = 'Mover para cima: slide {$a}';
 $string['notice:slide:number'] = 'Slide {$a}';
+$string['notice:slide:repeated'] = 'Este slide aparece duas vezes. Recarregue a página e tente de novo.';
 $string['notice:slide:video'] = 'Link do vídeo';
 $string['notice:slides:required'] = 'Um carrossel precisa de pelo menos {$a} slides, cada um com uma imagem, um link de vídeo ou uma legenda.';
 $string['notice:status'] = 'Status';

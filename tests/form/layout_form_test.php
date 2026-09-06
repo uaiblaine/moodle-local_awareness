@@ -242,6 +242,40 @@ final class layout_form_test extends \advanced_testcase {
     }
 
     /**
+     * A slide listed twice is refused on the row that repeats it; listed once each, both pass.
+     *
+     * Two rows carrying one stored id would both write the same record, the later winning. The
+     * control is the same payload with distinct ids, which the rule must let through.
+     */
+    public function test_a_slide_listed_twice_is_refused_on_the_row_that_repeats_it(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $payload = [
+            'template' => 'carousel',
+            'slide_media' => [slide::MEDIA_IMAGE, slide::MEDIA_IMAGE],
+            'slide_caption' => ['First', 'Second'],
+            'slide_videourl' => ['', ''],
+            'slide_image' => [0, 0],
+        ];
+
+        $errors = $this->validate($this->form(), $payload + ['slide_id' => [7, 7]]);
+        $this->assertArrayHasKey('slide_caption[1]', $errors, 'the repeated row was not refused');
+        $this->assertArrayNotHasKey('slide_caption[0]', $errors, 'the first row, which is legitimate, was refused');
+
+        $errors = $this->validate($this->form(), $payload + ['slide_id' => [7, 8]]);
+        $this->assertArrayNotHasKey('slide_caption[1]', $errors, 'distinct ids were refused');
+        $this->assertArrayNotHasKey('slide_caption[0]', $errors);
+
+        // Anywhere in the strip, not only next door: the third row repeats the first.
+        $three = ['slide_media' => [slide::MEDIA_IMAGE, slide::MEDIA_IMAGE, slide::MEDIA_IMAGE],
+            'slide_caption' => ['First', 'Second', 'Third'], 'slide_videourl' => ['', '', ''], 'slide_image' => [0, 0, 0]];
+        $errors = $this->validate($this->form(), ['template' => 'carousel', 'slide_id' => [7, 8, 7]] + $three);
+        $this->assertArrayHasKey('slide_caption[2]', $errors, 'a repeat two rows down was not refused');
+        $this->assertArrayNotHasKey('slide_caption[1]', $errors);
+        $this->assertArrayNotHasKey('slide_caption[0]', $errors);
+    }
+
+    /**
      * Saving writes the slides in order with their files, and a later save without a row deletes it.
      */
     public function test_saving_reconciles_the_slides_with_the_rows_submitted(): void {

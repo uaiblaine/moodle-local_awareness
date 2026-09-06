@@ -402,6 +402,58 @@ final class slide_reorder_test extends \advanced_testcase {
     }
 
     /**
+     * A save listing one slide twice is refused before anything is written, notice row included.
+     *
+     * The rows are read before the notice is saved, so the refusal has to come from there: the
+     * title in the same payload is the control that nothing was written first. The second half
+     * calls the reconciliation directly, the way a caller that never built its rows through
+     * slide_rows() would, and must be refused all the same.
+     */
+    public function test_a_save_listing_a_slide_twice_is_refused_before_anything_is_written(): void {
+        $this->resetAfterTest();
+        [$notice, $slides] = $this->carousel();
+        $ids = array_map(static fn(slide $s): int => (int) $s->get('id'), $slides);
+        set_config('allow_update', 1, 'local_awareness');
+
+        try {
+            helper::update_notice($notice, (object) [
+                'title' => 'Renamed',
+                'content' => '<p>News.</p>',
+                'perpetual' => 1,
+                'template' => 'carousel',
+                'slide_media' => [slide::MEDIA_IMAGE, slide::MEDIA_IMAGE],
+                'slide_caption' => ['Overwritten', 'Winner'],
+                'slide_videourl' => ['', ''],
+                'slide_image' => [0, 0],
+                'slide_id' => [$ids[0], $ids[0]],
+            ]);
+            $this->fail('a save listing a slide twice was accepted');
+        } catch (\invalid_parameter_exception $e) {
+            $this->assertStringContainsString('listed twice', $e->debuginfo);
+        }
+
+        $this->assertSame(
+            'Semester news',
+            awareness::get_record(['id' => $notice->get('id')])->get('title'),
+            'the notice was written first'
+        );
+        $stored = slide::for_notice($notice->get('id'));
+        $this->assertSame($ids, array_map(static fn(slide $s): int => (int) $s->get('id'), $stored), 'a slide was lost');
+        $this->assertSame(['Lab', 'Tour', 'Words'], array_map(static fn(slide $s): string => (string) $s->get('caption'), $stored));
+        $this->assertSame('slide.png', $stored[0]->get_image()->get_filename(), 'the first slide lost its image');
+
+        // Two rows apart, not next door: the third row repeats the first.
+        $rows = (object) [
+            'slide_caption' => ['Overwritten', 'Kept', 'Winner'],
+            'slide_videourl' => ['', '', ''],
+            'slide_image' => [0, 0, 0],
+            'slide_id' => [$ids[0], $ids[1], $ids[0]],
+        ];
+        $this->expectException(\invalid_parameter_exception::class);
+        helper::process_slides($notice, $rows);
+    }
+
+    /**
      * The save after a move stores the order shown, and a moved slide keeps its id and its image.
      *
      * The rows arrive rearranged with their ids, as the browser posts them after the re-render; the

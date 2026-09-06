@@ -824,6 +824,24 @@ class notice_form extends \core\form\persistent {
         $drafts = (array) ($data->slide_image ?? []);
         $media = (array) ($data->slide_media ?? []);
 
+        /*
+         * A stored slide may be listed once. Two rows carrying the same id would both write the
+         * same record, the later winning and the earlier lost without a word. No path through the
+         * form produces that; a request that does is refused, on the row that repeats the id,
+         * rather than reconciled by guesswork — and helper::slide_rows() refuses it again for any
+         * caller that never went through this form.
+         */
+        $seen = [];
+        foreach ((array) ($data->slide_id ?? []) as $i => $id) {
+            if ((int) $id <= 0) {
+                continue;
+            }
+            if (isset($seen[(int) $id])) {
+                $extra["slide_caption[{$i}]"] = get_string('notice:slide:repeated', 'local_awareness');
+            }
+            $seen[(int) $id] = true;
+        }
+
         $indexes = array_keys($captions + $links + $drafts);
         sort($indexes);
         foreach ($indexes as $i) {

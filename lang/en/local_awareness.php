@@ -287,6 +287,7 @@ $string['notice:slide:movedown:name'] = 'Move down: slide {$a}';
 $string['notice:slide:moveup'] = 'Move up';
 $string['notice:slide:moveup:name'] = 'Move up: slide {$a}';
 $string['notice:slide:number'] = 'Slide {$a}';
+$string['notice:slide:repeated'] = 'This slide is listed twice. Reload the page and try again.';
 $string['notice:slide:video'] = 'Video link';
 $string['notice:slides:required'] = 'A carousel needs at least {$a} slides, each with an image, a video link or a caption.';
 $string['notice:status'] = 'Status';
