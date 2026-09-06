@@ -131,7 +131,9 @@ class notice_form extends \core\form\persistent {
             helper::get_file_editor_options()
         );
         $mform->setType('content', PARAM_RAW);
-        $mform->addRule('content', get_string('required'), 'required', null, 'client');
+        $mform->addHelpButton('content', 'notice:content', 'local_awareness');
+        // Required for every layout but the image, which shows the image alone. The rule is added in
+        // definition_after_data(), once the layout is known; validate_layout() asks the layout too.
 
         // Background Image.
         $mform->addElement(
@@ -146,8 +148,9 @@ class notice_form extends \core\form\persistent {
             ]
         );
         $mform->addHelpButton('bgimage', 'notice:bgimage', 'local_awareness');
-        // The video and carousel layouts fill their media band themselves; a background behind it
-        // would be two competing surfaces, so the field is not offered for them.
+        // The video and carousel layouts fill their media band themselves, and a banner has no room
+        // for a picture; a background behind any of them would be two competing surfaces, so the
+        // field is not offered for them.
         foreach (awareness::TEMPLATES as $template) {
             if (!awareness::uses_bgimage($template)) {
                 $mform->hideIf('bgimage', 'template', 'eq', $template);
@@ -745,6 +748,31 @@ class notice_form extends \core\form\persistent {
     }
 
     /**
+     * Mark the text as required for the layouts that need it, once the layout is known.
+     *
+     * A rule declared in definition() cannot ask the layout, and a client rule would go on refusing
+     * an empty text after the author switched to the image layout on screen, because the browser's
+     * validation is generated at render. So the rule is a server one, added here for the layout the
+     * request carries: it paints the required marker and refuses an empty text on the way in, and
+     * validate_layout() refuses it again with the same words. The marker follows the layout the
+     * page was rendered with, not the radio the author clicks; the save is what decides.
+     *
+     * @return void
+     */
+    public function definition_after_data() {
+        parent::definition_after_data();
+
+        $mform = $this->_form;
+        $template = $this->optional_param('template', '', PARAM_ALPHA);
+        if ($template === '') {
+            $template = (string) ($this->get_persistent()->get('template') ?: awareness::TEMPLATES[0]);
+        }
+        if (awareness::requires_content($template)) {
+            $mform->addRule('content', get_string('required'), 'required', null, 'server');
+        }
+    }
+
+    /**
      * The rules that tie the layout to the other choices, each refused with its reason.
      *
      * hideIf hides a field; it does not stop the value travelling, and a client rule never posts
@@ -759,16 +787,42 @@ class notice_form extends \core\form\persistent {
         $extra = [];
         $template = (string) ($data->template ?? awareness::TEMPLATES[0]);
 
-        if (
-            (int) ($data->insistence ?? awareness::INSISTENCE_INFORMATIONAL) >= awareness::INSISTENCE_ACKNOWLEDGE
-            && !awareness::accepts_acknowledgement($template)
-        ) {
-            $extra['insistence'] = get_string('notice:insistence:notforlayout', 'local_awareness', self::layout_name($template));
+        $levels = awareness::insistence_levels_for($template);
+        if (!in_array((int) ($data->insistence ?? awareness::INSISTENCE_INFORMATIONAL), $levels, true)) {
+            // A layout with a close and nothing else says so; one with no room for the box says that.
+            $closeonly = $levels === [awareness::INSISTENCE_INFORMATIONAL];
+            $extra['insistence'] = get_string(
+                $closeonly ? 'notice:insistence:onlyinformational' : 'notice:insistence:notforlayout',
+                'local_awareness',
+                self::layout_name($template)
+            );
         }
 
         $position = (string) ($data->position ?? awareness::POSITIONS[0]);
         if ($template !== 'fullscreen' && !in_array($position, awareness::positions_for($template), true)) {
-            $extra['positiongroup'] = get_string('notice:position:notforlayout', 'local_awareness', self::layout_name($template));
+            $extra['positiongroup'] = get_string(
+                $template === 'banner' ? 'notice:position:onlyedges' : 'notice:position:notforlayout',
+                'local_awareness',
+                self::layout_name($template)
+            );
+        }
+
+        /*
+         * The text is required by every layout but the image, and the image is required by the
+         * image layout alone. Both used to be a client rule, which cannot ask the layout; the
+         * image is read from the draft area the picker posts, the way the slides are.
+         */
+        if (awareness::requires_content($template)) {
+            $content = is_array($data->content ?? null) ? (string) ($data->content['text'] ?? '') : (string) ($data->content ?? '');
+            if (trim(strip_tags($content)) === '' && !preg_match('/<(img|video|audio|iframe)\b/i', $content)) {
+                $extra['content'] = get_string('required');
+            }
+        }
+        if (awareness::requires_bgimage($template)) {
+            $draftid = (int) ($data->bgimage ?? 0);
+            if ($draftid <= 0 || (int) file_get_draft_area_info($draftid)['filecount'] === 0) {
+                $extra['bgimage'] = get_string('notice:bgimage:required', 'local_awareness');
+            }
         }
 
         if (awareness::uses_video($template)) {
@@ -1208,6 +1262,14 @@ class notice_form extends \core\form\persistent {
                 return get_string('notice:template:video', 'local_awareness');
             case 'carousel':
                 return get_string('notice:template:carousel', 'local_awareness');
+            case 'split':
+                return get_string('notice:template:split', 'local_awareness');
+            case 'minimal':
+                return get_string('notice:template:minimal', 'local_awareness');
+            case 'banner':
+                return get_string('notice:template:banner', 'local_awareness');
+            case 'image':
+                return get_string('notice:template:image', 'local_awareness');
             default:
                 throw new \coding_exception("No name for the layout '{$template}'");
         }
@@ -1237,6 +1299,14 @@ class notice_form extends \core\form\persistent {
                 return get_string('notice:template:video:desc', 'local_awareness');
             case 'carousel':
                 return get_string('notice:template:carousel:desc', 'local_awareness');
+            case 'split':
+                return get_string('notice:template:split:desc', 'local_awareness');
+            case 'minimal':
+                return get_string('notice:template:minimal:desc', 'local_awareness');
+            case 'banner':
+                return get_string('notice:template:banner:desc', 'local_awareness');
+            case 'image':
+                return get_string('notice:template:image:desc', 'local_awareness');
             default:
                 return '';
         }

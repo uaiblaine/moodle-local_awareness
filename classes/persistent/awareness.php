@@ -47,7 +47,7 @@ class awareness extends persistent {
      * One source for the form, the web service, the JavaScript mirror and the tests; the columns
      * only hold the choice, and the persistent's `choices` gate is what keeps them inside it.
      */
-    public const TEMPLATES = ['classic', 'hero', 'fullscreen', 'card', 'video', 'carousel'];
+    public const TEMPLATES = ['classic', 'hero', 'split', 'minimal', 'fullscreen', 'card', 'banner', 'image', 'video', 'carousel'];
 
     /** Positions on the screen. start/end are logical, so a corner flips under RTL. */
     public const POSITIONS = ['center', 'top', 'bottom', 'top-start', 'top-end', 'bottom-start', 'bottom-end'];
@@ -58,16 +58,34 @@ class awareness extends persistent {
     /** The four corners, where only a card is small enough to sit. */
     public const POSITIONS_CORNER = ['top-start', 'top-end', 'bottom-start', 'bottom-end'];
 
+    /** The two edges a strip can lie against; a banner is a strip, so it has no centre. */
+    public const POSITIONS_STRIP = ['top', 'bottom'];
+
     /** Entrance animations. slide takes its direction from the position; all collapse under reduced motion. */
     public const ANIMATIONS = ['none', 'fade', 'slide', 'zoom', 'spring'];
+
+    /**
+     * Layouts narrower than, or shaped unlike, core's large dialogue.
+     *
+     * modal_notice.js takes modal-lg off for these, sizes them itself, and ignores the width and
+     * height an author set; motion_contract_test pins its copy of this list against this one.
+     */
+    public const COMPACT = ['card', 'minimal', 'banner', 'image'];
+
+    /**
+     * Layouts that paint the uploaded image in the media band rather than as a cover behind the
+     * whole dialogue: a band across the top, a panel beside the text, or the image alone.
+     */
+    public const BAND = ['hero', 'split', 'image'];
 
     /**
      * The positions a layout may take.
      *
      * A fullscreen dialogue covers the screen, so it has no position; a card is compact enough for
-     * a corner; everything else sits centred or against the top or bottom edge, where a wide box
-     * still reads as one. The form offers these and extra_validation() refuses the rest, because a
-     * value the CSS has no rule for renders as centred and the stored choice would then lie.
+     * a corner; a banner is a strip and lies against the top or the bottom edge, never in the
+     * middle of the page; everything else sits centred or against the top or bottom edge, where a
+     * wide box still reads as one. The form offers these and extra_validation() refuses the rest,
+     * because a value the CSS has no rule for renders as centred and the stored choice would then lie.
      *
      * @param string $template One of TEMPLATES.
      * @return string[] A subset of POSITIONS.
@@ -79,22 +97,47 @@ class awareness extends persistent {
         if ($template === 'card') {
             return self::POSITIONS;
         }
+        if ($template === 'banner') {
+            return self::POSITIONS_STRIP;
+        }
 
         return self::POSITIONS_EDGE;
     }
 
     /**
+     * The insistence levels a layout can honour, in order.
+     *
+     * The footer is one shared block: the acknowledgement box beside the buttons. A card and a
+     * minimal box are a single line of buttons with no room for the box, so neither can be Must
+     * acknowledge. A banner is a strip and an image is the image alone: each shows a close and
+     * nothing else, so each can only be Informational — a reader could neither accept nor be
+     * blocked by a dialogue with no button to do it. The form refuses the rest with the reason.
+     *
+     * @param string $template One of TEMPLATES.
+     * @return int[] The INSISTENCE_* values allowed, lowest first.
+     */
+    public static function insistence_levels_for(string $template): array {
+        if (in_array($template, ['banner', 'image'], true)) {
+            return [self::INSISTENCE_INFORMATIONAL];
+        }
+        if (in_array($template, ['card', 'minimal'], true)) {
+            return [self::INSISTENCE_INFORMATIONAL, self::INSISTENCE_BLOCKING];
+        }
+
+        return [self::INSISTENCE_INFORMATIONAL, self::INSISTENCE_BLOCKING, self::INSISTENCE_ACKNOWLEDGE];
+    }
+
+    /**
      * Whether a layout can carry the acknowledgement checkbox.
      *
-     * The footer is one shared block: the checkbox row beside the buttons. A card's footer is a
-     * single line of one button and has no room for it, so a card cannot be Must acknowledge -
-     * offering the level would render an insistence the reader cannot satisfy.
+     * The highest level insistence_levels_for() allows: offering it to a layout whose footer has
+     * no room for the box would render an insistence the reader cannot satisfy.
      *
      * @param string $template One of TEMPLATES.
      * @return bool
      */
     public static function accepts_acknowledgement(string $template): bool {
-        return $template !== 'card';
+        return in_array(self::INSISTENCE_ACKNOWLEDGE, self::insistence_levels_for($template), true);
     }
 
     /**
@@ -108,17 +151,45 @@ class awareness extends persistent {
     }
 
     /**
-     * Whether a layout shows the uploaded background image.
+     * Whether a layout shows the uploaded image.
      *
-     * The video and carousel layouts fill their media band from the video field and the slides;
-     * a background behind that would be two competing surfaces, so the field is hidden for them
-     * and a stored file is ignored.
+     * The video and carousel layouts fill their media band from the video field and the slides,
+     * and a banner is one line of text with no room for a picture; a background behind any of
+     * them would be two competing surfaces, so the field is hidden for them and a stored file is
+     * ignored.
      *
      * @param string $template One of TEMPLATES.
      * @return bool
      */
     public static function uses_bgimage(string $template): bool {
-        return !in_array($template, ['video', 'carousel'], true);
+        return !in_array($template, ['video', 'carousel', 'banner'], true);
+    }
+
+    /**
+     * Whether a layout cannot render without the uploaded image.
+     *
+     * The image layout IS the image: with nothing uploaded there would be nothing to show but a
+     * close button, so the form refuses to save it without one.
+     *
+     * @param string $template One of TEMPLATES.
+     * @return bool
+     */
+    public static function requires_bgimage(string $template): bool {
+        return $template === 'image';
+    }
+
+    /**
+     * Whether a layout needs the notice's text.
+     *
+     * Every layout shows the content but the image layout, which shows the image alone; there the
+     * text is optional, and what an author writes is read to a screen-reader user as the image's
+     * description while staying invisible to everyone else.
+     *
+     * @param string $template One of TEMPLATES.
+     * @return bool
+     */
+    public static function requires_content(string $template): bool {
+        return $template !== 'image';
     }
 
     /**

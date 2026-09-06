@@ -210,11 +210,13 @@ $string['notice:audience:value'] = '~ {$a} usuários';
 $string['notice:behaviour'] = 'Comportamento';
 $string['notice:behaviour:none'] = 'Sem comportamento especial';
 $string['notice:behaviour:repeat'] = 'Repete a cada {$a}';
-$string['notice:bgimage'] = 'Imagem de fundo';
-$string['notice:bgimage_help'] = 'Envie uma imagem para o diálogo. O que ela vira depende do layout: Clássico, Tela cheia e Cartão a mostram como um fundo suave atrás de todo o diálogo; Destaque a mostra como uma faixa no topo, com o título por cima. Vídeo e Carrossel preenchem essa faixa por conta própria e não a usam.';
+$string['notice:bgimage'] = 'Imagem';
+$string['notice:bgimage:required'] = 'O layout Imagem precisa de uma imagem.';
+$string['notice:bgimage_help'] = 'Envie uma imagem para o diálogo. O que ela vira depende do layout: Clássico, Minimalista, Tela cheia e Cartão a mostram como um fundo suave atrás de todo o diálogo; Destaque, como uma faixa no topo com o título por cima; Dividido, como um painel ao lado do texto; e Imagem mostra só a imagem, e precisa de uma. Faixa, Vídeo e Carrossel não a usam.';
 $string['notice:cohort'] = 'Coorte';
 $string['notice:cohort:all'] = 'Todos os usuários';
 $string['notice:content'] = 'Conteúdo';
+$string['notice:content_help'] = 'O que o diálogo diz. Opcional no layout Imagem, que mostra só a imagem: ali, o que você escrever é lido por leitores de tela como descrição da imagem e não aparece para mais ninguém.';
 $string['notice:create'] = 'Criar novo alerta';
 $string['notice:delete'] = 'Excluir alerta';
 $string['notice:disable'] = 'Desabilitar alerta';
@@ -229,6 +231,7 @@ $string['notice:insistence:acknowledge'] = 'Exige reconhecimento';
 $string['notice:insistence:blocking'] = 'Bloqueante';
 $string['notice:insistence:informational'] = 'Informativo';
 $string['notice:insistence:notforlayout'] = 'O layout {$a} não tem espaço para a caixa de confirmação. Escolha outro layout, ou uma insistência menor.';
+$string['notice:insistence:onlyinformational'] = 'O layout {$a} mostra um botão de fechar e nada mais, então só pode ser Informativo.';
 $string['notice:insistence_help'] = 'O quanto o alerta é difícil de ultrapassar, e o que o leitor pode fazer em vez de aceitá-lo.
 
 Informativo: o leitor pode dispensá-lo, inclusive clicando fora dele, e a dispensa é registrada.
@@ -256,6 +259,7 @@ $string['notice:position:bottomstart'] = 'Rodapé, início';
 $string['notice:position:center'] = 'Centro';
 $string['notice:position:covered'] = 'A tela cheia ocupa a janela inteira, então não tem posição.';
 $string['notice:position:notforlayout'] = 'O layout {$a} não cabe num canto. Escolha o centro, o topo ou o rodapé.';
+$string['notice:position:onlyedges'] = 'O layout {$a} é uma faixa encostada no topo ou no rodapé. Escolha um dos dois.';
 $string['notice:position:top'] = 'Topo';
 $string['notice:position:topend'] = 'Topo, fim';
 $string['notice:position:topstart'] = 'Topo, início';
@@ -292,6 +296,8 @@ $string['notice:status'] = 'Status';
 $string['notice:status:draft'] = 'Rascunho';
 $string['notice:status:live'] = 'Ativo';
 $string['notice:template'] = 'Layout';
+$string['notice:template:banner'] = 'Faixa';
+$string['notice:template:banner:desc'] = 'Uma faixa de uma linha encostada no topo ou no rodapé, com um fechar. Só Informativo.';
 $string['notice:template:card'] = 'Cartão';
 $string['notice:template:card:desc'] = 'Compacto, normalmente em um canto. Não tem espaço para a caixa de confirmação.';
 $string['notice:template:carousel'] = 'Carrossel';
@@ -302,6 +308,12 @@ $string['notice:template:fullscreen'] = 'Tela cheia';
 $string['notice:template:fullscreen:desc'] = 'Ocupa a janela inteira, para um texto longo como uma política. Não tem posição.';
 $string['notice:template:hero'] = 'Destaque';
 $string['notice:template:hero:desc'] = 'A imagem enviada como faixa no topo, com o título sobre ela.';
+$string['notice:template:image'] = 'Imagem';
+$string['notice:template:image:desc'] = 'Só a imagem enviada, com um botão de fechar flutuando no canto. Só Informativo.';
+$string['notice:template:minimal'] = 'Minimalista';
+$string['notice:template:minimal:desc'] = 'Uma caixa estreita sem enfeite: o título, o texto e os botões. Sem caixa de confirmação.';
+$string['notice:template:split'] = 'Dividido';
+$string['notice:template:split:desc'] = 'A imagem enviada como um painel ao lado do texto.';
 $string['notice:template:video'] = 'Vídeo';
 $string['notice:template:video:desc'] = 'Um player montado a partir do link de vídeo, no lugar da faixa de imagem.';
 $string['notice:template_help'] = 'A forma do diálogo que o leitor vê. Todo layout é um diálogo de verdade: escurece a página atrás, mantém o teclado dentro dele e é anunciado como diálogo pelo leitor de tela, seja qual for o tamanho.
@@ -310,9 +322,17 @@ Clássico: cabeçalho, conteúdo e rodapé. O que todo aviso era antes dos layou
 
 Destaque: a imagem enviada como faixa no topo, com o título por cima.
 
+Dividido: a imagem enviada como um painel ao lado do texto; sem imagem, o painel fica na cor do site.
+
+Minimalista: uma caixa estreita sem enfeite, para uma mensagem curta. Não tem espaço para a caixa de confirmação, então não pode ser Exige reconhecimento.
+
 Tela cheia: cobre a janela inteira, para textos longos como uma política que o leitor precisa rolar. Não tem posição.
 
 Cartão: uma caixa compacta, em geral num canto, para uma mensagem curta com uma ação. Não tem espaço para a caixa de confirmação, então não pode ser Exige reconhecimento.
+
+Faixa: uma faixa de uma linha encostada no topo ou no rodapé, com o título, a primeira linha do texto e um fechar. Só Informativo.
+
+Imagem: só a imagem enviada, com um botão de fechar flutuando no canto. O título a nomeia para leitores de tela e o texto, se houver, a descreve; nenhum dos dois aparece. Só Informativo.
 
 Vídeo: um player montado a partir do link do vídeo no lugar da faixa de imagem. O filtro multimídia do site decide o que toca.
 

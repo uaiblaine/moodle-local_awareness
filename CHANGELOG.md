@@ -6,6 +6,55 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Four more layouts: Split, Minimal, Banner, and the Image alone (version 2026090601)
+
+The three layouts the first release deferred, and a fourth that was asked for since: a notice that
+is **a picture and nothing else**.
+
+**Image.** The uploaded image is the whole dialogue: the dialog shrinks to it, the chrome goes,
+and the close button floats outside the top corner on a light disc, so no picture can swallow it.
+There is no footer and no acknowledgement; closing is what records the visit, as it does for any
+Informational notice, and Informational is the only level the layout accepts — a reader could
+neither accept nor be blocked by a dialogue with no button to do it. The title names the picture
+for a screen reader and is required as ever; the text is optional, and what an author writes is
+read as the picture's description and shown to nobody. The layout refuses to save without an image.
+
+**Split.** The image as a panel beside the text, in the site's colour when there is none. The
+content box becomes a grid so the media band, which sits between the header and the body in the
+DOM, can span the side; below 40rem the panel returns to a band across the top.
+
+**Minimal.** A narrow box with the chrome stripped. No room for the acknowledgement box.
+
+**Banner.** A one-line strip across the whole width against the top or the bottom edge — the
+title, the first line of the text, the buttons, the close. Informational only, and only those two
+positions; the header is flattened into the row with `display: contents`, which keeps the element,
+the dialogue's name and the close button where the contract test expects them.
+
+**A rule that fights a utility the template wears is dead, and a test now says so.** Bootstrap
+declares its utilities with `!important`, so a plugin declaration on the same property of the same
+element never applies whatever its specificity. Four had shipped that way: a banner's and a
+fullscreen dialogue's `border-radius` against `rounded`, a card body's `padding-top` against
+`py-3`, and the dialogue's own `box-shadow` against `shadow-lg`, the last one from the plugin's
+first day. `rounded` left the template — the radius is the plugin's own rule now, zeroed for the
+banner and the fullscreen dialogue — and the other three declarations are gone.
+`motion_contract_test` reads the template's class lists and refuses any such rule from here on.
+
+**Also from the review.** The text keeps its required marker on every layout that needs a text,
+through a server rule added once the layout is known; the image layout's dialogue points at its
+offscreen text with `aria-describedby`, so a screen reader hears the description rather than the
+title twice; the split panel leads the column on a narrow screen, as its comment already said; and
+the editor's preview of an image layout with nothing uploaded yet shows the classic dialogue
+instead of an empty one, the way an unknown value does — and previews a banner at the top with
+Informational, the levels and positions the save would keep.
+
+**What moved underneath.** The persistent now says which insistence levels a layout can honour
+(`insistence_levels_for()`), which layouts paint the image in the band (`BAND`) and which are
+compact (`COMPACT`); the form and the two JavaScript mirrors read those, and the contract test
+pins the mirrors against them. The "Background image" field is now "Image", because for two
+layouts it is the image. The text's client-side required rule became a server rule that asks the
+layout, since a client rule cannot. The layout picker's order changed to the author's: Classic,
+Hero image, Split, Minimal, Full screen, Card, Banner, Image, Video, Carousel.
+
 ### A slide listed twice is refused (version 2026090412)
 
 Rows are matched to stored slides by their hidden id, so a request carrying the same id on two rows

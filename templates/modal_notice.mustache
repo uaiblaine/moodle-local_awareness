@@ -42,11 +42,14 @@
 
 <div class="modal moodle-has-zindex" data-region="modal-container" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="{{uniqid}}-modal-title">
     <div class="modal-dialog awareness modal-lg {{$classes}}{{/classes}}" role="document" data-region="modal" tabindex="0">
-        <div class="modal-content shadow-lg border-0 rounded">
-            {{!
-                No bg-* or border-* utility on the header or the footer: Bootstrap 5 generates those
-                with !important, which the layouts' own chrome in styles.css could never outbid.
-            }}
+        {{!
+            No rounded, no bg-* and no border-* utility on the content box, the header or the
+            footer: Bootstrap generates those with !important, which the layouts' own chrome in
+            styles.css could never outbid - the radius a banner has to drop, for one. The shadow
+            and border-0 stay, because no layout wants them otherwise; motion_contract_test reads
+            this template's class lists and refuses a stylesheet rule that fights any of them.
+        }}
+        <div class="modal-content shadow-lg border-0">
             <div class="modal-header {{$headerclasses}}{{headerclasses}}{{/headerclasses}}" data-region="header">
                 {{$header}}
                     <h5 id="{{uniqid}}-modal-title" class="modal-title" data-region="title">{{$title}}{{title}}{{/title}}</h5>
@@ -66,7 +69,7 @@
                 <div class="la-media-video" data-region="video"></div>
                 <div class="la-media-carousel" data-region="carousel"></div>
             </div>
-            <div class="modal-body px-4 py-3" data-region="body">
+            <div id="{{uniqid}}-modal-body" class="modal-body px-4 py-3" data-region="body">
                 {{$body}}
                     {{{body}}}
                 {{/body}}

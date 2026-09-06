@@ -234,6 +234,22 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `modal_notice.js` carry hand copies of the corners and the sized/compact layouts;
   `tests/local/motion_contract_test.php` pins them against the persistent.
 
+- **A layout is three lists on the persistent, and the JavaScript copies them by hand.**
+  `insistence_levels_for()` says which levels a layout can honour (banner and image: Informational
+  only — a close and nothing else; card and minimal: no acknowledgement box), `positions_for()`
+  which positions (banner: the two edges, `POSITIONS_STRIP`), `COMPACT` which layouts drop
+  `modal-lg` and ignore the author's size, `BAND` which paint the image in the media band rather
+  than as a cover. `notice_form.js` mirrors the ceilings and the strip, `modal_notice.js` the
+  compact and band lists, and `motion_contract_test` pins every mirror against the persistent — a
+  layout added to `TEMPLATES` without a decision in each fails there, not in front of a reader.
+  The image layout is the picture alone: the text is optional and offscreen (the picture's
+  description), the title is its alt, the footer is `position: absolute; visibility: hidden` —
+  never `display: none`, which the footer's own `d-flex` beats with `!important` — and the
+  header's close floats outside the corner. The same trap holds for every utility the template
+  wears (`rounded` was dropped from it for this reason, `px-4 py-3 pb-4` remain): a plugin rule
+  setting a property a utility owns is dead, and `motion_contract_test` now refuses one. The banner flattens its header with `display: contents`, never `display:
+  none`, because the header holds the dialogue's name and the close button.
+
 - **The queue reuses one dialogue, and core's `show()` returns early on a visible one.** So nothing
   core emits fires for the second notice onward: the entrance is `setAnimation()` after every
   `show()` (reflow trick, class dropped on `animationend`), `modal-lg` is toggled by `setTemplate()`

@@ -356,10 +356,15 @@ final class notice_form_test extends \advanced_testcase {
         $method->setAccessible(true);
         $errors = [];
 
-        $clean = $method->invokeArgs($form, [(object) ['filter_course' => [(int) $course->id]], [], &$errors]);
+        // The text is now a server rule, so the payload carries one the way the form would.
+        $body = ['content' => ['text' => '<p>Body</p>', 'format' => FORMAT_HTML]];
+        $clean = $method->invokeArgs($form, [(object) (['filter_course' => [(int) $course->id]] + $body), [], &$errors]);
         $this->assertSame([], $clean);
 
-        $refused = $method->invokeArgs($form, [(object) ['filter_course' => [(int) $course->id, $missing]], [], &$errors]);
+        $refused = $method->invokeArgs(
+            $form,
+            [(object) (['filter_course' => [(int) $course->id, $missing]] + $body), [], &$errors]
+        );
         $this->assertSame(
             ['filter_course' => get_string('scope:problem:filter_course', 'local_awareness')],
             $refused
@@ -506,7 +511,10 @@ final class notice_form_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
-        $data = (object) ['filter_category' => [(int) $course->category]];
+        $data = (object) [
+            'filter_category' => [(int) $course->category],
+            'content' => ['text' => '<p>Body</p>', 'format' => FORMAT_HTML],
+        ];
 
         $site = new notice_form(null, ['persistent' => null, 'id' => 0]);
         $method = new \ReflectionMethod($site, 'extra_validation');

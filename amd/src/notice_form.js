@@ -110,10 +110,48 @@ define([], function() {
     // The one layout that covers the window, and so has no position to pick.
     var COVERED_LAYOUT = 'fullscreen';
 
+    /*
+     * The one layout that is a strip: it lies against the top or the bottom edge and has no
+     * centre. Mirrors awareness::POSITIONS_STRIP and awareness::positions_for('banner').
+     */
+    var STRIP_LAYOUT = 'banner';
+    var STRIP_POSITIONS = ['top', 'bottom'];
+
+    /*
+     * The highest insistence each layout can honour, by level number; a layout absent here
+     * honours all three. Mirrors awareness::insistence_levels_for(): a card and a minimal box
+     * have no room for the acknowledgement box, a banner and an image show a close and nothing
+     * else. The server refuses the rest anyway - this only stops the author picking what the
+     * save would bounce.
+     */
+    var INSISTENCE_CEILING = {card: 1, minimal: 1, banner: 0, image: 0};
+    var INSISTENCE_TOP = 2;
+
+    var syncInsistence = function(layout) {
+        var select = document.getElementById(SELECTORS.INSISTENCE);
+        if (!select) {
+            return;
+        }
+        var ceiling = Object.prototype.hasOwnProperty.call(INSISTENCE_CEILING, layout)
+            ? INSISTENCE_CEILING[layout]
+            : INSISTENCE_TOP;
+        var displaced = false;
+        Array.prototype.forEach.call(select.options, function(option) {
+            option.disabled = parseInt(option.value, 10) > ceiling;
+            if (option.disabled && option.selected) {
+                displaced = true;
+            }
+        });
+        if (displaced) {
+            select.value = String(ceiling);
+        }
+    };
+
     var syncPositions = function() {
         var checked = document.querySelector(LAYOUT_SELECTORS.LAYOUT_RADIOS + ':checked');
         var layout = checked ? checked.value : '';
         var cornersAllowed = layout === CORNER_LAYOUT;
+        var strip = layout === STRIP_LAYOUT;
         /*
          * Full screen covers the window, so it has no position at all. The group used to be hidden
          * for it by a server-side hideIf, and a control that vanishes reads as a fault: the screen
@@ -124,18 +162,21 @@ define([], function() {
         var displaced = false;
         document.querySelectorAll(LAYOUT_SELECTORS.POSITION_RADIOS).forEach(function(radio) {
             var corner = CORNERS.indexOf(radio.value) !== -1;
-            radio.disabled = covered || (corner && !cornersAllowed);
-            if (corner && !cornersAllowed && radio.checked) {
+            var offstrip = strip && STRIP_POSITIONS.indexOf(radio.value) === -1;
+            radio.disabled = covered || (corner && !cornersAllowed) || offstrip;
+            if (((corner && !cornersAllowed) || offstrip) && radio.checked) {
                 radio.checked = false;
                 displaced = true;
             }
         });
         if (displaced) {
-            var fallback = document.querySelector(LAYOUT_SELECTORS.POSITION_RADIOS + '[value="' + FALLBACK_POSITION + '"]');
+            var wanted = strip ? STRIP_POSITIONS[0] : FALLBACK_POSITION;
+            var fallback = document.querySelector(LAYOUT_SELECTORS.POSITION_RADIOS + '[value="' + wanted + '"]');
             if (fallback) {
                 fallback.checked = true;
             }
         }
+        syncInsistence(layout);
 
         var group = document.querySelector(LAYOUT_SELECTORS.POSITION_GROUP);
         if (group) {

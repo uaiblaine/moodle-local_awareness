@@ -124,13 +124,22 @@ final class layout_test extends \advanced_testcase {
     public function test_the_positions_a_layout_may_take(): void {
         $this->assertSame(['center'], awareness::positions_for('fullscreen'));
         $this->assertSame(awareness::POSITIONS, awareness::positions_for('card'));
+        // A banner is a strip: the two edges, never the centre nor a corner.
+        $this->assertSame(awareness::POSITIONS_STRIP, awareness::positions_for('banner'));
+        $this->assertSame(['top', 'bottom'], awareness::POSITIONS_STRIP);
+        $this->assertNotContains('center', awareness::positions_for('banner'));
 
-        foreach (['classic', 'hero', 'video', 'carousel'] as $template) {
+        foreach (['classic', 'hero', 'split', 'minimal', 'image', 'video', 'carousel'] as $template) {
             $this->assertSame(awareness::POSITIONS_EDGE, awareness::positions_for($template), $template);
             foreach (awareness::POSITIONS_CORNER as $corner) {
                 $this->assertNotContains($corner, awareness::positions_for($template), "{$template} must not sit in {$corner}");
             }
         }
+        // Every layout's positions are drawn from the vocabulary, and the strip's from the edges.
+        foreach (awareness::TEMPLATES as $template) {
+            $this->assertSame([], array_diff(awareness::positions_for($template), awareness::POSITIONS), $template);
+        }
+        $this->assertSame([], array_diff(awareness::POSITIONS_STRIP, awareness::POSITIONS_EDGE));
 
         // The two position lists partition the vocabulary; a position in neither would be unreachable.
         $this->assertEqualsCanonicalizing(
@@ -140,14 +149,48 @@ final class layout_test extends \advanced_testcase {
     }
 
     /**
-     * The card is the one layout whose footer cannot hold the acknowledgement checkbox.
+     * The levels each layout can honour: no box for the compact ones, a close and nothing else for two.
+     *
+     * The order of the refusing list is the picker's order, so a layout added to the vocabulary
+     * without a decision here fails the first assertion rather than being offered all three.
      */
-    public function test_only_the_card_refuses_the_acknowledgement_level(): void {
+    public function test_the_insistence_levels_a_layout_can_honour(): void {
         $refusing = array_values(array_filter(awareness::TEMPLATES, static function (string $template): bool {
             return !awareness::accepts_acknowledgement($template);
         }));
+        $this->assertSame(['minimal', 'card', 'banner', 'image'], $refusing);
 
-        $this->assertSame(['card'], $refusing);
+        $all = [awareness::INSISTENCE_INFORMATIONAL, awareness::INSISTENCE_BLOCKING, awareness::INSISTENCE_ACKNOWLEDGE];
+        foreach (['banner', 'image'] as $template) {
+            $this->assertSame([awareness::INSISTENCE_INFORMATIONAL], awareness::insistence_levels_for($template), $template);
+        }
+        foreach (['card', 'minimal'] as $template) {
+            $this->assertSame(
+                [awareness::INSISTENCE_INFORMATIONAL, awareness::INSISTENCE_BLOCKING],
+                awareness::insistence_levels_for($template),
+                $template
+            );
+        }
+        foreach (['classic', 'hero', 'split', 'fullscreen', 'video', 'carousel'] as $template) {
+            $this->assertSame($all, awareness::insistence_levels_for($template), $template);
+        }
+        // Informational is the floor everywhere: a layout nobody could dismiss would be a layout nobody could pass.
+        foreach (awareness::TEMPLATES as $template) {
+            $this->assertSame(awareness::INSISTENCE_INFORMATIONAL, awareness::insistence_levels_for($template)[0], $template);
+        }
+    }
+
+    /**
+     * The lists the JavaScript mirrors are drawn from the vocabulary, and say what they claim.
+     */
+    public function test_the_compact_and_band_lists_are_drawn_from_the_vocabulary(): void {
+        $this->assertSame([], array_diff(awareness::COMPACT, awareness::TEMPLATES));
+        $this->assertSame([], array_diff(awareness::BAND, awareness::TEMPLATES));
+        $this->assertContains('image', awareness::COMPACT, 'the image sizes itself to the picture');
+        $this->assertContains('banner', awareness::COMPACT, 'the banner is a strip, not a large dialogue');
+        foreach (awareness::BAND as $template) {
+            $this->assertTrue(awareness::uses_bgimage($template), "{$template} paints the image, so it must use it");
+        }
     }
 
     /**
@@ -160,8 +203,15 @@ final class layout_test extends \advanced_testcase {
 
         $this->assertFalse(awareness::uses_bgimage('video'));
         $this->assertFalse(awareness::uses_bgimage('carousel'));
-        foreach (['classic', 'hero', 'fullscreen', 'card'] as $template) {
+        $this->assertFalse(awareness::uses_bgimage('banner'), 'a one-line strip has no room for a picture');
+        foreach (['classic', 'hero', 'split', 'minimal', 'fullscreen', 'card', 'image'] as $template) {
             $this->assertTrue(awareness::uses_bgimage($template), $template);
+        }
+
+        // The image layout is the image: it needs one, and needs no text.
+        foreach (awareness::TEMPLATES as $template) {
+            $this->assertSame($template === 'image', awareness::requires_bgimage($template), $template);
+            $this->assertSame($template !== 'image', awareness::requires_content($template), $template);
         }
     }
 }

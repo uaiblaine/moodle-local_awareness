@@ -142,11 +142,22 @@ final class preview_external_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
 
-        $payload = preview_notice::execute(0, 'x', '<p>x</p>', 'banner', 'top-end', 'bounce');
+        $payload = preview_notice::execute(0, 'x', '<p>x</p>', 'marquee', 'top-end', 'bounce');
 
         $this->assertSame('classic', $payload['template']);
         $this->assertSame('center', $payload['position'], 'a corner is not offered to the classic layout');
         $this->assertSame('none', $payload['animation']);
+
+        // A layout that exists but cannot take the position previews in the first position it can: a strip's is the top.
+        $banner = preview_notice::execute(0, 'x', '<p>x</p>', 'banner', 'top-end', 'fade', awareness::INSISTENCE_ACKNOWLEDGE);
+        $this->assertSame('banner', $banner['template']);
+        $this->assertSame('top', $banner['position'], 'a banner cannot sit in a corner nor in the centre');
+        $this->assertSame(awareness::INSISTENCE_INFORMATIONAL, $banner['insistence'], 'a banner shows a close and nothing else');
+
+        // An image layout with nothing uploaded yet has nothing to show: it previews as the classic until it has.
+        $bare = preview_notice::execute(0, 'x', '<p>x</p>', 'image', 'center', 'fade', 0, '', 0);
+        $this->assertSame('classic', $bare['template'], 'an image layout with no picture previewed as an empty dialogue');
+        $this->assertSame('', $bare['bgimageurl']);
     }
 
     /**

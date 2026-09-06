@@ -1,0 +1,35 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_awareness/notice/image
+
+    The picture of the image layout: the uploaded image, alone, in the dialogue's media band. The
+    title is its alternative text, so a screen reader hears what the notice is; the notice's text,
+    when the author wrote one, describes it from the dialogue's body, offscreen. Rendered by
+    modal_notice.js into the band, which the image layout shows and every other layout leaves empty.
+
+    Context variables required for this template:
+      * url - the image's URL, already through the file API
+      * alt - the notice's title as plain text, not HTML
+
+    Example context (json):
+    {
+        "url": "https://example.com/pluginfile.php/1/local_awareness/bgimage/7/poster.jpg",
+        "alt": "Enrolment week"
+    }
+}}
+<img src="{{url}}" alt="{{alt}}" class="la-image">
