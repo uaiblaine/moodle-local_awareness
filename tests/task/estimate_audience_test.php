@@ -201,6 +201,70 @@ final class estimate_audience_test extends \advanced_testcase {
     }
 
     /**
+     * The message carries the title in its plain spelling: filtered in the notice's context, never escaped.
+     *
+     * The message is FORMAT_PLAIN, so nothing downstream filters or unescapes it: a multilang title
+     * sent raw shows both languages. The multilang filter is switched on for strings, and the
+     * control is that format_string() really drops the other language here. A bare ampersand is
+     * the escaping fixture, because tag-shaped input is stripped alike in both spellings. The
+     * course notice sits in a course that switches the filter off, so its title keeps both
+     * languages only when it is formatted in its own context.
+     *
+     * @return void
+     */
+    public function test_the_message_carries_the_title_filtered_and_unescaped(): void {
+        filter_set_global_state('multilang', TEXTFILTER_ON);
+        filter_set_applies_to_strings('multilang', true);
+        set_config('audience_sync_limit', 0, 'local_awareness');
+        live_mode::reset_cache();
+        $this->setAdminUser();
+
+        $course = $this->getDataGenerator()->create_course();
+        filter_set_local_state('multilang', \context_course::instance($course->id)->id, TEXTFILTER_OFF);
+
+        $title = '<span lang="en" class="multilang">Rock & roll</span><span lang="pt_br" class="multilang">Samba</span>';
+        helper::create_new_notice((object) ['title' => $title, 'content' => '<p>Site.</p>']);
+        $data = (object) ['title' => $title, 'content' => '<p>Course.</p>'];
+        helper::create_new_notice($data, author_scope::course((int) $course->id));
+
+        $this->assertSame(
+            'Rock & roll',
+            format_string($title, true, ['context' => \context_system::instance(), 'escape' => false]),
+            'precondition: the multilang filter runs on strings at the site'
+        );
+
+        $sink = $this->redirectMessages();
+        foreach (awareness::get_records() as $notice) {
+            $job = audience_job::get_record(['noticeid' => (int) $notice->get('id')]);
+            $this->assertSame(audience_job::STATUS_PENDING, $job->get('status'), 'the estimate was queued');
+            $task = new estimate_audience();
+            $task->set_custom_data(['jobid' => $job->get('jobid')]);
+            $task->execute();
+        }
+        $messages = $sink->get_messages();
+        $sink->close();
+
+        $this->assertCount(2, $messages);
+        $byscope = [];
+        foreach ($messages as $message) {
+            $byscope[str_contains($message->contexturl, 'courseid=') ? 'course' : 'site'] = $message;
+        }
+
+        $site = $byscope['site'];
+        $expected = get_string('message:audience_ready:subject', 'local_awareness', (object) ['title' => 'Rock & roll']);
+        $this->assertSame($expected, $site->subject);
+        $this->assertSame($expected, $site->smallmessage);
+        $this->assertStringContainsString('"Rock & roll"', $site->fullmessage);
+        $this->assertStringNotContainsString('Samba', $site->fullmessage);
+
+        $this->assertSame(
+            get_string('message:audience_ready:subject', 'local_awareness', (object) ['title' => 'Rock & rollSamba']),
+            $byscope['course']->subject,
+            'the course notice is formatted in its course, where the filter is off'
+        );
+    }
+
+    /**
      * A queued estimate that fails is recorded on its job, stores no count and tells nobody.
      *
      * No stored criteria make the real estimator throw, so it is replaced in core's DI container,

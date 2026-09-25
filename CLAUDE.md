@@ -92,11 +92,16 @@ Behat site fails every scenario on the same core locator and looks like your bug
 
 ## Where the real documentation is
 
-- **`docs/RECONCILIACAO-2026-08.md` is the open-work list.** It gives every one
-  of the 198 findings in `docs/AUDIT-2026-08.md` a verdict against the code with
-  current-tree evidence. **Read it, never the audit** — the audit is explicitly
-  the August snapshot of the starting point, and treating it as the open list
-  sends you to re-investigate a hundred settled findings.
+- **`docs/RECONCILIACAO-2026-08.md` is closed except REPO-10**, the missing
+  release tag and released CHANGELOG section, which is a release decision for
+  the owner, not a defect. It gives every one of the 198 findings in
+  `docs/AUDIT-2026-08.md` a verdict against the code with current-tree evidence.
+  **Read it, never the audit** — the audit is explicitly the August snapshot of
+  the starting point, and treating it as an open list sends you to re-investigate
+  a hundred settled findings.
+- The September 2026 comment audit and its fixes (PR #74, version `2026092401`)
+  closed a further 73 findings, outside those 198. Its reports are kept outside
+  the repo, in `~/dev/moodle-dev/data/comment-audit/local_awareness-2026-09-23/`.
 - The August audit's M12, M13, M14 and M16 are pinned in `tests/helper_test.php` by
   `test_a_refused_blocking_notice_can_still_be_acknowledged`,
   `test_a_notice_targeting_a_hidden_cohort_reaches_its_members`,
@@ -244,7 +249,12 @@ Behat site fails every scenario on the same core locator and looks like your bug
   course-scoped form and save read a context and groups the course no longer has (`group_scope`
   reaches `groups_get_all_groups()`, which calls `context_course::instance()`). The list's other
   actions (delete, disable, enable, reset, recalculate) need no form and work on an orphan, and an
-  orphan's URLs carry no `courseid`, because both pages `get_course()` one.
+  orphan's URLs carry no `courseid`, and the list offers an orphan no Edit
+  (`all_notices::is_orphan()`). A saved link naming a deleted course is gated on the URL's missing
+  scope before any notice is resolved: whoever holds the site capability for the page's verb (either
+  verb for `managenotice.php`, manage for `editnotice.php`) is redirected to the site list with
+  `notification:coursenotfound`, and anyone else gets core's `invalidcourseid`;
+  `tests/deleted_course_link_test.php` pins it.
   `tests/editnotice_orphan_test.php` pins it. `helper::may_serve_files_of()` is the file gate:
   author bypass in the notice's scope, then course access for a course notice, then the audience.
   Course deletion purges through the `before_course_deleted` hook —
@@ -578,9 +588,13 @@ Behat site fails every scenario on the same core locator and looks like your bug
 - **`helper.php` requires `filelib.php` for the AJAX read path**, and only Behat guards it: the
   PHPUnit process has usually loaded filelib already, so a missing require shows only in an
   end-to-end request.
-- **A page script can be tested in-process.** `tests/editnotice_orphan_test.php` requires
-  `editnotice.php` inside a test method: declare the globals it uses, reset `$PAGE` and `$OUTPUT`
-  per run, set `$_SERVER['REQUEST_METHOD']` and `$_GET` or `$_POST`, and capture the output.
+- **A page script can be tested in-process.** `tests/editnotice_orphan_test.php` and
+  `tests/deleted_course_link_test.php` run a page through `tests/fixtures/<page>_request.php`,
+  whose top-level code binds core's globals and requires the page in the calling method's scope (a
+  `global` list inside the method reads as unused variables to phpmd, which does not analyse
+  top-level code). Reset `$PAGE`, `$OUTPUT` and `$COURSE` (to `clone($SITE)`, or `get_course()`
+  answers from the previous run) per run, set `$_SERVER['REQUEST_METHOD']` and `$_GET` or `$_POST`,
+  and capture the output. The create page ends in `die`, so use an Edit link to reach the form.
   `redirect()` throws `redirecterrordetected` in a CLI process, so a redirect is that exception and
   a confirmation page is the captured output. The redirect's message and target are not observable
   that way: assert URLs through a rendered button, or through state.

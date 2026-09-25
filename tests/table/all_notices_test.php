@@ -383,7 +383,7 @@ final class all_notices_test extends \advanced_testcase {
             'courseid' => (int) $course->id,
             'filtervalues' => json_encode(['filter_groups' => [$goneid]]),
         ]);
-        $plain = $this->notice(['title' => 'Plain']);
+        $this->notice(['title' => 'Plain']);
 
         $table = new all_notices('probe', new \moodle_url('/local/awareness/managenotice.php'));
         $table->set_filterset(new all_notices_filterset());
@@ -628,6 +628,58 @@ final class all_notices_test extends \advanced_testcase {
         $this->assertStringContainsString('courseid=' . $course->id, $row['actions'], 'every action keeps the course');
         $mine->guess_base_url();
         $this->assertSame((int) $course->id, (int) $mine->baseurl->get_param('courseid'));
+    }
+
+    /**
+     * An orphan is not offered Edit, which editnotice.php refuses it, and keeps every action that needs no form.
+     *
+     * The course is deleted directly, bypassing the before_course_deleted purge, which is how an
+     * orphan arises. A live course notice on the same page is the control that Edit is offered at
+     * all, and the title column labelling the orphan is the control that the row is the one meant.
+     */
+    public function test_an_orphan_is_not_offered_edit(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        set_config('allow_delete', 1, 'local_awareness');
+        $live = $this->getDataGenerator()->create_course();
+        $gone = $this->getDataGenerator()->create_course();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $control = $generator->create_notice(['title' => 'live', 'courseid' => $live->id]);
+        $orphan = $generator->create_notice(['title' => 'orphan', 'courseid' => $gone->id]);
+        $DB->delete_records('context', ['contextlevel' => CONTEXT_COURSE, 'instanceid' => $gone->id]);
+        $DB->delete_records('course', ['id' => $gone->id]);
+        \context_helper::reset_caches();
+        accesslib_clear_all_caches_for_unit_testing();
+        $this->assertFalse(author_scope::of($orphan)->exists(), 'precondition: the course is gone');
+
+        $table = $this->scoped_table(null);
+        $table->query_db(all_notices::PER_PAGE, false);
+        $rows = [];
+        foreach ($table->rawdata as $notice) {
+            $rows[$notice->get('title')] = $table->format_row($notice);
+        }
+        $edithref = static fn(awareness $notice): string => (new \moodle_url('/local/awareness/editnotice.php', [
+            'noticeid' => (int) $notice->get('id'),
+            'action' => 'edit',
+            'sesskey' => sesskey(),
+        ]))->out();
+
+        $this->assertStringContainsString(
+            'href="' . $edithref($control) . '"',
+            $rows['live']['actions'],
+            'a live notice is offered Edit'
+        );
+        $this->assertStringContainsString(get_string('manage:scope:orphan', 'local_awareness'), $rows['orphan']['title']);
+        $this->assertStringNotContainsString('action=edit', $rows['orphan']['actions'], 'an orphan is not offered Edit');
+        foreach (['disable', 'recalculate', 'unconfirmedreset', 'unconfirmeddelete'] as $action) {
+            $this->assertStringContainsString('action=' . $action, $rows['orphan']['actions'], "an orphan keeps {$action}");
+        }
+        $this->assertStringContainsString(
+            'data-noticeid="' . $orphan->get('id') . '"',
+            $rows['orphan']['actions'],
+            'an orphan keeps its preview'
+        );
     }
 
     /**

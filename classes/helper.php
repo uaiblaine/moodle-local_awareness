@@ -2560,7 +2560,6 @@ class helper {
 
         // Resolve the course from the courseid passed by JS.
         $course = null;
-        $coursecontext = null;
         if ($courseid > 1) { // 1 is the site/frontpage course, not a real course.
             $course = $DB->get_record('course', ['id' => $courseid]);
             /*
@@ -2582,9 +2581,6 @@ class helper {
              */
             if ($course && !can_access_course($course, null, '', true)) {
                 $course = null;
-            }
-            if ($course) {
-                $coursecontext = \context_course::instance($course->id, IGNORE_MISSING);
             }
         }
 

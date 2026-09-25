@@ -15,19 +15,20 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details.
+ * Runs managenotice.php as one request, inside the test method that includes this file.
+ *
+ * Same shape as editnotice_request.php beside it, which says why the globals are bound here.
  *
  * @package    local_awareness
- * @copyright  Catalyst IT
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_awareness'; // Full name of the plugin (used for diagnostics).
-$plugin->version   = 2026092500;         // The current module version (Date: YYYYMMDDXX).
-$plugin->release = 'v1.0';
-$plugin->requires = 2024100700;          // Requires Moodle 4.5 or later.
-$plugin->supported = [405, 502];  // Supported from Moodle 4.5 to 5.2.
-$plugin->maturity = MATURITY_STABLE;
+global $CFG, $DB, $OUTPUT, $PAGE, $SITE, $USER;
+
+$PAGE = new moodle_page();
+$OUTPUT = new bootstrap_renderer();
+
+require($CFG->dirroot . '/local/awareness/managenotice.php');

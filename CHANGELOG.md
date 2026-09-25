@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Loose ends after the code audit (version 2026092500)
+
+The "audience estimate ready" message shows the notice title the way the notice list does: filters
+run in the notice's own context, so a multilang title shows one language, and an ampersand is no
+longer sent as "&amp;" in the plain-text subject, body and short message. When an estimate failed
+without a reason, the editor's audience panel showed "Estimate failed:" with nothing after it; it now
+says the server did not return an answer, as the other failed estimates already did.
+
+The notice list no longer offers Edit on a notice whose course has been deleted, since the editor
+refuses to open it; preview, enable and disable, recalculate, ask everyone again, the reports and
+delete are still offered. A saved link to the notice list or the editor that names a deleted course
+no longer ends in a database error: someone who may open the site notice list is sent there with a
+warning, and anyone else gets Moodle's standard "invalid course ID" error.
+
+Tests and housekeeping: a coverage run no longer stops on an invalid `@covers` tag, dead local
+variables are gone so the strict phpmd ruleset reports nothing, three JavaScript modules carry the
+same copyright line as the others, and the August reconciliation document records that it is closed
+except for the release itself.
+
 ### Fixes to access, escaping and behaviour found by the code audit (version 2026092401)
 
 **Access and group reach.** A course author confined to their own groups (separate groups, without

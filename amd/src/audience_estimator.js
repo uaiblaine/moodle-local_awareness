@@ -24,7 +24,7 @@
  *    the result, up to pollMax attempts.
  *
  * @module     local_awareness/audience_estimator
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 define([
@@ -346,7 +346,8 @@ define([
             if (response.status === 'ready') {
                 handleReady(response);
             } else if (response.status === 'error') {
-                handleError(response.errormsg || '');
+                // A job can fail with an exception that carries no message.
+                handleError(response.errormsg || state.strings.noAnswer);
             } else {
                 if (state.pollAttempts >= state.pollMax) {
                     handleTimeout();

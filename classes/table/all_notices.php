@@ -566,12 +566,14 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             return $this->report_only_actions($awareness, $menu);
         }
 
-        $primary = [
-            ['edit', get_string('edit'), 't/edit'],
-            $awareness->get('enabled')
-                ? ['disable', get_string('notice:disable', 'local_awareness'), 't/hide']
-                : ['enable', get_string('notice:enable', 'local_awareness'), 't/show'],
-        ];
+        // Not Edit for an orphan, which editnotice.php refuses; every other action needs no form and works on it.
+        $primary = [];
+        if (!$this->is_orphan($awareness)) {
+            $primary[] = ['edit', get_string('edit'), 't/edit'];
+        }
+        $primary[] = $awareness->get('enabled')
+            ? ['disable', get_string('notice:disable', 'local_awareness'), 't/hide']
+            : ['enable', get_string('notice:enable', 'local_awareness'), 't/show'];
         foreach ($primary as [$name, $label, $icon]) {
             $menu->add_primary_action(new \core\output\action_menu\link_primary(
                 $action($name),
@@ -623,6 +625,22 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         }
 
         return $OUTPUT->render($menu);
+    }
+
+    /**
+     * Whether a row is an orphan: a course notice whose course is gone.
+     *
+     * Only the site list can hold one, since a course list opens only for a course that exists, and
+     * query_db() has already read that list's courses for the title column, which labels the same
+     * rows manage:scope:orphan.
+     *
+     * @param awareness $awareness The notice.
+     * @return bool
+     */
+    private function is_orphan(awareness $awareness): bool {
+        $courseid = (int) $awareness->get('courseid');
+
+        return $courseid > SITEID && $this->scope()->is_site() && !isset($this->coursenames[$courseid]);
     }
 
     /**

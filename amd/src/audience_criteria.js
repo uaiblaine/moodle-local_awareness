@@ -22,7 +22,7 @@
  * the field name; we read those names directly.
  *
  * @module     local_awareness/audience_criteria
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 define([], function() {
