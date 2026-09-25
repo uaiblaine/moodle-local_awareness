@@ -72,7 +72,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     public function __construct(string $uniqueid, ?\moodle_url $url = null, int $page = 0, int $perpage = self::PER_PAGE) {
         parent::__construct($uniqueid);
 
-        $this->set_attribute('class', 'local-awareness awarenesss');
+        $this->set_attribute('class', 'local-awareness');
 
         /*
          * The table's accessible name, which screen readers announce when listing a page's tables.
@@ -293,7 +293,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * What an empty result looks like.
      *
      * Rendered by the table, not the page, because the AJAX refresh replaces only the table's own
-     * HTML. With filters active it offers to clear them; with none, to create a notice.
+     * HTML. With filters active it offers to clear them; with none, it offers an author the create
+     * button, gated like the page's own ({@see \local_awareness\output\manage_page::export_for_template()}),
+     * and a reports-only viewer nothing.
      *
      * @return void
      */
@@ -311,13 +313,13 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 'clearlabel' => get_string('manage:filter:clear', 'local_awareness'),
             ]);
         } else {
+            $cancreate = helper::require_author($this->scope(), 'manage', false);
             echo $OUTPUT->render_from_template('local_awareness/manage/empty', [
                 'message' => get_string('manage:empty:none', 'local_awareness'),
-                'showcreate' => true,
-                'createurl' => $this->page_url(
-                    '/local/awareness/editnotice.php',
-                    ['noticeid' => 0, 'sesskey' => sesskey()]
-                )->out(false),
+                'showcreate' => $cancreate,
+                'createurl' => $cancreate
+                    ? $this->page_url('/local/awareness/editnotice.php', ['noticeid' => 0, 'sesskey' => sesskey()])->out(false)
+                    : '',
                 'createlabel' => get_string('notice:create', 'local_awareness'),
             ]);
         }
@@ -353,10 +355,13 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * A predicate excluding the notices whose groups the current user may not reach, or nothing.
      *
      * The candidates are the rows naming a group at all, found by a LIKE on the JSON column for
-     * group_scope::FIELD; a row without that key cannot be excluded. Each candidate is decided by
-     * group_scope::admits() for its own course, memoised per course. A site notice is never
-     * excluded, even one whose stored JSON names a group, so a site administrator can still reach
-     * it.
+     * group_scope::FIELD; a row without that key cannot be excluded. Only a course in separate
+     * groups mode confines anyone ({@see group_scope::is_restricted()}), so the same query keeps
+     * only such courses. That also leaves out a site notice, even one whose stored JSON names a
+     * group, and a notice whose course is gone: neither confines anybody, and an administrator must
+     * still reach both to fix them. What is left is decided by group_scope::admits() for its own
+     * course, memoised per course, and only for a viewer without moodle/site:accessallgroups there:
+     * a viewer who may access all groups costs this one query, whatever the number of courses.
      *
      * @param author_scope $scope The list's scope.
      * @return array [sql, params], the sql empty when nothing is excluded.
@@ -364,24 +369,43 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     protected function unreachable_notices_sql(author_scope $scope): array {
         global $DB;
 
-        $where = $DB->sql_like('filtervalues', ':grpkey');
-        $params = ['grpkey' => '%' . $DB->sql_like_escape('"' . group_scope::FIELD . '"') . '%'];
+        $where = $DB->sql_like('a.filtervalues', ':grpkey');
+        $params = [
+            'grpkey' => '%' . $DB->sql_like_escape('"' . group_scope::FIELD . '"') . '%',
+            'grpmode' => SEPARATEGROUPS,
+            'grpctxlevel' => CONTEXT_COURSE,
+        ];
         if (!$scope->is_site()) {
-            $where .= ' AND courseid = :grpcourseid';
+            $where .= ' AND a.courseid = :grpcourseid';
             $params['grpcourseid'] = $scope->get_courseid();
         }
-        $candidates = $DB->get_records_select(awareness::TABLE, $where, $params, '', 'id, courseid, filtervalues');
+        /*
+         * The course contexts are preloaded, so the capability check below reads no context row. A
+         * LEFT join, so a course missing its context row is still decided rather than skipped.
+         */
+        $ctxfields = \context_helper::get_preload_record_columns_sql('ctx');
+        $sql = "SELECT a.id, a.courseid, a.filtervalues, {$ctxfields}
+                  FROM {" . awareness::TABLE . "} a
+                  JOIN {course} c ON c.id = a.courseid AND c.groupmode = :grpmode
+             LEFT JOIN {context} ctx ON ctx.instanceid = a.courseid AND ctx.contextlevel = :grpctxlevel
+                 WHERE {$where}";
+        $candidates = $DB->get_records_sql($sql, $params);
 
         $excluded = [];
         $reach = [];
         foreach ($candidates as $record) {
+            \context_helper::preload_from_record($record);
             $courseid = (int) $record->courseid;
             $targets = group_scope::decode($record->filtervalues);
             if ($targets === [] || $courseid <= SITEID) {
                 continue;
             }
-            $reach[$courseid] ??= group_scope::for_author(author_scope::course($courseid));
-            if (!$reach[$courseid]->admits($targets)) {
+            if (!array_key_exists($courseid, $reach)) {
+                // The second half of group_scope::is_restricted(); the query above holds the first.
+                $confined = !has_capability('moodle/site:accessallgroups', \context_course::instance($courseid));
+                $reach[$courseid] = $confined ? group_scope::for_author(author_scope::course($courseid)) : null;
+            }
+            if ($reach[$courseid] !== null && !$reach[$courseid]->admits($targets)) {
                 $excluded[] = (int) $record->id;
             }
         }
@@ -408,13 +432,12 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
         $wheres = ['1 = 1'];
         $params = [];
-        $filterset = $this->get_filterset();
 
-        if ($filterset === null) {
-            return [implode(' AND ', $wheres), $params];
-        }
-
-        // The list's scope: a course page lists that course's notices and nothing else.
+        /*
+         * The list's scope: a course page lists that course's notices and nothing else. The scope
+         * and the group reach below apply with or without a filterset; scope() reads an absent one
+         * as the site.
+         */
         $scope = $this->scope();
         if (!$scope->is_site()) {
             $wheres[] = 'courseid = :courseid';
@@ -430,6 +453,11 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         if ($unreachablesql !== '') {
             $wheres[] = $unreachablesql;
             $params += $unreachableparams;
+        }
+
+        $filterset = $this->get_filterset();
+        if ($filterset === null) {
+            return [implode(' AND ', $wheres), $params];
         }
 
         if ($filterset->has_filter('name')) {
@@ -521,16 +549,18 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
          * spellings, keyboard handling and ARIA, and it emits a .dropdown. Boost on 5.x has a
          * `.table-responsive .dropdown { position: static }` rule that lets that menu escape the
          * scroll container's overflow clip; a .btn-group wrapper is position: relative and would
-         * clip the last row's menu. Moodle 4.5's Boost has no such rule.
+         * clip the last row's menu. Moodle 4.5's Boost has no such rule and wraps the table in
+         * .no-overflow instead; styles.css supplies the rule for that wrapper behind the Bootstrap 4
+         * gate.
          */
         $menu = new \core\output\action_menu();
         $menu->set_kebab_trigger(get_string('actions'));
 
         /*
-         * A viewer who may not manage this notice gets the preview and the reports, none of the
-         * verbs: a link to an action require_author() would refuse is a link to an error. Decided
-         * per row because each row is judged in its own scope, and on the site list a capability
-         * overridden in one course differs from row to row.
+         * A viewer who may not manage this notice gets the preview and, where they may read them,
+         * the reports; none of the verbs: a link to an action require_author() would refuse is a
+         * link to an error. Decided per row because each row is judged in its own scope, and on
+         * the site list a capability overridden in one course differs from row to row.
          */
         if (!helper::require_author(author_scope::of($awareness), 'manage', false)) {
             return $this->report_only_actions($awareness, $menu);
@@ -573,20 +603,6 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             ['recalculate', get_string('notice:audience:recalculate', 'local_awareness'), 'i/calc'],
             ['unconfirmedreset', get_string('notice:reset', 'local_awareness'), 't/reset'],
         ];
-        /*
-         * Gated on the level, not on reqack: from Blocking up a notice records acceptances and
-         * refusals (see helper::dismiss_notice()), even without demanding a tick. An Informational
-         * notice records neither, so it offers no report.
-         */
-        if ($awareness->get_insistence() >= awareness::INSISTENCE_BLOCKING) {
-            $secondary[] = ['acknowledged_report', get_string('report:button:ack', 'local_awareness'), 'i/report'];
-            $secondary[] = ['dismissed_report', get_string('report:button:dis', 'local_awareness'), 'i/report'];
-        }
-        // Delete stays last because it is destructive.
-        if (get_config('local_awareness', 'allow_delete')) {
-            $secondary[] = ['unconfirmeddelete', get_string('notice:delete', 'local_awareness'), 't/delete'];
-        }
-
         foreach ($secondary as [$name, $label, $icon]) {
             $menu->add_secondary_action(new \core\output\action_menu\link_secondary(
                 $action($name),
@@ -594,12 +610,59 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 $label
             ));
         }
+        foreach ($this->report_links($awareness) as $link) {
+            $menu->add_secondary_action($link);
+        }
+        // Delete stays last because it is destructive.
+        if (get_config('local_awareness', 'allow_delete')) {
+            $menu->add_secondary_action(new \core\output\action_menu\link_secondary(
+                $action('unconfirmeddelete'),
+                new \pix_icon('t/delete', ''),
+                get_string('notice:delete', 'local_awareness')
+            ));
+        }
 
         return $OUTPUT->render($menu);
     }
 
     /**
-     * The actions a reports-only viewer gets: the preview, and the two reports where rows can exist.
+     * The two compliance report links of a notice, or none.
+     *
+     * Offered from Blocking up, not on reqack: from that level a notice records acceptances and
+     * refusals (see helper::dismiss_notice()) even without demanding a tick, and an Informational
+     * notice records neither. Offered only to a viewer who may read this notice's reports, whatever
+     * they may do to the notice itself. The links go straight to the report pages, which gate on
+     * the viewreports verb themselves; editnotice.php would demand the manage verb first.
+     *
+     * @param awareness $awareness The notice.
+     * @return \core\output\action_menu\link_secondary[]
+     */
+    private function report_links(awareness $awareness): array {
+        $offered = $awareness->get_insistence() >= awareness::INSISTENCE_BLOCKING
+            && helper::require_author(author_scope::of($awareness), 'viewreports', false);
+        if (!$offered) {
+            return [];
+        }
+
+        $params = ['noticeid' => (int) $awareness->get('id')];
+        $reports = [
+            ['/local/awareness/report/acknowledged_systemreport.php', get_string('report:button:ack', 'local_awareness')],
+            ['/local/awareness/report/dismissed_systemreport.php', get_string('report:button:dis', 'local_awareness')],
+        ];
+        $links = [];
+        foreach ($reports as [$path, $label]) {
+            $links[] = new \core\output\action_menu\link_secondary(
+                new moodle_url($path, $params),
+                new \pix_icon('i/report', ''),
+                $label
+            );
+        }
+
+        return $links;
+    }
+
+    /**
+     * The actions a viewer who may not manage the notice gets: the preview, and the reports they may read.
      *
      * @param awareness $awareness The notice.
      * @param \core\output\action_menu $menu The menu, with its trigger already set.
@@ -608,7 +671,6 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     private function report_only_actions(awareness $awareness, \core\output\action_menu $menu): string {
         global $OUTPUT;
 
-        $id = (int) $awareness->get('id');
         $previewlabel = get_string('notice:preview', 'local_awareness');
         $menu->add_primary_action(new \core\output\action_menu\link_primary(
             new moodle_url('#'),
@@ -622,22 +684,8 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             ]
         ));
 
-        // The same gate col_actions() applies: informational notices record nothing to report on.
-        if ($awareness->get_insistence() >= awareness::INSISTENCE_BLOCKING) {
-            $reports = [
-                ['acknowledged_report', get_string('report:button:ack', 'local_awareness')],
-                ['dismissed_report', get_string('report:button:dis', 'local_awareness')],
-            ];
-            foreach ($reports as [$name, $label]) {
-                $menu->add_secondary_action(new \core\output\action_menu\link_secondary(
-                    $this->page_url(
-                        '/local/awareness/editnotice.php',
-                        ['noticeid' => $id, 'action' => $name, 'sesskey' => sesskey()]
-                    ),
-                    new \pix_icon('i/report', ''),
-                    $label
-                ));
-            }
+        foreach ($this->report_links($awareness) as $link) {
+            $menu->add_secondary_action($link);
         }
 
         return $OUTPUT->render($menu);
@@ -652,7 +700,15 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     protected function col_status(awareness $awareness): string {
         global $OUTPUT;
 
-        $clashes = $this->clashtitles[(int) $awareness->get('id')] ?? [];
+        /*
+         * collision::clash_titles_for() returns the rivals' titles raw. They are formatted as the
+         * title column formats its own, but unescaped: the explanation reaches double stashes.
+         */
+        $options = ['context' => \context_system::instance(), 'escape' => false];
+        $clashes = array_map(
+            static fn(string $title): string => format_string($title, true, $options),
+            $this->clashtitles[(int) $awareness->get('id')] ?? []
+        );
         $explanation = empty($clashes)
             ? ''
             : get_string('collision:badgetooltip', 'local_awareness', implode(', ', $clashes));
@@ -812,8 +868,15 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         $this->cohortnames ??= helper::built_cohorts_options();
         $options = $this->cohortnames;
 
-        $names = array_map(static function ($cohortid) use ($options) {
-            return helper::get_cohort_name((int) $cohortid, $options);
+        /*
+         * The option list holds raw names. The line and the list reach double stashes, so each name
+         * is formatted, unescaped, in the system context: the list carries no cohort's own.
+         */
+        $context = \context_system::instance();
+        $names = array_map(static function ($cohortid) use ($options, $context) {
+            $name = helper::get_cohort_name((int) $cohortid, $options);
+
+            return format_string($name, true, ['context' => $context, 'escape' => false]);
         }, $cohorts);
         $list = implode(', ', $names);
 
@@ -848,7 +911,8 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             $this->groupnames = [];
             foreach ($DB->get_records_list('groups', 'id', array_keys($ids), '', 'id, name, courseid') as $group) {
                 $context = \context_course::instance((int) $group->courseid, IGNORE_MISSING) ?: \context_system::instance();
-                $this->groupnames[(int) $group->id] = format_string($group->name, true, ['context' => $context]);
+                // Unescaped: the line and the list reach double stashes, which escape them.
+                $this->groupnames[(int) $group->id] = format_string($group->name, true, ['context' => $context, 'escape' => false]);
             }
         }
 
@@ -874,13 +938,12 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         /*
          * format_string(), not the raw value: the persistent stores the title as
          * PARAM_RAW_TRIMMED, and the modal formats it the same way, so a multilang title reads
-         * alike in both (see notice_payload::build()).
+         * alike in both (see notice_payload::build()). Escaped for the template's triple stash,
+         * unescaped for its tooltip attribute, which is a double stash.
          */
-        $title = format_string(
-            $awareness->get('title'),
-            true,
-            ['context' => \context_system::instance()]
-        );
+        $context = \context_system::instance();
+        $title = format_string($awareness->get('title'), true, ['context' => $context]);
+        $titleplain = format_string($awareness->get('title'), true, ['context' => $context, 'escape' => false]);
 
         /*
          * The path is PARAM_RAW too, but a URL pattern rather than prose: it is passed raw and
@@ -894,10 +957,14 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         $courseid = (int) $awareness->get('courseid');
         if ($courseid > 0 && $this->scope()->is_site()) {
             if (isset($this->coursenames[$courseid])) {
+                // Unescaped: the sentence reaches a double stash.
                 $name = format_string(
                     $this->coursenames[$courseid]->fullname,
                     true,
-                    ['context' => \context_course::instance($courseid, IGNORE_MISSING) ?: \context_system::instance()]
+                    [
+                        'context' => \context_course::instance($courseid, IGNORE_MISSING) ?: \context_system::instance(),
+                        'escape' => false,
+                    ]
                 );
                 $course = [
                     'name' => get_string('manage:scope:course', 'local_awareness', $name),
@@ -910,7 +977,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
         return $OUTPUT->render_from_template('local_awareness/manage/cell_title', [
             'title' => $title,
-            'titleplain' => $title,
+            'titleplain' => $titleplain,
             'where' => $path !== '' ? $path : get_string('notice:pathmatch:anywhere', 'local_awareness'),
             'course' => $course,
         ]);

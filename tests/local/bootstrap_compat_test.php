@@ -190,22 +190,84 @@ final class bootstrap_compat_test extends \basic_testcase {
     }
 
     /**
-     * Whether a line is prose rather than markup.
+     * The lines of a source that are markup or code rather than prose, keyed by 0-based line index.
      *
      * The rules below are about what reaches the browser. A comment that names a class or an
      * attribute in order to explain a rule is not a violation of it.
      *
-     * @param string $line One raw source line.
-     * @return bool True when the line opens with a PHP, JS or Mustache comment marker.
+     * A comment is recognised when its opener starts a line: `//`, `/*` or `{{!`. A block or
+     * Mustache comment then runs to its closer, however many lines later, so the continuation lines
+     * of a template docblock are prose too even though nothing marks them; whatever follows the
+     * closer on its line is kept. A line starting with `*` outside a tracked comment is taken as the
+     * body of a docblock whose opener shared a line with code.
+     *
+     * @param string $source A whole PHP, JS or Mustache source.
+     * @return array Line index => the code on that line, comments removed.
      */
-    private function is_comment_line(string $line): bool {
-        $trimmed = ltrim($line);
+    private function code_lines(string $source): array {
+        $openers = ['{{!' => '}}', '/*' => '*/'];
+        $code = [];
+        $closer = null;
+        foreach (preg_split('/\R/', $source) as $index => $line) {
+            $rest = $line;
+            while (true) {
+                if ($closer !== null) {
+                    $end = strpos($rest, $closer);
+                    if ($end === false) {
+                        continue 2;
+                    }
+                    $rest = substr($rest, $end + strlen($closer));
+                    $closer = null;
+                }
+                $rest = ltrim($rest);
+                if ($rest === '' || str_starts_with($rest, '//') || str_starts_with($rest, '*')) {
+                    continue 2;
+                }
+                $opened = false;
+                foreach ($openers as $opener => $end) {
+                    if (str_starts_with($rest, $opener)) {
+                        $rest = substr($rest, strlen($opener));
+                        $closer = $end;
+                        $opened = true;
+                        break;
+                    }
+                }
+                if (!$opened) {
+                    break;
+                }
+            }
+            $code[$index] = $rest;
+        }
 
-        return $trimmed === ''
-            || str_starts_with($trimmed, '//')
-            || str_starts_with($trimmed, '/*')
-            || str_starts_with($trimmed, '*')
-            || str_starts_with($trimmed, '{{!');
+        return $code;
+    }
+
+    /**
+     * The markup lines of a plugin file.
+     *
+     * @param string $path Absolute path.
+     * @return array Line index => the code on that line.
+     */
+    private function file_code_lines(string $path): array {
+        $source = file_get_contents($path);
+        $this->assertNotFalse($source, "Could not read {$path}");
+
+        return $this->code_lines($source);
+    }
+
+    /**
+     * The rules behind the Bootstrap 4 gate that backport a Boost 5.x behaviour, not a utility.
+     *
+     * Their classes are core's and the plugin's own, never a Bootstrap 5 utility the markup uses,
+     * so the utility checks below leave them out; test_the_row_menu_escapes_its_scroll_wrapper()
+     * checks them instead.
+     *
+     * @return array Exact selector => the declaration it must carry.
+     */
+    private function backports(): array {
+        return [
+            'body.' . bootstrap::BODY_CLASS_BS4 . ' .local-awareness-manage .no-overflow .dropdown' => 'position: static;',
+        ];
     }
 
     /**
@@ -227,6 +289,9 @@ final class bootstrap_compat_test extends \basic_testcase {
             if (!preg_match('/body\.' . $gate . '\b/', $selector)) {
                 continue;
             }
+            if (array_key_exists(trim($selector), $this->backports())) {
+                continue;
+            }
             preg_match_all('/\.([a-z][a-z0-9-]*)/', $selector, $matches);
             foreach ($matches[1] as $token) {
                 $tokens[] = $token;
@@ -243,10 +308,7 @@ final class bootstrap_compat_test extends \basic_testcase {
     private function used_bs5_tokens(): array {
         $used = [];
         foreach ($this->markup_files() as $path) {
-            foreach (file($path) as $line) {
-                if ($this->is_comment_line($line)) {
-                    continue;
-                }
+            foreach ($this->file_code_lines($path) as $line) {
                 foreach ($this->bs5_only_utilities() as $pattern => $unusedlabel) {
                     if (!preg_match_all($pattern, $line, $matches)) {
                         continue;
@@ -322,6 +384,48 @@ final class bootstrap_compat_test extends \basic_testcase {
     }
 
     /**
+     * The manage list's row menu escapes the table's scroll wrapper on 4.5, as Boost lets it on 5.x.
+     *
+     * flexible_table wraps a responsive table in an overflow container, and the action menu is
+     * positioned against its .dropdown inside it, so the menu of a row near the end of a short list
+     * is clipped. Boost 5.x makes that .dropdown static inside .table-responsive; 4.5 names the
+     * wrapper .no-overflow and has no such rule, so the plugin supplies it behind the Bootstrap 4
+     * gate. The wrapper name comes from core, so it is read from core on the branch the test runs on.
+     *
+     * @return void
+     */
+    public function test_the_row_menu_escapes_its_scroll_wrapper(): void {
+        global $CFG;
+
+        $css = preg_replace('~/\*.*?\*/~s', '', file_get_contents($this->plugin_root() . '/styles.css'));
+        preg_match_all('/([^{}]+)\{([^{}]*)\}/', $css, $matches, PREG_SET_ORDER);
+        $rules = [];
+        foreach ($matches as $match) {
+            $rules[trim($match[1])] = trim($match[2]);
+        }
+        $this->assertNotEmpty($this->backports(), 'no backport is listed, so nothing is checked');
+        foreach ($this->backports() as $selector => $declaration) {
+            $this->assertArrayHasKey($selector, $rules, "styles.css no longer has {$selector}");
+            $this->assertStringContainsString($declaration, $rules[$selector], "{$selector} no longer sets {$declaration}");
+        }
+
+        $table = file_get_contents($CFG->libdir . '/table/classes/flexible_table.php');
+        $this->assertNotFalse($table, 'core\'s flexible_table could not be read');
+        $wrapper = bootstrap::is_bs4() ? 'no-overflow' : 'table-responsive';
+        $this->assertStringContainsString(
+            "'class' => '{$wrapper}'",
+            $table,
+            "core no longer wraps a responsive table in .{$wrapper}, which the row menu's rule depends on"
+        );
+
+        $this->assertMatchesRegularExpression(
+            '/class="local-awareness-manage".*\{\{\{tablehtml\}\}\}/s',
+            file_get_contents($this->plugin_root() . '/templates/manage/page.mustache'),
+            'the list is no longer rendered inside .local-awareness-manage, which the rule is scoped to'
+        );
+    }
+
+    /**
      * The Bootstrap data-API spellings missing from one line.
      *
      * Extracted from the sweep so the rule can be asserted against fixtures. With no live offender
@@ -376,10 +480,7 @@ final class bootstrap_compat_test extends \basic_testcase {
         $offenders = [];
         $checked = 0;
         foreach ($this->markup_files() as $path) {
-            foreach (file($path) as $number => $line) {
-                if ($this->is_comment_line($line)) {
-                    continue;
-                }
+            foreach ($this->file_code_lines($path) as $number => $line) {
                 foreach ($this->badge_text_colours() as $background => $required) {
                     if (!preg_match('/\b' . preg_quote($background, '/') . '\b/', $line)) {
                         continue;
@@ -418,10 +519,7 @@ final class bootstrap_compat_test extends \basic_testcase {
     public function test_data_api_attributes_are_paired(): void {
         $offenders = [];
         foreach ($this->markup_files() as $path) {
-            foreach (file($path) as $number => $line) {
-                if ($this->is_comment_line($line)) {
-                    continue;
-                }
+            foreach ($this->file_code_lines($path) as $number => $line) {
                 foreach ($this->data_api_offences($line) as $offence) {
                     $offenders[] = basename($path) . ':' . ($number + 1) . ' has only ' . $offence;
                 }
@@ -484,6 +582,42 @@ final class bootstrap_compat_test extends \basic_testcase {
     }
 
     /**
+     * The scans skip every line of a comment, the unmarked ones inside it included, and nothing else.
+     *
+     * A multi-line Mustache docblock has continuation lines that carry no marker of their own. Each
+     * prose line of the fixture names a class one of the scans reports, so a reader that lets one
+     * through fails here, and the markup lines around them prove it still reads code.
+     *
+     * @return void
+     */
+    public function test_comments_are_told_from_markup(): void {
+        $source = implode("\n", [
+            '{{!',
+            '    A docblock line naming badge bg-success and sr-only.',
+            '}}',
+            '<span class="badge bg-success text-white">',
+            '/*',
+            '   A block comment line naming fw-bold.',
+            '*/ <b class="after-block">',
+            '{{! One line. }}<i class="after-mustache">',
+            '// A line comment naming data-toggle.',
+            ' * A docblock body naming ml-1.',
+            '',
+            '<div class="last">',
+        ]);
+
+        $this->assertSame(
+            [
+                3 => '<span class="badge bg-success text-white">',
+                6 => '<b class="after-block">',
+                7 => '<i class="after-mustache">',
+                11 => '<div class="last">',
+            ],
+            $this->code_lines($source)
+        );
+    }
+
+    /**
      * The markup must never carry a Bootstrap 4 name that Moodle 5.x has deprecated.
      *
      * The paired form ("ml-1 ms-1") counts too: ms-1 alone already resolves on 4.5, so the pair
@@ -496,10 +630,7 @@ final class bootstrap_compat_test extends \basic_testcase {
         $scanned = 0;
         foreach ($this->markup_files() as $path) {
             $scanned++;
-            foreach (file($path) as $number => $line) {
-                if ($this->is_comment_line($line)) {
-                    continue;
-                }
+            foreach ($this->file_code_lines($path) as $number => $line) {
                 foreach ($this->deprecated_bs4_names() as $pattern => $replacement) {
                     if (preg_match($pattern, $line, $matches)) {
                         $offenders[] = basename($path) . ':' . ($number + 1)
@@ -515,9 +646,9 @@ final class bootstrap_compat_test extends \basic_testcase {
             [],
             $offenders,
             'Moodle 5.x back-ports these Bootstrap 4 names only through bs4-compat.scss, which marks '
-                . 'them deprecated and which Moodle 6.0 removes; their Bootstrap 5 spellings are in '
-                . '4.5\'s own forward bridge, so the BS5 name alone is correct on both branches: '
-                . implode('; ', $offenders)
+                . 'them deprecated and which Moodle 6.0 removes; their Bootstrap 5 spellings resolve on '
+                . '4.5 too, through core\'s forward bridge or, for visually-hidden, the plugin\'s own '
+                . 'polyfill, so use the BS5 name alone: ' . implode('; ', $offenders)
         );
     }
 
@@ -592,8 +723,8 @@ final class bootstrap_compat_test extends \basic_testcase {
         $this->assertSame(
             [],
             $offenders,
-            'These entry points set a plugin body class but never call bootstrap::mark_page(), so the '
-                . 'Bootstrap 4 polyfill will not reach them: ' . implode(', ', $offenders)
+            'These pages call $PAGE->set_url() but never bootstrap::mark_page(), so the Bootstrap 4 '
+                . 'polyfill will not reach them: ' . implode(', ', $offenders)
         );
     }
 

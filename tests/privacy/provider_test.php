@@ -475,6 +475,76 @@ final class provider_test extends \advanced_testcase {
     }
 
     /**
+     * Every column of this plugin's tables that holds a user id is declared, author stamps included.
+     *
+     * Core's compliance test finds user columns through foreign keys to {user}. A usermodified
+     * column stamped by core\persistent carries no such key, so only this sweep sees one. It reads
+     * the live table columns, so a table added later with either column is checked too.
+     */
+    public function test_every_user_id_column_is_declared(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $declared = [];
+        foreach (provider::get_metadata(new collection('local_awareness'))->get_collection() as $item) {
+            if (method_exists($item, 'get_privacy_fields') && $item->get_privacy_fields() !== null) {
+                $declared[$item->get_name()] = array_keys($item->get_privacy_fields());
+            }
+        }
+
+        $seen = [];
+        foreach ($DB->get_tables(false) as $table) {
+            if ($table !== 'local_awareness' && strpos($table, 'local_awareness_') !== 0) {
+                continue;
+            }
+            foreach (array_keys($DB->get_columns($table)) as $column) {
+                if ($column !== 'userid' && $column !== 'usermodified') {
+                    continue;
+                }
+                $seen[] = "{$table}.{$column}";
+                $this->assertContains($column, $declared[$table] ?? [], "{$table}.{$column} holds a user id and is not declared");
+            }
+        }
+
+        // Precondition: the sweep reached the author stamps, the columns core's own test misses.
+        $this->assertContains('local_awareness.usermodified', $seen);
+        $this->assertContains('local_awareness_slides.usermodified', $seen);
+    }
+
+    /**
+     * A slide's author column, declared like the notice's, survives erasure of its author too.
+     *
+     * The control is a view row of the same user, which the same call must erase, so the slide's
+     * survival is the provider leaving it alone and not the erasure never having run.
+     */
+    public function test_the_slide_table_is_declared_but_never_erased(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $author = $this->getDataGenerator()->create_user();
+        $slideid = $DB->insert_record('local_awareness_slides', (object) [
+            'noticeid' => 7,
+            'sortorder' => 0,
+            'caption' => 'Lab',
+            'usermodified' => $author->id,
+            'timecreated' => time(),
+            'timemodified' => time(),
+        ]);
+        $this->seed_one('local_awareness_lastview', (int) $author->id);
+
+        provider::delete_data_for_all_users_in_context(\context_user::instance($author->id));
+
+        $this->assertSame(0, $this->row_count((int) $author->id), 'the control: the erasure ran');
+        $this->assertSame(
+            (int) $author->id,
+            (int) $DB->get_field('local_awareness_slides', 'usermodified', ['id' => $slideid]),
+            'erasing the author must not rewrite who made the slide'
+        );
+    }
+
+    /**
      * The export goes only into the subject's own user context.
      *
      * get_contexts_for_userid() never lists a foreign context, but the export makes the same check

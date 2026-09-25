@@ -12,7 +12,11 @@
       writes the recomputed count into; label is the already-resolved string
     * audience.hascount (bool) — whether a stored count exists to render
     * audience.initialcountformatted (string) — that count, formatted
-    * audience.initialstate (string) — idle|cached|...
+    * audience.initialstate_idle (bool) — no stored count: the state line says reach has not been
+      calculated yet
+    * audience.initialstate_cached (bool) — a stored count: the state line shows cachedlabel
+    * audience.cachedlabel (string) — when the stored count was computed, and whether it still
+      matches the notice's filters; empty when there is no stored count
     * audience.contextrules (array of {key, label})
     * audience.threshold (int) — used by JS via data attribute
     * audience.poll_interval_ms (int)
@@ -26,7 +30,9 @@
             "summary": [{"key": "cohorts", "label": "Cohorts", "value": 0}],
             "hascount": false,
             "initialcountformatted": "—",
-            "initialstate": "idle",
+            "initialstate_idle": true,
+            "initialstate_cached": false,
+            "cachedlabel": "",
             "contextrules": [],
             "threshold": 3,
             "poll_interval_ms": 10000,

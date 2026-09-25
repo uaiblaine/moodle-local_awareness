@@ -137,12 +137,16 @@ class acknowledged_notice extends system_report {
          * in: the retrieve web service takes both from the client, and a course-level reports holder
          * could otherwise read any notice's report by pairing their course's context with another
          * notice's id. For the same reason the report stays in the system context in every scope.
+         *
+         * The group reach is asked here as well as by the page's resolve_notice_as_author(), because
+         * core's report web services build the report from the client's parameters and ask only
+         * this method.
          */
         $notice = awareness::get_record(['id' => $this->get_parameter('noticeid', 0, PARAM_INT)]);
         if (!$notice) {
             return false;
         }
 
-        return helper::require_author(author_scope::of($notice), 'viewreports', false);
+        return helper::require_author(author_scope::of($notice), 'viewreports', false) && helper::may_reach_groups($notice);
     }
 }

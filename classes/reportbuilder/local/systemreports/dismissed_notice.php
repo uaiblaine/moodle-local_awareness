@@ -123,12 +123,12 @@ class dismissed_notice extends system_report {
      * @return bool
      */
     protected function can_view(): bool {
-        // Decided from the report's own noticeid parameter, never from its context; see acknowledged_notice::can_view().
+        // From the report's own noticeid, never its context, and within the group reach; see acknowledged_notice::can_view().
         $notice = awareness::get_record(['id' => $this->get_parameter('noticeid', 0, PARAM_INT)]);
         if (!$notice) {
             return false;
         }
 
-        return helper::require_author(author_scope::of($notice), 'viewreports', false);
+        return helper::require_author(author_scope::of($notice), 'viewreports', false) && helper::may_reach_groups($notice);
     }
 }

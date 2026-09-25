@@ -220,10 +220,14 @@ final class author_scope {
      * enrols from — the same set apply() narrows a submission to, so the picker never offers
      * something the save would silently drop.
      *
-     * @return array
+     * The names are formatted and escaped for the notice form's autocomplete, which renders option
+     * text unescaped; see helper::cohort_menu_options(). A sink that escapes for itself would show
+     * them escaped twice.
+     *
+     * @return array Cohort id => formatted, escaped name.
      */
     public function cohort_options(): array {
-        $options = helper::built_cohorts_options();
+        $options = helper::cohort_menu_options();
         if ($this->is_site()) {
             return $options;
         }

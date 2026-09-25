@@ -44,7 +44,6 @@ final class all_notices_test extends datasource_testcase {
         $this->setAdminUser();
 
         // Two notices, one of them disabled: the report lists both.
-        $now = time();
         $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
             'title' => 'Notice Alpha',
             'content' => 'Content A',
@@ -140,7 +139,6 @@ final class all_notices_test extends datasource_testcase {
 
         $this->setAdminUser();
 
-        $now = time();
         foreach ([['Repeats daily', 86400], ['Never repeats', 0]] as [$title, $interval]) {
             $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
                 'title' => $title,
@@ -194,7 +192,6 @@ final class all_notices_test extends datasource_testcase {
 
         $this->setAdminUser();
 
-        $now = time();
         $rows = [
             ['Html row', '<p>Read the <em>policy</em>.</p>', FORMAT_HTML],
             ['Plugin row', '<p><img src="@@PLUGINFILE@@/diagram.png" alt="d"></p>', FORMAT_HTML],
@@ -254,7 +251,6 @@ final class all_notices_test extends datasource_testcase {
 
         $this->setAdminUser();
 
-        $now = time();
         foreach (['Notice One', 'Notice Two', 'Notice Three'] as $title) {
             $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
                 'title' => $title,
@@ -300,7 +296,6 @@ final class all_notices_test extends datasource_testcase {
 
         $this->setAdminUser();
 
-        $now = time();
         $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
             'title' => 'Stress notice',
             'content' => '',
@@ -336,7 +331,6 @@ final class all_notices_test extends datasource_testcase {
         $course = $this->getDataGenerator()->create_course();
         $this->assertGreaterThan(1, (int) $course->id, 'the course id must be large enough to tell from a boolean');
 
-        $now = time();
         foreach ([(int) $course->id, 0] as $i => $reqcourse) {
             $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
                 'title' => 'Notice ' . $i,

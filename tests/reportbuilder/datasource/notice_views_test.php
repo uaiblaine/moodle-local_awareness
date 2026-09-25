@@ -43,7 +43,6 @@ final class notice_views_test extends datasource_testcase {
      * @return int The inserted notice ID.
      */
     private function create_notice(string $title = 'View notice'): int {
-        global $DB;
         return (int) $this->getDataGenerator()->get_plugin_generator('local_awareness')
             ->create_notice(['title' => $title])->get('id');
     }

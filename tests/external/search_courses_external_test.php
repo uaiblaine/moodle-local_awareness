@@ -198,6 +198,26 @@ final class search_courses_external_test extends \advanced_testcase {
     }
 
     /**
+     * The two-character minimum counts characters, not bytes.
+     *
+     * One accented letter is two bytes in UTF-8, so a byte count lets a single character through to
+     * an unanchored search of the whole catalogue. The seeded course starts with that character, so
+     * the empty result is the guard's doing, and two characters of the same name are the control.
+     */
+    public function test_one_multibyte_character_is_still_one_character(): void {
+        $this->resetAfterTest();
+
+        $this->getDataGenerator()->create_course(['fullname' => 'École normale']);
+        $this->login_as_manager();
+
+        // The force: the query a byte count would have let through.
+        $this->assertSame(2, strlen('É'));
+
+        $this->assertSame([], $this->search('É'));
+        $this->assertCount(1, $this->search('Éc'));
+    }
+
+    /**
      * The site course is never offered.
      */
     public function test_the_site_course_is_excluded(): void {

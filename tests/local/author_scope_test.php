@@ -580,6 +580,31 @@ final class author_scope_test extends \advanced_testcase {
     }
 
     /**
+     * The form's cohort names come escaped for the autocomplete; the shared list keeps them raw.
+     *
+     * element-autocomplete.mustache prints option text through a triple stash, so the picker needs
+     * the escaped spelling, while built_cohorts_options() and get_cohort_name() hand the raw name
+     * to callers that format it for their own sink. A bare ampersand tells the two apart; a
+     * tag-shaped name would be stripped the same way by both. Both scopes are asked, because each
+     * builds its list on its own branch.
+     */
+    public function test_the_form_gets_escaped_cohort_names_and_the_shared_list_raw_ones(): void {
+        global $DB;
+
+        $course = $this->getDataGenerator()->create_course();
+        $cohort = $this->getDataGenerator()->create_cohort(['name' => 'Staff & Faculty']);
+        $id = (int) $cohort->id;
+        $studentroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+        enrol_get_plugin('cohort')->add_instance($course, ['customint1' => $id, 'roleid' => $studentroleid]);
+
+        $this->assertSame('Staff &amp; Faculty', author_scope::site()->cohort_options()[$id]);
+        $this->assertSame('Staff &amp; Faculty', author_scope::course((int) $course->id)->cohort_options()[$id]);
+
+        $this->assertSame('Staff & Faculty', helper::built_cohorts_options()[$id]);
+        $this->assertSame('Staff & Faculty', helper::get_cohort_name($id));
+    }
+
+    /**
      * A scope knows the context its decisions are taken in.
      *
      * Against a real generated course, so the lookup is a real one; and both scopes in one test,

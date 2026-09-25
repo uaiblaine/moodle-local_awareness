@@ -741,42 +741,46 @@ final class audience_estimator_test extends \advanced_testcase {
     }
 
     /**
-     * Two proficiency rules are both demanded, with requireall and without it.
+     * requireall turns every competency rule into a demand for proficiency.
      *
-     * Without requireall each rule demands the state it names; requireall makes every rule demand
-     * proficiency. Both rules here name proficiency, so the two estimates agree.
+     * The second rule is written as "not proficient", so the two settings pick disjoint people:
+     * without requireall each rule demands the state it names, and only the users proficient in the
+     * first competency alone qualify; with it both rules demand proficiency, and only the user
+     * proficient in both does. The counts differ (two against one), so an estimate ignoring
+     * requireall fails here, and the per-user rule is asked about the same people in both settings.
      */
     public function test_the_competency_rule_honours_require_all(): void {
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
 
         $both = $generator->create_user();
-        $one = $generator->create_user();
-        $generator->enrol_user($both->id, $course->id);
-        $generator->enrol_user($one->id, $course->id);
+        $firstonly = $generator->create_user();
+        $alsofirstonly = $generator->create_user();
+        foreach ([$both, $firstonly, $alsofirstonly] as $user) {
+            $generator->enrol_user($user->id, $course->id);
+        }
 
         $first = $this->create_competency();
         $second = $this->create_competency();
         $this->record_proficiency($both->id, (int) $course->id, $first, 1);
         $this->record_proficiency($both->id, (int) $course->id, $second, 1);
-        $this->record_proficiency($one->id, (int) $course->id, $first, 1);
+        $this->record_proficiency($firstonly->id, (int) $course->id, $first, 1);
+        $this->record_proficiency($alsofirstonly->id, (int) $course->id, $first, 1);
 
         $rules = [
             ['id' => $first, 'proficient' => 1, 'name' => 'a'],
-            ['id' => $second, 'proficient' => 1, 'name' => 'b'],
+            ['id' => $second, 'proficient' => 0, 'name' => 'b'],
         ];
+        $each = ['filter_competency_rules' => $rules];
+        $all = ['filter_competency_rules' => $rules, 'filter_competency_requireall' => 1];
 
-        $all = estimator::normalise([
-            'filter_competency_rules' => $rules,
-            'filter_competency_requireall' => 1,
-        ]);
-        $this->assertSame(1, (new estimator())->estimate($all)['count']);
+        // Without requireall: proficient in the first and not in the second.
+        $this->assertSame(2, (new estimator())->estimate(estimator::normalise($each))['count']);
+        $this->assertSame(2, $this->users_admitted_by_the_rule($each, (int) $course->id));
 
-        // Without requireall the same data still demands both, since each rule names proficiency in
-        // its own right, so the discriminating input is the missing second record.
-        $this->assertSame(1, (new estimator())->estimate(
-            estimator::normalise(['filter_competency_rules' => $rules])
-        )['count']);
+        // With requireall: proficient in both.
+        $this->assertSame(1, (new estimator())->estimate(estimator::normalise($all))['count']);
+        $this->assertSame(1, $this->users_admitted_by_the_rule($all, (int) $course->id));
     }
 
     /**
@@ -961,5 +965,38 @@ final class audience_estimator_test extends \advanced_testcase {
         $count = (int) (new estimator())->estimate(estimator::normalise($scoped))['count'];
         $this->assertSame(1, $count, 'only the teacher of the listed course');
         $this->assertSame($this->users_admitted_by_the_rule($scoped, (int) $course->id), $count);
+    }
+
+    /**
+     * The front page role counts for a rule in any context and not for a system-level one.
+     *
+     * Core holds it in the site course's context, which is not the system context. The default user
+     * role, held in the system context, is the control: it counts under both, so a system-level rule
+     * that reached nobody for every implicit role would fail here.
+     */
+    public function test_the_front_page_role_counts_in_any_context_only(): void {
+        global $CFG;
+
+        $frontpageroleid = (int) $CFG->defaultfrontpageroleid;
+        $userroleid = (int) $CFG->defaultuserroleid;
+        $this->assertGreaterThan(0, $frontpageroleid, 'the site must have a front page role');
+        $this->assertNotSame($userroleid, $frontpageroleid, 'the two implicit roles must differ');
+
+        $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->create_user();
+        $everyone = (new estimator())->estimate(estimator::normalise([]))['count'];
+
+        $anywhere = ['filter_role' => [$frontpageroleid]];
+        $atsystem = ['filter_role' => [$frontpageroleid], 'filter_role_context' => CONTEXT_SYSTEM];
+
+        $this->assertSame($everyone, (new estimator())->estimate(estimator::normalise($anywhere))['count']);
+        $this->assertSame($everyone, $this->users_admitted_by_the_rule($anywhere));
+
+        $this->assertSame(0, (new estimator())->estimate(estimator::normalise($atsystem))['count']);
+        $this->assertSame(0, $this->users_admitted_by_the_rule($atsystem));
+
+        $control = ['filter_role' => [$userroleid], 'filter_role_context' => CONTEXT_SYSTEM];
+        $this->assertSame($everyone, (new estimator())->estimate(estimator::normalise($control))['count']);
+        $this->assertSame($everyone, $this->users_admitted_by_the_rule($control));
     }
 }

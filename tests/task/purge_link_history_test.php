@@ -16,8 +16,6 @@
 
 namespace local_awareness\task;
 
-use local_awareness\persistent\linkhistory;
-
 /**
  * The retention task for link-click history, and the meaning of a click it must not change.
  *
@@ -129,8 +127,8 @@ final class purge_link_history_test extends \advanced_testcase {
     /**
      * Two clicks on one link are two clicks.
      *
-     * count_clicked_links() reports COUNT(hlinkid), so a rate limit of any window would turn a
-     * reader who clicked twice into one who clicked once.
+     * Each click is one row of the link history report source, so a rate limit of any window would
+     * turn a reader who clicked twice into one who clicked once.
      *
      * It goes through helper::track_link(), not the persistent, because the tests in
      * tests/persistent/linkhistory_test.php seed rows directly and would stay green through a guard
@@ -170,9 +168,5 @@ final class purge_link_history_test extends \advanced_testcase {
             $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $linkid, 'userid' => $user->id]),
             'a second click on the same link was collapsed into the first'
         );
-
-        $counts = linkhistory::count_clicked_links((int) $user->id, (int) $notice->get('id'));
-        $row = reset($counts);
-        $this->assertSame(2, (int) $row->clickcount, 'the reported click count is no longer a count of clicks');
     }
 }

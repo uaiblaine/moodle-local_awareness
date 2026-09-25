@@ -7,10 +7,16 @@ here. This file keeps only what is true for this plugin.
 
 Plugin context: a Moodle **local** plugin ("Awareness") that shows site
 announcements to users in a modal, optionally requiring an acknowledgement and
-recording who acknowledged or dismissed each notice. It owns six tables
+recording who acknowledged or dismissed each notice. It owns seven tables
 (`local_awareness` plus `_ack`, `_lastview`, `_hlinks`, `_hlinks_his`,
-`_audience_jobs`), four of which hold user-linked rows and are therefore in the
-privacy provider. It integrates with core Report Builder (five datasources, two
+`_audience_jobs`, `_slides`). Four hold user-linked rows and are exported and
+erased by the privacy provider; `local_awareness` and `_slides` are declared for
+their `usermodified` author stamp only and deliberately left out of the
+contextlist, export and delete paths.
+`tests/privacy/provider_test.php::test_every_user_id_column_is_declared` sweeps
+every `userid`/`usermodified` column against `get_metadata()`, because core's
+compliance test finds user columns only through foreign keys to `{user}`. It
+integrates with core Report Builder (five datasources, two
 system reports), the Cohort, Competency and Role subsystems, and injects itself
 into every page through the `before_footer_html_generation` hook. Supports
 Moodle **4.5 through 5.2** (`$plugin->requires = 2024100700`,
@@ -91,6 +97,12 @@ Behat site fails every scenario on the same core locator and looks like your bug
   current-tree evidence. **Read it, never the audit** — the audit is explicitly
   the August snapshot of the starting point, and treating it as the open list
   sends you to re-investigate a hundred settled findings.
+- The August audit's M12, M13, M14 and M16 are pinned in `tests/helper_test.php` by
+  `test_a_refused_blocking_notice_can_still_be_acknowledged`,
+  `test_a_notice_targeting_a_hidden_cohort_reaches_its_members`,
+  `test_renaming_a_link_keeps_its_identity_and_its_history` and
+  `test_reading_a_competency_rule_creates_no_competency_state`, for cross-referencing the
+  reconciliation.
 - `docs/PLANO-correcoes.md` — the four-phase plan, closed at 27/27.
 - `docs/mockups/` — the approved HTML prototypes the admin surface was designed
   against, and `docs/README.md` records the design decisions that shape the markup.
@@ -157,9 +169,12 @@ Behat site fails every scenario on the same core locator and looks like your bug
   nothing reads it at runtime, and there is no `require_logout()` and no
   `is_siteadmin()` exemption anywhere in this plugin any more. Callers ask
   `>= INSISTENCE_BLOCKING`, never `=== `, so a level added above Acknowledge
-  does not silently fall out of those tests. The Behat generator carries its own
-  copy of the mapping because it is loaded before `config.php` and cannot reach
-  the plugin's classes — keep the two in step.
+  does not silently fall out of those tests. The Behat generator maps an
+  `insistence` column through the same `awareness::INSISTENCE_*` constants: only
+  the file's top level runs before `config.php`, and a step body runs after it,
+  so the classes autoload there. Only the two `>=` comparisons are repeated
+  beside `helper::sanitise_data()`, which is private. The slide step likewise
+  uses `slide::FILEAREA`.
 
 - **Every authoring action that SAVES a notice expires every acceptance on it.**
   `core\persistent::update()` is final and stamps `timemodified` unconditionally,
@@ -181,12 +196,16 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `course_deleted` observer clearing the field: clearing it widens the audience, and an observer
   can be missed where the consumers cannot. The editor drops the dead course on the next edit and
   the scope refuses it on save. `tests/reqcourse_missing_course_test.php` pins the three beside a
-  live control; keep them in step.
+  live control; keep them in step. The theme rule does too: `check_filters()` returns false when
+  `current_theme_name()` throws (a course in a missing category under category themes, or a page
+  with no context), pinned by `check_filters_test::test_an_unresolvable_theme_withholds_a_theme_notice`.
+  `get_notices` validates its context first, so an ordinary request never lands there, and
+  `page_probe` still admits on uncertainty, so it stays a superset.
 
 - **`filter_role_context` is a MODIFIER of `filter_role`**, not a rule of its
   own: it is absent from both `estimator::AUDIENCE_FIELDS` and `CONTEXT_FIELDS`,
-  and never reaches `rule_describer::describe()`. The five keys `describe()`
-  handles are exactly the five `audience:rule:*` strings carrying a `{$a}`;
+  and never reaches `rule_describer::describe()`. The six keys `describe()`
+  handles are exactly the six `audience:rule:*` strings carrying a `{$a}`;
   `ruleLabel()` in the JS discards `display` when the label has no placeholder.
   This has been mis-filed as a defect once — it is not one.
 
@@ -202,22 +221,32 @@ Behat site fails every scenario on the same core locator and looks like your bug
   they are folded into the `filtervalues` JSON before it runs. Both write paths, the
   `estimate_audience` web service and `notice_form::extra_validation()` call the scope, in that
   shape, and existence checks stay OUT of `estimator::normalise()`, which is a pure shape-and-hash
-  function unit-tested with literal ids. The course scope is implemented and tested but has no
-  production caller until the `courseid` column exists; do not "clean it up" as dead code, and do
-  not wire it without reading `docs/SCOPE-VALIDATOR-FEASIBILITY.md`. Likewise
-  `helper::require_author($scope, $verb)` is the only place a plugin capability is checked — every
-  page, verb, web service and report passes through it — the pages and web services with the
-  site scope, every verb that acts ON a notice with `author_scope::of($notice)`, the notice's own
-  scope read from its `courseid`. `local/awareness:managecourse` and `viewreportscourse` are
-  declared with no archetype and nothing grants them yet; nothing in production constructs a
-  course scope except `of()` on a stored row, and no page can store one. `helper::resolve_notice()`
-  is how a page turns an id into a notice; it fails closed, because the editor's create-or-update
-  branch once keyed on "not found". Ownership is pinned on every write path and never read from
-  the submission; a course whose row is gone makes `author_scope::exists()` false, and
-  `require_author()` asks that before it resolves a context, so an orphan is refused to course
-  authors, not fatal, not promoted to the site, and still deletable by the site capability at the
-  system context. `helper::may_serve_files_of()` is the file gate: author bypass in the notice's
-  scope, then course access for a course notice, then the audience.
+  function unit-tested with literal ids. `helper::require_author($scope, $verb)` is where every
+  plugin capability is checked — every page, verb, web service and report passes through it — the
+  pages and web services with the scope of their request, every verb that acts ON a notice with
+  `author_scope::of($notice)`, the notice's own scope read from its `courseid`. The one check made
+  elsewhere is the site list's `admin_externalpage` in `settings.php`, which core makes before
+  `managenotice.php` or `editnotice.php` runs in site mode: it names `local/awareness:manage` and
+  `local/awareness:viewreports`, and `check_access()` admits either, so a reports-only user opens
+  the list and `editnotice.php`, which shares the page for its navigation, still refuses them
+  through `require_author($scope, 'manage')`. `local/awareness:managecourse` and
+  `viewreportscourse` are declared with no archetype; an administrator grants them in the course.
+  `helper::resolve_notice()` is how a page turns an id into a notice; it fails closed, because the
+  editor's create-or-update branch once keyed on "not found". Ownership is pinned on every write
+  path and never read from the submission; a course whose row is gone makes
+  `author_scope::exists()` false, and `require_author()` asks that before it resolves a context, so
+  an orphan is refused to course authors, not fatal, not promoted to the site, and still reached by
+  the site capability at the system context. `group_scope::groupmode()` reads a missing course as
+  `NOGROUPS`, so an orphan aimed at groups confines nobody, and `render_notice` validates the
+  system context for it; `tests/local/group_scope_orphan_test.php` pins both. `editnotice.php`
+  builds `notice_form` only for `create` and `edit`, and refuses both for an orphan with a redirect
+  to the site list (`notification:orphannotice`): its forced course filter matches no page, and the
+  course-scoped form and save read a context and groups the course no longer has (`group_scope`
+  reaches `groups_get_all_groups()`, which calls `context_course::instance()`). The list's other
+  actions (delete, disable, enable, reset, recalculate) need no form and work on an orphan, and an
+  orphan's URLs carry no `courseid`, because both pages `get_course()` one.
+  `tests/editnotice_orphan_test.php` pins it. `helper::may_serve_files_of()` is the file gate:
+  author bypass in the notice's scope, then course access for a course notice, then the audience.
   Course deletion purges through the `before_course_deleted` hook —
   the `course_deleted` event fires after the course and its context are gone — via
   `helper::purge_notice()`, which is not a verb and asks nothing; `delete_notice()` is the verb.
@@ -226,20 +255,33 @@ Behat site fails every scenario on the same core locator and looks like your bug
   two pages in course mode with `author_scope::for_request()` turning the URL into a scope — the
   URL's scope gated BEFORE the notice is resolved, the notice's scope winning after — the manage
   table reading its scope from the filterset (absent filterset → the site), the form reading its
-  scope from customdata (absent → the site) and rendering only what the scope admits, and the five
-  editor web services taking `courseid`, gating on it and answering inside it. The per-rule chips
-  are withheld at the READ for a course scope, because jobs are shared by criteria hash across
-  scopes; a rival outside the scope is described, never named. A course-notice role needs
-  enrolment or `moodle/course:view` beside `managecourse`.
+  scope from customdata (absent → the site) and rendering only what the scope admits, and the six
+  editor web services (`check_collision`, `estimate_audience`, `get_estimate`, `preview_notice`,
+  `search_courses`, `search_roles`) taking `courseid`, gating on it and answering inside it. Their
+  JavaScript reads the scope through one module, `local_awareness/editor_scope` (`courseId()`),
+  from the `data-courseid` that `editor_page` renders on `[data-region="la-editor"]` from the scope
+  the page resolved; no editor module reads it from the URL, where a course notice opened without
+  `?courseid=` would read as the site. `tests/local/editor_js_contract_test.php` pins it. The
+  per-rule chips are withheld at the READ for a course scope, because jobs are shared by criteria
+  hash across scopes; a rival outside the scope is described, never named. A course-notice role
+  needs enrolment or `moodle/course:view` beside `managecourse`.
 
 - **The dialogue's layout, position and entrance are `la-*` classes with hand-written CSS, and
   nothing in it may be a Bootstrap 5 utility.** `bootstrap::mark_page()` gates the BS4 polyfill on
   a body class four plugin pages add; the dialogue is injected on every page by the hook, so the
   gate can never reach it — `modal-fullscreen`, `rounded-3`, `sticky-bottom`, `visually-hidden`
-  are dead on 4.5 there with no repair path (`fw-bold` was the first casualty). Specificity is not
-  the problem: `.awareness.la-x` (0,2,0) beats every core rule on `.modal-dialog`; what cannot be
-  beaten is a BS5 `bg-*`/`border-*` utility, generated with `!important`, so the template carries
-  none. The vocabularies live on the persistent (`awareness::TEMPLATES`, `POSITIONS`,
+  are dead on 4.5 there with no repair path (`fw-bold` was the first casualty). Specificity is
+  rarely the problem: `.awareness.la-x` (0,2,0) beats core's layout rules on `.modal-dialog`, and
+  Bootstrap's `.modal.fade .modal-dialog` and `.modal.show .modal-dialog` (0,3,0) set only the
+  transform and transition, which the plugin does not fight. What cannot be beaten is a utility,
+  generated with `!important`, so the template carries no `bg-*`, and its one border utility is
+  `border-0` on `.modal-content`, which both branches define; an edge the plugin wants is drawn
+  some other way (the banner's brand edge). The keyboard focus ring is
+  `.awareness .modal-content button:focus-visible` (and `input`), (0,3,1), a 3px outline in
+  `var(--la-brand)`: core's `button.btn-close:focus` and `input[type="checkbox"]:focus` zero the
+  outline at (0,2,1) and come later in the compiled sheet, so a two-class selector ties and loses.
+  `motion_contract_test::test_the_dialogue_keeps_a_visible_focus_ring` checks the specificity and
+  refuses any `outline: 0` or `outline: none` in a dialogue focus rule. The vocabularies live on the persistent (`awareness::TEMPLATES`, `POSITIONS`,
   `ANIMATIONS`, `positions_for()`, `accepts_acknowledgement()`) and its `choices` gate is the one
   server-side check — the PARAM types only constrain the character set. `notice_form.js` and
   `modal_notice.js` carry hand copies of the corners and the sized/compact layouts;
@@ -258,8 +300,11 @@ Behat site fails every scenario on the same core locator and looks like your bug
   never `display: none`, which the footer's own `d-flex` beats with `!important` — and the
   header's close floats outside the corner. The same trap holds for every utility the template
   wears (`rounded` was dropped from it for this reason, `px-4 py-3 pb-4` remain): a plugin rule
-  setting a property a utility owns is dead, and `motion_contract_test` now refuses one. The banner flattens its header with `display: contents`, never `display:
-  none`, because the header holds the dialogue's name and the close button.
+  setting a property a utility owns is dead, and `motion_contract_test` refuses one: every class on
+  an addressed element of `modal_notice.mustache` must appear in its `$owners` map with the
+  properties it owns, so a utility added to the template without an entry fails there. The banner
+  flattens its header with `display: contents`, never `display: none`, because the header holds the
+  dialogue's name and the close button.
 
 - **The queue reuses one dialogue, and core's `show()` returns early on a visible one.** So nothing
   core emits fires for the second notice onward: the entrance is `setAnimation()` after every
@@ -290,9 +335,10 @@ Behat site fails every scenario on the same core locator and looks like your bug
   the section opens on every edit.
 
 - **Three services hand a notice to the dialogue, and one class builds all three.**
-  `local\notice_payload::build()` and `::structure()` are used by `get_notices`, `preview_notice`
-  (the editor's, from the author's draft areas) and `render_notice` (the manage list's). A field
-  added to `build()` without `structure()` is stripped by `clean_returnvalue()` in silence, and
+  `local\notice_payload::structure()` declares the shape for `get_notices`, `preview_notice` (the
+  editor's) and `render_notice` (the manage list's); `build()` fills it for `get_notices` and
+  `render_notice`, while `preview_notice` builds its own payload from the author's draft areas. A
+  field added to `build()` without `structure()` is stripped by `clean_returnvalue()` in silence, and
   `tests/external/notice_external_test.php` pins the exact key set. The video link is wrapped in a
   real anchor before `format_text()` — the multimedia filter embeds nothing from a bare URL — and the
   captions are `PARAM_RAW` on the way out, escaped once by the template's double stash.
@@ -318,13 +364,23 @@ Behat site fails every scenario on the same core locator and looks like your bug
   course and FORBIDS it at the site. Delivery is MEMBERSHIP, not visibility — `helper::user_group_ids()`
   reads `groups_get_user_groups(..., includehidden: true)`, because `groups_get_all_groups()` filters
   by what the CURRENT user may see and would drop a member of a hidden group. Reach is enforced in
-  four places that must stay in step: `resolve_notice_as_author()` (pages), `require_group_reach()`
-  (the five action methods), the pluginfile author branch, and `all_notices::unreachable_notices_sql()`
-  (the list, in SQL from a LIKE on the JSON key). `tests/group_audience_test.php` pins all four.
+  six places that must stay in step: `resolve_notice_as_author()` (pages), `require_group_reach()`
+  (the five action methods), the pluginfile author branch, `all_notices::unreachable_notices_sql()`
+  (the list), `render_notice` (the list's preview) and the `can_view()` of both system reports,
+  which core's report web services build from client parameters and ask nothing else.
+  `tests/group_audience_test.php` pins all six. The list finds its candidates with a LIKE on the
+  JSON key, joined in the same query to courses in separate groups mode with their contexts
+  preloaded; a viewer holding `moodle/site:accessallgroups` in the course is admitted without a
+  `group_scope` being built, and only a confined viewer reaches `admits()`
+  (`tests/table/all_notices_group_reach_test.php`). The exclusion applies with or without a
+  filterset. `render_notice` answers every refusal, reach included, with the
+  `notification:noticedoesnotexist` the pages give, and gates BEFORE `validate_context()`, whose
+  login check on another course's context would otherwise refuse differently and say the id
+  exists.
   `narrow()` and `admits()` answer DIFFERENT questions — what may be SAVED, and who may REACH what
-  is saved — and only the second is about separation: a deleted group, a non-participation group and
-  the site scope confine nobody, or deleting a group would hide the notices naming it from everyone
-  including the administrator who has to fix them.
+  is saved — and only the second is about separation: a deleted group, a non-participation group, a
+  deleted course and the site scope confine nobody, or deleting a group would hide the notices naming
+  it from everyone including the administrator who has to fix them.
 
 - **A course notice's page reach is the scope's, not the author's.** `pathmatch` is FORCED to
   `author_scope::COURSE_PATHMATCH` (`/course/view.php%` — the wildcard because the reader's page
@@ -334,8 +390,139 @@ Behat site fails every scenario on the same core locator and looks like your bug
   because no scope wrote it, and the first save stored null); `check_collision` and `editnotice.php`
   ask the scope for the reach they compare, or a course author compares the empty pattern, which
   overlaps everything; and `collision_warning.js` renders into `#fitem_id_scope_line` where the
-  page-reach field is absent. `get_estimate` withholds `context_only_filters` under a course scope
-  for the same reason it withholds the breakdown — it is the scope's value, not the author's.
+  page-reach field is absent. The forced reach is not part of the audience question either:
+  `external\estimate_audience` unsets `pathmatch` under a course scope, and
+  `notice_audience::criteria_for()` leaves it out of a course notice's criteria, so the two hash
+  alike and a save joins the editor's job in flight rather than queueing a second estimate
+  (`audience_notice_audience_test` pins both scopes; upgrade step 2026092401 re-stamped the counts
+  stored before). `get_estimate` returns the context rules in every scope; under a course scope
+  they come out empty because neither criteria set carries `pathmatch` and the scope forbids
+  `filter_theme`. The per-rule breakdown is what it withholds there. The successor once intended
+  for the forced pattern is a page-type choice shaped like a block's ("any course page", "the
+  course's main page") with `COURSE_PATHMATCH` as its first member; that decision belongs in
+  `docs/SCOPE-VALIDATOR-FEASIBILITY.md`.
+
+- **Notice events are logged in the notice's own context.** `helper::event_context()` gives the
+  course context for a course notice, and the system context for a site notice or an orphan whose
+  course row is gone; a deletion during course deletion still has its context, because the purge
+  runs from `before_course_deleted`. The nine notice event classes add `?courseid=` to `get_url()`
+  in a course context. `awareness_audience_estimated` stays in the system context: it describes a
+  job shared across scopes by criteria hash, not a notice. Pinned by
+  `events_test::test_a_course_notice_logs_every_event_in_its_course`.
+
+- **Core's implicit roles count where core holds them.** The default user role counts for role
+  context "All" (0) and System; the front page role for "All" only, because core holds it in the
+  site course's context and a course-level rule never means the site course; the guest holds
+  neither. `helper::user_matches_role_filter()` and `estimator::predicate()` must stay in step;
+  `role_filter_test::test_front_page_role_follows_core` and
+  `audience_estimator_test::test_the_front_page_role_counts_in_any_context_only` pin them. The Role
+  context field's help (`filter_role_context_help`, en and pt_br) states the same rule for authors;
+  change it with the code. `notice_form_test::test_every_field_with_a_help_string_has_its_help_button`
+  reads both `notice:<field>_help` and `<field>_help` keys and asserts `filter_role_context` is among
+  the fields it examined.
+
+- **A cohort name has two spellings, and the helper hands out the raw one.**
+  `helper::built_cohorts_options()` and `get_cohort_name()` return names as stored, for callers
+  that format for their own sink; the manage list formats them unescaped in the system context,
+  because its lines are double stashes and the option list carries no cohort context. The notice
+  form takes `helper::cohort_menu_options()` through `author_scope::cohort_options()`: escaped, in
+  each cohort's own context, because `element-autocomplete.mustache` prints options through a
+  triple stash. Both lists come from one `listable_cohorts()`, so `allowed_cohorts()` validates
+  exactly what the menu offers. In the manage list only the title's triple stash takes the escaped
+  `format_string()`; the tooltip, the course chip, the group and cohort lines and the conflict
+  explanation take `['escape' => false]`. `tests/table/all_notices_rendering_test.php` and
+  `author_scope_test` pin both directions with a bare `&`. The same split holds for rivals in a
+  collision warning: `collision::formatted_titles($clashes, $scope, $escape)` is the one place
+  they are redacted and spelt, escaped for a notification message (`editnotice.php`), plain and
+  stripped for `check_collision`'s PARAM_TEXT; `clash_titles_for()` and `visible_title()` stay raw.
+
+- **The list's report links go straight to the report pages.** They are offered per row when the
+  notice is Blocking or above and `helper::require_author(author_scope::of($notice), 'viewreports')`
+  holds, whatever the viewer may do to the notice; the report pages gate on that verb themselves
+  (`resolve_notice_as_author()` plus each report's `can_view()`). `editnotice.php` no longer has
+  report actions: it demands the manage verb before its switch, which is what sent reports-only
+  viewers to a permission error. The empty list offers "Create" only when the manage verb holds,
+  as `manage_page` does for its own button.
+
+- **An action code in a report column must decide what Sum and Average print.** `noticeview:action`
+  is `TYPE_TEXT`, which keeps the two off it. `acknowledgement:action` stays `TYPE_INTEGER`, and its
+  formatter `acknowledgement::format_action()` prints the number under Sum (the count of
+  acknowledgements) and Average (the acknowledged share) and the action's name otherwise. The
+  aggregation's name is the callback's fourth argument on both branches. The formatter reads the raw
+  aggregate from `$row->action`, not `$value`, because 4.5's `column::format_value()` casts `$value`
+  to the column type before the callbacks run, so an Average of 0.5 arrives as 0. Disabling the two
+  aggregations would not have fixed saved reports: core's `datasource::get_active_columns()` applies
+  a stored aggregation without consulting `get_disabled_aggregation()`, which only the editor's menu
+  reads. `test_sum_and_average_of_the_action_are_numbers` in both `acknowledged_notices_test` and
+  `dismissed_notices_test` pins it through real reports, and
+  `acknowledged_notices_test::test_a_fractional_average_is_not_read_as_an_action` calls the
+  formatter with the arguments 4.5 passes.
+
+- **Competing notices are enabled repeaters that have not ended.** `collision::enabled_repeating_notices()`
+  applies only the upper bound of the window (`window::open_prefilter_sql()`), so a notice scheduled
+  for later still competes and an ended one does not. `clash_titles_for()` badges a listed notice
+  only when it is itself in that set, the one `clashing_ids()` walks. The edited notice's own end
+  counts too: `clashes_for()` takes it (`$timeend`, 0 for none) and returns nothing once
+  `window::has_ended()` holds, the same half-open test the rivals get. The editor sends `perpetual`
+  and the end date selector's parts as `timeend` {year, month, day, hour, minute}, not a timestamp,
+  because only the server knows the author's timezone and calendar; `check_collision::selector_time()`
+  converts them as `MoodleQuickForm_date_time_selector::exportValue()` does (calendar
+  `convert_to_gregorian()`, then `make_timestamp(..., 99)`), and ignores them for a perpetual notice,
+  as `editnotice.php` does. Both parameters are optional, so an older client gets the old answer.
+  `collision_warning.js` re-checks on `change` of the perpetual select and of every end-date part.
+  `editor_js_contract_test::test_the_collision_warning_sends_the_notice_window` pins the request keys
+  against `execute_parameters()`, the field ids against the rendered site and course forms, and the
+  build against the source; `collision_external_test::test_the_end_is_read_in_the_authors_timezone`
+  pins the conversion. A disabled notice is still warned about, because it can be enabled from the
+  list without passing through the editor. The warning after a save asks
+  `collision::clashes_for_save()`, which takes the reach through the scope and the submitted end
+  (already zeroed for a perpetual notice), so it agrees with the editor's;
+  `collision_test::test_the_save_warning_judges_the_submitted_end_and_the_scope_reach` pins it.
+
+- **`notice_audience::refresh()` has a fourth outcome, `STATE_ERROR`.**
+  `task\estimate_audience::resolve()` swallows every failure into the job, so `resolve_inline()`
+  reads the job's status to tell a stored count from nothing stored. `state_of()` never returns it.
+  `editnotice.php` reports it as an error on recalculate and as a warning after a save. No real
+  notice makes the estimate throw (a stored notice's criteria pass through `estimator::normalise()`),
+  so `task\estimate_audience::resolve()` takes the estimator from core's container,
+  `\core\di::get(estimator::class)`, and a test substitutes one that throws with
+  `\core\di::set(estimator::class, $stub)`; core resets the container after every test on 4.5 and
+  5.2. `resolve()` is the one body behind the adhoc task, `resolve_inline()` and the
+  `estimate_audience` web service.
+  `audience_notice_audience_test::test_refresh_reports_a_failed_inline_estimate_as_an_error` pins
+  `STATE_ERROR` and `STATE_CURRENT` through `refresh()`, and
+  `task\estimate_audience_test::test_a_failed_queued_estimate_is_recorded_and_not_announced` the
+  queued path (job in error, no count stored, no message). The estimator must stay stateless, because
+  the container hands out one shared instance.
+
+- **The `audience_estimate_ready` message provider names no capability, on purpose.** A provider
+  takes one capability, and `message_send()` refuses any recipient for whom
+  `message_get_providers_for_user()` does not list the provider; with `local/awareness:manage`
+  every course author's message was dropped. The side effect is that every user sees the provider
+  in their notification preferences. The message links a course notice to its course's list.
+
+- **The editor's buttons are added last.** `notice_form::define_buttons()` runs after
+  `define_behaviour()` in both scopes: core wraps the sticky footer around the group where it is
+  added, so the call order is the DOM and tab order. `closeHeaderBefore('buttonar')` keeps the
+  footer out of the last section's collapsible container.
+  `notice_form_test::test_the_buttons_come_after_every_field` pins it.
+
+- **The reader's dialogue tracks `a[data-linkid]` only.** `helper::update_hyperlinks()` tags the
+  anchors of the stored content at save time; anchors made at render time (a media fallback link,
+  filter output) carry no id, and `local_awareness_tracklink` refuses a click without one, which
+  showed the reader an error. Repeat clicks are not throttled: each click is one row of the link
+  history report source, and every throttle considered merged genuine clicks.
+  `modal_notice.js` routes the backdrop and Escape exits through `pressClose()`, which clicks only
+  the first of the three `data-action="close"` buttons; a `trigger()` on the collection ran the
+  close handler once per button.
+
+- **The Bootstrap 4 polyfill holds one behaviour backport as well as utilities.**
+  `body.local-awareness-bs4 .local-awareness-manage .no-overflow .dropdown { position: static }`
+  lets the list's row menu escape the scroll wrapper on 4.5, where `flexible_table` wraps a
+  responsive table in `.no-overflow`; 5.x uses `.table-responsive`, where Boost has the rule. It is
+  listed in `bootstrap_compat_test::backports()`, which exempts it from the utility-token checks,
+  and `test_the_row_menu_escapes_its_scroll_wrapper` reads core's wrapper class on the running
+  branch; a future backport goes in that list too.
 
 - **A dev site that upgraded mid-change never registers a web service added afterwards.**
   `external_functions` is refreshed only when `$plugin->version` rises; a stack already at the bumped
@@ -375,6 +562,48 @@ Behat site fails every scenario on the same core locator and looks like your bug
 - **Mutation-test every new test**, and revert the mutation from a *file copy* —
   `git checkout --` restores from HEAD and silently discards uncommitted work
   alongside the mutation.
+- **File-serving tests never serve a file.** They ask `local_awareness_pluginfile()` for the
+  area's `.` directory entry with `['dontdie' => true]` (`probe()` in `tests/lib_test.php` and
+  `tests/slidemedia_pluginfile_test.php`): `send_stored_file()` returns silently for a directory
+  under dontdie, identically on 4.5 and 5.2, so null means every check passed and the entry was
+  found, and false means a refusal or a miss. Deleting the file and asserting false cannot tell a
+  gate refusal from a missing file, and asserting a refusal with a real file in place makes a
+  missing gate end the PHPUnit process instead of failing a test.
+- **Competency proficiency is memoised in an ad hoc `MODE_REQUEST` cache**
+  (`local_awareness`/`proficiency`), not a function static, so it is purged between tests. A test
+  that changes proficiency and asks again within the same test must purge
+  (`\cache_helper::purge_all()`). For the same reason, never memoise
+  `helper::built_cohorts_options()` in a static: a test creating or deleting a cohort between two
+  calls would read the old list.
+- **`helper.php` requires `filelib.php` for the AJAX read path**, and only Behat guards it: the
+  PHPUnit process has usually loaded filelib already, so a missing require shows only in an
+  end-to-end request.
+- **A page script can be tested in-process.** `tests/editnotice_orphan_test.php` requires
+  `editnotice.php` inside a test method: declare the globals it uses, reset `$PAGE` and `$OUTPUT`
+  per run, set `$_SERVER['REQUEST_METHOD']` and `$_GET` or `$_POST`, and capture the output.
+  `redirect()` throws `redirecterrordetected` in a CLI process, so a redirect is that exception and
+  a confirmation page is the captured output. The redirect's message and target are not observable
+  that way: assert URLs through a rendered button, or through state.
+- **The content editor's draft area is prepared in `notice_form::get_default_data()`**, where the
+  notice id is known; preparing it in `editnotice.php` against item 0 hands the editor an empty
+  area.
+- **A slide's fields cannot be one moodleform group.** `hideIf` and `setType` do reach a group's
+  children and the delete button's client hints can be restored by hand, but the group drops its
+  children's labels; `tests/form/picker_render_test.php` pins the row shape that replaced it.
+- **The source-scanning tests are strict on purpose.** `lang_usage_test` skips `tests/` and strips
+  comments, so a key named only in a test or a comment is dead, and it exempts only `_help`,
+  `cachedef_` and `messageprovider:` keys (every task fetches its `task_` string in `get_name()`).
+  `bootstrap_compat_test::code_lines()` follows multi-line `{{! }}` and `/* */` comments, so
+  template docblock prose is never scanned as markup; the recipe for re-deriving its BS5-only list
+  is in the fleet file. `stylesheet_contract_test` fails on a `la-*`, `local-awareness-*` or
+  `competency-picker-*` class the stylesheet styles and no shipped code emits, on a property set
+  twice in one media context, on a form id selector not scoped to `.local-awareness-editor`, and
+  on a `.la-pagehead` heading level the shell does not render: removing markup that emits a class
+  means deleting its rule in the same change.
+- **Removed API, and what replaced it in tests.** `awareness::get_all_notices()`,
+  `window::open_sql()` and `linkhistory::count_clicked_links()` are gone: tests read notices with
+  `awareness::get_records()`, and that two clicks are two rows is pinned by
+  `purge_link_history_test` counting `{local_awareness_hlinks_his}` rows.
 
 ## When in doubt
 

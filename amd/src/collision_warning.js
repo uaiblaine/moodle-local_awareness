@@ -25,7 +25,12 @@
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notification) {
+define([
+    'core/ajax',
+    'core/str',
+    'core/notification',
+    'local_awareness/editor_scope'
+], function(Ajax, Str, Notification, EditorScope) {
 
     var SELECTORS = {
         pathmatch: '#id_pathmatch',
@@ -36,24 +41,17 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
          * notice fires, and so the right place to say what it will be competing with.
          */
         slotHost: '#fitem_id_pathmatch, #fitem_id_scope_line',
-        noticeid: '#id_id'
+        noticeid: '#id_id',
+        perpetual: '#id_perpetual',
+        // Followed by one of DATE_PARTS: the selects the end date and time selector renders.
+        timeend: '#id_timeend_'
     };
+
+    // The keys check_collision reads the end date by, and the suffixes of its selects.
+    var DATE_PARTS = ['year', 'month', 'day', 'hour', 'minute'];
 
     // Long enough that typing a path does not fire a request per keystroke.
     var DEBOUNCE_MS = 400;
-
-    /**
-     * The course the editor writes for, read once from the editor root; 0 for the site.
-     *
-     * Every web service the editor calls takes it, so that a course author's requests are gated and
-     * scoped as a course author's rather than refused at the site.
-     *
-     * @returns {number}
-     */
-    var courseId = function() {
-        var root = document.querySelector('[data-region="la-editor"]');
-        return root ? (parseInt(root.getAttribute('data-courseid'), 10) || 0) : 0;
-    };
 
     var state = {
         noticeid: 0,
@@ -99,6 +97,37 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
     };
 
     /**
+     * Whether the notice is set to run with no window, which makes its end date irrelevant.
+     *
+     * @returns {Boolean} True when perpetual, and where the form has no such field.
+     */
+    var perpetual = function() {
+        var field = document.querySelector(SELECTORS.perpetual);
+        return !field || field.value !== '0';
+    };
+
+    /**
+     * The end date as its selector holds it, in the author's calendar and timezone.
+     *
+     * Sent as parts rather than as a timestamp: only the server knows the author's timezone and
+     * calendar, and check_collision converts the parts as the save does.
+     *
+     * @returns {Object|null} The year, month, day, hour and minute, or null where the form has no end date.
+     */
+    var timeEnd = function() {
+        var parts = {};
+        var complete = DATE_PARTS.every(function(part) {
+            var field = document.querySelector(SELECTORS.timeend + part);
+            if (!field) {
+                return false;
+            }
+            parts[part] = parseInt(field.value, 10) || 0;
+            return true;
+        });
+        return complete ? parts : null;
+    };
+
+    /**
      * Put the current answer on screen.
      *
      * @param {Array} titles Titles of the notices this one would compete with.
@@ -137,10 +166,13 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
             methodname: 'local_awareness_check_collision',
             args: {
                 noticeid: state.noticeid,
-                courseid: courseId(),
+                courseid: EditorScope.courseId(),
                 // Empty where the form offers no field; the server's scope writes the real reach.
                 pathmatch: pathfield ? pathfield.value : '',
-                repeats: true
+                repeats: true,
+                // The window the save would store: a notice whose end has passed competes with nobody.
+                perpetual: perpetual(),
+                timeend: timeEnd()
             }
         }])[0].then(function(response) {
             // A reply that arrived after a newer question was asked is stale, not an answer.
@@ -188,6 +220,16 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
                 intervalfield.addEventListener('input', schedule);
                 intervalfield.addEventListener('change', schedule);
             }
+            var perpetualfield = document.querySelector(SELECTORS.perpetual);
+            if (perpetualfield) {
+                perpetualfield.addEventListener('change', schedule);
+            }
+            DATE_PARTS.forEach(function(part) {
+                var field = document.querySelector(SELECTORS.timeend + part);
+                if (field) {
+                    field.addEventListener('change', schedule);
+                }
+            });
 
             // Answer for the state the form opens in, so an existing clash is visible immediately.
             check();

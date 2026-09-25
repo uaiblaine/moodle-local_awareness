@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\audience\estimator;
 use local_awareness\audience\live_mode;
 use local_awareness\audience\notice_audience;
 use local_awareness\persistent\audience_job;
@@ -36,6 +37,9 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
  * @covers \local_awareness\audience\notice_audience
  */
 final class audience_notice_audience_test extends \advanced_testcase {
+    /**
+     * Each test runs as the administrator, with the cached site user count forgotten.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -103,6 +107,143 @@ final class audience_notice_audience_test extends \advanced_testcase {
         $notice = awareness::get_record(['title' => 'Cohort notice']);
         $this->assertSame(notice_audience::STATE_CURRENT, notice_audience::state_of($notice));
         $this->assertSame(notice_audience::hash_for($notice), $notice->get('audiencehash'));
+    }
+
+    /**
+     * Saving a course notice joins the job the editor raised for the same form.
+     *
+     * Under a course scope the editor's web service leaves the forced page reach out of the
+     * question, so the saved notice must hash without it too, or the save queues a second estimate
+     * of the same thing. The notice's stored reach is asserted first: it is what the two used to
+     * disagree about.
+     */
+    public function test_a_course_notice_joins_the_editor_s_job(): void {
+        global $DB;
+
+        set_config('audience_sync_limit', 0, 'local_awareness');
+        live_mode::reset_cache();
+        $course = $this->getDataGenerator()->create_course();
+
+        $_POST['sesskey'] = sesskey();
+        $response = \core_external\external_api::call_external_function(
+            'local_awareness_estimate_audience',
+            ['criteria' => json_encode([]), 'courseid' => (int) $course->id],
+            false
+        );
+        $this->assertFalse($response['error']);
+        $editorjob = audience_job::get_record(['jobid' => $response['data']['jobid']]);
+        $this->assertSame(audience_job::STATUS_PENDING, $editorjob->get('status'));
+
+        $state = helper::create_new_notice(
+            $this->form_data(['title' => 'Course notice']),
+            \local_awareness\local\author_scope::course((int) $course->id)
+        );
+
+        $notice = awareness::get_record(['title' => 'Course notice']);
+        $this->assertSame(\local_awareness\local\author_scope::COURSE_PATHMATCH, $notice->get('pathmatch'));
+        $this->assertSame(notice_audience::STATE_PENDING, $state);
+        $this->assertSame($editorjob->get('criteriahash'), notice_audience::hash_for($notice));
+        $this->assertSame(1, $DB->count_records(audience_job::TABLE), 'the save queued a second estimate');
+        $joined = audience_job::get_record(['jobid' => $editorjob->get('jobid')]);
+        $this->assertSame((int) $notice->get('id'), (int) $joined->get('noticeid'));
+    }
+
+    /**
+     * A site notice keeps its page reach in the criteria, as the editor's web service does at the site.
+     *
+     * The control for the course case: the reach is dropped for the course scope alone.
+     */
+    public function test_a_site_notice_keeps_its_page_reach_in_the_criteria(): void {
+        set_config('audience_sync_limit', 100000, 'local_awareness');
+
+        helper::create_new_notice($this->form_data(['title' => 'Dashboard', 'pathmatch' => '/my/']));
+        $notice = awareness::get_record(['title' => 'Dashboard']);
+
+        $this->assertSame('/my/', notice_audience::criteria_for($notice)['pathmatch'] ?? null);
+    }
+
+    /**
+     * An estimate that fails during the request is reported as failed, and stores nothing.
+     *
+     * resolve() swallows the failure into the job, so only the job's status can tell. A job whose
+     * criteria the estimator cannot read is the failure; the same notice's own criteria are the
+     * control that the path reports a computed count as current.
+     */
+    public function test_a_failed_inline_estimate_is_reported_as_an_error(): void {
+        set_config('audience_sync_limit', 100000, 'local_awareness');
+        helper::create_new_notice($this->form_data(['title' => 'Counted']));
+        $notice = awareness::get_record(['title' => 'Counted']);
+        $count = $notice->get('audiencecount');
+        $computed = $notice->get('audiencecomputed');
+        $this->assertNotNull($count, 'the notice starts with a stored count');
+
+        $job = $this->job_for($notice, json_encode(['cohorts' => 'not a list']));
+        $this->assertSame(notice_audience::STATE_ERROR, notice_audience::resolve_inline($job));
+        $this->assertSame(audience_job::STATUS_ERROR, $job->get('status'));
+        $reread = awareness::get_record(['id' => $notice->get('id')]);
+        $this->assertSame($count, $reread->get('audiencecount'));
+        $this->assertSame($computed, $reread->get('audiencecomputed'));
+
+        $control = $this->job_for($notice, json_encode(notice_audience::criteria_for($notice)));
+        $this->assertSame(notice_audience::STATE_CURRENT, notice_audience::resolve_inline($control));
+        $this->assertSame(audience_job::STATUS_READY, $control->get('status'));
+    }
+
+    /**
+     * refresh() reports an inline estimate that failed as an error, and one that succeeded as current.
+     *
+     * A stored notice's criteria pass through estimator::normalise(), so no real notice makes the
+     * estimate throw; the estimator is replaced in core's DI container instead, which is where
+     * estimate_audience::resolve() takes it from. Putting the real estimator back and refreshing the
+     * same notice is the control.
+     */
+    public function test_refresh_reports_a_failed_inline_estimate_as_an_error(): void {
+        set_config('audience_sync_limit', 100000, 'local_awareness');
+        helper::create_new_notice($this->form_data(['title' => 'Counted']));
+        $notice = awareness::get_record(['title' => 'Counted']);
+        $count = $notice->get('audiencecount');
+        $computed = $notice->get('audiencecomputed');
+        $this->assertNotNull($count, 'the notice starts with a stored count');
+        $this->assertTrue(live_mode::is_live(), 'the refresh resolves during the request');
+
+        $failing = $this->createStub(estimator::class);
+        $failing->method('estimate')->willThrowException(new \dml_read_exception('estimate failed'));
+        \core\di::set(estimator::class, $failing);
+
+        $this->assertSame(notice_audience::STATE_ERROR, notice_audience::refresh($notice, true));
+        $jobs = audience_job::get_records(['noticeid' => (int) $notice->get('id')], 'id', 'DESC');
+        $this->assertSame(audience_job::STATUS_ERROR, reset($jobs)->get('status'));
+        $reread = awareness::get_record(['id' => $notice->get('id')]);
+        $this->assertSame($count, $reread->get('audiencecount'));
+        $this->assertSame($computed, $reread->get('audiencecomputed'));
+
+        \core\di::set(estimator::class, new estimator());
+        $this->assertSame(notice_audience::STATE_CURRENT, notice_audience::refresh($reread, true));
+        $jobs = audience_job::get_records(['noticeid' => (int) $notice->get('id')], 'id', 'DESC');
+        $this->assertSame(audience_job::STATUS_READY, reset($jobs)->get('status'));
+    }
+
+    /**
+     * A pending job raised for a saved notice, with the given criteria.
+     *
+     * @param awareness $notice The notice.
+     * @param string $criteria The criteria JSON the job carries.
+     * @return audience_job
+     */
+    private function job_for(awareness $notice, string $criteria): audience_job {
+        global $USER;
+
+        $job = new audience_job(0, (object) [
+            'jobid' => audience_job::new_jobid(),
+            'userid' => (int) $USER->id,
+            'noticeid' => (int) $notice->get('id'),
+            'criteriahash' => notice_audience::hash_for($notice),
+            'criteria' => $criteria,
+            'status' => audience_job::STATUS_PENDING,
+        ]);
+        $job->create();
+
+        return $job;
     }
 
     /**

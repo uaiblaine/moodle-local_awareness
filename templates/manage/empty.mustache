@@ -21,12 +21,12 @@
     it, because an AJAX refresh replaces the table's HTML and nothing else — an empty state living
     outside would keep showing the previous answer.
 
-    Two shapes, deliberately different: a site with no notices at all is invited to create one, and
-    a filter that matched nothing is offered a way back out instead.
+    Two shapes, deliberately different: an author looking at a list with no notices at all is
+    invited to create one, and a filter that matched nothing is offered a way back out instead.
 
     Context variables required for this template:
     * message (string) - what happened
-    * showcreate (bool) - offer the create-notice call to action
+    * showcreate (bool) - offer the create-notice call to action; false for a reports-only viewer
     * createurl (string) - where that goes
     * createlabel (string) - its label
     * showclear (bool) - offer to clear the filters

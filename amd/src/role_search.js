@@ -1,26 +1,43 @@
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
- * AJAX role search handler for Moodle autocomplete elements.
+ * Role picker for the notice editor's audience rules.
+ *
+ * Feeds the autocomplete from local_awareness_search_roles, which applies the capability check for
+ * the editor's scope and offers the roles that can be held at the chosen role context.
  *
  * @module     local_awareness/role_search
- * @copyright  Anderson Blaine <anderson@blaine.com.br>
+ * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define(['core/ajax', 'jquery'], function(Ajax, $) {
+define(['core/ajax', 'jquery', 'local_awareness/editor_scope'], function(Ajax, $, EditorScope) {
 
     /**
-     * The course the editor writes for, read once from the editor root; 0 for the site.
+     * Fetch the roles matching a search.
      *
-     * Every web service the editor calls takes it, so that a course author's requests are gated and
-     * scoped as a course author's rather than refused at the site.
+     * core/form-autocomplete calls this as the author types; existing selections are rendered by the
+     * form itself. The role context select narrows the list at the site; under a course scope the
+     * server answers for the course whatever level is sent.
      *
-     * @returns {number}
+     * @param {String} selector The selector of the autocomplete element.
+     * @param {String} query The current search query.
+     * @param {Function} callback The callback to invoke with results.
+     * @param {Function} failure The callback on failure.
      */
-    var courseId = function() {
-        var root = document.querySelector('[data-region="la-editor"]');
-        return root ? (parseInt(root.getAttribute('data-courseid'), 10) || 0) : 0;
-    };
-
     var transport = function(selector, query, callback, failure) {
         var contextSelect = $('#id_filter_role_context');
         var contextLevel = contextSelect.length ? contextSelect.val() : 0;
@@ -30,7 +47,7 @@ define(['core/ajax', 'jquery'], function(Ajax, $) {
             args: {
                 query: query,
                 contextlevel: parseInt(contextLevel, 10) || 0,
-                courseid: courseId()
+                courseid: EditorScope.courseId()
             }
         };
 
@@ -50,6 +67,13 @@ define(['core/ajax', 'jquery'], function(Ajax, $) {
             .catch(failure);
     };
 
+    /**
+     * Process the AJAX results before displaying them.
+     *
+     * @param {String} selector The selector of the autocomplete element.
+     * @param {Array} results The results from the transport function.
+     * @return {Array} Processed results.
+     */
     var processResults = function(selector, results) {
         return results;
     };

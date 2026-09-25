@@ -134,8 +134,8 @@ function xmldb_local_awareness_upgrade($oldversion) {
     if ($oldversion < 2026081103) {
         /*
          * local_awareness_hlinks_his grows one row per link click and is queried by hlinkid (the
-         * join in linkhistory::count_clicked_links()) and by userid (its WHERE, and privacy
-         * erasure), with no index on either. Moodle emits no real FOREIGN KEY constraint
+         * joins to the notice's links) and by userid (privacy export and erasure), with no index on
+         * either. Moodle emits no real FOREIGN KEY constraint
          * (sql_generator::$foreign_keys is false on every driver), so these keys declare the
          * relationships and build the two indexes without failing on rows whose hlinkid no longer
          * resolves.
@@ -389,6 +389,53 @@ function xmldb_local_awareness_upgrade($oldversion) {
         }
 
         upgrade_plugin_savepoint(true, 2026090402, 'local', 'awareness');
+    }
+
+    if ($oldversion < 2026092401) {
+        /*
+         * A course notice's audience criteria no longer carry its pathmatch, which the course scope
+         * forces and the editor's estimate leaves out, so a saved course notice now hashes as the
+         * editor's form does. A count stored before that is still right, because page reach never
+         * enters a count, but its hash would read as "filters changed" until recalculated. This
+         * re-stamps each course notice whose stored hash is exactly the one its criteria made with
+         * the pathmatch in.
+         *
+         * The criteria are assembled as notice_audience::criteria_for() assembles them, while the
+         * normalising and hashing are the estimator's own, since a copy of those could not be shown
+         * to agree with it. Should either change shape later, no stored hash matches and the rows
+         * are left as they are, which a recalculation fixes. Written through $DB, because the
+         * persistent's update() stamps timemodified and would expire every recorded acceptance.
+         */
+        $rs = $DB->get_recordset_select(
+            'local_awareness',
+            'courseid > :siteid',
+            ['siteid' => SITEID],
+            'id',
+            'id, cohorts, reqcourse, pathmatch, filtervalues, audiencehash'
+        );
+        foreach ($rs as $record) {
+            if ((string) $record->audiencehash === '') {
+                continue;
+            }
+            $raw = [];
+            if (!empty($record->cohorts)) {
+                $raw['cohorts'] = explode(',', $record->cohorts);
+            }
+            $raw['reqcourse'] = (int) $record->reqcourse;
+            $filters = json_decode((string) $record->filtervalues, true);
+            $filters = is_array($filters) ? $filters : [];
+
+            $saved = \local_awareness\audience\estimator::hash(
+                \local_awareness\audience\estimator::normalise($raw + ['pathmatch' => (string) $record->pathmatch] + $filters)
+            );
+            $current = \local_awareness\audience\estimator::hash(\local_awareness\audience\estimator::normalise($raw + $filters));
+            if ($record->audiencehash === $saved && $saved !== $current) {
+                $DB->set_field('local_awareness', 'audiencehash', $current, ['id' => $record->id]);
+            }
+        }
+        $rs->close();
+
+        upgrade_plugin_savepoint(true, 2026092401, 'local', 'awareness');
     }
 
     return true;

@@ -125,24 +125,21 @@ final class window_test extends \basic_testcase {
     }
 
     /**
-     * Both SQL builders name each placeholder once and bind exactly the names they use.
-     *
-     * {@see window::open_sql()} explains why one instant is bound under two names.
+     * The SQL builder names each placeholder once and binds exactly the names it uses.
      *
      * @return void
      */
-    public function test_the_sql_builders_bind_every_placeholder_exactly_once(): void {
-        foreach ([window::open_prefilter_sql('a', self::NOW), window::open_sql('b', self::NOW)] as [$sql, $params]) {
-            preg_match_all('/:([a-z0-9_]+)/', $sql, $found);
+    public function test_the_sql_builder_binds_every_placeholder_exactly_once(): void {
+        [$sql, $params] = window::open_prefilter_sql('a', self::NOW);
+        preg_match_all('/:([a-z0-9_]+)/', $sql, $found);
 
-            $this->assertNotEmpty($found[1], 'the fragment names no placeholders at all');
-            $this->assertSame(count($found[1]), count(array_unique($found[1])), 'a name appears twice');
-            $this->assertSame(
-                array_values(array_unique($found[1])),
-                array_values(array_keys($params)),
-                'the named placeholders and the bound parameters disagree'
-            );
-        }
+        $this->assertNotEmpty($found[1], 'the fragment names no placeholders at all');
+        $this->assertSame(count($found[1]), count(array_unique($found[1])), 'a name appears twice');
+        $this->assertSame(
+            array_values(array_unique($found[1])),
+            array_values(array_keys($params)),
+            'the named placeholders and the bound parameters disagree'
+        );
     }
 
     /**
@@ -151,8 +148,8 @@ final class window_test extends \basic_testcase {
      * @return void
      */
     public function test_distinct_prefixes_do_not_collide(): void {
-        [, $first] = window::open_sql('one', self::NOW);
-        [, $second] = window::open_sql('two', self::NOW);
+        [, $first] = window::open_prefilter_sql('one', self::NOW);
+        [, $second] = window::open_prefilter_sql('two', self::NOW);
 
         $this->assertSame([], array_intersect_key($first, $second));
     }

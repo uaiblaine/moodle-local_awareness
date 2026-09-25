@@ -58,6 +58,25 @@ final class collision_external_test extends \advanced_testcase {
     }
 
     /**
+     * An instant as the end date selector holds it, in a given timezone.
+     *
+     * @param int $time The instant.
+     * @param string|int $timezone The timezone to read it in; 99 for the current user's.
+     * @return array The year, month, day, hour and minute check_collision reads.
+     */
+    private function selector_parts(int $time, $timezone = 99): array {
+        $date = usergetdate($time, $timezone);
+
+        return [
+            'year' => (int) $date['year'],
+            'month' => (int) $date['mon'],
+            'day' => (int) $date['mday'],
+            'hour' => (int) $date['hours'],
+            'minute' => (int) $date['minutes'],
+        ];
+    }
+
+    /**
      * It names the notices a new one would compete with.
      */
     public function test_it_names_the_competing_notices(): void {
@@ -82,6 +101,83 @@ final class collision_external_test extends \advanced_testcase {
         $this->assertSame(['Dashboard rival'], check_collision::execute(0, '/my/%', true)['titles']);
 
         $this->assertSame([], check_collision::execute(0, '/my/%', false)['titles']);
+    }
+
+    /**
+     * A notice whose end has passed competes with nobody, so the editor warns about nothing.
+     *
+     * The controls are the same end on a perpetual notice, whose window the save discards, and an
+     * end still ahead: both report the rival, so the empty answer comes from the end alone.
+     */
+    public function test_a_notice_whose_end_has_passed_reports_nothing(): void {
+        $this->setAdminUser();
+        $this->repeating('Dashboard rival', '/my/%');
+        $ended = $this->selector_parts(time() - DAYSECS);
+
+        $this->assertSame(['Dashboard rival'], check_collision::execute(0, '/my/%', true, 0, true, $ended)['titles']);
+        $this->assertSame(
+            ['Dashboard rival'],
+            check_collision::execute(0, '/my/%', true, 0, false, $this->selector_parts(time() + WEEKSECS))['titles']
+        );
+
+        $this->assertSame([], check_collision::execute(0, '/my/%', true, 0, false, $ended)['titles']);
+    }
+
+    /**
+     * The end date is read in the author's timezone, as the save reads it.
+     *
+     * Fourteen hours separate the author from the server here, so an end two hours ago in the
+     * author's time would still be twelve hours ahead if its parts were read in the server's.
+     */
+    public function test_the_end_is_read_in_the_authors_timezone(): void {
+        global $USER;
+
+        $this->setTimezone('UTC', 'UTC');
+        $this->setAdminUser();
+        $USER->timezone = 'Pacific/Kiritimati';
+        $this->repeating('Dashboard rival', '/my/%');
+
+        // Precondition: the author's wall clock really is fourteen hours ahead of the server's.
+        $now = time();
+        $this->assertSame(
+            (int) usergetdate($now + (14 * HOURSECS), 'UTC')['hours'],
+            (int) usergetdate($now, 99)['hours']
+        );
+
+        $ahead = $this->selector_parts($now + (2 * HOURSECS), 'Pacific/Kiritimati');
+        $this->assertSame(['Dashboard rival'], check_collision::execute(0, '/my/%', true, 0, false, $ahead)['titles']);
+
+        $ended = $this->selector_parts($now - (2 * HOURSECS), 'Pacific/Kiritimati');
+        $this->assertSame([], check_collision::execute(0, '/my/%', true, 0, false, $ended)['titles']);
+    }
+
+    /**
+     * The window arrives in the shape the editor sends it, through the same validation.
+     *
+     * An older client sends neither key, which test_the_declared_return_shape_carries_the_titles
+     * covers; a form with no end date sends null.
+     */
+    public function test_the_declared_parameters_accept_the_window_the_editor_sends(): void {
+        $this->setAdminUser();
+        $this->repeating('Dashboard rival', '/my/%');
+        $_POST['sesskey'] = sesskey();
+        $args = ['noticeid' => 0, 'courseid' => 0, 'pathmatch' => '/my/%', 'repeats' => true, 'perpetual' => false];
+
+        $response = \core_external\external_api::call_external_function(
+            'local_awareness_check_collision',
+            $args + ['timeend' => null],
+            false
+        );
+        $this->assertFalse($response['error'], 'a null end failed validation');
+        $this->assertSame(['Dashboard rival'], $response['data']['titles']);
+
+        $response = \core_external\external_api::call_external_function(
+            'local_awareness_check_collision',
+            $args + ['timeend' => $this->selector_parts(time() - DAYSECS)],
+            false
+        );
+        $this->assertFalse($response['error'], 'the end date failed validation');
+        $this->assertSame([], $response['data']['titles']);
     }
 
     /**

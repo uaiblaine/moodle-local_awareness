@@ -76,17 +76,37 @@ final class check_filters_test extends \advanced_testcase {
     }
 
     /**
-     * A pattern without a wildcard is anchored at the END only.
+     * A pattern without a wildcard is anchored at the end as well as the start.
      *
      * Pinned because it is surprising: '/course/view.php' does not match '/course/view.php?id=2',
      * because the pattern gets a '$' appended and the query string is part of the target. An author
-     * writing a plain path therefore has to know to add '%'.
+     * writing a plain path therefore has to know to add '%'. The exact page is the control.
      */
     public function test_a_plain_pattern_is_anchored_at_the_end(): void {
         $this->resetAfterTest();
 
+        $this->assertTrue(helper::check_path_match('/mod/forum/view.php', '/mod/forum/view.php'));
+        $this->assertFalse(helper::check_path_match('/mod/forum/view.php', '/mod/forum/view.phpx'));
+        $this->assertFalse(helper::check_path_match('/mod/forum/view.php', '/mod/forum/view.php/extra'));
         $this->assertFalse(helper::check_path_match('/course/view.php', '/course/view.php?id=2'));
         $this->assertTrue(helper::check_path_match('/course/view.php%', '/course/view.php?id=2'));
+    }
+
+    /**
+     * A pattern with a '%' anywhere leaves the end open, not only one ending in '%'.
+     *
+     * The documented behaviour of pathmatch_help, kept so stored patterns keep their reach: a
+     * wildcard in the middle still lets the page carry a query string or anything else after the
+     * last literal part.
+     */
+    public function test_a_pattern_with_a_wildcard_anywhere_leaves_the_end_open(): void {
+        $this->resetAfterTest();
+
+        $this->assertTrue(helper::check_path_match('/mod/%/view.php', '/mod/forum/view.php?id=5'));
+        $this->assertTrue(helper::check_path_match('/mod/%/view.php', '/mod/forum/view.phpx'));
+        $this->assertTrue(helper::check_path_match('/mod/%/view.php', '/mod/forum/view.php/extra'));
+        // Still anchored at the start, and the literal parts still have to be there.
+        $this->assertFalse(helper::check_path_match('/mod/%/view.php', '/mod/forum/index.php'));
     }
 
     /**
@@ -261,6 +281,118 @@ final class check_filters_test extends \advanced_testcase {
         ]);
 
         $this->assertFalse(helper::check_filters($payload, (int) $course->id));
+    }
+
+    /**
+     * A theme rule the reader's theme cannot be resolved for is withheld, like every other rule.
+     *
+     * With category themes on, a course whose category row is gone has no theme to resolve: the
+     * throwaway page current_theme_name() builds throws on the missing category. The precondition
+     * asserts that throw, and the same course with its category back is the control that the rule
+     * admits the theme it resolves.
+     */
+    public function test_an_unresolvable_theme_withholds_a_theme_notice(): void {
+        global $CFG, $DB;
+
+        $this->resetAfterTest();
+        $CFG->theme = 'boost';
+        $CFG->allowcategorythemes = 1;
+
+        $category = $this->getDataGenerator()->create_category();
+        $course = $this->getDataGenerator()->create_course(['category' => $category->id]);
+        $this->login_enrolled_in([$course]);
+        $payload = $this->filters(['filter_theme' => ['boost']]);
+
+        // Control: with its category in place the course resolves boost, and the rule admits.
+        $this->assertTrue(helper::check_filters($payload, (int) $course->id));
+
+        $missing = (int) $category->id + 1000;
+        $this->assertFalse($DB->record_exists('course_categories', ['id' => $missing]));
+        $DB->set_field('course', 'category', $missing, ['id' => $course->id]);
+        $orphan = $DB->get_record('course', ['id' => $course->id]);
+        $thrown = false;
+        try {
+            $page = new \moodle_page();
+            $page->set_course($orphan);
+            $this->assertNotEmpty($page->theme->name);
+        } catch (\moodle_exception $e) {
+            $thrown = true;
+        }
+        $this->assertTrue($thrown, 'the theme resolved, so the case below would not reach the failure it is about');
+
+        $this->assertFalse(helper::check_filters($payload, (int) $course->id));
+    }
+
+    /**
+     * A scalar payload admits, as an empty one does, and raises no warning on the way.
+     *
+     * json_decode() turns '123', '"text"' and 'true' into scalars, and a foreach over one warns
+     * before anything is decided. The warnings are collected rather than left to PHPUnit, whose
+     * handling of them differs between the versions Moodle 4.5 and 5.x ship. The rejecting course
+     * payload is the control that the function is not admitting everything.
+     */
+    public function test_a_scalar_payload_admits_without_a_warning(): void {
+        $this->resetAfterTest();
+        $this->setUser($this->getDataGenerator()->create_user());
+
+        $warnings = [];
+        set_error_handler(static function (int $errno, string $message) use (&$warnings): bool {
+            $warnings[] = $message;
+            return true;
+        });
+        try {
+            $answers = [];
+            foreach (['123', '"text"', 'true'] as $payload) {
+                $answers[$payload] = helper::check_filters($payload, 0);
+            }
+            $control = helper::check_filters($this->filters(['filter_course' => [SITEID + 1000]]), 0);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $warnings);
+        $this->assertSame(['123' => true, '"text"' => true, 'true' => true], $answers);
+        $this->assertFalse($control);
+    }
+
+    /**
+     * A proficiency answer does not outlive a cache purge.
+     *
+     * The competency rule remembers each answer for the request. MUC is purged between PHPUnit
+     * tests where a PHP static is not, and generated ids repeat from one test to the next, so a
+     * static answer could be read by a later test about somebody else. The purge here is the one the
+     * framework performs between tests; the refusal before it proves the rule is switched on.
+     */
+    public function test_a_proficiency_answer_does_not_outlive_a_cache_purge(): void {
+        global $USER;
+
+        $this->resetAfterTest();
+        set_config('enabled', 1, 'core_competency');
+
+        $course = $this->getDataGenerator()->create_course();
+        $competencies = $this->getDataGenerator()->get_plugin_generator('core_competency');
+        $this->setAdminUser();
+        $framework = $competencies->create_framework();
+        $competency = $competencies->create_competency(['competencyframeworkid' => $framework->get('id')]);
+        $competencyid = (int) $competency->get('id');
+        $this->login_enrolled_in([$course]);
+        $userid = (int) $USER->id;
+
+        $payload = $this->filters([
+            'filter_competency_rules' => [['id' => $competencyid, 'proficient' => 1]],
+        ]);
+        $this->assertFalse(helper::check_filters($payload, (int) $course->id), 'not yet proficient');
+
+        $competencies->create_user_competency_course([
+            'userid' => $userid,
+            'courseid' => $course->id,
+            'competencyid' => $competencyid,
+            'proficiency' => true,
+            'grade' => count($competency->get_scale()->scale_items),
+        ]);
+        \cache_helper::purge_all();
+
+        $this->assertTrue(helper::check_filters($payload, (int) $course->id), 'the answer from before the purge was reused');
     }
 
     /**

@@ -24,9 +24,9 @@ namespace local_awareness\local;
  *
  * The convention exemptions are named rather than skipped wholesale, because each is required for
  * a different reason: a _help string is fetched by addHelpButton() from the base key, a cachedef_
- * string by core from the cache's name in db/caches.php, a messageprovider: string from
- * db/messages.php, and a task_ string exists for every task class by convention, although core
- * names an adhoc task from its class and never fetches that one.
+ * string by core from the cache's name in db/caches.php, and a messageprovider: string from
+ * db/messages.php. A task_ string is not exempt: every task class, the adhoc one included, fetches
+ * its own in get_name().
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -45,17 +45,17 @@ final class lang_usage_test extends \basic_testcase {
     }
 
     /**
-     * Every non-lang source file the plugin ships, concatenated.
+     * The code of every source file the plugin ships, concatenated, comments removed.
      *
      * Swept from the root with an exclusion list rather than from a list of named directories, so
-     * a directory added later is covered by default. Tests and comments are read too, so a key
-     * named only there still counts as used.
+     * a directory added later is covered by default. Tests are skipped and comments removed, so a
+     * key named only in a test or in a comment counts as unused.
      *
-     * @return string The concatenated sources.
+     * @return string The concatenated code.
      */
     private function sources(): string {
         $root = $this->plugin_root();
-        $skip = ['lang', 'docs', 'build', '.git', 'node_modules'];
+        $skip = ['lang', 'docs', 'build', '.git', 'node_modules', 'tests'];
 
         $sources = '';
         $iterator = new \RecursiveIteratorIterator(
@@ -67,12 +67,44 @@ final class lang_usage_test extends \basic_testcase {
             )
         );
         foreach ($iterator as $file) {
-            if ($file->isFile() && in_array($file->getExtension(), ['php', 'mustache', 'js'], true)) {
-                $sources .= file_get_contents($file->getPathname());
+            $extension = $file->getExtension();
+            if ($file->isFile() && in_array($extension, ['php', 'mustache', 'js'], true)) {
+                $sources .= $this->code_of(file_get_contents($file->getPathname()), $extension) . "\n";
             }
         }
 
         return $sources;
+    }
+
+    /**
+     * A source with its comments removed.
+     *
+     * PHP goes through the tokenizer, so a `//` inside a string survives. JS loses its block
+     * comments and every `//` comment not preceded by a colon or a quote, which keeps a URL or a
+     * string holding one. Mustache loses its `{{! }}` comments.
+     *
+     * @param string $source The file's contents.
+     * @param string $extension php, js or mustache.
+     * @return string The code.
+     */
+    private function code_of(string $source, string $extension): string {
+        if ($extension === 'php') {
+            $code = '';
+            foreach (token_get_all($source) as $token) {
+                if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                    $code .= ' ';
+                    continue;
+                }
+                $code .= is_array($token) ? $token[1] : $token;
+            }
+            return $code;
+        }
+        if ($extension === 'mustache') {
+            return preg_replace('/\{\{!.*?\}\}/s', ' ', $source);
+        }
+
+        $source = preg_replace('~/\*.*?\*/~s', ' ', $source);
+        return preg_replace('~(^|[^:\'"\\\\])//.*$~m', '$1', $source);
     }
 
     /**
@@ -92,7 +124,7 @@ final class lang_usage_test extends \basic_testcase {
 
         $dead = [];
         foreach ($keys as $key) {
-            if (preg_match('/^(cachedef_|messageprovider:|task_)|_help$/', $key)) {
+            if (preg_match('/^(cachedef_|messageprovider:)|_help$/', $key)) {
                 continue;
             }
             /*
@@ -105,6 +137,41 @@ final class lang_usage_test extends \basic_testcase {
         }
 
         $this->assertSame([], $dead, 'these strings are defined in both packs and used nowhere: ' . implode(', ', $dead));
+    }
+
+    /**
+     * A key named only in a comment or in a test does not count as used.
+     *
+     * Each fixture holds keys in code beside keys in comments, so a stripper that removes too much
+     * fails as surely as one that removes too little.
+     *
+     * @return void
+     */
+    public function test_comments_and_tests_do_not_count_as_usage(): void {
+        $fixtures = [
+            'php' => "<?php\n// Named dead:one.\n/** Named dead:two. */\n"
+                . "\$s = get_string('live:one', 'local_awareness'); // Named dead:three.\n"
+                . "\$u = 'http://example.com/live:two';\n",
+            'js' => "// Named dead:one.\n/* Named dead:two. */\n"
+                . "getString('live:one', 'local_awareness'); // Named dead:three.\n"
+                . "var url = 'https://example.com/live:two';\n",
+            'mustache' => "{{! Named dead:one, dead:two and dead:three. }}\n"
+                . "{{#str}} live:one, local_awareness {{/str}}\n<a href=\"http://example.com/live:two\">\n",
+        ];
+        foreach ($fixtures as $extension => $source) {
+            $code = $this->code_of($source, $extension);
+            foreach (['live:one', 'live:two'] as $key) {
+                $this->assertStringContainsString($key, $code, "{$extension}: the code naming {$key} was stripped");
+            }
+            foreach (['dead:one', 'dead:two', 'dead:three'] as $key) {
+                $this->assertStringNotContainsString($key, $code, "{$extension}: the comment naming {$key} was kept");
+            }
+        }
+
+        // This method's name is code in a test file and nowhere else, so the sweep must not hold it.
+        $sources = $this->sources();
+        $this->assertStringContainsString('namespace local_awareness', $sources, 'the sweep read no plugin class');
+        $this->assertStringNotContainsString(__FUNCTION__, $sources, 'the sweep reads the tests');
     }
 
     /**

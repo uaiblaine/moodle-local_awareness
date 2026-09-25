@@ -46,7 +46,7 @@ class search_courses extends external_api {
     }
 
     /**
-     * Search courses by name, returning up to 50 matches.
+     * Search courses by name, returning up to 50 matches; a query under two characters returns none.
      *
      * @param string $query Search term.
      * @param int $courseid The course the editor is scoped to, 0 for the site.
@@ -68,7 +68,8 @@ class search_courses extends external_api {
         $query = trim($params['query']);
         $results = [];
 
-        if (strlen($query) >= 2) {
+        // Two characters, not two bytes: one accented or CJK character is several bytes in UTF-8.
+        if (\core_text::strlen($query) >= 2) {
             $likesql = $DB->sql_like('fullname', ':search', false);
             /*
              * Under a course scope the only course a notice may name is its own — the scope forces

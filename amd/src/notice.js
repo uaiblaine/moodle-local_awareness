@@ -87,10 +87,14 @@ define(
                         modal.getModal().on('click', modal.getAcceptButtonID(), function() {
                             acknowledgeNotice();
                         });
-                        // Event listener for link tracking.
-                        modal.getModal().on('click', 'a', function() {
-                            var linkid = $(this).attr("data-linkid");
-                            trackLink(linkid);
+                        /*
+                         * Link tracking, for the anchors the server registered when the notice was
+                         * saved. Anchors that appear at render time - text filter output, a video
+                         * link no player took - carry no data-linkid, and the tracking service
+                         * refuses a click without one.
+                         */
+                        modal.getModal().on('click', 'a[data-linkid]', function() {
+                            trackLink($(this).attr('data-linkid'));
                         });
                         // Event listener for ack checkbox.
                         modal.getModal().on('click', modal.getAckCheckboxID(), function() {
@@ -171,8 +175,8 @@ define(
         };
 
         /**
-         * Link tracking.
-         * @param {Integer} linkid
+         * Record a click on a tracked link.
+         * @param {String} linkid The anchor's data-linkid, a local_awareness_hlinks id.
          */
         var trackLink = function(linkid) {
             var promises = ajax.call([

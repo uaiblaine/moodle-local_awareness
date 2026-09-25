@@ -196,7 +196,7 @@ final class async_contract_test extends \basic_testcase {
         $this->assertStringContainsString(
             'sequence',
             $estimator,
-            'amd/build/audience_estimator.min.js predates the sequence guard — run mdl grunt and commit the bundle.'
+            'amd/build/audience_estimator.min.js predates the sequence guard: rebuild it with grunt amd and commit the bundle.'
         );
 
         $notice = file_get_contents($root . '/amd/build/notice.min.js');
@@ -204,7 +204,7 @@ final class async_contract_test extends \basic_testcase {
         $this->assertStringContainsString(
             'inflight',
             $notice,
-            'amd/build/notice.min.js predates the in-flight guard — run mdl grunt and commit the bundle.'
+            'amd/build/notice.min.js predates the in-flight guard: rebuild it with grunt amd and commit the bundle.'
         );
     }
 

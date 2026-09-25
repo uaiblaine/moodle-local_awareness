@@ -24,6 +24,11 @@
  */
 defined('MOODLE_INTERNAL') || die();
 
+/*
+ * 'capabilities' is documentation for the web service admin screens, and core reads it as a
+ * comma-separated list. Each lists every capability helper::require_author() accepts for the
+ * service: the site one, or its course counterpart under a course scope.
+ */
 $functions = [
     'local_awareness_dismiss' => [
         'classname' => 'local_awareness\\external\\dismiss_notice',
@@ -66,7 +71,7 @@ $functions = [
         'methodname' => 'execute',
         'description' => 'Repeating notices that would compete with this one for the same pages',
         'type' => 'read',
-        'capabilities' => 'local/awareness:manage',
+        'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
     ],
@@ -76,7 +81,7 @@ $functions = [
         'methodname' => 'execute',
         'description' => 'Search roles dynamically based on context',
         'type' => 'read',
-        'capabilities' => 'local/awareness:manage',
+        'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
     ],
@@ -86,7 +91,7 @@ $functions = [
         'methodname' => 'execute',
         'description' => 'Search courses by name for autocomplete',
         'type' => 'read',
-        'capabilities' => 'local/awareness:manage',
+        'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
     ],
@@ -96,7 +101,7 @@ $functions = [
         'methodname' => 'execute',
         'description' => 'Enqueue an asynchronous audience-estimate job',
         'type' => 'write',
-        'capabilities' => 'local/awareness:manage',
+        'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
     ],
@@ -106,7 +111,7 @@ $functions = [
         'methodname' => 'execute',
         'description' => 'Poll an audience-estimate job',
         'type' => 'read',
-        'capabilities' => 'local/awareness:manage',
+        'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
     ],
@@ -116,7 +121,7 @@ $functions = [
         'methodname' => 'execute',
         'description' => 'Render the notice the editor currently holds, as the reader would get it',
         'type' => 'read',
-        'capabilities' => 'local/awareness:manage',
+        'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
     ],
@@ -126,7 +131,8 @@ $functions = [
         'methodname' => 'execute',
         'description' => 'Render one saved notice for the manage list preview',
         'type' => 'read',
-        'capabilities' => 'local/awareness:viewreports',
+        'capabilities' => 'local/awareness:manage, local/awareness:managecourse, '
+            . 'local/awareness:viewreports, local/awareness:viewreportscourse',
         'loginrequired' => true,
         'ajax' => true,
     ],

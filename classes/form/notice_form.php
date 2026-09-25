@@ -174,6 +174,8 @@ class notice_form extends \core\form\persistent {
                 ]
             );
             $mform->setDefault('filter_role_context', 0);
+            // The help describes what helper::user_matches_role_filter() counts for each choice; keep them in step.
+            $mform->addHelpButton('filter_role_context', 'filter_role_context', 'local_awareness');
         }
 
         $filterroledefaults = [];
@@ -373,6 +375,7 @@ class notice_form extends \core\form\persistent {
         if ($coursemode) {
             $this->define_appearance($mform);
             $this->define_behaviour($mform);
+            $this->define_buttons($mform);
 
             return;
         }
@@ -444,6 +447,7 @@ class notice_form extends \core\form\persistent {
 
         $this->define_appearance($mform);
         $this->define_behaviour($mform);
+        $this->define_buttons($mform);
     }
 
     /**
@@ -650,13 +654,25 @@ class notice_form extends \core\form\persistent {
                 'animation' => awareness::ANIMATIONS[0],
             ]
         );
+    }
 
+    /**
+     * Preview, Save and Cancel, in core's sticky footer, after every section.
+     *
+     * The sticky footer is wrapped around the group where it is added, not moved to the end of the
+     * form, so this runs last: the DOM and tab order then reach every field before Save, and where
+     * the footer is not fixed (Behat, theme designer mode) it sits under the form rather than
+     * between two sections.
+     *
+     * @param \MoodleQuickForm $mform The form.
+     */
+    private function define_buttons(\MoodleQuickForm $mform): void {
         $buttonarray = [];
 
         /*
          * Preview sits with Save and Cancel because it is the third thing an author does with the
-         * whole form, not a property of the page head. type="button" and no name of its own: it
-         * must never submit, and the JS finds it by its data-action.
+         * whole form, not a property of the page head. type="button", because it must never submit;
+         * the JS finds it by its data-action, not by its name.
          */
         $buttonarray[] = $mform->createElement(
             'button',

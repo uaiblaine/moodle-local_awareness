@@ -22,7 +22,6 @@ use local_awareness\persistent\awareness;
 use renderable;
 use templatable;
 use renderer_base;
-use moodle_url;
 
 /**
  * Renderable for the redesigned notice editor page.
@@ -95,7 +94,7 @@ class editor_page implements renderable, templatable {
             'unsavedlabel' => get_string('editor:unsaved', 'local_awareness'),
             'requirements' => self::window_warning($this->awareness),
             'formhtml' => $formhtml,
-            // Read by every module that calls a web service: the scope travels with each request.
+            // Read by local_awareness/editor_scope for every module that calls a web service.
             'courseid' => $this->scope->get_courseid(),
             'helptitle' => get_string('editor:nav:howitworks', 'local_awareness'),
             'helpbody' => get_string('editor:nav:howitworks:body', 'local_awareness'),

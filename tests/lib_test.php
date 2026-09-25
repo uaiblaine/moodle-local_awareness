@@ -27,11 +27,11 @@ require_once($CFG->dirroot . '/local/awareness/lib.php');
  * Tests for the plugin's file-serving callback.
  *
  * local_awareness_pluginfile() is the only gate between a direct file URL and the attachments of
- * a notice that is switched off or aimed at someone else. Every refusal is a bare `return false`,
- * and a successful serve ends in send_stored_file(), which terminates the process.
- * So a refusal by helper::may_serve_files_of() is asserted with the file in place, where a missing
- * gate would serve it instead of returning, and an admission either asks may_serve_files_of()
- * directly or deletes the file first, so the callback falls out at its own get_file() miss.
+ * a notice that is switched off or aimed at someone else. Every refusal and every file miss is the
+ * same bare `return false`, and serving a real file ends in send_stored_file(), which terminates
+ * the process. So each case asks for the area's directory entry instead ({@see self::probe()}):
+ * the callback returns null exactly when it got past every check and found the entry, which tells
+ * an admission from a refusal without serving anything.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -96,40 +96,82 @@ final class lib_test extends \advanced_testcase {
     }
 
     /**
+     * Ask the callback for the root directory entry of one item's file area.
+     *
+     * file_storage keeps a '.' record beside every stored file, and send_stored_file() returns
+     * without output for a directory when 'dontdie' is set. So the callback returns null when it
+     * passed every check and its own get_file() found the entry, and false for every refusal and
+     * every miss. The entry exists wherever a file was stored.
+     *
+     * @param int $itemid The item id in the URL.
+     * @param string $filearea The file area in the URL.
+     * @param \context|null $context The context of the URL, the system context when null.
+     * @param \stdClass|null $course The course the callback is given.
+     * @return bool|null False when refused or missing, null when the entry was reached.
+     */
+    private function probe(int $itemid, string $filearea = 'content', ?\context $context = null, ?\stdClass $course = null) {
+        return local_awareness_pluginfile(
+            $course,
+            null,
+            $context ?? \context_system::instance(),
+            $filearea,
+            [$itemid, '.'],
+            false,
+            ['dontdie' => true]
+        );
+    }
+
+    /**
+     * Store a file for a notice at a chosen location, so the probe finds an entry there.
+     *
+     * @param awareness $notice The notice whose id is the item id.
+     * @param string $filearea The file area.
+     * @param \context $context The context.
+     */
+    private function store_file_at(awareness $notice, string $filearea, \context $context): void {
+        get_file_storage()->create_file_from_string([
+            'contextid' => $context->id,
+            'component' => 'local_awareness',
+            'filearea' => $filearea,
+            'itemid' => $notice->get('id'),
+            'filepath' => '/',
+            'filename' => 'policy.txt',
+        ], 'the policy');
+    }
+
+    /**
      * A context other than the system context is refused.
+     *
+     * A file is stored at exactly the course-context location the request names, and the caller is
+     * the admin, whom the audience gate admits: without the context check the callback would reach
+     * that entry. The control is the same request in the system context.
      */
     public function test_a_non_system_context_is_refused(): void {
         $this->resetAfterTest();
 
         $notice = $this->seed_notice_with_file(1);
         $course = $this->getDataGenerator()->create_course();
+        $coursecontext = \context_course::instance($course->id);
+        $this->store_file_at($notice, 'content', $coursecontext);
 
-        $this->assertFalse(local_awareness_pluginfile(
-            $course,
-            null,
-            \context_course::instance($course->id),
-            'content',
-            [$notice->get('id'), 'policy.txt'],
-            false
-        ));
+        $this->assertNull($this->probe((int) $notice->get('id')), 'the control: the system context is served');
+        $this->assertFalse($this->probe((int) $notice->get('id'), 'content', $coursecontext, $course));
     }
 
     /**
      * A file area this plugin does not own is refused.
+     *
+     * Built like the context case: a file is stored in the foreign area the request names, so only
+     * the file-area check stands between the admin and that entry.
      */
     public function test_an_unknown_filearea_is_refused(): void {
         $this->resetAfterTest();
 
         $notice = $this->seed_notice_with_file(1);
+        $this->store_file_at($notice, 'notafilearea', \context_system::instance());
 
-        $this->assertFalse(local_awareness_pluginfile(
-            null,
-            null,
-            \context_system::instance(),
-            'notafilearea',
-            [$notice->get('id'), 'policy.txt'],
-            false
-        ));
+        $this->assertNull($this->probe((int) $notice->get('id')), 'the control: the content area is served');
+        $this->assertFalse($this->probe((int) $notice->get('id'), 'notafilearea'));
     }
 
     /**
@@ -162,23 +204,13 @@ final class lib_test extends \advanced_testcase {
         $notice = $this->seed_notice_with_file(0);
         $this->setUser($this->getDataGenerator()->create_user());
 
-        $this->assertFalse(local_awareness_pluginfile(
-            null,
-            null,
-            \context_system::instance(),
-            'content',
-            [$notice->get('id'), 'policy.txt'],
-            false
-        ));
+        $this->assertFalse($this->probe((int) $notice->get('id')));
     }
 
     /**
      * A plain user gets past the gate on an enabled notice.
      *
-     * The control for the disabled case. The file is deleted first, so an enabled notice falls out
-     * at the callback's own get_file() miss, below the gate. That false cannot be told apart from
-     * the gate's; what the pair proves is the disabled case, which with the gate removed would
-     * serve its file and exit instead of returning false.
+     * The control for the disabled case: same kind of user, same request.
      */
     public function test_a_plain_user_passes_the_gate_on_an_enabled_notice(): void {
         $this->resetAfterTest();
@@ -188,23 +220,7 @@ final class lib_test extends \advanced_testcase {
 
         $this->assertFalse(has_capability('local/awareness:manage', \context_system::instance()));
 
-        get_file_storage()->get_file(
-            \context_system::instance()->id,
-            'local_awareness',
-            'content',
-            $notice->get('id'),
-            '/',
-            'policy.txt'
-        )->delete();
-
-        $this->assertFalse(local_awareness_pluginfile(
-            null,
-            null,
-            \context_system::instance(),
-            'content',
-            [$notice->get('id'), 'policy.txt'],
-            false
-        ));
+        $this->assertNull($this->probe((int) $notice->get('id')));
     }
 
     /**
@@ -219,25 +235,7 @@ final class lib_test extends \advanced_testcase {
         $this->assertTrue(has_capability('local/awareness:manage', \context_system::instance()));
         $this->assertFalse((bool) $notice->get('enabled'));
 
-        // Deleting the stored file makes the callback fall out at its get_file() miss instead of
-        // calling send_stored_file(), which would terminate the test process.
-        get_file_storage()->get_file(
-            \context_system::instance()->id,
-            'local_awareness',
-            'content',
-            $notice->get('id'),
-            '/',
-            'policy.txt'
-        )->delete();
-
-        $this->assertFalse(local_awareness_pluginfile(
-            null,
-            null,
-            \context_system::instance(),
-            'content',
-            [$notice->get('id'), 'policy.txt'],
-            false
-        ));
+        $this->assertNull($this->probe((int) $notice->get('id')));
     }
 
     /**
@@ -245,8 +243,7 @@ final class lib_test extends \advanced_testcase {
      *
      * The file URL carries a notice id and nothing else, so without an audience check any
      * authenticated user who guessed the id could read the attachments of a notice whose body
-     * get_notices() withholds from them. The file is in place: with the gate removed this case
-     * reaches send_stored_file() instead of returning false.
+     * get_notices() withholds from them. The control is the cohort member below.
      */
     public function test_a_user_outside_the_audience_cannot_fetch_the_files(): void {
         $this->resetAfterTest();
@@ -259,22 +256,14 @@ final class lib_test extends \advanced_testcase {
         // In no cohort, holding nothing.
         $this->setUser($this->getDataGenerator()->create_user());
 
-        $this->assertFalse(local_awareness_pluginfile(
-            null,
-            null,
-            \context_system::instance(),
-            'content',
-            [$notice->get('id'), 'policy.txt'],
-            false
-        ));
+        $this->assertFalse($this->probe((int) $notice->get('id')));
     }
 
     /**
      * A member of the targeted cohort gets past the gate.
      *
-     * The control, built like the enabled case: the file is deleted first, so a user who is in the
-     * audience falls out at the callback's own get_file() miss, below the gate. Same notice, same
-     * file name, differing only in whether the reader is in the cohort.
+     * The control for the case above: same notice, same request, differing only in whether the
+     * reader is in the cohort.
      */
     public function test_a_member_of_the_targeted_cohort_passes_the_gate(): void {
         $this->resetAfterTest();
@@ -288,23 +277,7 @@ final class lib_test extends \advanced_testcase {
         cohort_add_member($cohort->id, $user->id);
         $this->setUser($user);
 
-        get_file_storage()->get_file(
-            \context_system::instance()->id,
-            'local_awareness',
-            'content',
-            $notice->get('id'),
-            '/',
-            'policy.txt'
-        )->delete();
-
-        $this->assertFalse(local_awareness_pluginfile(
-            null,
-            null,
-            \context_system::instance(),
-            'content',
-            [$notice->get('id'), 'policy.txt'],
-            false
-        ));
+        $this->assertNull($this->probe((int) $notice->get('id')));
     }
 
     /**
@@ -339,9 +312,8 @@ final class lib_test extends \advanced_testcase {
     /**
      * The manager bypass is decided in the notice's own scope: a course author reaches only their course's files.
      *
-     * Asked at the seam the callback stands behind, so no file has to be served; and asked through
-     * the callback too, with the file in place, for the two refusals — a refusal that were not one
-     * would reach send_stored_file() rather than return the strict false asserted.
+     * Asked at the seam the callback stands behind, and through the callback too for the two
+     * refusals; the author's own file through the callback is the next test.
      */
     public function test_a_course_author_reaches_only_their_own_course_s_unpublished_files(): void {
         $this->resetAfterTest();
@@ -361,24 +333,12 @@ final class lib_test extends \advanced_testcase {
         $this->assertFalse(helper::may_serve_files_of($notices['site']), 'a site notice\'s unpublished file is refused');
 
         foreach (['theirs', 'site'] as $key) {
-            $this->assertFalse(local_awareness_pluginfile(
-                null,
-                null,
-                \context_system::instance(),
-                'content',
-                [$notices[$key]->get('id'), 'policy.txt'],
-                false
-            ), "the callback refuses {$key} with the file in place");
+            $this->assertFalse($this->probe((int) $notices[$key]->get('id')), "the callback refuses {$key}");
         }
     }
 
     /**
      * The same course author reaches their own course's unpublished file through the real callback too.
-     *
-     * With the file deleted first, the callback falls out at its get_file() miss below the gate;
-     * with the gate refusing, it would fall out above it — the same false, which is why the seam
-     * carries the positive assertion and this only keeps the file's own discipline of proving each
-     * scope's path through local_awareness_pluginfile().
      */
     public function test_a_course_author_s_own_file_passes_the_real_callback(): void {
         $this->resetAfterTest();
@@ -393,23 +353,7 @@ final class lib_test extends \advanced_testcase {
         role_assign($roleid, $user->id, \context_course::instance($mine->id)->id);
         $this->setUser($user);
 
-        get_file_storage()->get_file(
-            \context_system::instance()->id,
-            'local_awareness',
-            'content',
-            $notices['mine']->get('id'),
-            '/',
-            'policy.txt'
-        )->delete();
-
-        $this->assertFalse(local_awareness_pluginfile(
-            null,
-            null,
-            \context_system::instance(),
-            'content',
-            [$notices['mine']->get('id'), 'policy.txt'],
-            false
-        ));
+        $this->assertNull($this->probe((int) $notices['mine']->get('id')));
     }
 
     /**

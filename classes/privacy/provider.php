@@ -417,11 +417,11 @@ class provider implements
         );
 
         /*
-         * A notice is configuration rather than one person's data, but core\persistent stamps the
-         * author into usermodified on every create and update, so the user id is declared. As with
-         * core's analytics_models and analytics_models_log, it is left out of the contextlist, the
-         * export and every delete path: blanking it would rewrite the record of who published the
-         * notice.
+         * A notice and its carousel slides are configuration rather than one person's data, but
+         * core\persistent stamps the author into usermodified on every create and update, so the
+         * user id is declared for both tables. As with core's analytics_models and
+         * analytics_models_log, it is left out of the contextlist, the export and every delete
+         * path: blanking it would rewrite the record of who published the notice.
          */
         $collection->add_database_table(
             'local_awareness',
@@ -429,6 +429,14 @@ class provider implements
                 'usermodified' => 'privacy:metadata:usermodified',
             ],
             'privacy:metadata:local_awareness'
+        );
+
+        $collection->add_database_table(
+            'local_awareness_slides',
+            [
+                'usermodified' => 'privacy:metadata:local_awareness_slides:usermodified',
+            ],
+            'privacy:metadata:local_awareness_slides'
         );
 
         return $collection;

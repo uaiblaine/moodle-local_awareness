@@ -24,7 +24,7 @@ namespace local_awareness\local;
  *  - every string id a template asks for exists;
  *  - aria-modal and the accessible name sit on the element with role="dialog";
  *  - Tab is left to core's FocusLock, with no second trap in the plugin;
- *  - the close button is actuated through a selector scoped to the dialogue;
+ *  - the close button is actuated through a selector scoped to the dialogue, and pressed once;
  *  - the refused-click animation class is on the element the stylesheet animates;
  *  - neither language pack claims that acknowledgement logs the reader out.
  *
@@ -184,9 +184,55 @@ final class modal_contract_test extends \basic_testcase {
 
         // Control: the button must still be actuated somewhere, or the assertion above is free.
         $this->assertStringContainsString(
-            'SELECTORS.CLOSE_BUTTON).trigger(',
+            'getModal().find(SELECTORS.CLOSE_BUTTON).first().trigger(',
             $js,
             'The refused-exit paths must still route through the close button so the dismissal is recorded.'
+        );
+    }
+
+    /**
+     * A backdrop click or Escape presses one close button, not every one the selector matches.
+     *
+     * jQuery's trigger() clicks every element in the collection, and the selector matches the header
+     * cross, the footer Close and Not now, so an unnarrowed trigger runs the close handler once per
+     * button. The reader's queue survives that only because of its in-flight guard; the previews,
+     * only because the first destroy() strips the handlers from the rest.
+     *
+     * @return void
+     */
+    public function test_each_exit_path_presses_one_close_button(): void {
+        $js = $this->read('amd/src/modal_notice.js');
+        $template = $this->read('templates/modal_notice.mustache');
+
+        // The force: the template really carries several buttons the selector matches.
+        $this->assertGreaterThanOrEqual(
+            2,
+            substr_count($template, 'data-action="close"'),
+            'The template no longer carries several close buttons, so this test guards nothing.'
+        );
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/SELECTORS\.CLOSE_BUTTON\)\s*\.trigger\(/',
+            $js,
+            'A trigger() on every close button runs the close handler once per button.'
+        );
+
+        // Both exit paths go through the one helper that narrows the collection.
+        $start = strpos($js, 'ModalNotice.prototype.registerEventListeners = function()');
+        $this->assertNotFalse($start, 'registerEventListeners() is gone, so the scan below would pass blind.');
+        $end = strpos($js, "\n        };", $start);
+        $this->assertNotFalse($end, 'registerEventListeners() has no end at its indent.');
+        $this->assertSame(
+            2,
+            substr_count(substr($js, $start, $end - $start), 'pressClose('),
+            'The backdrop and the Escape handler must each press the close button through pressClose().'
+        );
+
+        // Moodle serves amd/build, so the fix only counts once the bundle carries it.
+        $this->assertStringContainsString(
+            '.first().trigger("click")',
+            $this->read('amd/build/modal_notice.min.js'),
+            'amd/build/modal_notice.min.js predates the single press: rebuild it.'
         );
     }
 

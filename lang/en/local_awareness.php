@@ -48,6 +48,7 @@ $string['audience:rules_too_many'] = 'Too many filter rules to estimate automati
 $string['audience:state:auto_pending'] = 'Computing — refreshing as you change the filters…';
 $string['audience:state:cached'] = 'Result computed at {$a}.';
 $string['audience:state:error'] = 'Estimate failed: {$a}';
+$string['audience:state:error_noanswer'] = 'the server did not return an answer.';
 $string['audience:state:idle'] = 'Reach has not been calculated yet.';
 $string['audience:state:manual_ready'] = 'Click "Calculate reach" when you are ready.';
 $string['audience:state:queued'] = 'Calculating in the background…';
@@ -162,6 +163,17 @@ $string['filter_role_context'] = 'Role context';
 $string['filter_role_context:category'] = 'Course category';
 $string['filter_role_context:course'] = 'Course';
 $string['filter_role_context:system'] = 'System';
+$string['filter_role_context_help'] = 'Where the reader must hold one of the selected roles for the role rule to count them. It changes nothing while no role is selected.
+
+All: a role held anywhere counts, in any context. Every logged-in user also counts as holding the Default role for all users and the Default site home role (normally Authenticated user and Authenticated user on site home), so selecting either of those reaches everyone who is logged in.
+
+System: only roles assigned at the system level, plus the Default role for all users.
+
+Course category: only roles assigned in a course category; when categories are chosen under Display restrictions, only in those.
+
+Course: only roles assigned in a course itself, not in its activities; when courses or categories are chosen under Display restrictions, only in those courses and in the courses of those categories.
+
+The guest user counts as holding neither default role.';
 $string['filter_theme'] = 'Theme';
 $string['filters'] = 'Filters';
 $string['manage:empty:filtered'] = 'No notices match these filters.';
@@ -200,6 +212,7 @@ A reader who has asked their device for reduced motion sees a plain fade whateve
 $string['notice:audience'] = 'Target audience';
 $string['notice:audience:cohorts'] = 'Cohorts: {$a}';
 $string['notice:audience:computed'] = 'Computed {$a}';
+$string['notice:audience:failed'] = 'The audience estimate for "{$a}" could not be calculated. The previous figure, if any, is unchanged; try again later.';
 $string['notice:audience:groups'] = 'Groups: {$a}';
 $string['notice:audience:never'] = 'Not calculated';
 $string['notice:audience:pending'] = 'Calculating…';
@@ -352,10 +365,14 @@ $string['notice:videourl_help'] = 'A link to the video: a YouTube or Vimeo page,
 $string['notification:nodeleteallowed'] = 'Notice deletion is not allowed';
 $string['notification:noticedoesnotexist'] = 'The notice does not exist';
 $string['notification:noupdateallowed'] = 'Notice update is not allowed';
+$string['notification:orphannotice'] = 'This notice belonged to a course that no longer exists. No page can show it, so it cannot be edited; it can still be previewed, disabled or deleted.';
 $string['pathmatch'] = 'Apply to URL match';
-$string['pathmatch_help'] = 'Notices will be displayed on any page whose URL matches this value.
+$string['pathmatch_help'] = 'Notices will be displayed on any page whose URL matches this value. The value is compared with the page address after the site address, query string included, starting from its first character.
 
-You can use the % character as a wildcard to mean anything.
+Without a % the value must match the whole address: /course/view.php does not match /course/view.php?id=2.
+
+With a % anywhere in the value, each % stands for any text, and the value only has to match the beginning of the address: /mod/%/view.php matches /mod/forum/view.php?id=5, and also /mod/forum/view.php/extra.
+
 Some example values include:
 
 * /my/% - to match the Dashboard
@@ -380,6 +397,8 @@ $string['privacy:metadata:local_awareness_ack'] = 'Notice acknowledgement';
 $string['privacy:metadata:local_awareness_audience_jobs'] = 'Audience estimate jobs';
 $string['privacy:metadata:local_awareness_hlinks_his'] = 'Hyperlink tracking';
 $string['privacy:metadata:local_awareness_lastview'] = 'Notice last view';
+$string['privacy:metadata:local_awareness_slides'] = 'Carousel slides of the site notices, recording the user who last created or edited each one';
+$string['privacy:metadata:local_awareness_slides:usermodified'] = 'ID of the user who last created or edited the slide';
 $string['privacy:metadata:noticeid'] = 'ID of the notice the record refers to';
 $string['privacy:metadata:noticetitle'] = 'Title of the notice at the time of the acknowledgement';
 $string['privacy:metadata:resultcount'] = 'Number of users the estimate reached';
@@ -454,4 +473,3 @@ $string['setting:settings'] = 'Settings';
 $string['task_estimate_audience'] = 'Estimate a notice audience';
 $string['task_purge_audience_jobs'] = 'Purge spent audience estimate jobs';
 $string['task_purge_link_history'] = 'Purge old link-click history';
-$string['timeformat:resetinterval'] = '%a day(s), %h hour(s), %i minute(s) and %s second(s)';

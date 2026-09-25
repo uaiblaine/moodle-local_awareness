@@ -117,6 +117,22 @@ final class notice_external_test extends \advanced_testcase {
     }
 
     /**
+     * Call one of the reader-facing write services by name, the way the browser reaches it.
+     *
+     * @param string $name The function name without its local_awareness_ prefix.
+     * @param array $args Its arguments, keyed.
+     * @return bool The status the service answered.
+     */
+    private function call_status(string $name, array $args): bool {
+        $_POST['sesskey'] = sesskey();
+        $response = \core_external\external_api::call_external_function('local_awareness_' . $name, $args, false);
+
+        $this->assertFalse($response['error'], "local_awareness_{$name} raised an exception");
+
+        return (bool) $response['data']['status'];
+    }
+
+    /**
      * An enabled notice that applies to the user is recorded — the control for every
      * "nothing was recorded" assertion below.
      */
@@ -817,45 +833,62 @@ final class notice_external_test extends \advanced_testcase {
      * each web service and not only the footer hook, or a direct POST could still read, dismiss,
      * acknowledge and click-track a notice.
      *
-     * Each half of the pair runs the same call — switch off, then switch on — so a failure to
-     * write cannot be mistaken for the fixture being wrong.
+     * The notice is delivered while the switch is on, so the write services' other gate,
+     * helper::may_act_on_notice(), admits every write below: each refusal can only come from that
+     * service's own switch check. Each write leaves a row only it writes (a dismissal row, an
+     * acceptance row, a click row), and the control repeats the same three calls with the switch
+     * back on and finds each row.
      */
     public function test_the_site_switch_gates_every_delivery_web_service(): void {
         global $DB;
 
         $notice = $this->create_notice();
+        $noticeid = (int) $notice->get('id');
         $link = noticelink::create_new_link((object) [
-            'noticeid' => $notice->get('id'),
+            'noticeid' => $noticeid,
             'text' => 'the policy',
             'link' => 'https://example.com/policy',
         ]);
+        $linkid = (int) $link->get('id');
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
+        $this->deliver($notice);
+
         set_config('enabled', 0, 'local_awareness');
 
-        $off = get_notices::execute('/my/', 0);
-        $this->assertSame([], $off['notices'], 'no notice may be served while off');
+        $this->assertSame([], get_notices::execute('/my/', 0)['notices'], 'no notice may be served while off');
 
-        dismiss_notice::execute((int) $notice->get('id'));
-        acknowledge_notice::execute((int) $notice->get('id'));
-        track_link::execute((int) $link->get('id'));
+        // Precondition: apart from the switch, each write below would be recorded.
+        $this->assertTrue(helper::may_act_on_notice($notice), 'the delivery marker must survive the switch');
 
-        $this->assertSame(0, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
-        $this->assertSame(0, $DB->count_records('local_awareness_lastview', ['noticeid' => $notice->get('id')]));
-        $this->assertSame(0, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->get('id')]));
+        $this->assertFalse($this->call_status('dismiss', ['noticeid' => $noticeid]));
+        $this->assertFalse($this->call_status('acknowledge', ['noticeid' => $noticeid]));
+        $this->assertFalse($this->call_status('tracklink', ['linkid' => $linkid]));
 
-        // Control: with the switch on, the same four calls all take effect.
+        $dismissed = ['noticeid' => $noticeid, 'action' => acknowledgement::ACTION_DISMISSED];
+        $accepted = ['noticeid' => $noticeid, 'action' => acknowledgement::ACTION_ACKNOWLEDGED];
+        $this->assertSame(0, $DB->count_records('local_awareness_ack', $dismissed), 'dismiss_notice wrote while off');
+        $this->assertSame(0, $DB->count_records('local_awareness_ack', $accepted), 'acknowledge_notice wrote while off');
+        $clicks = ['hlinkid' => $linkid];
+        $this->assertSame(0, $DB->count_records('local_awareness_hlinks_his', $clicks), 'track_link wrote while off');
+        $this->assertSame(0, $DB->count_records('local_awareness_lastview', ['noticeid' => $noticeid]));
+
+        /*
+         * Control: with the switch on, the same three calls each record their own row. Acceptance
+         * runs before dismissal because helper::acknowledge_notice() reads the latest recorded view
+         * and helper::dismiss_notice() does not, so neither sees what the other left behind.
+         */
         set_config('enabled', 1, 'local_awareness');
 
-        $on = get_notices::execute('/my/', 0);
-        $this->assertCount(1, $on['notices'], 'the fixture notice is deliverable');
+        $this->assertTrue($this->call_status('tracklink', ['linkid' => $linkid]));
+        $this->assertTrue($this->call_status('acknowledge', ['noticeid' => $noticeid]));
+        $this->assertTrue($this->call_status('dismiss', ['noticeid' => $noticeid]));
 
-        acknowledge_notice::execute((int) $notice->get('id'));
-        track_link::execute((int) $link->get('id'));
-
-        $this->assertSame(1, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
-        $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->get('id')]));
+        $this->assertSame(1, $DB->count_records('local_awareness_ack', $dismissed));
+        $this->assertSame(1, $DB->count_records('local_awareness_ack', $accepted));
+        $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', $clicks));
+        $this->assertSame(1, $DB->count_records('local_awareness_lastview', ['noticeid' => $noticeid]));
     }
 
     /**

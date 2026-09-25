@@ -17,6 +17,7 @@
 namespace local_awareness\task;
 
 use local_awareness\audience\estimator;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\audience_job;
 
 /**
@@ -29,6 +30,16 @@ use local_awareness\persistent\audience_job;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class estimate_audience extends \core\task\adhoc_task {
+    /**
+     * Name shown in the task logs and the adhoc task list; core derives one from the class otherwise.
+     *
+     * @return string
+     * @throws \coding_exception
+     */
+    public function get_name(): string {
+        return get_string('task_estimate_audience', 'local_awareness');
+    }
+
     /**
      * Run the task.
      */
@@ -97,8 +108,11 @@ class estimate_audience extends \core\task\adhoc_task {
         $message->fullmessagehtml = '';
         $message->smallmessage = $message->subject;
         $message->notification = 1;
-        $message->contexturl = (new \moodle_url('/local/awareness/managenotice.php'))->out(false);
-        $message->contexturlname = get_string('setting:managenotice', 'local_awareness');
+        // The list the notice is in: a course author cannot open the site's.
+        $scope = author_scope::of($notice);
+        $listparams = $scope->is_site() ? [] : ['courseid' => $scope->get_courseid()];
+        $message->contexturl = (new \moodle_url('/local/awareness/managenotice.php', $listparams))->out(false);
+        $message->contexturlname = get_string($scope->is_site() ? 'setting:managenotice' : 'coursenotices', 'local_awareness');
 
         try {
             message_send($message);
@@ -131,7 +145,9 @@ class estimate_audience extends \core\task\adhoc_task {
              * one conditional SUM column per rule in the estimate query.
              */
             $withbreakdown = (int) $job->get('noticeid') <= 0;
-            $result = (new estimator())->estimate($criteria, $withbreakdown);
+            // From core's container rather than new, so a test can substitute an estimator that fails.
+            // The container hands out one shared instance, which is safe while the estimator keeps no state.
+            $result = \core\di::get(estimator::class)->estimate($criteria, $withbreakdown);
             $job->set('resultcount', (int) $result['count']);
             $job->set('breakdown', json_encode($result['breakdown']));
             $job->set('status', audience_job::STATUS_READY);

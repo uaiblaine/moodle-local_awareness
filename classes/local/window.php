@@ -102,25 +102,4 @@ final class window {
 
         return ["({$alias}timeend = 0 OR {$alias}timeend > :{$end})", [$end => $now]];
     }
-
-    /**
-     * is_open() as SQL, for callers not reading through the enabled-notices cache.
-     *
-     * Two placeholder names for one value, not one name used twice: fix_sql_params() counts
-     * placeholder occurrences against the parameter array and throws duplicateparaminsql when a
-     * name appears more often than the array explains.
-     *
-     * @param string $prefix Unique prefix for this statement's placeholder names.
-     * @param int $now The instant to judge against.
-     * @param string $alias Table alias including its dot, or an empty string.
-     * @return array Two elements: the SQL fragment, and the parameters it names.
-     */
-    public static function open_sql(string $prefix, int $now, string $alias = ''): array {
-        $start = $prefix . 'start';
-        $end = $prefix . 'end';
-        $sql = "({$alias}timestart = 0 OR {$alias}timestart <= :{$start})"
-            . " AND ({$alias}timeend = 0 OR {$alias}timeend > :{$end})";
-
-        return [$sql, [$start => $now, $end => $now]];
-    }
 }

@@ -28,6 +28,7 @@
  */
 
 import Ajax from 'core/ajax';
+import {courseId} from 'local_awareness/editor_scope';
 import ModalNotice from 'local_awareness/modal_notice';
 import Notification from 'core/notification';
 import Pending from 'core/pending';
@@ -127,7 +128,7 @@ const readSlides = () => {
  * @returns {Object} The service arguments.
  */
 const readForm = () => ({
-    courseid: parseInt(new URLSearchParams(window.location.search).get('courseid'), 10) || 0,
+    courseid: courseId(),
     title: value(SELECTORS.title).trim(),
     content: getContent(),
     template: value(SELECTORS.template) || 'classic',

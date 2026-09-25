@@ -1,14 +1,18 @@
-/* Modern Modal Styles */
+/*
+ * The notice dialogue's header and footer. Their grounds are set here rather than as bg-* utilities,
+ * so a layout can clear them. The footer's side and bottom padding belong to the px-4 and pb-4 it
+ * wears, which Bootstrap declares !important, so only its top padding is set here.
+ */
 .awareness .modal-header {
-    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
-    background-color: var(--bs-secondary-bg, #f8f9fa);
+    border-bottom: 1px solid var(--la-line);
+    background-color: var(--la-surface);
     padding: 1rem 1.5rem;
 }
 
 .awareness .modal-footer {
-    border-top: 1px solid var(--bs-border-color, #dee2e6);
-    background-color: var(--bs-body-bg, #fff);
-    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--la-line);
+    background-color: var(--la-paper);
+    padding-top: 1rem;
 }
 
 #awareness-modal-ackcheckbox {
@@ -37,11 +41,16 @@
     border-color: var(--bs-secondary, var(--secondary, #6c757d));
 }
 
-/* Ensure focus visibility for accessibility */
-.awareness button:focus,
-.awareness input:focus {
-    outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(15, 108, 191, 0.25);
+/*
+ * The dialogue's keyboard focus ring, the editor's: an outline in the theme's brand colour. Core's
+ * button.btn-close:focus and input[type="checkbox"]:focus score (0,2,1), zero the outline and come
+ * later in the compiled sheet, so this rule carries a third class to outrank them. It reaches every
+ * button of the content box, the carousel's arrows and dots included.
+ */
+.awareness .modal-content button:focus-visible,
+.awareness .modal-content input:focus-visible {
+    outline: 3px solid var(--la-brand);
+    outline-offset: 2px;
 }
 
 /* Background Image Modal Styles */
@@ -97,9 +106,12 @@
     transform-origin: center;
 }
 
-/* Hide the dropdown arrow on AJAX-powered course autocomplete fields */
-#fitem_id_reqcourse .form-autocomplete-downarrow,
-#fitem_id_filter_course .form-autocomplete-downarrow {
+/*
+ * The two course autocompletes search on the server as the author types, with showSuggestions off,
+ * so their arrow has no list to open. Scoped to the editor: a plugin stylesheet loads on every page.
+ */
+.local-awareness-editor #fitem_id_reqcourse .form-autocomplete-downarrow,
+.local-awareness-editor #fitem_id_filter_course .form-autocomplete-downarrow {
     display: none;
 }
 
@@ -370,7 +382,7 @@
     margin-bottom: 22px;
 }
 
-.la-pagehead h1 {
+.la-pagehead h2 {
     font-weight: 700;
     letter-spacing: -.02em;
     font-size: 1.75rem;
@@ -666,7 +678,7 @@
 }
 
 /*
- * The buttons live in core's sticky footer; notice_form::define_appearance() says why it needs
+ * The buttons live in core's sticky footer; notice_form::define_buttons() says why it needs
  * closeHeaderBefore('buttonar') as well.
  *
  * Centred without touching core's own alignment, because that cannot be touched: the bar carries
@@ -1225,18 +1237,6 @@
     color: #fff;
 }
 
-.la-btn--soft {
-    background: var(--la-surface);
-    border-color: var(--la-line);
-    color: var(--la-ink);
-}
-
-.la-btn--soft:hover {
-    background: var(--la-line);
-    color: var(--la-ink);
-    text-decoration: none;
-}
-
 .la-btn--ghost {
     background: transparent;
     border-color: var(--la-line);
@@ -1416,41 +1416,13 @@
     font-weight: 500;
 }
 
-.la-chip--muted {
-    background: transparent;
-    color: var(--la-ink-muted);
-}
-
 .la-chip--brand {
     background: var(--la-brand-soft);
     border-color: var(--la-line);
     color: var(--la-brand-strong);
 }
 
-/* Spinner */
-.la-spinner {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 2px solid var(--la-line);
-    border-top-color: var(--la-brand);
-    display: inline-block;
-    vertical-align: middle;
-    animation: la-spin .8s linear infinite;
-    margin-right: .35rem;
-}
-
-@keyframes la-spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 @media (prefers-reduced-motion: reduce) {
-    .la-spinner {
-        animation-duration: 3s;
-    }
-
     .la-btn {
         transition: none;
     }
@@ -1479,15 +1451,6 @@
    and overflow-y auto. The dialog is what is placed, sized and animated; the
    backdrop is core's singleton on the body and is not reachable from here.
    =========================================================================== */
-
-/* The header and footer grounds, here rather than as bg-* utilities so a layout can clear them. */
-.awareness .modal-header {
-    background-color: var(--la-surface);
-}
-
-.awareness .modal-footer {
-    background-color: var(--la-paper);
-}
 
 /* The radius is the plugin's, not the rounded utility's: that one is !important,
    and a banner and a fullscreen dialogue have to drop it. */
@@ -1740,12 +1703,6 @@
 
 .la-carousel-arrow--next {
     inset-inline-end: 0.75rem;
-}
-
-.la-carousel-arrow:focus-visible,
-.la-carousel-dot:focus-visible {
-    outline: 3px solid var(--la-brand);
-    outline-offset: 2px;
 }
 
 .la-carousel-dots {
@@ -2129,7 +2086,8 @@ body.behat-site .awareness.jelly-anim {
       override core's values wherever they win on specificity or set a property core leaves alone.
 
       Used by the competency picker and rules and by the manage list, all on the plugin's own
-      pages. Deletable in one edit when 405 leaves $plugin->supported. */
+      pages. Its .dropdown rule backports a Boost 5.x behaviour rather than a utility. Deletable in
+      one edit when 405 leaves $plugin->supported. */
 
 body.local-awareness-bs4 .form-select {
     display: inline-block;
@@ -2209,6 +2167,18 @@ body.local-awareness-bs4 .visually-hidden {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+/*
+ * The manage list's row menu, opened on the last rows of a short list. The table's scroll wrapper
+ * is .no-overflow on 4.5 (overflow: auto) and .table-responsive on 5.x, and the menu is positioned
+ * against its .dropdown, so it is clipped inside the wrapper. Boost 5.x makes that .dropdown static,
+ * which moves the menu's containing block out to the dynamic table's positioned container, outside
+ * the wrapper; 4.5 has no such rule, so this is it, for the 4.5 wrapper. The specificity beats
+ * Bootstrap 4's .dropdown without !important.
+ */
+body.local-awareness-bs4 .local-awareness-manage .no-overflow .dropdown {
+    position: static;
 }
 
 /*

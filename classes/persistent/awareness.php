@@ -462,15 +462,6 @@ class awareness extends persistent {
     }
 
     /**
-     * Get all notices, most recently modified first.
-     *
-     * @return self[]
-     */
-    public static function get_all_notices(): array {
-        return self::get_records([], 'timemodified', 'DESC');
-    }
-
-    /**
      * Create new notice
      * @param \stdClass $data
      * @return persistent

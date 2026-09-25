@@ -75,8 +75,7 @@ final class acceptance_state_test extends \advanced_testcase {
         $row = new acknowledgement(0, (object) [
             'userid' => $userid,
             'username' => 'u' . $userid,
-            // These three are NULL_ALLOWED but have no default, so core\persistent::validate() treats
-            // them as required and rejects null: each needs a value.
+            // The persistent requires these three copies, so each needs a value.
             'firstname' => 'First' . $userid,
             'lastname' => 'Last' . $userid,
             'idnumber' => '',

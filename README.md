@@ -28,7 +28,9 @@ This repository is currently maintained and evolved under the Awareness directio
 - An audience estimate in the editor, computed asynchronously, showing the reach of the
   rules as they are edited.
 - Optional requirement to complete a selected course before the notice stops appearing.
-- URL path matching to scope notices to specific pages.
+- URL path matching to scope notices to specific pages. Without a `%` the pattern must match the
+  whole page address (path and query string); with a `%` anywhere, each `%` stands for any text and
+  only the beginning of the address has to match.
 - Scheduling via start date and expiry date.
 - Perpetual notices (always active while enabled).
 - Recurring re-display using reset intervals.
@@ -55,6 +57,19 @@ Current declared support in plugin metadata:
 
 - Settings: Site administration > Awareness > Settings
 - Management: Site administration > Awareness > Manage notice
+
+## Capabilities
+
+- `local/awareness:manage` creates, edits and deletes notices, at the site and in every course.
+- `local/awareness:viewreports` reads the acknowledgement and dismissal reports. On its own it
+  opens Manage notice read-only: each notice can be previewed and its reports opened, and nothing
+  can be created or changed.
+- `local/awareness:managecourse` and `local/awareness:viewreportscourse` are their course-level
+  counterparts; see [Course notices](#course-notices).
+
+The "Audience estimate finished" notification goes to whoever saved or recalculated the notice, a
+site or a course author. It is not tied to a capability, so every user sees it listed in their
+notification preferences.
 
 ## Configuration
 
@@ -89,12 +104,14 @@ When creating or editing a notice, you can configure:
 
 ## Reports
 
-From Manage notice, each notice provides access to:
+From Manage notice, each notice from the Blocking level up provides access to:
 
 - Acknowledgement report.
 - Dismiss report.
 
-Reports include filtering and downloadable exports.
+The links are offered to whoever may read that notice's reports, and open the reports directly.
+An informational notice records neither acceptances nor refusals, so it offers no report. Reports
+include filtering and downloadable exports.
 
 ### Report Builder
 
@@ -135,8 +152,14 @@ course backup. Groups follow the course's group mode the way Moodle applies it e
 separate groups mode an author without `moodle/site:accessallgroups` may address only their own
 groups and sees only the notices aimed at them; otherwise, any group of the course. The course's
 group mode does not have to be set for a notice to address a group — that setting governs how
-activities separate participants, not who a notice reaches. A holder of `viewreportscourse` alone sees the course's list read-only, with the two reports
-of each notice and nothing to create or change.
+activities separate participants, not who a notice reaches. The same separation applies to the
+list's preview and to both reports. A holder of `viewreportscourse` alone sees the course's list
+read-only, with the reports of each notice and nothing to create or change; a holder of
+`managecourse` alone manages the notices and is offered no report links. What happens to a course
+notice is logged in the course's context, so it appears in the course's logs. Deleting a course
+deletes its notices; one left behind all the same (after a failed deletion, for example) stays in
+the site list, where a holder of `local/awareness:manage` can delete, disable or enable it but not
+edit it, because no page can show it any more.
 
 ## Contributing
 

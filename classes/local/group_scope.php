@@ -123,14 +123,22 @@ final class group_scope {
     /**
      * The course's group mode: NOGROUPS, SEPARATEGROUPS or VISIBLEGROUPS.
      *
-     * @return int NOGROUPS for the site scope.
+     * A course that is gone reads as NOGROUPS: it separates nobody, as a deleted group confines
+     * nobody in admits(), so its orphaned notices stay reachable to the site capability that
+     * helper::require_author() admits for them.
+     *
+     * @return int NOGROUPS for the site scope and for a course that no longer exists.
      */
     public function groupmode(): int {
+        global $DB;
+
         if (!$this->applies()) {
             return NOGROUPS;
         }
 
-        return (int) get_course($this->courseid)->groupmode;
+        $groupmode = $DB->get_field('course', 'groupmode', ['id' => $this->courseid]);
+
+        return $groupmode === false ? NOGROUPS : (int) $groupmode;
     }
 
     /**

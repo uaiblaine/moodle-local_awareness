@@ -16,6 +16,7 @@
 
 namespace local_awareness\audience;
 
+use local_awareness\local\author_scope;
 use local_awareness\persistent\audience_job;
 use local_awareness\persistent\awareness;
 use local_awareness\task\estimate_audience as estimate_audience_task;
@@ -43,14 +44,20 @@ class notice_audience {
     public const STATE_STALE = 'stale';
     /** A computation is queued or running. */
     public const STATE_PENDING = 'pending';
+    /** The estimate run during the request failed and stored nothing. From refresh() and resolve_inline(), never state_of(). */
+    public const STATE_ERROR = 'error';
 
     /**
      * The normalised criteria a saved notice targets.
      *
-     * Assembles the same shape the editor's JavaScript sends, from the columns and the filtervalues
-     * JSON the notice actually stores, so a count computed from a saved notice and one computed
-     * from the form that saved it hash identically. Any divergence here shows up as a notice that
-     * is permanently "stale" the moment it is saved.
+     * Assembles the criteria the estimate_audience web service hashes for the editor's form, from
+     * the columns and the filtervalues JSON the notice actually stores, so a count computed from a
+     * saved notice and one computed from the form that saved it hash identically. Any divergence
+     * here shows up as a notice that is permanently "stale" the moment it is saved, and as a save
+     * that cannot join the editor's job for the same question.
+     *
+     * A course notice carries no pathmatch: the one it stores is the scope's forced reach, which
+     * {@see \local_awareness\external\estimate_audience::execute()} drops under a course scope.
      *
      * @param awareness $notice
      * @return array Normalised criteria.
@@ -65,7 +72,9 @@ class notice_audience {
         }
 
         $raw['reqcourse'] = (int) $notice->get('reqcourse');
-        $raw['pathmatch'] = (string) $notice->get('pathmatch');
+        if (author_scope::of($notice)->is_site()) {
+            $raw['pathmatch'] = (string) $notice->get('pathmatch');
+        }
 
         $filters = json_decode((string) $notice->get('filtervalues'), true);
         if (is_array($filters)) {
@@ -121,8 +130,9 @@ class notice_audience {
      *
      * @param awareness $notice The saved notice.
      * @param bool $force Recompute even when the stored count is current.
-     * @return string The state the notice is left in — current when it was computed here, pending
-     *                when the work was queued, or unchanged when there was nothing to do.
+     * @return string The state the notice is left in — current when it was computed here, error when
+     *                that computation failed, pending when the work was queued, or current when there
+     *                was nothing to do.
      */
     public static function refresh(awareness $notice, bool $force = false): string {
         global $USER;
@@ -167,8 +177,7 @@ class notice_audience {
              * Small site: finish now, so the list is right the moment the author lands on it and
              * nobody is notified about work that took milliseconds.
              */
-            estimate_audience_task::resolve($job);
-            return self::STATE_CURRENT;
+            return self::resolve_inline($job);
         }
 
         $task = new estimate_audience_task();
@@ -177,6 +186,21 @@ class notice_audience {
         \core\task\manager::queue_adhoc_task($task);
 
         return self::STATE_PENDING;
+    }
+
+    /**
+     * Resolve a job during the request and say what it left its notice in.
+     *
+     * resolve() catches every failure and records it on the job, so only the job's status tells a
+     * stored count from nothing stored.
+     *
+     * @param audience_job $job A pending job raised for a saved notice.
+     * @return string STATE_CURRENT when the count was computed, STATE_ERROR when the estimate failed and nothing was stored.
+     */
+    public static function resolve_inline(audience_job $job): string {
+        estimate_audience_task::resolve($job);
+
+        return $job->get('status') === audience_job::STATUS_READY ? self::STATE_CURRENT : self::STATE_ERROR;
     }
 
     /**

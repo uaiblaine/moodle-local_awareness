@@ -385,20 +385,21 @@ class estimator {
                                     WHERE {$ra}.userid = u.id AND {$ra}.roleid {$insql} {$ctxwhere})";
             $params += $inparams;
 
-            // The default user and front page roles have no {role_assignments} rows; a filter naming
-            // one admits every user in the population, as helper::user_matches_role_filter() does.
-            if ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM) {
-                $defaults = [];
-                if (!empty($CFG->defaultuserroleid)) {
-                    $defaults[] = (int) $CFG->defaultuserroleid;
-                }
-                if (!empty($CFG->defaultfrontpageroleid)) {
-                    $defaults[] = (int) $CFG->defaultfrontpageroleid;
-                }
-                $defaults = array_unique($defaults);
-                if (array_intersect($defaults, $roleids)) {
-                    $clauses[] = "1 = 1";
-                }
+            /*
+             * The default user and front page roles have no {role_assignments} rows and are held by
+             * every user in the population, which already leaves out the guest. A rule naming one
+             * admits everybody where helper::user_matches_role_filter() counts it: the default role
+             * for any context or the system, the front page role for any context only.
+             */
+            $defaults = [];
+            if (!empty($CFG->defaultuserroleid) && ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM)) {
+                $defaults[] = (int) $CFG->defaultuserroleid;
+            }
+            if (!empty($CFG->defaultfrontpageroleid) && $rolectx == 0) {
+                $defaults[] = (int) $CFG->defaultfrontpageroleid;
+            }
+            if (array_intersect($defaults, $roleids)) {
+                $clauses[] = "1 = 1";
             }
 
             $where[] = '(' . implode(' OR ', $clauses) . ')';

@@ -740,12 +740,10 @@ define([], function() {
             }
 
             setTimeout(function() {
-                if (bind()) {
-                    competencyBound = initCompetencyFilter() || competencyBound;
-                } else {
-                    competencyBound = initCompetencyFilter() || competencyBound;
-                }
-                if (bind() && competencyBound) {
+                // Both binders are idempotent, so a second pass only binds what the first missed.
+                var courseBound = bind();
+                competencyBound = initCompetencyFilter() || competencyBound;
+                if (courseBound && competencyBound) {
                     return;
                 }
 

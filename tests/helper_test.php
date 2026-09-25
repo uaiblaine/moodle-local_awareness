@@ -116,7 +116,7 @@ final class helper_test extends \advanced_testcase {
         $formdata->content = '<p>Read <a href="https://example.com/policy">the policy</a>.</p>';
         helper::create_new_notice($formdata);
 
-        $notices = awareness::get_all_notices();
+        $notices = awareness::get_records();
         $stored = reset($notices)->get('content');
 
         $this->assertStringNotContainsStringIgnoringCase('<!DOCTYPE', $stored);
@@ -144,7 +144,7 @@ final class helper_test extends \advanced_testcase {
         $formdata->content = '<p><img src="@@PLUGINFILE@@/diagram.png" alt="Diagram"></p>';
         helper::create_new_notice($formdata);
 
-        $notices = awareness::get_all_notices();
+        $notices = awareness::get_records();
         $notice = reset($notices);
 
         // Storage keeps the placeholder.
@@ -170,7 +170,7 @@ final class helper_test extends \advanced_testcase {
         $formdata->content = 'Moodle <iframe width="1280" height="720" src="https://www.youtube.com/embed/3ORsUGVNxGs"></iframe>';
         helper::create_new_notice($formdata);
 
-        $allnotices = awareness::get_all_notices();
+        $allnotices = awareness::get_records();
         $actual = reset($allnotices);
         $this->assertStringContainsString($formdata->content, $actual->get('content'));
 
@@ -179,7 +179,7 @@ final class helper_test extends \advanced_testcase {
         $awareness = awareness::get_record(['id' => $actual->get('id')]);
         helper::update_notice($awareness, $formdata);
 
-        $allnotices = awareness::get_all_notices();
+        $allnotices = awareness::get_records();
         $actual = reset($allnotices);
         $this->assertStringContainsString($formdata->content, $actual->get('content'));
 
@@ -188,20 +188,9 @@ final class helper_test extends \advanced_testcase {
         $expected = '<p>H&eacute;llo &#128515; world &amp; caf&eacute;</p>';
         helper::update_notice($awareness, $formdata);
 
-        $allnotices = awareness::get_all_notices();
+        $allnotices = awareness::get_records();
         $actual = reset($allnotices);
         $this->assertStringContainsString($expected, $actual->get('content'));
-    }
-
-    /**
-     * Test time interval format.
-     */
-    public function test_format_interval_time(): void {
-        // The interval is 1 day(s) 2 hour(s) 3 minute(s) 4 second(s).
-        $timeinterval = 93784;
-        $formatedtime = helper::format_interval_time($timeinterval);
-        // Assume the time format is '%a day(s), %h hour(s), %i minute(s) and %s second(s)'.
-        $this->assertStringContainsString('1 day(s), 2 hour(s), 3 minute(s) and 4 second(s)', $formatedtime);
     }
 
     /**
@@ -539,7 +528,7 @@ final class helper_test extends \advanced_testcase {
             ]);
 
             $stored = null;
-            foreach (awareness::get_all_notices() as $candidate) {
+            foreach (awareness::get_records() as $candidate) {
                 if ($candidate->get('title') === 'Level ' . $level) {
                     $stored = $candidate;
                 }
@@ -853,9 +842,8 @@ final class helper_test extends \advanced_testcase {
         $courseid = (int) $course->id;
 
         /*
-         * Control. The rule short-circuits whenever it resolves an empty theme name, and then every
-         * theme filter admits — so a filter naming a theme nobody uses has to be refused, or the
-         * assertions below pass without the rule being switched on at all.
+         * Control: a filter naming a theme nobody uses is refused, so the rule is switched on and
+         * the pair below is decided by the theme it resolves.
          */
         $this->assertFalse(helper::check_filters(json_encode(['filter_theme' => ['nosuchtheme']]), $courseid));
 

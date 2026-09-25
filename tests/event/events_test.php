@@ -18,6 +18,7 @@ namespace local_awareness\event;
 
 use local_awareness\audience\notice_audience;
 use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
 
@@ -41,6 +42,7 @@ use local_awareness\persistent\noticelink;
  * @covers \local_awareness\event\awareness_dismissed
  * @covers \local_awareness\event\awareness_link_clicked
  * @covers \local_awareness\event\awareness_audience_estimated
+ * @covers \local_awareness\event\awareness_acknowledged
  */
 final class events_test extends \advanced_testcase {
     /**
@@ -130,8 +132,88 @@ final class events_test extends \advanced_testcase {
         $this->assertEquals(
             \context_system::instance()->id,
             $event->contextid,
-            'the notice is a site-wide object, so the event belongs to the system context'
+            'a site notice belongs to the system context, and so do its events'
         );
+    }
+
+    /**
+     * Every event about a course notice is logged in that course's context, and links to its list.
+     *
+     * Each verb runs once, the reader's three on a notice actually delivered to them, so every
+     * notice event class appears; the site notice in test_create_fires_created() is the control
+     * that the context follows the notice rather than being fixed.
+     */
+    public function test_a_course_notice_logs_every_event_in_its_course(): void {
+        $this->resetAfterTest();
+        set_config('allow_update', 1, 'local_awareness');
+        set_config('allow_delete', 1, 'local_awareness');
+        set_config('enabled', 1, 'local_awareness');
+
+        $course = $this->getDataGenerator()->create_course();
+        $reader = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $scope = author_scope::course((int) $course->id);
+
+        $sink = $this->redirectEvents();
+
+        $this->setAdminUser();
+        helper::create_new_notice((object) [
+            'title' => 'Course notice',
+            'content' => '<p>Read <a href="https://example.com/policy">the policy</a>.</p>',
+            'perpetual' => 1,
+        ], $scope);
+        $notice = awareness::get_record(['title' => 'Course notice']);
+        $this->assertSame((int) $course->id, (int) $notice->get('courseid'), 'the notice must belong to the course');
+        helper::update_notice($notice, (object) [
+            'id' => $notice->get('id'),
+            'title' => 'Course notice',
+            'content' => '<p>Read <a href="https://example.com/policy">the policy</a> again.</p>',
+            'perpetual' => 1,
+        ]);
+        $notice = new awareness($notice->get('id'));
+        helper::disable_notice($notice);
+        helper::enable_notice($notice);
+        helper::reset_notice($notice);
+
+        $this->setUser($reader);
+        \local_awareness\external\get_notices::execute('/course/view.php?id=' . $course->id, (int) $course->id);
+        $this->assertTrue(helper::was_notice_delivered($notice), 'the reader was not served the notice');
+        $links = noticelink::get_notice_link_records($notice->get('id'));
+        $this->assertTrue(helper::track_link((int) array_key_first($links))['status'], 'the click was refused');
+        // Accepted before refused: acknowledge_notice() takes a settled refusal of this notice as an answer.
+        helper::acknowledge_notice($notice);
+        helper::dismiss_notice($notice);
+
+        $this->setAdminUser();
+        helper::delete_notice(new awareness($notice->get('id')));
+
+        // The audience estimate is about a job, not the notice, and is left out.
+        $events = array_filter(
+            $sink->get_events(),
+            static fn($event): bool => str_starts_with(get_class($event), 'local_awareness\\event\\')
+                && !($event instanceof awareness_audience_estimated)
+        );
+        $sink->close();
+
+        $this->assertEqualsCanonicalizing(
+            [
+                awareness_created::class,
+                awareness_updated::class,
+                awareness_disabled::class,
+                awareness_enabled::class,
+                awareness_reset::class,
+                awareness_link_clicked::class,
+                awareness_dismissed::class,
+                awareness_acknowledged::class,
+                awareness_deleted::class,
+            ],
+            array_map(static fn($event): string => get_class($event), array_values($events))
+        );
+        $coursecontextid = (int) \context_course::instance($course->id)->id;
+        foreach ($events as $event) {
+            $name = get_class($event);
+            $this->assertSame($coursecontextid, (int) $event->contextid, "{$name} left the course");
+            $this->assertEquals($course->id, $event->get_url()->get_param('courseid'), "{$name} links outside the course");
+        }
     }
 
     /**

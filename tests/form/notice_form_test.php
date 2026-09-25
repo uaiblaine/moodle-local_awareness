@@ -203,11 +203,16 @@ final class notice_form_test extends \advanced_testcase {
     }
 
     /**
-     * Every field with a help string actually offers the help button.
+     * Every field with a help string offers the help button on its own row.
      *
      * A help string with no addHelpButton() call is translated and maintained but never shown, and
      * no linter reports it. Driven from the language pack rather than a hand-kept list, so a help
-     * string added later without its button fails this test.
+     * string added later without its button fails this test. A field's help is keyed
+     * notice:<field>_help, or <field>_help for the audience and page filters, and both are read.
+     *
+     * The help text is looked for inside the field's own row (fitem_id_<name>, or fgroup_id_<name>
+     * for a group), because a search of the whole page is satisfied by the same sentence on another
+     * field or in a section description.
      */
     public function test_every_field_with_a_help_string_has_its_help_button(): void {
         global $PAGE;
@@ -225,38 +230,72 @@ final class notice_form_test extends \advanced_testcase {
         $form = new notice_form(null, ['persistent' => null, 'id' => 0]);
         $html = $form->render();
 
+        $dom = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        $xpath = new \DOMXPath($dom);
+
         $strings = get_string_manager()->load_component_strings('local_awareness', 'en');
+        $plain = static function (string $text): string {
+            return trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($text), ENT_QUOTES, 'UTF-8')));
+        };
 
         $missing = [];
         $checked = [];
         foreach (array_keys($strings) as $key) {
-            if (!str_starts_with($key, 'notice:') || !str_ends_with($key, '_help')) {
+            if (!str_ends_with($key, '_help')) {
                 continue;
             }
-            $element = substr($key, strlen('notice:'), -strlen('_help'));
+            $element = substr($key, 0, -strlen('_help'));
+            if (str_starts_with($element, 'notice:')) {
+                $element = substr($element, strlen('notice:'));
+            }
 
-            /*
-             * Only fields the form renders are checked. The help text is the anchor because core's
-             * help_icon template carries no field identifier: it puts the escaped string into the
-             * popover's data-content attribute (data-bs-content on 5.x).
-             */
+            // Only fields the form renders are checked.
             if (!str_contains($html, 'name="' . $element . '"')) {
                 continue;
             }
             $checked[] = $element;
 
-            $needle = s(shorten_text(strip_tags($strings[$key]), 40, true, ''));
-            if ($needle !== '' && !str_contains($html, $needle)) {
+            /*
+             * A group (a duration is one) has no input of that name: its row carries it as
+             * data-groupname and its inputs are <name>[...], so the row is found by its id first.
+             * Otherwise the row is the nearest ancestor carrying a row id: a grouped radio's own
+             * label also carries the fitem class, but no id, and the group's help sits on its row.
+             */
+            $rows = $xpath->query('//*[@id="fitem_id_' . $element . '" or @id="fgroup_id_' . $element . '"]');
+            if ($rows->length === 0) {
+                $rows = $xpath->query('//*[@name="' . $element . '"]/ancestor::*'
+                    . '[starts-with(@id, "fitem_id_") or starts-with(@id, "fgroup_id_")][1]');
+            }
+            $this->assertGreaterThan(0, $rows->length, "the rendered field {$element} sits in no form row");
+
+            /*
+             * Core's help_icon template carries no field identifier: it puts the formatted help into
+             * the popover's data-content attribute (data-bs-content on 5.x), so that is what is read.
+             */
+            $needle = $plain(shorten_text(strip_tags($strings[$key]), 40, true, ''));
+            $found = false;
+            foreach ($xpath->query('.//*[@data-content or @data-bs-content]', $rows->item(0)) as $icon) {
+                $text = $icon->getAttribute('data-bs-content') ?: $icon->getAttribute('data-content');
+                if ($needle !== '' && str_contains($plain($text), $needle)) {
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
                 $missing[] = $element;
             }
         }
 
-        $this->assertSame([], $missing, 'these fields define a help string but never show it: '
+        $this->assertSame([], $missing, 'these fields define a help string but never show it on their own row: '
             . implode(', ', $missing));
 
         /*
-         * The loop must have examined some fields, perpetual among them; otherwise a rename would
-         * leave the assertion above passing over an empty set.
+         * The loop must have examined some fields, perpetual and a grouped one among them;
+         * otherwise a rename would leave the assertion above passing over an empty set.
          */
         $this->assertNotEmpty($checked, 'no rendered field carried a help string — the scan is broken');
         $this->assertContains(
@@ -264,6 +303,8 @@ final class notice_form_test extends \advanced_testcase {
             $checked,
             'the field this test was written for must be among those examined'
         );
+        $this->assertContains('template', $checked, 'a grouped field must be among those examined');
+        $this->assertContains('filter_role_context', $checked, 'a filter keyed without notice: must be among those examined');
     }
 
     /**
@@ -613,6 +654,49 @@ final class notice_form_test extends \advanced_testcase {
                 'scope' => author_scope::course((int) $course->id),
             ]))
         );
+    }
+
+    /**
+     * Preview, Save and Cancel come after every field, in both scopes.
+     *
+     * Core wraps the sticky footer around the button group where the group is added, so a group
+     * added before the last section puts the buttons ahead of that section's fields in the DOM: the
+     * keyboard reaches Save before the schedule, and where the footer is not fixed the bar sits
+     * between two sections. The behaviour section is the last one, and its fields are the control:
+     * they exist, so the order check below has something to be out of order with.
+     */
+    public function test_the_buttons_come_after_every_field(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $PAGE->set_url('/local/awareness/editnotice.php');
+        $course = $this->getDataGenerator()->create_course();
+
+        $forms = [
+            'site' => new notice_form(null, ['persistent' => null, 'id' => 0]),
+            'course' => new notice_form(null, [
+                'persistent' => null,
+                'id' => 0,
+                'scope' => author_scope::course((int) $course->id),
+            ]),
+        ];
+        // The last section's header and fields, the last date field included.
+        $behaviour = ['id="id_header_behavior"', 'name="enabled"', 'name="insistence"', 'name="perpetual"', 'name="timeend['];
+
+        foreach ($forms as $label => $form) {
+            $html = $form->render();
+
+            $buttons = strpos($html, 'data-action="preview"');
+            $this->assertNotFalse($buttons, "the {$label} form renders no Preview button");
+            $this->assertNotFalse(strpos($html, 'name="submitbutton"'), "the {$label} form renders no Save button");
+
+            foreach ($behaviour as $field) {
+                $position = strrpos($html, $field);
+                $this->assertNotFalse($position, "the {$label} form renders no {$field}");
+                $this->assertLessThan($buttons, $position, "the {$label} form puts {$field} after its buttons");
+            }
+        }
     }
 
     /**

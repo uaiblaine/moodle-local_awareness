@@ -59,19 +59,42 @@ final class motion_contract_test extends \basic_testcase {
     }
 
     /**
-     * The rule blocks of a stylesheet chunk, as selector => declarations.
+     * The rule blocks of a stylesheet chunk, in source order.
+     *
+     * A list rather than a map keyed by selector: the same selector can open two rules, and a map
+     * would keep only the last, hiding the first from every scan below.
      *
      * @param string $css The chunk.
-     * @return array
+     * @return array List of [selector list, declarations] pairs.
      */
     private function rules(string $css): array {
         $rules = [];
         preg_match_all('/([^{}]+)\{([^{}]*)\}/', $css, $matches, PREG_SET_ORDER);
         foreach ($matches as $match) {
-            $rules[trim($match[1])] = trim($match[2]);
+            $rules[] = [trim($match[1]), trim($match[2])];
         }
 
         return $rules;
+    }
+
+    /**
+     * The specificity of one selector, as [ids, classes, types].
+     *
+     * Enough for the selectors this test reads: ids, classes, attribute selectors, pseudo-classes
+     * and type selectors. Pseudo-elements are dropped, and :not() or :has() count as one
+     * pseudo-class rather than by their argument, so it is not for selectors using those.
+     *
+     * @param string $selector One selector, not a list.
+     * @return array The three counts, comparable with the spaceship operator.
+     */
+    private function specificity(string $selector): array {
+        $selector = preg_replace('/::[\w-]+/', '', $selector);
+        $ids = preg_match_all('/#[\w-]+/', $selector);
+        $classes = preg_match_all('/\.[\w-]+|\[[^\]]*\]|:[\w-]+/', $selector);
+        $rest = preg_replace('/#[\w-]+|\.[\w-]+|\[[^\]]*\]|:[\w-]+(\([^)]*\))?/', ' ', $selector);
+        $types = preg_match_all('/(?<![\w-])[a-z][a-z0-9]*/i', $rest);
+
+        return [$ids, $classes, $types];
     }
 
     /**
@@ -153,7 +176,7 @@ final class motion_contract_test extends \basic_testcase {
     public function test_no_layout_hides_the_header(): void {
         $rules = $this->rules($this->css());
         $checked = 0;
-        foreach ($rules as $selector => $declarations) {
+        foreach ($rules as [$selector, $declarations]) {
             if (!str_contains($selector, '.la-tpl-') || !str_contains($selector, '.modal-header')) {
                 continue;
             }
@@ -186,8 +209,9 @@ final class motion_contract_test extends \basic_testcase {
      * utility classes already sets with !important.
      *
      * Bootstrap generates its utilities with !important on both branches, so such a declaration is
-     * dead whatever its specificity. The element-to-utility map is read from the template, so a
-     * utility added there is covered without touching this test, provided $owners names it.
+     * dead whatever its specificity. The element-to-utility map is read from the template, and a
+     * class on an addressed element that $owners does not name fails the test, so a utility added
+     * there has to be given its properties here before anything else is checked.
      */
     public function test_no_rule_fights_a_utility_the_template_wears(): void {
         $owners = [
@@ -212,24 +236,36 @@ final class motion_contract_test extends \basic_testcase {
             'modal-dialog', 'modal-content', 'modal-header', 'modal-title', 'btn-close', 'modal-body', 'modal-footer', 'form-check',
         ];
 
-        // What each addressed element wears, read from the template.
+        /*
+         * What each addressed element wears, read from the template: every class except the
+         * subjects themselves, core's modal-* component names, the plugin's own names (awareness,
+         * la-*) and Mustache blocks. Whatever is left is a utility and must be in $owners.
+         */
         preg_match_all('/<(?:div|button|h5|input)\b[^>]*\bclass="([^"]+)"/', $this->read('templates/modal_notice.mustache'), $tags);
-        $wears = [];
+        $worn = [];
         foreach ($tags[1] as $classes) {
             $list = preg_split('/\s+/', trim(preg_replace('/\{\{.*?\}\}/', '', $classes)));
             foreach ($subjects as $subject) {
                 if (in_array($subject, $list, true)) {
-                    $wears[$subject] = array_values(array_intersect($list, array_keys($owners)));
+                    $worn[$subject] = array_values(array_filter($list, static function (string $class) use ($subjects): bool {
+                        return !in_array($class, $subjects, true)
+                            && $class !== 'awareness'
+                            && !preg_match('/^(la|modal)-/', $class);
+                    }));
                 }
             }
         }
-        $this->assertContains('d-flex', $wears['modal-footer'] ?? [], 'the footer no longer wears d-flex; the map read nothing');
-        $unknown = array_diff(array_merge(...array_values($wears)), array_keys($owners));
+        $this->assertContains('d-flex', $worn['modal-footer'] ?? [], 'the footer no longer wears d-flex; the map read nothing');
+        $unknown = array_diff(array_merge(...array_values($worn)), array_keys($owners));
         $this->assertSame([], array_values($unknown), 'a utility on the template has no owner map entry');
+        $wears = [];
+        foreach ($worn as $subject => $utilities) {
+            $wears[$subject] = array_values(array_intersect($utilities, array_keys($owners)));
+        }
 
         $checked = 0;
         $dead = [];
-        foreach ($this->rules($this->css()) as $group => $declarations) {
+        foreach ($this->rules($this->css()) as [$group, $declarations]) {
             foreach (explode(',', $group) as $selector) {
                 $compounds = preg_split('/[\s>+~]+/', trim($selector));
                 $last = end($compounds);
@@ -253,6 +289,64 @@ final class motion_contract_test extends \basic_testcase {
         }
         $this->assertGreaterThan(10, $checked, 'the scan reached almost no rule on the template\'s elements');
         $this->assertSame([], $dead, "dead declarations:\n" . implode("\n", $dead));
+    }
+
+    /**
+     * Every button and input of the dialogue shows a keyboard focus ring in the theme's colour.
+     *
+     * Core's button.btn-close:focus and input[type="checkbox"]:focus zero the outline at (0,2,1),
+     * and core's sheet is compiled after the plugin's, so a tie goes to core: the ring has to score
+     * higher. And no dialogue focus rule may zero the outline, because whichever such rule outranks
+     * a ring hides it (the carousel's own ring was lost that way).
+     *
+     * @return void
+     */
+    public function test_the_dialogue_keeps_a_visible_focus_ring(): void {
+        $core = [0, 2, 1];
+        $this->assertSame($core, $this->specificity('button.btn-close:focus'), 'the specificity helper misreads core\'s rule');
+        $this->assertSame($core, $this->specificity('input[type="checkbox"]:focus'), 'the helper misreads an attribute');
+
+        $focusrules = 0;
+        $zeroed = [];
+        $rings = [];
+        foreach ($this->rules($this->css()) as [$group, $declarations]) {
+            foreach (array_map('trim', explode(',', $group)) as $selector) {
+                if (!str_contains($selector, ':focus') || !preg_match('/\.(awareness|la-carousel)\b/', $selector)) {
+                    continue;
+                }
+                $focusrules++;
+                if (preg_match('/(^|[;\s])outline\s*:\s*(0|none)\b/', $declarations)) {
+                    $zeroed[] = $selector;
+                }
+                $ring = preg_match('/(^|[;\s])outline\s*:\s*[2-9]px solid var\(--la-brand\)/', $declarations);
+                if ($ring && preg_match('/\b(button|input):focus-visible$/', $selector, $element)) {
+                    $rings[$element[1]][] = $selector;
+                }
+            }
+        }
+
+        $this->assertGreaterThan(0, $focusrules, 'no dialogue focus rule found; the scan is blind');
+        $this->assertSame([], $zeroed, 'these dialogue focus rules remove the outline');
+        foreach (['button', 'input'] as $element) {
+            $this->assertNotEmpty($rings[$element] ?? [], "no rule outlines a focused {$element} of the dialogue in --la-brand");
+            foreach ($rings[$element] as $selector) {
+                $this->assertSame(
+                    1,
+                    $this->specificity($selector) <=> $core,
+                    "{$selector} does not outrank core's focus rule, which zeroes the outline"
+                );
+            }
+        }
+
+        // The ring reaches the carousel because its arrows and dots are buttons inside the content box.
+        $carousel = $this->read('templates/notice/carousel.mustache');
+        $this->assertSame(2, preg_match_all('/<button\b[^>]*\bclass="la-carousel-arrow\b/', $carousel));
+        $this->assertSame(1, preg_match_all('/<button\b[^>]*\bclass="la-carousel-dot\b/', $carousel));
+        $this->assertMatchesRegularExpression(
+            '/<div class="modal-content\b.*data-region="carousel"/s',
+            $this->read('templates/modal_notice.mustache'),
+            'the carousel band has left the content box the ring is scoped to'
+        );
     }
 
     /**
@@ -377,7 +471,7 @@ final class motion_contract_test extends \basic_testcase {
      */
     public function test_the_picker_state_rules_read_the_radios_next_sibling(): void {
         $states = [];
-        foreach (array_keys($this->rules($this->css())) as $selector) {
+        foreach ($this->rules($this->css()) as [$selector]) {
             foreach (explode(',', $selector) as $part) {
                 $part = trim($part);
                 if (preg_match('/input\[name="(template|position)"\][^\s+~]*\s*[+~]\s*label\b/', $part)) {
@@ -407,7 +501,7 @@ final class motion_contract_test extends \basic_testcase {
     public function test_no_rule_sets_display_on_a_bootstrap_display_utility(): void {
         $utilities = 0;
         $offenders = [];
-        foreach ($this->rules($this->css()) as $selector => $declarations) {
+        foreach ($this->rules($this->css()) as [$selector, $declarations]) {
             foreach (explode(',', $selector) as $part) {
                 if (!preg_match('/\.d-(flex|inline-flex|block|inline-block|inline|none|grid)$/', trim($part))) {
                     continue;

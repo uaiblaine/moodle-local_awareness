@@ -27,9 +27,10 @@ require_once($CFG->dirroot . '/local/awareness/lib.php');
 /**
  * A slide's image is served through the notice's gate, though its item id is the slide's.
  *
- * Same technique as lib_test, because a successful serve ends in send_stored_file(), which
- * terminates the process: a refusal is asserted with the file in place, and the positive path by
- * deleting the file first so the callback falls out at its own get_file() miss, below the gate.
+ * Same technique as lib_test: serving a real file ends in send_stored_file(), which terminates the
+ * process, so each case asks for the slide area's directory entry with 'dontdie' set. The callback
+ * returns null only when it resolved the slide to its notice, passed that notice's gate and found
+ * the entry under the slide id; every refusal and every miss returns false.
  *
  * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
  *
@@ -67,19 +68,23 @@ final class slidemedia_pluginfile_test extends \advanced_testcase {
     }
 
     /**
-     * The callback, for a slide's image.
+     * The callback, asked for the root directory entry of a slide's image area.
+     *
+     * send_stored_file() returns without output for a directory when 'dontdie' is set, so this
+     * never serves a file.
      *
      * @param int $slideid The slide id in the URL.
-     * @return bool|null What the callback returned.
+     * @return bool|null False when refused or missing, null when the entry was reached.
      */
-    private function serve(int $slideid) {
+    private function probe(int $slideid) {
         return local_awareness_pluginfile(
             null,
             null,
             \context_system::instance(),
             slide::FILEAREA,
-            [$slideid, 'lab.png'],
-            false
+            [$slideid, '.'],
+            false,
+            ['dontdie' => true]
         );
     }
 
@@ -91,21 +96,21 @@ final class slidemedia_pluginfile_test extends \advanced_testcase {
         $slide = $this->seed_slide(0);
         $this->setUser($this->getDataGenerator()->create_user());
 
-        $this->assertFalse($this->serve((int) $slide->get('id')));
+        $this->assertFalse($this->probe((int) $slide->get('id')));
     }
 
     /**
-     * A plain user passes the gate on an enabled notice: with the file deleted, the callback
-     * reaches its own file miss, which is below the gate.
+     * A plain user passes the gate on an enabled notice: the control for the disabled case.
+     *
+     * Reaching the entry proves the slide id was resolved to its notice: PHPUnit starts each table's
+     * id sequence at a different value, so reading the slide id as a notice id would find no notice.
      */
     public function test_a_plain_user_passes_the_gate_on_an_enabled_notice(): void {
         $this->resetAfterTest();
         $slide = $this->seed_slide(1);
         $this->setUser($this->getDataGenerator()->create_user());
 
-        $slide->get_image()->delete();
-
-        $this->assertFalse($this->serve((int) $slide->get('id')));
+        $this->assertNull($this->probe((int) $slide->get('id')));
     }
 
     /**
@@ -115,6 +120,6 @@ final class slidemedia_pluginfile_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
 
-        $this->assertFalse($this->serve(987654));
+        $this->assertFalse($this->probe(987654));
     }
 }

@@ -25,9 +25,11 @@
 defined('MOODLE_INTERNAL') || die();
 
 $messageproviders = [
-    // Sent when a background audience estimate for a saved notice completes (the estimate_audience
-    // adhoc task).
-    'audience_estimate_ready' => [
-        'capability' => 'local/awareness:manage',
-    ],
+    /*
+     * Sent when a background audience estimate for a saved notice completes (the estimate_audience
+     * adhoc task), to whoever saved or recalculated it: a site author or a course author. No
+     * capability, because a provider takes one and message_send() refuses a recipient who holds it
+     * nowhere, which would drop every course author's message; core's report schedules do the same.
+     */
+    'audience_estimate_ready' => [],
 ];

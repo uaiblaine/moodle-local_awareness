@@ -19,6 +19,8 @@ namespace local_awareness\table;
 use core_table\local\filter\filter;
 use core_table\local\filter\integer_filter;
 use core_table\local\filter\string_filter;
+use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 
 /**
@@ -629,46 +631,141 @@ final class all_notices_test extends \advanced_testcase {
     }
 
     /**
+     * A user holding the given capabilities in a context, through a role of their own.
+     *
+     * @param \context $context Where the role is assigned and the capabilities allowed.
+     * @param array $capabilities The capabilities the role allows.
+     * @return \stdClass The user.
+     */
+    private function user_with(\context $context, array $capabilities): \stdClass {
+        $user = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        foreach ($capabilities as $capability) {
+            assign_capability($capability, CAP_ALLOW, $roleid, $context->id, true);
+        }
+        role_assign($roleid, $user->id, $context->id);
+
+        return $user;
+    }
+
+    /**
+     * The action menu the current user gets on the only row of a course list.
+     *
+     * @param int $courseid The course.
+     * @return string The rendered menu.
+     */
+    private function actions_on_course_list(int $courseid): string {
+        $table = $this->scoped_table($courseid);
+        $table->query_db(all_notices::PER_PAGE, false);
+
+        return $table->format_row(reset($table->rawdata))['actions'];
+    }
+
+    /**
+     * The two report pages of a notice, as the escaped href the menu carries.
+     *
+     * @param int $noticeid The notice.
+     * @return array The acknowledged report's href and the dismissed report's.
+     */
+    private function report_hrefs(int $noticeid): array {
+        return [
+            (new \moodle_url('/local/awareness/report/acknowledged_systemreport.php', ['noticeid' => $noticeid]))->out(),
+            (new \moodle_url('/local/awareness/report/dismissed_systemreport.php', ['noticeid' => $noticeid]))->out(),
+        ];
+    }
+
+    /**
      * A reports-only viewer sees the course list, with the reports and the preview and none of the verbs.
      *
-     * The manage holder beside them, on the same row, is the control that the verbs exist to be
-     * withheld; the report actions appear for both, because the notice is one that records answers.
+     * The report links lead to the report pages themselves, which gate on the reports verb: the
+     * viewer is asserted to pass that gate and to fail the manage gate editnotice.php applies, so a
+     * report link routed through editnotice.php would be a link to a permission error. Nothing in
+     * the viewer's menu may go to editnotice.php at all.
      */
     public function test_a_reports_only_viewer_gets_a_read_only_list(): void {
         $course = $this->getDataGenerator()->create_course();
         $this->setAdminUser();
         $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
-        $generator->create_notice(['title' => 'mine', 'courseid' => $course->id, 'reqack' => 1]);
-        $context = \context_course::instance($course->id);
-
-        $reader = $this->getDataGenerator()->create_user();
-        $roleid = $this->getDataGenerator()->create_role();
-        assign_capability('local/awareness:viewreportscourse', CAP_ALLOW, $roleid, $context->id, true);
-        role_assign($roleid, $reader->id, $context->id);
-
-        $author = $this->getDataGenerator()->create_user();
-        $authorrole = $this->getDataGenerator()->create_role();
-        assign_capability('local/awareness:managecourse', CAP_ALLOW, $authorrole, $context->id, true);
-        role_assign($authorrole, $author->id, $context->id);
+        $notice = $generator->create_notice(['title' => 'mine', 'courseid' => $course->id, 'reqack' => 1]);
+        $noticeid = (int) $notice->get('id');
+        $reader = $this->user_with(\context_course::instance($course->id), ['local/awareness:viewreportscourse']);
 
         $this->setUser($reader);
-        $table = $this->scoped_table((int) $course->id);
-        $this->assertTrue($table->has_capability(), 'the reports capability opens the list');
-        $table->query_db(all_notices::PER_PAGE, false);
-        $actions = $table->format_row(reset($table->rawdata))['actions'];
-        $this->assertStringContainsString('action=acknowledged_report', $actions);
-        $this->assertStringContainsString('action=dismissed_report', $actions);
-        $verbs = ['action=edit', 'action=disable', 'action=unconfirmeddelete', 'action=unconfirmedreset', 'action=recalculate'];
-        foreach ($verbs as $verb) {
-            $this->assertStringNotContainsString($verb, $actions, "a reader is offered no {$verb}");
-        }
+        $this->assertFalse(
+            helper::require_author(author_scope::of($notice), 'manage', false),
+            'precondition: editnotice.php would refuse this viewer'
+        );
+        $this->assertSame(
+            $noticeid,
+            (int) helper::resolve_notice_as_author($noticeid, 'viewreports')->get('id'),
+            'precondition: the report pages admit this viewer'
+        );
 
-        $this->setUser($author);
-        $table = $this->scoped_table((int) $course->id);
-        $table->query_db(all_notices::PER_PAGE, false);
-        $actions = $table->format_row(reset($table->rawdata))['actions'];
-        $this->assertStringContainsString('action=edit', $actions, 'the author is offered the verbs: the control');
-        $this->assertStringContainsString('action=acknowledged_report', $actions);
+        $this->assertTrue($this->scoped_table((int) $course->id)->has_capability(), 'the reports capability opens the list');
+        $actions = $this->actions_on_course_list((int) $course->id);
+        foreach ($this->report_hrefs($noticeid) as $href) {
+            $this->assertStringContainsString('href="' . $href . '"', $actions, 'each report link goes to its report page');
+        }
+        $this->assertStringNotContainsString('editnotice.php', $actions, 'nothing a reader is offered needs the manage verb');
+        $this->assertStringContainsString(get_string('notice:preview', 'local_awareness'), $actions);
+    }
+
+    /**
+     * The report links follow the reports capability, not the manage one.
+     *
+     * An author holding only the course manage capability is offered the verbs and no report, since
+     * managecourse does not read reports and the report pages would refuse them. The author who
+     * also holds the course reports capability is the control that this notice offers reports at
+     * all, and that an author gets them from the same report pages.
+     */
+    public function test_the_report_links_follow_the_reports_capability(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $context = \context_course::instance($course->id);
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $notice = $generator->create_notice(['title' => 'mine', 'courseid' => $course->id, 'reqack' => 1]);
+        [$ackhref, $dishref] = $this->report_hrefs((int) $notice->get('id'));
+
+        $this->setUser($this->user_with($context, ['local/awareness:managecourse']));
+        $actions = $this->actions_on_course_list((int) $course->id);
+        $this->assertStringContainsString('action=edit', $actions, 'the author is offered the verbs');
+        $this->assertStringNotContainsString('systemreport.php', $actions, 'and no report they may not read');
+        $this->assertStringNotContainsString(get_string('report:button:ack', 'local_awareness'), $actions);
+        $this->assertStringNotContainsString(get_string('report:button:dis', 'local_awareness'), $actions);
+
+        $this->setUser($this->user_with($context, ['local/awareness:managecourse', 'local/awareness:viewreportscourse']));
+        $actions = $this->actions_on_course_list((int) $course->id);
+        $this->assertStringContainsString('action=edit', $actions);
+        $this->assertStringContainsString('href="' . $ackhref . '"', $actions, 'an author who reads reports is offered them');
+        $this->assertStringContainsString('href="' . $dishref . '"', $actions);
+    }
+
+    /**
+     * An empty list offers the create button to an author and to nobody else.
+     *
+     * The empty-state message is asserted for both viewers, so the absence of the button for the
+     * reader is the absence of the button and not of the whole empty state.
+     */
+    public function test_the_empty_list_offers_create_only_to_an_author(): void {
+        global $PAGE;
+
+        $course = $this->getDataGenerator()->create_course();
+        $PAGE->set_url(new \moodle_url('/local/awareness/managenotice.php', ['courseid' => $course->id]));
+        $context = \context_course::instance($course->id);
+        $message = get_string('manage:empty:none', 'local_awareness');
+        $createlabel = get_string('notice:create', 'local_awareness');
+
+        $this->setUser($this->user_with($context, ['local/awareness:viewreportscourse']));
+        $html = $PAGE->get_renderer('local_awareness')->render($this->scoped_table((int) $course->id));
+        $this->assertStringContainsString($message, $html, 'the empty state rendered');
+        $this->assertStringNotContainsString('editnotice.php', $html, 'a reader is offered nothing to create');
+        $this->assertStringNotContainsString($createlabel, $html);
+
+        $this->setUser($this->user_with($context, ['local/awareness:managecourse']));
+        $html = $PAGE->get_renderer('local_awareness')->render($this->scoped_table((int) $course->id));
+        $this->assertStringContainsString($message, $html);
+        $this->assertStringContainsString('editnotice.php', $html, 'an author is: the control');
+        $this->assertStringContainsString($createlabel, $html);
     }
 
     /**

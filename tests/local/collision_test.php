@@ -136,6 +136,127 @@ final class collision_test extends \advanced_testcase {
     }
 
     /**
+     * A notice whose window has closed for good competes with nobody, in all three answers.
+     *
+     * It can never display again. The notice scheduled for later is the control that the window
+     * cuts only at the end, and the two live notices are the control that the ended one is left
+     * out for its window and not because nothing clashes at all.
+     */
+    public function test_an_ended_notice_no_longer_counts(): void {
+        $this->setAdminUser();
+        $a = $this->notice('Live A', '/my/%', DAYSECS);
+        $b = $this->notice('Live B', '/my/%', DAYSECS);
+        $ended = $this->notice('Ended', '/my/%', DAYSECS);
+        $ended->set('timestart', time() - (2 * WEEKSECS));
+        $ended->set('timeend', time() - WEEKSECS);
+        $ended->update();
+        $later = $this->notice('Later', '/my/%', DAYSECS);
+        $later->set('timestart', time() + WEEKSECS);
+        $later->set('timeend', time() + (2 * WEEKSECS));
+        $later->update();
+
+        // Precondition: the ended notice is still enabled and repeating, so only its window can exclude it.
+        $stored = awareness::get_record(['id' => $ended->get('id')]);
+        $this->assertSame(1, (int) $stored->get('enabled'));
+        $this->assertGreaterThan(0, (int) $stored->get('resetinterval'));
+        $this->assertLessThan(time(), (int) $stored->get('timeend'));
+
+        $clashes = collision::clashes_for(0, '/my/%', DAYSECS);
+        $this->assertEqualsCanonicalizing(
+            [(int) $a->get('id'), (int) $b->get('id'), (int) $later->get('id')],
+            array_keys($clashes)
+        );
+
+        $this->assertEqualsCanonicalizing(
+            [(int) $a->get('id'), (int) $b->get('id'), (int) $later->get('id')],
+            collision::clashing_ids()
+        );
+
+        $map = collision::clash_titles_for([$a, $ended]);
+        $this->assertEqualsCanonicalizing(['Live B', 'Later'], $map[(int) $a->get('id')]);
+        $this->assertArrayNotHasKey((int) $ended->get('id'), $map, 'a notice that has ended is not badged either');
+    }
+
+    /**
+     * A notice whose own end has passed competes with nobody, as an ended rival does not.
+     *
+     * It can never show again. The controls are the same question with no end and with an end
+     * still ahead, which do report the rival, so the empty answers come from the end alone.
+     */
+    public function test_a_notice_whose_own_end_has_passed_competes_with_nobody(): void {
+        $this->setAdminUser();
+        $rival = [(int) $this->notice('Live rival', '/my/%', DAYSECS)->get('id')];
+
+        $this->assertSame($rival, array_keys(collision::clashes_for(0, '/my/%', DAYSECS)));
+        $this->assertSame($rival, array_keys(collision::clashes_for(0, '/my/%', DAYSECS, time() + WEEKSECS)));
+
+        $this->assertSame([], collision::clashes_for(0, '/my/%', DAYSECS, time() - MINSECS));
+        // The window is half-open, so the end itself has already passed.
+        $this->assertSame([], collision::clashes_for(0, '/my/%', DAYSECS, time()));
+    }
+
+    /**
+     * The warning after a save judges the submitted end and the scope's page reach.
+     *
+     * The same submission with no end and with an end still ahead reports the rival, so the empty
+     * answer comes from the end that has passed. Under a course scope the reach is the forced
+     * course page, so the course rival is met and the rival on /my/ is not.
+     */
+    public function test_the_save_warning_judges_the_submitted_end_and_the_scope_reach(): void {
+        $this->setAdminUser();
+        $site = author_scope::site();
+        $rival = [(int) $this->notice('Live rival', '/my/%', DAYSECS)->get('id')];
+        $submission = (object) ['pathmatch' => '/my/%', 'resetinterval' => DAYSECS, 'timeend' => 0];
+
+        $this->assertSame($rival, array_keys(collision::clashes_for_save(null, $submission, $site)));
+        $submission->timeend = time() + WEEKSECS;
+        $this->assertSame($rival, array_keys(collision::clashes_for_save(null, $submission, $site)));
+        $submission->timeend = time() - MINSECS;
+        $this->assertSame([], collision::clashes_for_save(null, $submission, $site));
+
+        $courserival = [(int) $this->notice('Course rival', author_scope::COURSE_PATHMATCH, DAYSECS)->get('id')];
+        $course = $this->getDataGenerator()->create_course();
+        $incourse = (object) ['pathmatch' => '', 'resetinterval' => DAYSECS, 'timeend' => 0];
+        $this->assertSame(
+            $courserival,
+            array_keys(collision::clashes_for_save(null, $incourse, author_scope::course((int) $course->id)))
+        );
+    }
+
+    /**
+     * The warning's titles are redacted outside the author's scope and spelt for the sink.
+     *
+     * The ampersand is the fixture that tells the two spellings apart: format_string() rewrites it
+     * only when escaping, while quotes and tag-shaped input read the same in both modes.
+     */
+    public function test_formatted_titles_redact_outside_the_scope_and_follow_the_sink(): void {
+        $this->setAdminUser();
+        $mine = $this->getDataGenerator()->create_course();
+        $other = $this->getDataGenerator()->create_course();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $own = $generator->create_notice(['title' => 'Own & rival', 'courseid' => $mine->id]);
+        $theirs = $generator->create_notice(['title' => 'Their & rival', 'courseid' => $other->id]);
+        $site = $generator->create_notice(['title' => 'Site & rival']);
+
+        $course = author_scope::course((int) $mine->id);
+        $this->assertSame(
+            [
+                'Own &amp; rival',
+                get_string('collision:redacted:course', 'local_awareness'),
+                get_string('collision:redacted:site', 'local_awareness'),
+            ],
+            collision::formatted_titles([$own, $theirs, $site], $course)
+        );
+        $this->assertSame(['Own & rival'], collision::formatted_titles([$own], $course, false));
+
+        // The control: the site sees every title, so the redaction above is the scope's doing.
+        $this->assertSame(
+            ['Own &amp; rival', 'Their &amp; rival', 'Site &amp; rival'],
+            collision::formatted_titles([$own, $theirs, $site], author_scope::site())
+        );
+    }
+
+    /**
      * The listing map names the rivals of each competing notice, and leaves the rest out.
      */
     public function test_clash_titles_for_a_listing(): void {

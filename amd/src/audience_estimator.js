@@ -30,8 +30,9 @@
 define([
     'core/ajax',
     'core/str',
-    'local_awareness/audience_criteria'
-], function(Ajax, str, criteriaReader) {
+    'local_awareness/audience_criteria',
+    'local_awareness/editor_scope'
+], function(Ajax, str, criteriaReader, EditorScope) {
     'use strict';
 
     // The criteria object keys mirror the moodleform/server field names
@@ -110,6 +111,7 @@ define([
             'audience:state:cached',
             'audience:state:timeout',
             'audience:state:error',
+            'audience:state:error_noanswer',
             'audience:reach:value',
             'audience:rules_too_many',
             'audience:rule:cohorts',
@@ -140,6 +142,7 @@ define([
                 cachedTpl: byKey['audience:state:cached'],
                 timeout: byKey['audience:state:timeout'],
                 errorTpl: byKey['audience:state:error'],
+                noAnswer: byKey['audience:state:error_noanswer'],
                 reachValueTpl: byKey['audience:reach:value'],
                 rulesTooMany: byKey['audience:rules_too_many'],
                 ruleLabels: {
@@ -184,19 +187,6 @@ define([
             state.slots.stateLine.textContent = text || '';
         }
     }
-
-    /**
-     * The course the editor writes for, read once from the editor root; 0 for the site.
-     *
-     * Every web service the editor calls takes it, so that a course author's requests are gated and
-     * scoped as a course author's rather than refused at the site.
-     *
-     * @returns {number}
-     */
-    var courseId = function() {
-        var root = document.querySelector('[data-region="la-editor"]');
-        return root ? (parseInt(root.getAttribute('data-courseid'), 10) || 0) : 0;
-    };
 
     /**
      * Write the reach value text.
@@ -345,7 +335,7 @@ define([
 
         Ajax.call([{
             methodname: 'local_awareness_get_estimate',
-            args: {jobid: jobid, courseid: courseId()}
+            args: {jobid: jobid, courseid: EditorScope.courseId()}
         }])[0].then(function(response) {
             if (mine !== state.sequence) {
                 return null;
@@ -369,7 +359,7 @@ define([
             if (mine !== state.sequence) {
                 return;
             }
-            handleError((err && err.message) ? err.message : 'AJAX error');
+            handleError(failureText(err));
         });
     }
 
@@ -420,6 +410,19 @@ define([
                 }
             } catch (e) { /* No-op. */ }
         }
+    }
+
+    /**
+     * The text to put in the error state for a failed call.
+     *
+     * core/ajax rejects with the server's exception, whose message is already in the author's
+     * language; anything else gets the pack's own sentence rather than an English literal.
+     *
+     * @param {Object} err What the call rejected with.
+     * @returns {string} The message to substitute into the error state.
+     */
+    function failureText(err) {
+        return (err && err.message) ? err.message : state.strings.noAnswer;
     }
 
     /**
@@ -509,13 +512,13 @@ define([
 
         Ajax.call([{
             methodname: 'local_awareness_estimate_audience',
-            args: {criteria: json, courseid: courseId()}
+            args: {criteria: json, courseid: EditorScope.courseId()}
         }])[0].then(function(response) {
             if (mine !== state.sequence) {
                 return null;
             }
             if (!response || !response.jobid) {
-                handleError('No job id returned.');
+                handleError(state.strings.noAnswer);
                 return null;
             }
             if (response.status === 'pending') {
@@ -534,7 +537,7 @@ define([
             if (mine !== state.sequence) {
                 return;
             }
-            handleError((err && err.message) ? err.message : 'AJAX error');
+            handleError(failureText(err));
         });
     }
 

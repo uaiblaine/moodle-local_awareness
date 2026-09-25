@@ -17,8 +17,8 @@
 namespace local_awareness;
 
 use local_awareness\persistent\awareness;
-use local_awareness\persistent\linkhistory;
 use local_awareness\persistent\noticelink;
+use local_awareness\persistent\noticeview;
 
 /**
  * Tests for creating, resetting, enabling and delivering notices, and for acting on them.
@@ -153,6 +153,8 @@ final class awareness_test extends \advanced_testcase {
      * @param array $formdata Array of form data to create notices
      */
     public function test_reset_notices(array $formdata): void {
+        global $DB;
+
         $this->setAdminUser();
 
         foreach ($formdata as $data) {
@@ -164,14 +166,18 @@ final class awareness_test extends \advanced_testcase {
 
         $allnotices = awareness::get_enabled_notices();
         $this->assertEquals(4, count($allnotices));
-        $oldnotice1 = array_shift($allnotices);
-        $oldnotice2 = array_shift($allnotices);
+        /*
+         * timemodified has one-second resolution, so every notice is moved an hour into the past
+         * rather than waiting for the clock: the reset below is then strictly later. Read back by
+         * id, because the enabled-notices cache still holds the values from before the move.
+         */
+        $DB->set_field('local_awareness', 'timemodified', time() - HOURSECS);
+        $oldnotice1 = new awareness(array_shift($allnotices)->get('id'));
+        $oldnotice2 = new awareness(array_shift($allnotices)->get('id'));
         // Only reset Notice 1.
-        sleep(1);
         helper::reset_notice($oldnotice1);
-        $allnotices = awareness::get_enabled_notices();
-        $newnotice1 = array_shift($allnotices);
-        $newnotice2 = array_shift($allnotices);
+        $newnotice1 = new awareness($oldnotice1->get('id'));
+        $newnotice2 = new awareness($oldnotice2->get('id'));
         $this->assertEquals("Notice 1", $newnotice1->get('title'));
         $this->assertGreaterThan($oldnotice1->get('timemodified'), $newnotice1->get('timemodified'));
         $this->assertEquals($oldnotice1->get('timecreated'), $newnotice1->get('timecreated'));
@@ -229,7 +235,7 @@ final class awareness_test extends \advanced_testcase {
      * @param array $formdata Data to test on.
      */
     public function test_user_notice($formdata): void {
-        global $USER;
+        global $DB, $USER;
 
         $this->setAdminUser();
         foreach ($formdata as $data) {
@@ -283,8 +289,17 @@ final class awareness_test extends \advanced_testcase {
         $this->assertEquals(1, count($usernotices));
         $this->assertEquals(2, count($USER->viewednotices));
 
+        /*
+         * Move the recorded interactions an hour back, and the notices further still, so the reset
+         * below is strictly later than the dismissal without waiting for the clock, while the
+         * acknowledgement stays later than the notice it acknowledges. The user's cached views are
+         * dropped, because the set_field() calls bypass the persistents that would purge them.
+         */
+        $DB->set_field('local_awareness_lastview', 'timemodified', time() - HOURSECS, ['userid' => $user1->id]);
+        $DB->set_field('local_awareness', 'timemodified', time() - 2 * HOURSECS);
+        noticeview::purge_user_cache((int) $user1->id);
+
         // Admin user reset notice 1.
-        sleep(1);
         $this->setAdminUser();
         helper::reset_notice($notice1);
 
@@ -304,6 +319,8 @@ final class awareness_test extends \advanced_testcase {
      * @param array $formdata Data to test on.
      */
     public function test_user_hlink_interact($formdata): void {
+        global $DB;
+
         $this->setAdminUser();
         foreach ($formdata as $data) {
             if (property_exists($data, 'cohorts')) {
@@ -340,8 +357,12 @@ final class awareness_test extends \advanced_testcase {
         // Click on links.
         helper::track_link($link1->id);
         helper::track_link($link2->id);
-        $userlinks = linkhistory::count_clicked_links($user1->id, $notice1->get('id'));
-        $this->assertEquals(2, count($userlinks));
+        foreach ([$link1, $link2] as $link) {
+            $this->assertSame(
+                1,
+                $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->id, 'userid' => $user1->id])
+            );
+        }
     }
 
 
@@ -427,7 +448,7 @@ final class awareness_test extends \advanced_testcase {
         ];
 
         helper::create_new_notice($formdata);
-        $allnotices = awareness::get_all_notices();
+        $allnotices = awareness::get_records();
         $notice = array_shift($allnotices);
 
         // Must see 1 notice.
@@ -456,7 +477,7 @@ final class awareness_test extends \advanced_testcase {
         ];
 
         helper::create_new_notice($formdata);
-        $allnotices = awareness::get_all_notices();
+        $allnotices = awareness::get_records();
         $notice = array_shift($allnotices);
 
         // Must see 1 notice.
@@ -509,7 +530,7 @@ final class awareness_test extends \advanced_testcase {
         ]);
 
         $notices = [];
-        foreach (awareness::get_all_notices() as $candidate) {
+        foreach (awareness::get_records() as $candidate) {
             $notices[$candidate->get('title')] = $candidate;
         }
         $notice = $notices['Notice 1'];

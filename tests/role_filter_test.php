@@ -151,6 +151,36 @@ final class role_filter_test extends \advanced_testcase {
     }
 
     /**
+     * The front page role is held where core holds it: in any context, never at the system level,
+     * and never by the guest.
+     *
+     * Core grants it in the site course's context to every logged-in user but the guest
+     * (get_user_accessdata()), so a rule in any context admits a user who holds nothing else, a
+     * system-level rule does not, and the guest is refused either way. The ordinary user admitted by
+     * the unscoped rule is the control for both refusals.
+     */
+    public function test_front_page_role_follows_core(): void {
+        global $CFG;
+
+        $frontpageroleid = (int) $CFG->defaultfrontpageroleid;
+        $this->assertGreaterThan(0, $frontpageroleid, 'the site must have a front page role');
+
+        $anywhere = $this->filters(['filter_role' => [$frontpageroleid]]);
+        $atsystem = $this->filters([
+            'filter_role' => [$frontpageroleid],
+            'filter_role_context' => CONTEXT_SYSTEM,
+        ]);
+
+        $this->setUser($this->getDataGenerator()->create_user());
+        $this->assertTrue(helper::check_filters($anywhere));
+        $this->assertFalse(helper::check_filters($atsystem));
+
+        $this->setGuestUser();
+        $this->assertTrue(isloggedin(), 'the guest must count as logged in, or the refusal below proves nothing');
+        $this->assertFalse(helper::check_filters($anywhere));
+    }
+
+    /**
      * A course role context takes the UNION of the course list and the category list.
      *
      * The two lists are joined with OR ({@see \local_awareness\local\role_scope::sql()}), so holding

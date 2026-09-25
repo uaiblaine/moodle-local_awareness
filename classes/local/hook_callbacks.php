@@ -88,7 +88,7 @@ class hook_callbacks {
             return false;
         }
 
-        if (!isloggedin() || !get_config('local_awareness', 'enabled')) {
+        if (!isloggedin() || !helper::is_delivery_enabled()) {
             return false;
         }
 

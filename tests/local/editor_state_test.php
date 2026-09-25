@@ -71,22 +71,28 @@ final class editor_state_test extends \basic_testcase {
     }
 
     /**
-     * Across the provider's rows the predicate reports both window problems and nothing else.
+     * A problem is reported exactly when window::is_open(), the display test, will never pass again.
+     *
+     * A cross-check against the display test rather than against the expected lists above: the
+     * window is one interval, so if any instant from now on is open, max(now, timestart) is open
+     * too, and that one instant answers "will this notice ever display" for every row.
      *
      * @return void
      */
-    public function test_the_predicate_actually_discriminates(): void {
-        $problems = [];
-        foreach (self::window_provider() as [$enabled, $start, $end, $unusedexpected]) {
-            $problems = array_merge($problems, editor_state::window_problems($enabled, $start, $end, self::NOW));
+    public function test_a_problem_means_the_display_test_never_passes_again(): void {
+        $verdicts = [];
+        foreach (self::window_provider() as $name => [$enabled, $timestart, $timeend]) {
+            $blocked = $enabled === 1 && !window::is_open($timestart, $timeend, max(self::NOW, $timestart));
+            $verdicts[] = $blocked;
+            $this->assertSame(
+                $blocked,
+                editor_state::window_problems($enabled, $timestart, $timeend, self::NOW) !== [],
+                $name
+            );
         }
 
-        $this->assertSame(
-            [
-                editor_state::WINDOW_EXPIRED,
-                editor_state::WINDOW_INVERTED,
-            ],
-            array_values(array_unique($problems))
-        );
+        // Precondition: the rows hold both verdicts, so a predicate stuck on either one fails above.
+        $this->assertContains(true, $verdicts);
+        $this->assertContains(false, $verdicts);
     }
 }

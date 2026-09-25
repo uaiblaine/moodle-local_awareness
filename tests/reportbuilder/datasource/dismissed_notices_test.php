@@ -23,6 +23,9 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/datasource_testcase.php');
 
 use core_reportbuilder_generator;
+use core_reportbuilder\local\aggregation\avg;
+use core_reportbuilder\local\aggregation\max;
+use core_reportbuilder\local\aggregation\sum;
 use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
 use local_awareness\reportbuilder\datasource\dismissed_notices;
 
@@ -34,6 +37,7 @@ use local_awareness\reportbuilder\datasource\dismissed_notices;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
  * @covers \local_awareness\reportbuilder\datasource\dismissed_notices
+ * @covers \local_awareness\reportbuilder\local\entities\acknowledgement
  */
 final class dismissed_notices_test extends datasource_testcase {
     /**
@@ -43,7 +47,6 @@ final class dismissed_notices_test extends datasource_testcase {
      * @return int The inserted notice ID.
      */
     private function create_notice(string $title = 'Test notice'): int {
-        global $DB;
         return (int) $this->getDataGenerator()->get_plugin_generator('local_awareness')
             ->create_notice(['title' => $title])->get('id');
     }
@@ -161,6 +164,56 @@ final class dismissed_notices_test extends datasource_testcase {
         $this->assertCount(1, $content);
         $row = array_values(reset($content));
         $this->assertEquals('Dismissed Filter B', $row[0]);
+    }
+
+    /**
+     * Under Sum and Average the action column shows the aggregate as a number, not an action's name.
+     *
+     * Every row here is a dismissal, whose action is 0, so both aggregates are 0: the dismissed
+     * action's own value. Max is the control: it keeps the action's values, so it still shows the name.
+     */
+    public function test_sum_and_average_of_the_action_are_numbers(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $user1 = $this->getDataGenerator()->create_user();
+        $user2 = $this->getDataGenerator()->create_user();
+        $noticea = $this->create_notice('Notice A');
+        $noticeb = $this->create_notice('Notice B');
+        $this->create_ack($noticea, $user1->id, acknowledgement_persistent::ACTION_DISMISSED);
+        $this->create_ack($noticeb, $user1->id, acknowledgement_persistent::ACTION_DISMISSED);
+        $this->create_ack($noticeb, $user2->id, acknowledgement_persistent::ACTION_DISMISSED);
+
+        $dismissed = get_string('report_ack:action_dismissed', 'local_awareness');
+        $expected = [
+            sum::get_class_name() => [['Notice A', '0'], ['Notice B', '0']],
+            avg::get_class_name() => [['Notice A', format_float(0, 2)], ['Notice B', format_float(0, 2)]],
+            max::get_class_name() => [['Notice A', $dismissed], ['Notice B', $dismissed]],
+        ];
+
+        /** @var core_reportbuilder_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_reportbuilder');
+        foreach ($expected as $aggregation => $rows) {
+            $report = $generator->create_report([
+                'name' => "Action {$aggregation}",
+                'source' => dismissed_notices::class,
+                'default' => 0,
+            ]);
+            $generator->create_column([
+                'reportid' => $report->get('id'),
+                'uniqueidentifier' => 'notice:title',
+                'sortenabled' => 1,
+                'sortdirection' => SORT_ASC,
+            ]);
+            $generator->create_column([
+                'reportid' => $report->get('id'),
+                'uniqueidentifier' => 'acknowledgement:action',
+                'aggregation' => $aggregation,
+            ]);
+
+            $content = $this->get_custom_report_content($report->get('id'));
+            $this->assertSame($rows, array_map('array_values', $content), $aggregation);
+        }
     }
 
     /**

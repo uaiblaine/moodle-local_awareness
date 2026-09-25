@@ -127,7 +127,7 @@ class helper {
 
         // Log created event.
         $params = [
-            'context' => \context_system::instance(),
+            'context' => self::event_context($awareness),
             'objectid' => $awareness->get('id'),
             'relateduserid' => $awareness->get('usermodified'),
         ];
@@ -188,7 +188,7 @@ class helper {
 
         // Log updated event.
         $params = [
-            'context' => \context_system::instance(),
+            'context' => self::event_context($awareness),
             'objectid' => $awareness->get('id'),
             'relateduserid' => $awareness->get('usermodified'),
         ];
@@ -544,7 +544,7 @@ class helper {
 
             // Log reset event.
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $notice->get('usermodified'),
             ];
@@ -574,7 +574,7 @@ class helper {
 
             // Log enabled event.
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $notice->get('usermodified'),
             ];
@@ -603,7 +603,7 @@ class helper {
 
             // Log disabled event.
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $notice->get('usermodified'),
             ];
@@ -660,8 +660,8 @@ class helper {
      *
      * Not a verb: the two callers are delete_notice(), which has already gated and consulted its
      * setting, and purge_course_notices(), which runs where there is no author to gate. The event is
-     * logged in the system context whatever the notice's scope, so a deletion is logged the same way
-     * however it happened.
+     * logged in the notice's own context however the deletion happened; during a course deletion
+     * that context still exists, because the purge runs from before_course_deleted.
      *
      * @param awareness $notice
      * @return void
@@ -670,7 +670,7 @@ class helper {
         $oldid = $notice->get('id');
         $notice->delete();
         $params = [
-            'context' => \context_system::instance(),
+            'context' => self::event_context($notice),
             'objectid' => $oldid,
             'relateduserid' => $notice->get('usermodified'),
         ];
@@ -702,21 +702,74 @@ class helper {
     }
 
     /**
+     * The context every event about a notice is logged in: the notice's course for a course notice,
+     * the system context for a site notice.
+     *
+     * So a course's logs, and core's reports and event monitoring on them, include what happened to
+     * that course's notices. A course notice whose course is gone falls back to the system context,
+     * which is the only one left to log it in.
+     *
+     * @param awareness $notice The notice the event is about.
+     * @return \context
+     */
+    private static function event_context(awareness $notice): \context {
+        $scope = author_scope::of($notice);
+        if (!$scope->is_site()) {
+            $context = \context_course::instance($scope->get_courseid(), IGNORE_MISSING);
+            if ($context) {
+                return $context;
+            }
+        }
+
+        return \context_system::instance();
+    }
+
+    /**
      * Built Audience options based on site cohorts.
      *
      * Every cohort, hidden ones included, except those in contexts where the current user can
-     * neither view nor manage cohorts (cohort_get_invisible_contexts()). Names are unformatted.
+     * neither view nor manage cohorts (cohort_get_invisible_contexts()).
      *
-     * @return array Cohort id => name.
+     * The names are RAW, exactly as stored: the caller formats them for its own sink. A moodleform
+     * menu, which renders option text unescaped, takes cohort_menu_options() instead.
+     *
+     * @return array Cohort id => raw name.
      * @throws \coding_exception
      */
     public static function built_cohorts_options() {
         $options = [];
-        $cohorts = cohort_get_all_cohorts(0, 0);
-        foreach ($cohorts['cohorts'] as $cohort) {
+        foreach (self::listable_cohorts() as $cohort) {
             $options[$cohort->id] = $cohort->name;
         }
         return $options;
+    }
+
+    /**
+     * The cohorts built_cohorts_options() lists, with names formatted for a moodleform menu.
+     *
+     * element-autocomplete.mustache emits every option through a triple stash, so each name goes
+     * through format_string() with its default escaping, in the cohort's own context: an ampersand
+     * arrives as an entity, markup is stripped and a multilang name resolves. The ids are the same
+     * set, so allowed_cohorts() validates exactly what this offers.
+     *
+     * @return array Cohort id => formatted, escaped name.
+     * @throws \coding_exception
+     */
+    public static function cohort_menu_options(): array {
+        $options = [];
+        foreach (self::listable_cohorts() as $cohort) {
+            $options[$cohort->id] = format_string($cohort->name, true, ['context' => (int) $cohort->contextid]);
+        }
+        return $options;
+    }
+
+    /**
+     * The cohort records the two option lists above are built from.
+     *
+     * @return \stdClass[] Cohort records, each carrying id, name and contextid.
+     */
+    private static function listable_cohorts(): array {
+        return cohort_get_all_cohorts(0, 0)['cohorts'];
     }
 
     /**
@@ -725,10 +778,10 @@ class helper {
      * A cohort id arriving by POST is a membership oracle unless it is checked: the estimator counts
      * members with a bare `cohortid IN (…)`, so an id nobody offered still returns a population size.
      *
-     * Checked against built_cohorts_options(), the call that builds the form's menu, so validation
-     * and menu cannot drift apart. Not cohort_get_cohort($id, $context): it requires the cohort's
-     * context to be among $context's parents, and the system context has none, so there it refuses
-     * every cohort, even for an admin.
+     * Checked against built_cohorts_options(), which lists the same cohorts as the form's menu
+     * (cohort_menu_options()), so validation and menu cannot drift apart. Not cohort_get_cohort($id,
+     * $context): it requires the cohort's context to be among $context's parents, and the system
+     * context has none, so there it refuses every cohort, even for an admin.
      *
      * @param array $cohortids Raw cohort ids as submitted.
      * @return array The subset the user may target, as ints, reindexed.
@@ -844,21 +897,6 @@ class helper {
                 'nopermissions',
                 ''
             );
-        }
-    }
-
-    /**
-     * Get a notice
-     *
-     * @param int $noticeid notice id
-     * @return bool|\stdClass
-     */
-    public static function retrieve_notice(int $noticeid) {
-        $awareness = awareness::get_record(['id' => $noticeid]);
-        if ($awareness) {
-            return $awareness->to_record();
-        } else {
-            return false;
         }
     }
 
@@ -1408,8 +1446,8 @@ class helper {
      * possible; what stops is showing notices to readers and recording what they did with them.
      *
      * The setting defaults to 0, so a plain truthy read is right here; this is not a default-ON
-     * checkbox where only a stored '0' counts as off. The four delivery web services share this
-     * method; the footer hook (local\hook_callbacks::should_load_on()) applies the same test inline.
+     * checkbox where only a stored '0' counts as off. The four delivery web services and the footer
+     * hook ({@see \local_awareness\local\hook_callbacks::should_load_on()}) all ask here.
      *
      * @return bool True when notices may be delivered.
      * @throws \dml_exception
@@ -1519,7 +1557,7 @@ class helper {
          */
         if (!$isguest) {
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $userid,
             ];
@@ -1558,7 +1596,7 @@ class helper {
             self::add_to_viewed_notices($notice, acknowledgement::ACTION_ACKNOWLEDGED);
             // Log acknowledged event.
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $persistent->get('usermodified'),
             ];
@@ -1589,9 +1627,10 @@ class helper {
          * The link id arrives from the client. Without these checks any authenticated user could
          * post arbitrary ids and fabricate click history for a notice never aimed at them.
          *
-         * Repeat clicks are deliberately not rate-limited: they are the quantity being reported, see
-         * linkhistory::count_clicked_links(). The table's growth is bounded by age instead, through
-         * the purge_link_history scheduled task.
+         * Repeat clicks are deliberately not rate-limited: each click is one row of the link history
+         * report source, so a throttle of any window would record a reader who clicked twice as one
+         * who clicked once. The table's growth is bounded by age instead, through the
+         * purge_link_history scheduled task.
          */
         $link = noticelink::get_record(['id' => $linkid]);
         if (!$link) {
@@ -1611,7 +1650,7 @@ class helper {
 
         // Log link clicked event; guests returned at the top.
         $params = [
-            'context' => \context_system::instance(),
+            'context' => self::event_context($notice),
             'objectid' => $linkid,
             'other' => ['noticeid' => (int) $notice->get('id')],
         ];
@@ -1624,42 +1663,16 @@ class helper {
     }
 
     /**
-     * Format date interval.
-     *
-     * @param string $time Time.
-     * @return string
-     */
-    public static function format_interval_time(string $time): string {
-        // Datetime for 01/01/1970.
-        $datefrom = new \DateTime("@0");
-        // Datetime for 01/01/1970 after the specified time (in seconds).
-        $dateto = new \DateTime("@$time");
-        // Format the date interval.
-        return $datefrom->diff($dateto)->format(get_string('timeformat:resetinterval', 'local_awareness'));
-    }
-
-    /**
-     * Format boolean value
-     *
-     * @param bool $value boolean
-     * @return string
-     */
-    public static function format_boolean(bool $value): string {
-        if ($value) {
-            return get_string('booleanformat:true', 'local_awareness');
-        } else {
-            return get_string('booleanformat:false', 'local_awareness');
-        }
-    }
-
-    /**
      * Get audience name from the audience options.
+     *
+     * The name is RAW, as built_cohorts_options() returns it, and so is any name in $options: the
+     * caller formats it for its own sink. The two placeholders are plain text.
      *
      * @param int $cohortid Cohort id
      * @param array|null $options A cohort option list already in hand, to save resolving it again.
      *                            Callers rendering many rows pass one; everyone else omits it and
      *                            gets the ordinary lookup.
-     * @return string
+     * @return string The raw cohort name, the "all" string for 0, or '-' for a cohort not listed.
      */
     public static function get_cohort_name(int $cohortid, ?array $options = null): string {
         if ($cohortid == 0) {
@@ -1673,51 +1686,6 @@ class helper {
         // makes the whole manage-notices page fatal.
         return $cohorts[$cohortid] ?? '-';
     }
-
-    /**
-     * Get course name
-     * @param int $courseid course id
-     * @return string
-     * @throws \coding_exception
-     */
-    public static function get_course_name(int $courseid): string {
-        global $DB;
-
-        if ($courseid == 0) {
-            return get_string('booleanformat:false', 'local_awareness');
-        }
-
-        $course = $DB->get_record('course', ['id' => $courseid]);
-        if ($course) {
-            return $course->fullname;
-        } else {
-            return '-';
-        }
-    }
-
-    /**
-     * Return all courses as an options array suitable for autocomplete elements.
-     * Excludes the site course (id=1). Sorted alphabetically by fullname.
-     *
-     * @return array  [id => fullname, ...]
-     * @throws \dml_exception
-     */
-    public static function get_all_courses_options(): array {
-        global $DB;
-        $courses = $DB->get_records_select(
-            'course',
-            'id <> :siteid',
-            ['siteid' => SITEID],
-            'fullname ASC',
-            'id, fullname'
-        );
-        $options = [];
-        foreach ($courses as $course) {
-            $options[$course->id] = $course->fullname;
-        }
-        return $options;
-    }
-
 
     /**
      * Whether the current user may perform an authoring verb under a scope, refusing when not.
@@ -2435,11 +2403,16 @@ class helper {
     private static function get_user_competency_proficiency(int $userid, int $courseid, int $competencyid): bool {
         global $DB;
 
-        static $cache = [];
-
-        $cachekey = $userid . ':' . $courseid . ':' . $competencyid;
-        if (array_key_exists($cachekey, $cache)) {
-            return $cache[$cachekey];
+        /*
+         * A request cache, not a static: several notices may name the same competency, and MUC is
+         * purged between PHPUnit tests where a static is not, while generated ids repeat from one
+         * test to the next. Stored as 0 or 1 because get() answers false for a miss.
+         */
+        $cache = \cache::make_from_params(\cache_store::MODE_REQUEST, 'local_awareness', 'proficiency', [], ['simplekeys' => true]);
+        $cachekey = "{$userid}_{$courseid}_{$competencyid}";
+        $cached = $cache->get($cachekey);
+        if ($cached !== false) {
+            return (bool) $cached;
         }
 
         /*
@@ -2457,13 +2430,25 @@ class helper {
             'competencyid' => $competencyid,
         ]);
 
-        $cache[$cachekey] = !empty($proficiency);
+        $cache->set($cachekey, empty($proficiency) ? 0 : 1);
 
-        return $cache[$cachekey];
+        return !empty($proficiency);
     }
 
     /**
      * Check if the current page matches the path pattern.
+     *
+     * The page is its path plus query string, as the browser reports it. Besides the FRONTPAGE, MY
+     * and MYCOURSES tokens, a pattern is matched from the first character of the page, and whether
+     * it must also reach the last one depends on a '%':
+     *
+     *  - Without a '%' the whole page must match: '/course/view.php' does not match
+     *    '/course/view.php?id=2'.
+     *  - With a '%' anywhere, each '%' stands for any text and the end is left open: '/mod/%/view.php'
+     *    matches '/mod/forum/view.php?id=5', and also '/mod/forum/view.phpx'.
+     *
+     * The open end is deliberate: pages carry query strings, and stored patterns would lose reach
+     * if it closed. The pathmatch_help string tells authors the same.
      *
      * @param string $pathmatch The URL pattern.
      * @param string $pageurl The current page URL path (from JS via AJAX).
@@ -2506,7 +2491,7 @@ class helper {
 
         /*
          * The pattern is anchored at the start, so a rule for '/mod/quiz/view.php' does not match
-         * '/anything/mod/quiz/view.php', and at the end unless it carries a '%'. A Moodle installed
+         * '/anything/mod/quiz/view.php', and at the end only when it carries no '%'. A Moodle installed
          * in a subdirectory reports '/moodle/mod/quiz/view.php' while the author may write the path
          * with or without that segment, so the pattern is tried against the target and against the
          * target with the wwwroot's own path segment removed, and either may match.
@@ -2539,21 +2524,22 @@ class helper {
      * Check if the filters match the current context.
      *
      * Path matching belongs to check_path_match(); the course here is decided by $courseid alone.
-     * An empty or undecodable payload, or one whose lists are all empty, admits.
+     * An empty or undecodable payload, a scalar one, or one whose lists are all empty, admits, as
+     * page_probe::filters_admit() and is_notice_available_to_user() do.
      *
      * @param string|null $filtervalues JSON encoded filter values.
      * @param int $courseid The current course ID (from JS via M.cfg.courseId).
      * @return bool
      */
     public static function check_filters(?string $filtervalues, int $courseid = 0): bool {
-        global $PAGE, $USER, $DB;
+        global $USER, $DB;
 
         if (empty($filtervalues)) {
             return true;
         }
 
         $filters = json_decode($filtervalues, true);
-        if (empty($filters)) {
+        if (empty($filters) || !is_array($filters)) {
             return true;
         }
 
@@ -2647,9 +2633,16 @@ class helper {
             try {
                 $currenttheme = self::current_theme_name($course);
             } catch (\Throwable $e) {
-                $currenttheme = '';
+                /*
+                 * No theme can be resolved for this reader: the course sits in a category that no
+                 * longer exists while category themes are on, or the page has no context. A notice
+                 * aimed at named themes is withheld, as every rule whose referent cannot be
+                 * resolved is. The get_notices service validates its context first, so an ordinary
+                 * request never lands here.
+                 */
+                return false;
             }
-            if (!empty($currenttheme) && !in_array($currenttheme, $filters['filter_theme'])) {
+            if (!in_array($currenttheme, $filters['filter_theme'])) {
                 return false;
             }
         }
@@ -2729,12 +2722,20 @@ class helper {
         $records = $DB->get_records_sql($sql, $params);
         $userroleids = array_map('intval', array_keys($records));
 
-        // Include Moodle's implicit default roles (not stored in role_assignments).
-        if ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM) {
-            if (!empty($CFG->defaultuserroleid) && isloggedin() && !isguestuser()) {
+        /*
+         * Core's two implicit roles have no {role_assignments} row. Every logged-in user but the
+         * guest holds the default user role in the system context and the front page role in the
+         * site course's context (get_user_accessdata()), so each counts only for a rule whose
+         * context covers where it is held: the default role for any context or the system, the front
+         * page role for any context only, since the site course is neither the system context nor
+         * one of the courses a course-level rule means. {@see \local_awareness\audience\estimator}
+         * makes the same choice in predicate().
+         */
+        if (isloggedin() && !isguestuser()) {
+            if (!empty($CFG->defaultuserroleid) && ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM)) {
                 $userroleids[] = (int) $CFG->defaultuserroleid;
             }
-            if (!empty($CFG->defaultfrontpageroleid) && isloggedin()) {
+            if (!empty($CFG->defaultfrontpageroleid) && $rolectx == 0) {
                 $userroleids[] = (int) $CFG->defaultfrontpageroleid;
             }
         }

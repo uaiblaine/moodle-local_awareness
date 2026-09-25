@@ -102,34 +102,56 @@ $scope = author_scope::for_request($awareness, $courseid);
 if ($awareness === null) {
     helper::require_author($scope, 'manage');
 }
-$scopeparams = $scope->is_site() ? [] : ['courseid' => $scope->get_courseid()];
+
+/*
+ * An orphan is a course notice whose course row is gone; only the site capability reaches one
+ * (helper::require_author()). It is not editable: its forced course filter matches no page whatever
+ * is changed, and the course-scoped form and save read a context and groups the course no longer
+ * has. The list's other actions need no form and still work on it, delete among them. It returns to
+ * the site list, because the course's own list cannot open without its course.
+ */
+$orphan = $awareness !== null && !$scope->exists();
+$scopeparams = ($scope->is_site() || $orphan) ? [] : ['courseid' => $scope->get_courseid()];
 $managenoticepage = new moodle_url('/local/awareness/managenotice.php', $scopeparams);
 $thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid, 'action' => $action] + $scopeparams);
 
-$customdata = [
-    'persistent' => $awareness,
-    'id' => $noticeid,
-    'scope' => $scope,
-];
-$mform = new notice_form($thispage, $customdata);
+// Only creating and editing show or save the form; the other actions act on the notice alone.
+$formaction = $action === 'create' || $action === 'edit';
+if ($orphan && $formaction) {
+    redirect(
+        $managenoticepage,
+        get_string('notification:orphannotice', 'local_awareness'),
+        null,
+        \core\output\notification::NOTIFY_WARNING
+    );
+}
+$mform = null;
+if ($formaction) {
+    $customdata = [
+        'persistent' => $awareness,
+        'id' => $noticeid,
+        'scope' => $scope,
+    ];
+    $mform = new notice_form($thispage, $customdata);
 
-// The content editor's draft area is prepared in notice_form::get_default_data(), where the
-// notice id is known.
+    // The content editor's draft area is prepared in notice_form::get_default_data(), where the
+    // notice id is known.
 
-// Prepare draft area for background image.
-$bgdraftitemid = file_get_submitted_draft_itemid('bgimage');
-file_prepare_draft_area(
-    $bgdraftitemid,
-    context_system::instance()->id,
-    'local_awareness',
-    'bgimage',
-    $noticeid ? $noticeid : 0,
-    ['maxfiles' => 1, 'accepted_types' => ['image']]
-);
-// Inject the draft item ID so the form's file picker shows existing files.
-$mform->set_data(['bgimage' => $bgdraftitemid]);
+    // Prepare draft area for background image.
+    $bgdraftitemid = file_get_submitted_draft_itemid('bgimage');
+    file_prepare_draft_area(
+        $bgdraftitemid,
+        context_system::instance()->id,
+        'local_awareness',
+        'bgimage',
+        $noticeid ? $noticeid : 0,
+        ['maxfiles' => 1, 'accepted_types' => ['image']]
+    );
+    // Inject the draft item ID so the form's file picker shows existing files.
+    $mform->set_data(['bgimage' => $bgdraftitemid]);
+}
 
-if ($formdata = $mform->get_data()) {
+if ($mform && ($formdata = $mform->get_data())) {
     // Say why when allow_update is off, as the delete path does for allow_delete: the save itself
     // (helper::update_notice()) refuses silently.
     if ($awareness && !get_config('local_awareness', 'allow_update')) {
@@ -146,12 +168,7 @@ if ($formdata = $mform->get_data()) {
      * take turns interrupting the same people, which is rarely intended but legitimate. Resolved
      * before the save, because a new notice has no id to exclude itself by once it is in the table.
      */
-    $clashes = \local_awareness\local\collision::clashes_for(
-        (int) ($awareness ? $awareness->get('id') : 0),
-        // Through the scope, which writes the course's main page where the form offers no field.
-        (string) $scope->apply(['pathmatch' => $formdata->pathmatch ?? ''])->criteria()['pathmatch'],
-        (int) ($formdata->resetinterval ?? 0)
-    );
+    $clashes = \local_awareness\local\collision::clashes_for_save($awareness ?: null, $formdata, $scope);
 
     if (!$awareness) {
         // Create new notice, in the scope this page is for.
@@ -163,9 +180,9 @@ if ($formdata = $mform->get_data()) {
 
 
     if (!empty($clashes)) {
-        $titles = array_map(function ($notice): string {
-            return $notice->get('title');
-        }, $clashes);
+        // The escaped spelling, because a notification renders its message as HTML; a rival outside
+        // the scope is described rather than named.
+        $titles = \local_awareness\local\collision::formatted_titles($clashes, $scope);
 
         redirect(
             $managenoticepage,
@@ -177,19 +194,29 @@ if ($formdata = $mform->get_data()) {
 
     /*
      * Checked after the collision warning, which takes precedence: a competing notice may need
-     * changing, a queued estimate is only news.
+     * changing, a failed or queued estimate is only news. The title is escaped for the same reason
+     * as the rivals' above.
      */
+    $savedtitle = format_string($formdata->title, true, ['context' => context_system::instance()]);
+    if ($audiencestate === \local_awareness\audience\notice_audience::STATE_ERROR) {
+        redirect(
+            $managenoticepage,
+            get_string('notice:audience:failed', 'local_awareness', $savedtitle),
+            null,
+            \core\output\notification::NOTIFY_WARNING
+        );
+    }
     if ($audiencestate === \local_awareness\audience\notice_audience::STATE_PENDING) {
         redirect(
             $managenoticepage,
-            get_string('notice:audience:queued', 'local_awareness', $formdata->title),
+            get_string('notice:audience:queued', 'local_awareness', $savedtitle),
             null,
             \core\output\notification::NOTIFY_INFO
         );
     }
 
     redirect($managenoticepage);
-} else if ($mform->is_cancelled()) {
+} else if ($mform && $mform->is_cancelled()) {
     redirect($managenoticepage);
 }
 
@@ -221,15 +248,14 @@ if (!$awareness) {
     redirect($managenoticepage);
 }
 
+// Every message below, a confirmation box or a notification, prints the title as HTML: the escaped spelling.
+$title = format_string($awareness->get('title'), true, ['context' => context_system::instance()]);
+
+/*
+ * The two compliance reports are not actions here: the list links straight to their pages, which
+ * gate on the viewreports verb, where this page has already demanded manage.
+ */
 switch ($action) {
-    case 'dismissed_report':
-        $reportpage = new moodle_url('/local/awareness/report/dismissed_systemreport.php', ["noticeid" => $noticeid]);
-        redirect($reportpage);
-        break;
-    case 'acknowledged_report':
-        $reportpage = new moodle_url('/local/awareness/report/acknowledged_systemreport.php', ["noticeid" => $noticeid]);
-        redirect($reportpage);
-        break;
     case 'unconfirmedreset':
         /*
          * Confirmed like a delete: reset saves the notice, which moves timemodified, the time every
@@ -242,7 +268,7 @@ switch ($action) {
         $confirmedreset = new single_button($thispage, get_string('notice:reset', 'local_awareness'), 'post');
         $cancel = new single_button($managenoticepage, get_string('cancel'), 'get');
         echo $OUTPUT->confirm(
-            get_string('confirmation:resetnotice', 'local_awareness', $awareness->get('title')),
+            get_string('confirmation:resetnotice', 'local_awareness', $title),
             $confirmedreset,
             $cancel
         );
@@ -257,17 +283,20 @@ switch ($action) {
         // Forced: the author asked for this number specifically, so an up-to-date hash is not a
         // reason to refuse — the site's population moves under a notice whose filters never change.
         $state = \local_awareness\audience\notice_audience::refresh($awareness, true);
-        $pending = $state === \local_awareness\audience\notice_audience::STATE_PENDING;
-        redirect(
-            $managenoticepage,
-            get_string(
-                $pending ? 'notice:audience:queued' : 'notice:audience:recalculated',
-                'local_awareness',
-                $awareness->get('title')
-            ),
-            null,
-            $pending ? \core\output\notification::NOTIFY_INFO : \core\output\notification::NOTIFY_SUCCESS
-        );
+        switch ($state) {
+            case \local_awareness\audience\notice_audience::STATE_ERROR:
+                $message = get_string('notice:audience:failed', 'local_awareness', $title);
+                $type = \core\output\notification::NOTIFY_ERROR;
+                break;
+            case \local_awareness\audience\notice_audience::STATE_PENDING:
+                $message = get_string('notice:audience:queued', 'local_awareness', $title);
+                $type = \core\output\notification::NOTIFY_INFO;
+                break;
+            default:
+                $message = get_string('notice:audience:recalculated', 'local_awareness', $title);
+                $type = \core\output\notification::NOTIFY_SUCCESS;
+        }
+        redirect($managenoticepage, $message, null, $type);
         break;
     case 'disable':
         helper::disable_notice($awareness);
@@ -285,7 +314,7 @@ switch ($action) {
             $confirmeddelete = new single_button($thispage, get_string('delete'), 'post');
             $cancel = new single_button($managenoticepage, get_string('cancel'), 'get');
             echo $OUTPUT->confirm(
-                get_string('confirmation:deletenotice', 'local_awareness', $awareness->get('title')),
+                get_string('confirmation:deletenotice', 'local_awareness', $title),
                 $confirmeddelete,
                 $cancel
             );

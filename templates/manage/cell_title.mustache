@@ -7,15 +7,16 @@
 
     The title arrives already through format_string(), which resolves the text filters and strips
     or cleans the markup, so it is emitted with a triple stash: escaping it again would print its
-    entities literally. The path is the opposite case — a URL pattern rather than prose — so it
-    arrives raw and is escaped here by Mustache.
+    entities literally. Everything else here arrives unescaped and is escaped once by Mustache: the
+    tooltip copy of the title, formatted without escaping; the path, a URL pattern rather than
+    prose, raw; and the course sentence.
 
     Context variables required:
     * title (string) — the filtered notice title, safe HTML
-    * titleplain (string) — the same title for the tooltip attribute
+    * titleplain (string) — the same title formatted but not escaped, for the tooltip attribute
     * where (string) — the raw path pattern, or the "anywhere" sentence
     * course (object, optional) — on the site list, the course a course notice belongs to:
-      name (string, already a sentence) and url (string, empty when the course is gone)
+      name (string, a plain sentence) and url (string, empty when the course is gone)
 
     Example context (json):
     {

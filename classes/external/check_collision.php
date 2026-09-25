@@ -24,7 +24,6 @@ use core_external\external_value;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\local\collision;
-use local_awareness\persistent\awareness;
 
 /**
  * Repeating notices that would compete with this one for the same pages.
@@ -46,6 +45,25 @@ class check_collision extends external_api {
             'pathmatch' => new external_value(PARAM_RAW, 'page reach being considered', VALUE_DEFAULT, ''),
             'repeats' => new external_value(PARAM_BOOL, 'whether the notice is set to repeat', VALUE_DEFAULT, false),
             'courseid' => new external_value(PARAM_INT, 'course the editor is scoped to, 0 for the site', VALUE_DEFAULT, 0),
+            'perpetual' => new external_value(
+                PARAM_BOOL,
+                'whether the notice has no window; timeend is then ignored',
+                VALUE_DEFAULT,
+                true
+            ),
+            'timeend' => new external_single_structure(
+                [
+                    'year' => new external_value(PARAM_INT, 'year'),
+                    'month' => new external_value(PARAM_INT, 'month, from 1'),
+                    'day' => new external_value(PARAM_INT, 'day of the month'),
+                    'hour' => new external_value(PARAM_INT, 'hour, from 0'),
+                    'minute' => new external_value(PARAM_INT, 'minute'),
+                ],
+                'end of the window as the date selector holds it, in the user calendar and timezone; null when there is none',
+                VALUE_DEFAULT,
+                null,
+                NULL_ALLOWED
+            ),
         ]);
     }
 
@@ -60,15 +78,26 @@ class check_collision extends external_api {
      * @param string $pathmatch Page reach being considered.
      * @param bool $repeats Whether the notice is set to repeat.
      * @param int $courseid The course the editor is scoped to, 0 for the site.
+     * @param bool $perpetual Whether the notice has no window, which makes its end irrelevant.
+     * @param array|null $timeend The end date selector's year, month, day, hour and minute; null when the form has none.
      * @return array
      * @throws \required_capability_exception
      */
-    public static function execute(int $noticeid = 0, string $pathmatch = '', bool $repeats = false, int $courseid = 0): array {
+    public static function execute(
+        int $noticeid = 0,
+        string $pathmatch = '',
+        bool $repeats = false,
+        int $courseid = 0,
+        bool $perpetual = true,
+        ?array $timeend = null
+    ): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'noticeid' => $noticeid,
             'pathmatch' => $pathmatch,
             'repeats' => $repeats,
             'courseid' => $courseid,
+            'perpetual' => $perpetual,
+            'timeend' => $timeend,
         ]);
 
         // Only reached from the notice editor, and it reports on notices the caller may not otherwise
@@ -76,7 +105,6 @@ class check_collision extends external_api {
         $scope = author_scope::for_request(null, (int) $params['courseid']);
         self::validate_context($scope->context());
         helper::require_author($scope, 'manage');
-        $syscontext = \context_system::instance();
 
         /*
          * The reach compared is the one the save would store, not the one the client typed: under a
@@ -86,27 +114,47 @@ class check_collision extends external_api {
          */
         $reach = (string) $scope->apply(['pathmatch' => $params['pathmatch']])->criteria()['pathmatch'];
 
+        // The end compared is the one the save would store too: none for a perpetual notice.
+        $end = (!$params['perpetual'] && $params['timeend'] !== null) ? self::selector_time($params['timeend']) : 0;
+
         $clashes = collision::clashes_for(
             (int) $params['noticeid'],
             $reach,
-            !empty($params['repeats']) ? 1 : 0
+            !empty($params['repeats']) ? 1 : 0,
+            $end
         );
 
         return [
             /*
-             * Stripped, not escaped. The slot is PARAM_TEXT, and clean_returnvalue() throws when its
-             * strip_tags() would change the value, so a title with a bare "<" before a letter would
-             * fail the whole response. escape => false keeps the plain spelling collision_warning.js
-             * needs, since it writes through textContent; the extra strip_tags() covers sites with
-             * formatstringstriptags off, where format_string() keeps tags.
+             * The plain spelling, stripped of tags: the slot is PARAM_TEXT and collision_warning.js
+             * writes it through textContent ({@see collision::formatted_titles()}). A rival outside
+             * the scope is named for what it is, not by its title.
              */
-            'titles' => array_values(array_map(function (awareness $notice) use ($syscontext, $scope): string {
-                // A rival outside the scope is named for what it is, not by its title.
-                return strip_tags(
-                    format_string(collision::visible_title($notice, $scope), true, ['context' => $syscontext, 'escape' => false])
-                );
-            }, $clashes)),
+            'titles' => collision::formatted_titles($clashes, $scope, false),
         ];
+    }
+
+    /**
+     * The timestamp a date and time selector's parts stand for.
+     *
+     * Converted as the form converts them when it is saved ({@see \MoodleQuickForm_date_time_selector::exportValue()}):
+     * the parts are in the user's calendar and timezone, which only the server knows, so the editor
+     * sends them as they are rather than guessing a timestamp from the browser's clock.
+     *
+     * @param array $parts The selector's year, month, day, hour and minute.
+     * @return int
+     */
+    private static function selector_time(array $parts): int {
+        $date = \core_calendar\type_factory::get_calendar_instance()->convert_to_gregorian(
+            $parts['year'],
+            $parts['month'],
+            $parts['day'],
+            $parts['hour'],
+            $parts['minute']
+        );
+
+        // Timezone 99 is the user's, the selector's default and the one notice_form leaves in place.
+        return (int) make_timestamp($date['year'], $date['month'], $date['day'], $date['hour'], $date['minute'], 0, 99, true);
     }
 
     /**

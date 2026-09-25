@@ -36,6 +36,7 @@ use local_awareness\persistent\audience_job;
  * @covers \local_awareness\external\search_courses
  * @covers \local_awareness\external\search_roles
  * @covers \local_awareness\external\check_collision
+ * @covers \local_awareness\external\render_notice
  */
 final class course_scope_external_test extends \advanced_testcase {
     /** @var \stdClass The author's course. */
@@ -237,6 +238,44 @@ final class course_scope_external_test extends \advanced_testcase {
             $courselevel,
             'precondition: the check has teeth only if the course-level set is a real subset'
         );
+    }
+
+    /**
+     * The list's preview answers a course author the same way for every notice outside their authority.
+     *
+     * The author is enrolled in the other course, so validate_context() admits them there and only
+     * the gate can refuse; a course they are not enrolled in is the case where validate_context()
+     * would refuse first, and differently, if it ran before the gate. An id naming nothing is the
+     * answer every refusal must match, and their own course's notice the control that the preview
+     * works for them at all.
+     */
+    public function test_the_list_preview_refuses_every_notice_outside_the_scope_alike(): void {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $own = $generator->create_notice(['courseid' => $this->mine->id]);
+        $theirs = $generator->create_notice(['courseid' => $this->other->id]);
+        $elsewhere = $generator->create_notice(['courseid' => $this->getDataGenerator()->create_course()->id]);
+        $site = $generator->create_notice();
+
+        $this->setUser($this->author);
+        $response = $this->call('render_notice', ['noticeid' => (int) $own->get('id')]);
+        $this->assertFalse($response['error'], 'the author previews their own course\'s notice');
+        $this->assertSame((int) $own->get('id'), $response['data']['id']);
+
+        $answers = [];
+        $ids = [
+            'theirs' => $theirs->get('id'),
+            'elsewhere' => $elsewhere->get('id'),
+            'site' => $site->get('id'),
+            'missing' => 987654,
+        ];
+        foreach ($ids as $key => $id) {
+            $response = $this->call('render_notice', ['noticeid' => (int) $id]);
+            $this->assertTrue($response['error'], "{$key} must be refused");
+            $answers[$key] = $response['exception']->errorcode . ': ' . $response['exception']->message;
+        }
+        $expected = 'notification:noticedoesnotexist: ' . get_string('notification:noticedoesnotexist', 'local_awareness');
+        $this->assertSame(array_fill_keys(array_keys($ids), $expected), $answers);
     }
 
     /**

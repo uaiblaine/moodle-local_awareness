@@ -78,8 +78,7 @@ class manage_page implements renderable, templatable {
         // The population the numbers describe is the list's: a course page counts that course only.
         $where = $this->scope->is_site() ? '' : ' WHERE courseid = :courseid';
         $params = $this->scope->is_site() ? [] : ['courseid' => $this->scope->get_courseid()];
-        $sql = 'SELECT COUNT(1) AS total,
-                       SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) AS live,
+        $sql = 'SELECT SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) AS live,
                        SUM(CASE WHEN enabled = 0 THEN 1 ELSE 0 END) AS draft,
                        SUM(COALESCE(audiencecount, 0)) AS reach
                   FROM {' . awareness::TABLE . '}' . $where;

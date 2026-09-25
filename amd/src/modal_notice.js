@@ -168,6 +168,19 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
             NOTICE_ID: 'data-noticeid'
         };
 
+        /**
+         * Press the dialogue's close button once, as the reader would.
+         *
+         * Three buttons match SELECTORS.CLOSE_BUTTON, and jQuery's trigger() clicks every element it
+         * holds, so a backdrop click or Escape would otherwise run the close handler three times.
+         * The first is enough: whichever path owns the dialogue binds its handler to the selector.
+         *
+         * @param {ModalNotice} modal The dialogue.
+         */
+        var pressClose = function(modal) {
+            modal.getModal().find(SELECTORS.CLOSE_BUTTON).first().trigger('click');
+        };
+
         var ModalNotice = function(root) {
             var self = Reflect.construct(Modal, [root], ModalNotice);
             self.insistence = INSISTENCE.INFORMATIONAL;
@@ -186,8 +199,8 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
          * Selector for the dialogue's exit buttons.
          *
          * Matches every data-action="close" button in templates/modal_notice.mustache: the header
-         * cross, the footer Close and Not now. The backdrop and Escape paths click the same
-         * selector, so every exit reaches the handler bound to it.
+         * cross, the footer Close and Not now. A handler bound to it answers any of them, which is
+         * how the backdrop and Escape paths reach it through pressClose().
          *
          * @returns {String} A selector matching the modal's close buttons.
          */
@@ -338,7 +351,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
                         dialog.addClass('jelly-anim');
                         return;
                     }
-                    modal.getModal().find(SELECTORS.CLOSE_BUTTON).trigger('click');
+                    pressClose(modal);
                 }
             });
 
@@ -357,7 +370,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
                         e.preventDefault();
                         return;
                     }
-                    this.getModal().find(SELECTORS.CLOSE_BUTTON).trigger('click');
+                    pressClose(this);
                 }
             }.bind(this));
         };

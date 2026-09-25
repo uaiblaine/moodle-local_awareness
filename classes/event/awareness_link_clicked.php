@@ -57,10 +57,12 @@ class awareness_link_clicked extends \core\event\base {
     }
 
     /**
-     * Gets URL.
+     * Gets URL: the list the notice belongs to, its course's for a course notice.
+     *
      * @return \moodle_url
      */
     public function get_url() {
-        return new \moodle_url('/local/awareness/managenotice.php');
+        $params = $this->contextlevel == CONTEXT_COURSE ? ['courseid' => $this->courseid] : [];
+        return new \moodle_url('/local/awareness/managenotice.php', $params);
     }
 }
