@@ -92,8 +92,17 @@ class estimate_audience extends \core\task\adhoc_task {
             return;
         }
 
+        /*
+         * The plain spelling, in the notice's own context: the message is FORMAT_PLAIN, so the title
+         * is filtered (a multilang title keeps one language) and never escaped. A course notice
+         * whose course is gone is formatted at the system context.
+         */
+        $scope = author_scope::of($notice);
+        $context = $scope->is_site()
+            ? \context_system::instance()
+            : (\context_course::instance($scope->get_courseid(), IGNORE_MISSING) ?: \context_system::instance());
         $data = (object) [
-            'title' => $notice->get('title'),
+            'title' => format_string($notice->get('title'), true, ['context' => $context, 'escape' => false]),
             'count' => (int) $job->get('resultcount'),
         ];
 
@@ -109,7 +118,6 @@ class estimate_audience extends \core\task\adhoc_task {
         $message->smallmessage = $message->subject;
         $message->notification = 1;
         // The list the notice is in: a course author cannot open the site's.
-        $scope = author_scope::of($notice);
         $listparams = $scope->is_site() ? [] : ['courseid' => $scope->get_courseid()];
         $message->contexturl = (new \moodle_url('/local/awareness/managenotice.php', $listparams))->out(false);
         $message->contexturlname = get_string($scope->is_site() ? 'setting:managenotice' : 'coursenotices', 'local_awareness');

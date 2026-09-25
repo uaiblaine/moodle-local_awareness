@@ -8,6 +8,18 @@ Este documento existe porque o cabeçalho da auditoria sempre disse que ela era 
 partida, não a lista do que ainda está aberto", e essa lista nunca foi feita. Os 191 achados numerados
 mais os 7 do crítico de completude passam a ter estado conhecido.
 
+> **Estado em 2026-09-25: encerrado, exceto o REPO-10.** Dos 198 achados, 197 estão encerrados —
+> corrigidos, sem objeto, refutados ou, no caso do M7, recusados com a razão escrita. O único em
+> aberto é o **REPO-10** (sem tag e sem secção de release no `CHANGELOG.md`), que é uma decisão de
+> release do dono do produto e não um defeito. Os cabeçalhos do censo e o placar foram acertados a
+> este estado; as contagens no resto do texto (as notas de cada fase e "O que sobrevive, e por quê")
+> ficam como estavam, como registo do que se sabia quando foram escritas.
+>
+> A **auditoria de comentários de setembro de 2026** e as suas correções (PR #74, versão
+> `2026092401`) fecharam mais **73 achados**, que não fazem parte destes 198: 72 corrigidos e 1
+> mantido com a razão escrita. Os relatórios dessa auditoria ficam fora do repositório, em
+> `~/dev/moodle-dev/data/comment-audit/local_awareness-2026-09-23/`.
+
 > **Atualização de 2026-08-24 (fase 23).** O **C3 fechou**. A metade que faltava era o
 > `forcelogout`, e ela deixou de existir: o mecanismo foi aposentado inteiro (PR #52), com as três
 > isenções de administrador — em duas grafias — a sair com ele. Convidados continuam a não ser
@@ -56,26 +68,29 @@ repositório já produziu duas vezes — medir a correção e não medir o que f
 
 **Vocabulário.** *corrigido* — o defeito saiu do código. *sem objeto* — o código que o continha foi
 apagado e nada o herdou. *parcial* — parte fechada, parte não, com o que falta nomeado. *aberto* — o
-defeito continua lá.
+defeito continua lá. *refutado* — investigado nos dois sentidos e concluído que não é defeito; o
+placar conta-o com os *sem objeto*. *recusado com razão* — a correção, ou a parte dela que faltava,
+foi recusada por uma razão escrita e fixada por um teste.
 
 ## Placar
 
-| Severidade | corrigido | sem objeto | parcial | aberto | total |
-|---|---:|---:|---:|---:|---:|
-| Alto | 10 | 0 | 0 | 0 | **10** |
-| Médio | 28 | 4 | 1 | 0 | **33** |
-| Crítico de completude | 5 | 1 | 1 | 0 | **7** |
-| Baixo | 86 | 9 | 1 | 0 | **96** |
-| Informativo | 44 | 7 | 0 | 1 | **52** |
-| **Total** | **173** | **21** | **3** | **1** | **198** |
+Estado depois da fase 24, acertado em 2026-09-25. Os dois *refutados* (WS-13 e BIZ-09) contam como
+*sem objeto*, como sempre contaram.
+
+| Severidade | corrigido | sem objeto | recusado com razão | parcial | aberto | total |
+|---|---:|---:|---:|---:|---:|---:|
+| Alto | 10 | 0 | 0 | 0 | 0 | **10** |
+| Médio | 28 | 4 | 1 | 0 | 0 | **33** |
+| Crítico de completude | 6 | 1 | 0 | 0 | 0 | **7** |
+| Baixo | 87 | 9 | 0 | 0 | 0 | **96** |
+| Informativo | 44 | 7 | 0 | 0 | 1 | **52** |
+| **Total** | **175** | **21** | **1** | **0** | **1** | **198** |
 
 **Os dez bloqueadores estão todos fechados**, e não por remoção: os dez são *corrigido*, nenhum é
-*sem objeto*. Somando corrigido e sem objeto, **194 dos 198 estão encerrados; 4 continuam a merecer
-uma decisão** — e **nenhum achado Alto ou Médio continua aberto**. Os quatro que restam são, um a
-um: **C3** (convidados e o `forcelogout`, em cima da mesa junto com o repensar do próprio mecanismo),
-**M7** (a inflação da própria contagem, recusada com razão escrita), **WS-01** (o payload do
-`get_notices`, cuja mudança parte vinte pontos de chamada e acrescenta perda silenciosa) e
-**REPO-10** (sem tag, por decisão do dono do produto). Nenhum é esquecimento.
+*sem objeto*. **197 dos 198 estão encerrados, e nenhum continua parcial.** Os três que a fase 20
+ainda deixava parciais fecharam nas fases 23 e 24: o **C3** e o **WS-01** por trabalho, o **M7** por
+decisão, recusado com a razão escrita. Resta o **REPO-10** (sem tag, por decisão do dono do
+produto), que não é esquecimento nem defeito.
 
 > **Atualizado em 2026-08-16 pela fase 5** (versão `2026081604`, branch `fix/phase-5-residue-and-coverage`).
 > Oito achados passaram a *corrigido* nessa fase: **C6** (`\Throwable` no gancho de rodapé), **C4**
@@ -443,7 +458,7 @@ diz o que resta e onde.
 - **H10** · corrigido — The five test_stress_datasource tests are gated behind PHPUNIT_LONGTEST, which moodle-plugin-ci never sets — they hide three real failures
   <br>`grep -rn 'PHPUNIT_LONGTEST' tests/ .github/` returns no `markTestSkipped` — only five docblocks stating the gate was removed: all_notices_test.php:191, acknowledged_notices_test.php:186, dismissed_notices_test.php:185, link_history_test.php:171, notice_views_test.php:176.
 
-### Importantes (M1–M33) — 1 de 33 em aberto
+### Importantes (M1–M33) — 0 de 33 em aberto
 
 - **M1** · corrigido — A stale Claude Code worktree is committed as a gitlink (submodule entry) with no .gitmodules, breaking every git submodule command
   <br>`git ls-files -s \| awk '$1=="160000"'` returns 0 rows and `git ls-files -s .claude` returns nothing; `git submodule status` now exits 0 with empty output. /Users/uaiblaine/dev/moodle-local_awareness/.gitignore lines 14-17 add `.claude/worktrees/` with a comment naming this exact gitlink incident.
@@ -514,7 +529,7 @@ diz o que resta e onde.
 - **M33** · corrigido — bootstrap_compat_test knows 5 of the ~25 Bootstrap 5-only families, so almost any new BS5 utility ships green
   <br>Fechado na fase 6 (2026-08-16): mesmo mapa, mesmas adições — ver M32.
 
-### Crítico de completude (C1–C7) — 1 de 7 em aberto
+### Crítico de completude (C1–C7) — 0 de 7 em aberto
 
 - **C1** · corrigido — Web service local_awareness_search_roles has no capability check — any authenticated user can enumerate every role on the site
   <br>classes/external.php:389-391 — search_roles() now does `$syscontext = \context_system::instance(); self::validate_context($syscontext); require_capability('local/awareness:manage', $syscontext);` before validate_parameters, with the comment naming the enumeration risk.
@@ -574,7 +589,7 @@ diz o que resta e onde.
 - **LANG-19** · corrigido — Behat step carries a copied comment describing forum discussions
   <br>Fechado na fase 12: o comentário copiado sobre fóruns foi substituído.
 
-### Web services — 1 de 18 em aberto
+### Web services — 0 de 18 em aberto
 
 - **WS-01** · **corrigido** — get_notices returns the entire notice DB record as a JSON blob in PARAM_RAW, defeating the execute_returns allowlist and leaking targeting…
   <br>The record-wide serialisation is gone: classes/external.php:253 copies a fixed 7-key allowlist out of to_record() (id, title, reqack, forcelogout, modal_width, modal_height, outsideclick) plus content/bgimageurl, and tests/external/notice_external_test.php:560-589 asserts the exact key set.

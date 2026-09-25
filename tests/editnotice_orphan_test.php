@@ -108,11 +108,6 @@ final class editnotice_orphan_test extends \advanced_testcase {
      * @return array{0: string, 1: ?\moodle_exception} The page output, and the exception it ended with.
      */
     private function run_page(array $params, string $method = 'GET'): array {
-        global $CFG, $DB, $OUTPUT, $PAGE, $SITE, $USER;
-
-        // Each run is a request of its own: a page already printed cannot be set up again.
-        $PAGE = new \moodle_page();
-        $OUTPUT = new \bootstrap_renderer();
         $_SERVER['REQUEST_METHOD'] = $method;
         $_GET = $method === 'GET' ? $params : [];
         $_POST = $method === 'POST' ? $params : [];
@@ -120,7 +115,8 @@ final class editnotice_orphan_test extends \advanced_testcase {
         $thrown = null;
         ob_start();
         try {
-            require($CFG->dirroot . '/local/awareness/editnotice.php');
+            // The fixture binds the globals the page reads and runs it here, in this method's scope.
+            require(__DIR__ . '/fixtures/editnotice_request.php');
         } catch (\moodle_exception $e) {
             $thrown = $e;
         } finally {

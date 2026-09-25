@@ -360,6 +360,7 @@ $string['notice:videourl'] = 'Link do vídeo';
 $string['notice:videourl:invalid'] = 'Informe um endereço completo, começando com http:// ou https://.';
 $string['notice:videourl:required'] = 'O layout Vídeo precisa de um link de vídeo.';
 $string['notice:videourl_help'] = 'Um link para o vídeo: uma página do YouTube ou do Vimeo, ou um link direto para um arquivo MP4 ou WebM. O filtro multimídia do site monta o player, então toca o que os players do site permitem; um link que eles não tratam aparece como link. O vídeo nunca começa sozinho.';
+$string['notification:coursenotfound'] = 'Esse link aponta para um curso que não existe mais. Os alertas que o curso deixou para trás estão listados aqui.';
 $string['notification:nodeleteallowed'] = 'Exclusão de alerta não permitida';
 $string['notification:noticedoesnotexist'] = 'O alerta não existe';
 $string['notification:noupdateallowed'] = 'Atualização de alerta não permitida';

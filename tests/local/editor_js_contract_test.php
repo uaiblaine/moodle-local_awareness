@@ -206,23 +206,77 @@ final class editor_js_contract_test extends \advanced_testcase {
     }
 
     /**
-     * Every module the plugin ships carries the GPL header.
+     * Every failed estimate says why, and a failure that brings no reason says so from the pack.
+     *
+     * audience:state:error ends in its placeholder, so an empty detail leaves the author a sentence
+     * that stops at the colon. A job in error carries the message of the exception it caught, which
+     * can be empty; every error path therefore ends in audience:state:error_noanswer, directly or
+     * through failureText().
+     */
+    public function test_every_estimate_failure_has_a_detail(): void {
+        $source = $this->read('amd/src/audience_estimator.js');
+
+        preg_match_all('/(?<!function )handleError\(([^;]*)\);/', $source, $calls);
+        // The force: the path that passes the job's own message is among those read.
+        $this->assertNotEmpty(
+            preg_grep('/response\.errormsg/', $calls[1]),
+            'the job-in-error path is gone, so the scan below would pass blind'
+        );
+        $this->assertGreaterThanOrEqual(4, count($calls[1]), 'the scan found implausibly few error paths');
+        foreach ($calls[1] as $argument) {
+            $this->assertMatchesRegularExpression(
+                '/^failureText\(err\)$|(^|\|\| )state\.strings\.noAnswer$/',
+                $argument,
+                "handleError({$argument}) can show the error line with nothing after the colon"
+            );
+        }
+
+        preg_match('/function failureText\(err\) \{(.*?)\n    \}/s', $source, $body);
+        $this->assertNotEmpty($body, 'failureText() is gone, so the scan below would pass blind');
+        $this->assertMatchesRegularExpression('/: state\.strings\.noAnswer;\s*$/', $body[1]);
+        $this->assertStringContainsString("noAnswer: byKey['audience:state:error_noanswer']", $source);
+
+        $this->assertStringContainsString(
+            'handleError(response.errormsg||state.strings.noAnswer)',
+            $this->read('amd/build/audience_estimator.min.js'),
+            'amd/build/audience_estimator.min.js predates the fallback: rebuild it.'
+        );
+    }
+
+    /**
+     * Every module the plugin ships carries the GPL header, and a docblock with the house tags.
+     *
+     * The docblock names the module, a copyright holder with the year, and the licence; the build
+     * keeps it at the top of the minified file.
      */
     public function test_every_module_carries_the_licence_header(): void {
         $modules = glob(dirname(__DIR__, 2) . '/amd/src/*.js');
         $this->assertGreaterThan(10, count($modules), 'the module sweep found implausibly few files');
 
         $missing = [];
+        $untagged = [];
         foreach ($modules as $path) {
-            $head = (string) file_get_contents($path, false, null, 0, 600);
+            $source = (string) file_get_contents($path);
             if (
-                !str_starts_with($head, '// This file is part of Moodle - http://moodle.org/')
-                || !str_contains($head, 'GNU General Public License')
+                !str_starts_with($source, '// This file is part of Moodle - http://moodle.org/')
+                || !str_contains(substr($source, 0, 600), 'GNU General Public License')
             ) {
                 $missing[] = basename($path);
+            }
+
+            $name = basename($path, '.js');
+            if (
+                !preg_match('~/\*\*(.*?)\*/~s', $source, $docblock)
+                || !str_contains($docblock[1], "\n * @module     local_awareness/{$name}\n")
+                || !preg_match('/\n \* @copyright  \d{4} \S/', $docblock[1])
+                || preg_match('/@copyright[^\n]*</', $docblock[1])
+                || !str_contains($docblock[1], "\n * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later\n")
+            ) {
+                $untagged[] = basename($path);
             }
         }
 
         $this->assertSame([], $missing, 'these modules ship without the licence header');
+        $this->assertSame([], $untagged, 'these modules lack @module, a dated @copyright or @license, or name an address');
     }
 }

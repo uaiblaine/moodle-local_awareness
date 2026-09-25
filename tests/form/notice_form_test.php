@@ -457,20 +457,20 @@ final class notice_form_test extends \advanced_testcase {
     }
 
     /**
-     * A fresh course with one cohort wired to it and one not.
+     * A fresh course enrolling from the cohort named "Wired cohort", beside one named "Unwired cohort".
      *
-     * @return array [course, wired cohort, unwired cohort]
+     * @return \stdClass The course.
      */
-    private function course_with_cohorts(): array {
+    private function course_with_cohorts(): \stdClass {
         global $DB;
 
         $course = $this->getDataGenerator()->create_course();
         $wired = $this->getDataGenerator()->create_cohort(['name' => 'Wired cohort']);
-        $unwired = $this->getDataGenerator()->create_cohort(['name' => 'Unwired cohort']);
+        $this->getDataGenerator()->create_cohort(['name' => 'Unwired cohort']);
         $studentroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
         enrol_get_plugin('cohort')->add_instance($course, ['customint1' => $wired->id, 'roleid' => $studentroleid]);
 
-        return [$course, $wired, $unwired];
+        return $course;
     }
 
     /**
@@ -486,7 +486,7 @@ final class notice_form_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
         $PAGE->set_url(new \moodle_url('/local/awareness/editnotice.php'));
-        [$course, $wired, $unwired] = $this->course_with_cohorts();
+        $course = $this->course_with_cohorts();
 
         $site = (new notice_form(null, ['persistent' => null, 'id' => 0]))->render();
         $mine = (new notice_form(null, [

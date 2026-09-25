@@ -27,11 +27,17 @@ namespace local_awareness\local;
  * A source scan pins a shape rather than a behaviour, which is why each assertion below names the
  * defect it exists for. What it buys is that deleting either guard fails a test.
  *
+ * The contracts are with the four web services those modules call: the estimator's request and
+ * its poll, and the notice's two writes.
+ *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
- * @covers \local_awareness\external
+ * @covers \local_awareness\external\estimate_audience
+ * @covers \local_awareness\external\get_estimate
+ * @covers \local_awareness\external\dismiss_notice
+ * @covers \local_awareness\external\acknowledge_notice
  */
 final class async_contract_test extends \basic_testcase {
     /**

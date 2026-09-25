@@ -362,6 +362,7 @@ $string['notice:videourl'] = 'Video link';
 $string['notice:videourl:invalid'] = 'Enter a full web address, starting with http:// or https://.';
 $string['notice:videourl:required'] = 'The Video layout needs a video link.';
 $string['notice:videourl_help'] = 'A link to the video: a YouTube or Vimeo page, or a direct link to an MP4 or WebM file. The site\'s multimedia filter builds the player, so what plays is whatever the site\'s media players allow; a link they do not handle is shown as a link. The video never starts by itself.';
+$string['notification:coursenotfound'] = 'That link names a course that no longer exists. Any notice the course left behind is listed here.';
 $string['notification:nodeleteallowed'] = 'Notice deletion is not allowed';
 $string['notification:noticedoesnotexist'] = 'The notice does not exist';
 $string['notification:noupdateallowed'] = 'Notice update is not allowed';

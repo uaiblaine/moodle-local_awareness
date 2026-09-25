@@ -398,7 +398,7 @@ final class awareness_test extends \advanced_testcase {
             ['course' => $course->id],
             ['completion' => 1]
         );
-        $data = $this->getDataGenerator()->create_module(
+        $this->getDataGenerator()->create_module(
             'data',
             ['course' => $course->id],
             ['completion' => 1]

@@ -82,7 +82,7 @@ final class window_test extends \basic_testcase {
     public function test_the_prefilter_is_a_superset_of_the_decision(): void {
         $strictlylooser = 0;
 
-        foreach (self::shape_provider() as $name => [$timestart, $timeend, $unusedexpected]) {
+        foreach (self::shape_provider() as $name => [$timestart, $timeend]) {
             foreach ([self::NOW - 15, self::NOW, self::NOW + 15] as $now) {
                 $open = window::is_open($timestart, $timeend, $now);
                 $prefiltered = self::prefilter_matches($timeend, $now);
@@ -113,7 +113,7 @@ final class window_test extends \basic_testcase {
      * @return void
      */
     public function test_the_projections_compose(): void {
-        foreach (self::shape_provider() as $name => [$timestart, $timeend, $unusedexpected]) {
+        foreach (self::shape_provider() as $name => [$timestart, $timeend]) {
             foreach ([self::NOW - 15, self::NOW, self::NOW + 15] as $now) {
                 $this->assertSame(
                     window::has_started($timestart, $now) && !window::has_ended($timeend, $now),

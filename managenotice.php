@@ -45,6 +45,24 @@ $scope = author_scope::for_request(null, $courseid);
 $scopeparams = $scope->is_site() ? [] : ['courseid' => $scope->get_courseid()];
 if ($scope->is_site()) {
     admin_externalpage_setup('local_awareness_managenotice');
+} else if (!$scope->exists()) {
+    /*
+     * A link saved before its course was deleted, which get_course() would answer with a
+     * missing-record error. The URL's scope is still gated first: for a missing course
+     * require_author() asks the site capability, so whoever passes may open the site list, where
+     * anything the course left behind is listed as an orphan. Anyone else gets core's answer for a
+     * course id that names nothing. editnotice.php does the same for its own verb.
+     */
+    require_login();
+    if (helper::require_author($scope, 'manage', false) || helper::require_author($scope, 'viewreports', false)) {
+        redirect(
+            new moodle_url('/local/awareness/managenotice.php'),
+            get_string('notification:coursenotfound', 'local_awareness'),
+            null,
+            \core\output\notification::NOTIFY_WARNING
+        );
+    }
+    throw new moodle_exception('invalidcourseid');
 } else {
     $course = get_course($scope->get_courseid());
     require_login($course);

@@ -46,6 +46,18 @@ if ($requested->is_site()) {
     admin_externalpage_setup('local_awareness_managenotice');
     helper::require_author($requested, 'manage');
     $PAGE->set_context(context_system::instance());
+} else if (!$requested->exists()) {
+    // A link naming a deleted course, gated and answered as managenotice.php does, for this page's verb.
+    require_login();
+    if (helper::require_author($requested, 'manage', false)) {
+        redirect(
+            new moodle_url('/local/awareness/managenotice.php'),
+            get_string('notification:coursenotfound', 'local_awareness'),
+            null,
+            \core\output\notification::NOTIFY_WARNING
+        );
+    }
+    throw new moodle_exception('invalidcourseid');
 } else {
     $course = get_course($requested->get_courseid());
     require_login($course);
