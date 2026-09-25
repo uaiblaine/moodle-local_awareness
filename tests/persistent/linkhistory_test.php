@@ -60,10 +60,9 @@ final class linkhistory_test extends \advanced_testcase {
     /**
      * The aggregate must be exposed under an explicit alias.
      *
-     * An unaliased COUNT() is named 'count' by PostgreSQL and 'COUNT(h.hlinkid)' by
-     * MySQL/MariaDB, so the property the report reads existed on one driver only and the
-     * link-click column rendered empty on the other. Asserting the alias — and the value —
-     * fails on every driver if the alias is dropped again.
+     * An unaliased COUNT() is named differently by PostgreSQL and MySQL/MariaDB (see
+     * linkhistory::count_clicked_links()), so asserting the alias and the value fails on every
+     * driver if the alias is dropped.
      *
      * @covers \local_awareness\persistent\linkhistory::count_clicked_links
      */

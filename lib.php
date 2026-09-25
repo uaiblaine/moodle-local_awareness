@@ -15,12 +15,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Plugin file serving.
+ * Plugin file serving and course navigation.
  *
- * The decision to load the notice module lives in
- * \local_awareness\local\hook_callbacks::before_footer_html_generation(), registered in
- * db/hooks.php — not here. It used to be a navigation callback in this file; the hook fires
- * later in the render, when $PAGE->url is settled enough to judge the page rules.
+ * The notice module is loaded by \local_awareness\local\hook_callbacks::before_footer_html_generation()
+ * (db/hooks.php), not from here: that hook fires late enough for $PAGE->url to be settled.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -29,7 +27,7 @@
  */
 
 /**
- * Serve the files from the MYPLUGIN file areas
+ * Serve a notice's content, background and slide files, to whoever may see that notice.
  *
  * @param stdClass $course the course object
  * @param stdClass $cm the course module object
@@ -68,12 +66,7 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
         return false;
     }
 
-    /*
-     * The gate itself lives in helper::may_serve_files_of(), where it can be tested without serving
-     * a file; what it covers, and what it deliberately does not, is written there. It used to be
-     * enabled-only, which left the attachments of a cohort-targeted notice readable by any
-     * authenticated user who guessed the id.
-     */
+    // The audience gate, and what it deliberately does not cover: see helper::may_serve_files_of().
     if (!\local_awareness\helper::may_serve_files_of($notice)) {
         return false;
     }
@@ -103,11 +96,10 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
  */
 function local_awareness_extend_navigation_course(navigation_node $navigation, stdClass $course, context $context): void {
     /*
-     * Core hands this callback the SITE course too: settings_navigation's CONTEXT_MODULE branch
-     * calls load_course_settings() with no site guard, so every activity on the front page reaches
-     * here with course id 1. The site has no course scope — its notices live in Site administration
-     * — and author_scope::course() refuses the site course by design, so this returns before it is
-     * asked. It has to be the first statement.
+     * Core calls this for the site course too: settings_navigation loads course settings for
+     * every CONTEXT_MODULE page, front-page activities included. The site has no course scope (its
+     * notices live in Site administration) and author_scope::course() throws on the site course,
+     * so this must be the first statement.
      */
     if ((int) $course->id <= SITEID) {
         return;

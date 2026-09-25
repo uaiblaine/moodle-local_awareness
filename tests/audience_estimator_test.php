@@ -21,12 +21,9 @@ use local_awareness\audience\estimator;
 /**
  * Tests for the audience estimator.
  *
- * Coverage is declared in this docblock rather than with #[CoversClass]. The attribute is the
- * form Moodle's own standards prefer, and PHPUnit 12 drops doc-comment metadata entirely — but
- * moodle-cs on the 4.05 leg cannot see attributes, and reports every method here as missing
- * coverage information, which fails phpcs under --max-warnings 0. While this plugin still
- * supports 4.5, the docblock is the only form both ends of the range accept. Switch when the
- * supported range drops 405.
+ * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
+ * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage. Move to the
+ * attribute when 4.5 support is dropped.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -81,11 +78,10 @@ final class audience_estimator_test extends \advanced_testcase {
     }
 
     /**
-     * Only the rules that can be answered about a USER are reported as audience rules.
+     * Only the rules that can be answered about a user are reported as audience rules.
      *
-     * The page-dependent keys are a different kind of restriction — they need a page URL, which no
-     * count has — so counting them among the audience rules would claim a precision the estimate
-     * does not have.
+     * The page-dependent keys need a page URL, which no count has, so counting them among the
+     * audience rules would claim a precision the estimate does not have.
      *
      * @return void
      */
@@ -106,9 +102,8 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * Only the two rules that are properties of the page stay out of the count.
      *
-     * The category, course, format and competency rules were context-only until an author pointed
-     * out that they do bound who can ever see the notice. What remains genuinely uncountable is the
-     * URL the page is served at and the theme it is served in — neither says anything about a user.
+     * The category, course, format and competency rules look like page rules but bound who can ever
+     * see the notice, so they count. The URL and the theme say nothing about a user.
      */
     public function test_only_the_page_rules_are_context_only(): void {
         $criteria = [
@@ -125,12 +120,10 @@ final class audience_estimator_test extends \advanced_testcase {
     }
 
     /**
-     * A notice with nothing narrowed reaches the whole site, and says so.
+     * A notice with nothing narrowed reaches the whole site, and says so, rather than counting zero.
      *
-     * Zero was the old answer, and the editor rendered it as "— " beside an unchanged prompt, so
-     * pressing Calculate reach on a fresh notice looked like a broken button rather than a notice
-     * aimed at everyone. The control is the suspended user: the count has to be the ACTIVE
-     * population, not simply every row in {user}.
+     * The control is the suspended user: the count is the active population, not every row in
+     * {user}.
      */
     public function test_estimate_with_no_rules_counts_every_active_user(): void {
         global $DB;
@@ -172,10 +165,9 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * A single cohort rule counts its members and nobody else.
      *
-     * The breakdown is asserted beside the total because estimate() produces both from ONE
-     * statement — a SUM(CASE ...) total plus one SUM(CASE ...) column per rule — so the two are
-     * built by sibling expressions over the same scan and can disagree if a rule's isolated form
-     * drifts from the combined one.
+     * The breakdown is asserted beside the total because estimate() builds each as a separate
+     * SUM(CASE ...) column of one statement, so a rule's isolated form can drift from the combined
+     * one.
      *
      * @return void
      */
@@ -238,11 +230,9 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * A chip counts its own rule alone, so the group chip can exceed the total, exactly as the cohort's does.
      *
-     * Group membership outlives an ACTIVE enrolment — a suspended user keeps their groups, and the
-     * audience wants an active one — so a chip that answers "how many match this rule" is larger
-     * here than the rule's share of the audience. That is the breakdown's documented contract, not
-     * a defect, and the cohort chip in the same run is the control: it reads the same way over the
-     * same person, so nothing may "fix" one of them alone.
+     * A suspended enrolment keeps its groups while the course rule wants an active one, so the
+     * group chip counts a user the total excludes. That is the breakdown's contract, not a defect:
+     * the cohort chip reads the same way over the same person, so neither may be changed alone.
      */
     public function test_a_chip_counts_its_own_rule_alone_as_the_cohort_chip_does(): void {
         $generator = $this->getDataGenerator();
@@ -280,7 +270,7 @@ final class audience_estimator_test extends \advanced_testcase {
     }
 
     /**
-     * Audience rules combine by INTERSECTION: only the user matching both is counted.
+     * Audience rules combine by intersection: only the user matching both is counted.
      *
      * Three users make the two failure modes distinguishable — a union would answer 3 and a
      * dropped rule would answer 2, so an answer of 1 can only be the intersection.
@@ -369,11 +359,9 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * A cohort member in an excluded state is not counted.
      *
-     * The member is added to the cohort FIRST and flagged AFTERWARDS. The previous version of this
-     * test created the deleted user already deleted, could not add them to the cohort at all
-     * (cohort_add_member refuses), and then asserted a count that the cohort-membership clause
-     * alone produced — so `u.deleted = 0` could be deleted from the estimator with the test still
-     * green. Flagging after joining is what puts the row in front of the predicate.
+     * The member joins the cohort first and is flagged afterwards with set_field(). A user created
+     * deleted would already have left the cohort (delete_user() removes every membership), so the
+     * membership clause alone would satisfy the assertion and the state predicate would go untested.
      *
      * @dataProvider excluded_user_state_provider
      * @param string $field The user field to flag.
@@ -402,9 +390,9 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * The guest account is never counted, even as a cohort member.
      *
-     * Guest is excluded twice over — by id and by username — because the id is only 1 on a site
-     * Moodle installed itself. This asserts the behaviour rather than either mechanism, so the
-     * pair can be rearranged without rewriting the test.
+     * The estimator excludes guest both by $CFG->siteguest and by username
+     * ({@see \local_awareness\audience\estimator::base_predicate()}). This asserts the behaviour
+     * rather than either mechanism, so the pair can be rearranged without rewriting the test.
      */
     public function test_estimate_excludes_the_guest_account(): void {
         global $CFG;
@@ -426,9 +414,8 @@ final class audience_estimator_test extends \advanced_testcase {
      * The course rule counts the people enrolled in that course, not the whole site.
      *
      * check_filters() only ever shows a course-targeted notice on a course page the user can enter,
-     * so the reach is bounded by enrolment. The two controls matter more than the assertion: an
-     * outsider proves the rule narrows at all, and a second enrolled user proves it is not simply
-     * counting one row.
+     * so the reach is bounded by enrolment. The controls: an outsider proves the rule narrows at
+     * all, and a second enrolled user proves it is not simply counting one row.
      */
     public function test_the_course_rule_counts_the_people_enrolled_in_it(): void {
         $generator = $this->getDataGenerator();
@@ -481,8 +468,9 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * A hidden course is not reach for the people enrolled in it.
      *
-     * can_access_course() refuses one to anyone without moodle/course:viewhiddencourses, which is
-     * nobody in the population this counts by default.
+     * can_access_course() refuses one to anyone without moodle/course:viewhiddencourses. The bulk
+     * count cannot resolve that capability, so it skips hidden courses for everyone and reads low
+     * for their teachers ({@see \local_awareness\audience\estimator::course_scope_sql()}).
      */
     public function test_the_course_rule_skips_hidden_courses(): void {
         $generator = $this->getDataGenerator();
@@ -504,11 +492,9 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * Every rule at once, in one statement, without a placeholder collision.
      *
-     * The total and the per-rule chips are now conditional columns of a single query, so each rule's
-     * predicate appears in it at least twice. Moodle counts placeholder OCCURRENCES against the
-     * parameter array and throws duplicateparaminsql when a name repeats, which makes "many rules
-     * set together" the failure mode of the whole design — and the one no other test here reaches,
-     * since they set two rules at most.
+     * The total and the per-rule chips are conditional columns of a single query, so each rule's
+     * predicate appears in it at least twice, and Moodle throws duplicateparaminsql when a
+     * placeholder name repeats. Setting every rule together is what exposes a collision.
      *
      * The counts are asserted as well as the shape: a query that merely runs could still be
      * correlating a subquery against the wrong copy of an alias.
@@ -560,13 +546,8 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * The estimate costs the same number of reads whatever the rule count.
      *
-     * This is the property the conditional-aggregation rewrite exists for, and the only one that
-     * cannot be seen in a result: the counts were already correct as N+1 separate statements. Each
-     * of those was a full pass over {user}, so on a site with hundreds of thousands of users the
-     * rule count multiplied the cost of a number the author reads once.
-     *
-     * Compared against a one-rule estimate rather than asserted as a literal, so it keeps meaning
-     * if the surrounding code ever reads a config value on the way past.
+     * One statement per rule would give the same counts, each as a full pass over {user}, so this
+     * property cannot be seen in a result.
      */
     public function test_the_estimate_does_not_cost_more_reads_as_rules_are_added(): void {
         global $DB;
@@ -615,10 +596,9 @@ final class audience_estimator_test extends \advanced_testcase {
      * The course count never claims more people than the per-user rule would admit.
      *
      * The bulk predicate models the enrolment branch of can_access_course() and not the viewer
-     * branch, so it is a lower bound rather than an equality — stated in course_scope_sql() and
-     * pinned here so the size of the gap cannot drift unnoticed. The gap in this fixture is exactly
-     * the site admin, who can enter any course without being enrolled in it; asserting that, rather
-     * than only the inequality, is what stops this from passing on a count of zero.
+     * branch, so it is a lower bound ({@see \local_awareness\audience\estimator::course_scope_sql()}).
+     * The gap in this fixture is exactly the site admin, who can enter any course without being
+     * enrolled in it; asserting that, not only the inequality, stops this passing on a count of zero.
      */
     public function test_the_course_count_never_claims_more_than_the_rule_admits(): void {
         $generator = $this->getDataGenerator();
@@ -687,10 +667,9 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * The site course is never reach for these rules, even though everyone is "enrolled" on it.
      *
-     * get_enrolled_join() skips its enrolment join entirely for SITEID because core treats every
-     * user as enrolled on the front page. Carrying that exemption into this count would report the
-     * whole site for a category rule that names the front page's category — a rule check_filters()
-     * can never satisfy, because it resolves a course only above id 1.
+     * get_enrolled_join() treats every user as enrolled on SITEID. Carrying that exemption into this
+     * count would report the whole site for a rule check_filters() can never satisfy, because it
+     * resolves a course only above id 1.
      */
     public function test_the_site_course_is_not_reach(): void {
         global $DB;
@@ -700,15 +679,10 @@ final class audience_estimator_test extends \advanced_testcase {
         $generator->create_user();
 
         /*
-         * The front-page enrolment is the whole test. Nobody normally holds one — which is why core
-         * treats everyone as enrolled there — so without it the count is zero whether the site
-         * course is excluded or not, and the assertion below would pass while proving nothing.
-         *
-         * It is written straight to the tables because the API refuses to build it: add_instance()
-         * throws "Invalid request to add enrol instance to frontpage", and the generator silently
-         * enrols nobody when it finds no instance. The rows still turn up on migrated sites, which
-         * is the case this guards, and the row count below is what catches a setup that quietly
-         * stopped creating them.
+         * Without a front-page enrolment the count is zero whether the site course is excluded or
+         * not, so the assertion below would prove nothing. It is written straight to the tables
+         * because add_instance() throws for the front page and the generator enrols nobody when it
+         * finds no instance; the row count below catches a setup that stopped creating it.
          */
         $enrolid = $DB->insert_record('enrol', (object) [
             'enrol' => 'manual',
@@ -767,7 +741,10 @@ final class audience_estimator_test extends \advanced_testcase {
     }
 
     /**
-     * requireall demands every named competency, not merely one of them.
+     * Two proficiency rules are both demanded, with requireall and without it.
+     *
+     * Without requireall each rule demands the state it names; requireall makes every rule demand
+     * proficiency. Both rules here name proficiency, so the two estimates agree.
      */
     public function test_the_competency_rule_honours_require_all(): void {
         $generator = $this->getDataGenerator();
@@ -795,8 +772,8 @@ final class audience_estimator_test extends \advanced_testcase {
         ]);
         $this->assertSame(1, (new estimator())->estimate($all)['count']);
 
-        // Control: without requireall the same data still demands both, since each rule names
-        // proficiency in its own right — so the discriminating input is the missing second record.
+        // Without requireall the same data still demands both, since each rule names proficiency in
+        // its own right, so the discriminating input is the missing second record.
         $this->assertSame(1, (new estimator())->estimate(
             estimator::normalise(['filter_competency_rules' => $rules])
         )['count']);
@@ -848,15 +825,11 @@ final class audience_estimator_test extends \advanced_testcase {
      * Record a user's proficiency for a competency in a course.
      *
      * Writes the {competency_usercompcourse} row that helper::get_user_competency_proficiency()
-     * reads directly, which is the state the notice rule and the estimate both ask about. It used
-     * to be read through core_competency\api::get_user_competency_in_course(), which creates the
-     * relation when it is missing — a write from a read-typed web service, audit finding M16.
+     * reads directly, which is the state the notice rule and the estimate both ask about.
      *
-     * The grade is not decoration. user_competency_course::validate_proficiency() refuses a
-     * proficiency without one and validate_grade() refuses a grade outside the competency's scale,
-     * so it is read off that scale rather than guessed: the top item for proficient, the first for
-     * not. Core's own tests create these rows with both fields left null, which is why they never
-     * had to solve this.
+     * user_competency_course::validate_proficiency() refuses a proficiency without a grade, and
+     * validate_grade() refuses a grade outside the competency's scale, so the grade is read off
+     * that scale: the top item for proficient, the first for not.
      *
      * @param int $userid The user.
      * @param int $courseid The course the proficiency was earned in.
@@ -871,8 +844,6 @@ final class audience_estimator_test extends \advanced_testcase {
             'userid' => $userid,
             'courseid' => $courseid,
             'competencyid' => $competencyid,
-            // PARAM_BOOL: persistent::validate() converts false to 0 for itself, but an int 0 is
-            // compared as the string "0" against clean_param()'s "" and rejected.
             'proficiency' => (bool) $proficiency,
             'grade' => $proficiency ? count($scaleitems) : 1,
         ]);
@@ -909,10 +880,9 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * The breakdown chip for a role rule keeps the scope that rule was given.
      *
-     * The editor renders one chip per audience rule beside the total. Isolating filter_role used to
-     * drop filter_role_context and the course and category lists with it, so a rule meaning
-     * "teachers of this one course" was counted as "teachers anywhere", and the chip disagreed with
-     * the total sitting next to it — upward, and by the whole size of the site.
+     * Isolating filter_role for its chip keeps filter_role_context and the course and category
+     * lists; without them a rule meaning "teachers of this one course" is counted as "teachers
+     * anywhere", and the chip exceeds the total beside it.
      */
     public function test_the_role_breakdown_keeps_the_scope_the_rule_was_given(): void {
         global $DB;
@@ -939,8 +909,8 @@ final class audience_estimator_test extends \advanced_testcase {
             $chips[$row['key']] = (int) $row['count'];
         }
 
-        // Control: the combined count has always respected the scope. The chip is what drifted, so
-        // asserting they agree is only meaningful while this stays at 1.
+        // Control: the total respects the scope, so the chip agreeing with it is only meaningful
+        // while this stays at 1.
         $this->assertSame(1, (int) $result['count']);
         $this->assertSame(1, $chips['filter_role']);
     }
@@ -948,10 +918,10 @@ final class audience_estimator_test extends \advanced_testcase {
     /**
      * The bulk count agrees, user for user, with the per-user rule it mirrors.
      *
-     * This class is a second implementation of the role rule — helper::check_filters() is the
-     * first, and the two are kept in step by nothing but care. Rather than compare the two bodies,
-     * this asks each of them about every user the count claims to cover and requires the same
-     * answer, for an unscoped rule and for a course-scoped one.
+     * The estimator is a second implementation of the role rule beside helper::check_filters(); the
+     * two share only role_scope::sql(). Rather than compare the bodies, this asks each of them about
+     * every user the count claims to cover and requires the same answer, for an unscoped rule and
+     * for a course-scoped one.
      */
     public function test_the_bulk_count_agrees_with_the_per_user_rule(): void {
         global $DB;

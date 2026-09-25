@@ -24,15 +24,9 @@ use local_awareness\persistent\noticelink;
 /**
  * Tests that each write path fires the event it claims to fire.
  *
- * The fleet rule is that every write fires an event, and until now nothing asserted that any of
- * the eight event classes was ever constructed. That silence hid a real defect for months:
- * enable_notice() and disable_notice() both fired awareness_updated under comments reading "Log
- * enabled event" and "Log disable event", so awareness_enabled and awareness_disabled were
- * unreachable — complete classes, with maintained strings in two languages, listed in the admin
- * event reference, on which an admin could build an event-monitor rule that could never fire.
- *
- * Each case asserts the event CLASS, not merely that some event happened. Asserting a count
- * would have passed throughout the period the wrong class was being fired.
+ * Each case asserts the event class, not merely that some event fired: a verb firing another
+ * verb's event (enable_notice() firing awareness_updated, say) passes a count, and leaves an
+ * event-monitor rule on the right event that never matches.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -69,20 +63,17 @@ final class events_test extends \advanced_testcase {
     /**
      * Serve a notice to the current session through the real read path.
      *
-     * helper::track_link() now requires that select_for_display() actually handed this notice over
-     * — the only record that the page-dependent rules ran. Setting the marker by hand would make
-     * the assertions below test a fiction, so this goes through the web service and then checks
-     * the marker really appeared.
+     * helper::track_link() refuses a notice that select_for_display() never handed over, the only
+     * record that the page-dependent rules ran. So this goes through the get_notices web service
+     * rather than setting the session marker by hand, and asserts the marker appeared.
      *
      * @param awareness $notice The notice expected to be delivered.
      * @return void
      */
     private function deliver(awareness $notice): void {
         /*
-         * The site switch defaults to OFF (settings.php), and get_notices returns before minting
-         * anything when it is. Turning it on here is a precondition of delivery, not part of what
-         * any test in this file asserts — that the switch really gates delivery is pinned in
-         * tests/external/notice_external_test.php.
+         * The plugin's 'enabled' setting defaults to off, and get_notices returns no notice while
+         * it is. That gate is tested in tests/external/notice_external_test.php.
          */
         set_config('enabled', 1, 'local_awareness');
 
@@ -112,11 +103,9 @@ final class events_test extends \advanced_testcase {
     /**
      * Creating a notice fires awareness_created, carrying the notice as its object.
      *
-     * It also fires awareness_audience_estimated, and that is asserted here rather than filtered
-     * out: create_new_notice() ends in notice_audience::refresh(), which creates an audience-job
-     * row, and a save really does raise an estimate. Asserting the ordered pair keeps the file's
-     * rule — assert the CLASS, never a count — while recording the coupling, so a later change
-     * that stops estimating on save shows up here instead of passing quietly.
+     * It also fires awareness_audience_estimated, because create_new_notice() ends in
+     * notice_audience::refresh(), which creates an audience job. The ordered pair is asserted, so a
+     * change that stops estimating on save fails here.
      */
     public function test_create_fires_created(): void {
         $this->resetAfterTest();
@@ -165,16 +154,14 @@ final class events_test extends \advanced_testcase {
         });
 
         /*
-         * One event, not two: update_notice() also ends in notice_audience::refresh(), but the
-         * criteria are unchanged from make_notice(), so the job raised moments ago is reused and
-         * no row is created. That is the dedup working, and it is why the estimate event belongs
-         * to job CREATION rather than to the web-service call.
+         * One event: update_notice() also ends in notice_audience::refresh(), but the criteria are
+         * unchanged from make_notice(), so no audience job is created and no estimate event fires.
          */
         $this->assertSame([awareness_updated::class], $fired);
     }
 
     /**
-     * Enabling fires awareness_enabled — NOT awareness_updated.
+     * Enabling fires awareness_enabled, not awareness_updated.
      */
     public function test_enable_fires_enabled(): void {
         $this->resetAfterTest();
@@ -191,7 +178,7 @@ final class events_test extends \advanced_testcase {
     }
 
     /**
-     * Disabling fires awareness_disabled — NOT awareness_updated.
+     * Disabling fires awareness_disabled, not awareness_updated.
      */
     public function test_disable_fires_disabled(): void {
         $this->resetAfterTest();
@@ -207,11 +194,9 @@ final class events_test extends \advanced_testcase {
     }
 
     /**
-     * Enable and disable fire DIFFERENT events from each other and from update.
+     * Enable and disable fire different events from each other and from update.
      *
-     * The defect this file was written for is precisely that three verbs shared one event, so a
-     * per-verb assertion is not enough on its own: three tests each asserting awareness_updated
-     * would also have passed. This pins the distinctness directly.
+     * Pins the distinctness directly, independently of which class each per-verb test above expects.
      */
     public function test_the_three_update_verbs_are_distinguishable(): void {
         $this->resetAfterTest();
@@ -268,16 +253,14 @@ final class events_test extends \advanced_testcase {
     }
 
     /**
-     * Dismissing a notice that does NOT require acknowledgement still fires awareness_dismissed.
+     * Dismissing a notice that does not require acknowledgement still fires awareness_dismissed.
      *
-     * This is the defect: the trigger used to sit inside the reqack branch, so an ordinary
-     * dismissal left no trace an admin could reach. local_awareness_ack only ever holds reqack
-     * rows, and local_awareness_lastview records that the notice was met without recording who
-     * acted, so nothing anywhere logged it.
+     * For an Informational notice the event is the only record of each dismissal:
+     * local_awareness_ack gets a dismissal row only from Blocking up, and local_awareness_lastview
+     * keeps only the user's latest interaction.
      *
-     * The control is the reqack case below: both must fire, and only the compliance ROW differs
-     * between them. Without the pair, an assertion that "a dismissal fires" would be satisfied by
-     * the reqack path alone — which was already true before the fix.
+     * The reqack case below is the paired control: both must fire, and only the compliance row
+     * differs between them.
      */
     public function test_dismissing_an_ordinary_notice_fires_dismissed(): void {
         $this->resetAfterTest();
@@ -304,11 +287,10 @@ final class events_test extends \advanced_testcase {
     }
 
     /**
-     * Dismissing a notice that DOES require acknowledgement fires the same event.
+     * Dismissing a notice that does require acknowledgement fires the same event.
      *
-     * The control for the test above. It also pins the rule the dedupe comment states: a repeated
-     * refusal is a real event even though the compliance row must not be duplicated, so the second
-     * dismissal fires again while writing nothing.
+     * The control for the test above. It also pins that a repeated refusal fires the event again
+     * while the compliance row is not duplicated ({@see \local_awareness\helper::dismiss_notice()}).
      */
     public function test_dismissing_a_reqack_notice_fires_dismissed_every_time(): void {
         global $DB;
@@ -363,8 +345,8 @@ final class events_test extends \advanced_testcase {
         $this->assertSame([], $fired);
 
         /*
-         * Control: the same notice, dismissed by a real user, DOES fire. Without it this passes
-         * for any reason at all — including the trigger having been deleted outright.
+         * Control: the same notice dismissed by a real user does fire, so the empty list above is
+         * not a missing trigger.
          */
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
@@ -435,12 +417,11 @@ final class events_test extends \advanced_testcase {
     }
 
     /**
-     * The editor's Recalculate button fires awareness_audience_estimated.
+     * The manage list's Recalculate action fires awareness_audience_estimated.
      *
-     * notice_audience::refresh() is the second job-creation site, and the one the manual
-     * recalculation and every notice save go through. An earlier draft of this fix instrumented
-     * only the web service, which would have logged the editor's debounced previews — which mostly
-     * reuse a job and create nothing — while missing every deliberate recalculation.
+     * notice_audience::refresh() is the job-creation path behind the manual recalculation and every
+     * notice save; the estimate_audience web service is the other. The event is fired on job
+     * creation, from both.
      */
     public function test_recalculating_an_audience_fires_the_estimate_event(): void {
         $this->resetAfterTest();
@@ -458,16 +439,11 @@ final class events_test extends \advanced_testcase {
     /**
      * Every event class the plugin ships is reachable from a write path.
      *
-     * A class nobody fires is a promise to an admin building an event-monitor rule. This walks
-     * classes/event/ from disk rather than from a hand-kept list, so a new event class added
-     * later without a firing site turns this red instead of shipping dead.
-     *
-     * The scan reads the WHOLE plugin source, not helper.php alone. It used to read that one file,
-     * which is an inclusion list of size one: the day a trigger landed anywhere else — and
-     * awareness_audience_estimated is triggered from persistent\audience_job — the test would have
-     * reported a live event as dead, and the obvious repair would have been to add a second
-     * filename rather than to notice the shape of the mistake. Exclusion list, scanned from the
-     * plugin root, so a directory nobody thought of is covered by default.
+     * An event class nobody fires is an event-monitor rule that can never match. The classes are
+     * listed from classes/event/ on disk, and firing sites are searched for in the whole plugin
+     * source minus an exclusion list (awareness_audience_estimated is fired from
+     * persistent\audience_job, not helper.php), so a new class or a new directory is covered
+     * without editing the test.
      */
     public function test_no_event_class_is_unreachable(): void {
         global $CFG;
@@ -505,10 +481,8 @@ final class events_test extends \advanced_testcase {
         $this->assertSame([], $unfired, 'event classes with no firing site in the plugin source');
 
         /*
-         * Non-vacuity on both halves. The class glob proves there was something to check, and the
-         * file counter proves the sweep actually read the tree — an excluded-everything filter
-         * would otherwise satisfy the assertion above by finding no source at all, which is the
-         * failure mode the widening introduces.
+         * An empty class glob would pass the assertion above with nothing checked, so the class
+         * count is asserted; the file count shows the sweep read the tree.
          */
         $this->assertGreaterThan(0, count($classes));
         $this->assertGreaterThan(20, $scanned, 'the source sweep read implausibly few files');

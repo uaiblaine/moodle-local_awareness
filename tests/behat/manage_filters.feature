@@ -34,20 +34,16 @@ Feature: Filtering the notice list
 
   Scenario: Searching by name ignores accents
     # Asserted through the result count rather than "should not see" on the other title: the
-    # conflict badge on the surviving row names its rival inside a visually-hidden explanation, so
-    # that title is legitimately present in the page text even when its row is gone. That hidden
-    # text is the point of the badge — it is what a screen reader announces — and it makes any
-    # whole-page negative assertion near it unreliable.
+    # conflict badge on the surviving row names its rival in visually-hidden text for screen
+    # readers, so that title stays in the page text even when its row is gone.
     When I set the field "Search by name" to "manutencao"
     Then I should see "Manutenção programada"
     And I should see "Notices found: 1"
 
   Scenario: A name filter arriving in the URL survives the first touch of another control
     # managenotice.php accepts the filter values as URL parameters so a filtered list can be linked
-    # to, and the server honoured them — but the search box rendered empty, because the value was
-    # exported to the template and no markup consumed it. The reader then saw a short list with no
-    # visible reason, and the first touch of Status made manage_list.js read the empty box and push
-    # a filterset without the name, silently widening the list back to everything.
+    # to. The search box has to show the name it arrived with: manage_list.js reads every control
+    # when Status is touched, and an empty box would widen the list back to everything.
     When I visit "/local/awareness/managenotice.php?name=manutencao"
     Then the field "Search by name" matches value "manutencao"
     And I should see "Notices found: 1"

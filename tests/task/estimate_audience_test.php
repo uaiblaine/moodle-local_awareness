@@ -29,6 +29,9 @@ use local_awareness\persistent\audience_job;
  * @covers \local_awareness\task\estimate_audience
  */
 final class estimate_audience_test extends \advanced_testcase {
+    /**
+     * Initial set up.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -126,7 +129,7 @@ final class estimate_audience_test extends \advanced_testcase {
     public function test_execute_with_unknown_jobid_does_not_throw(): void {
         $jobid = 'does-not-exist-' . time();
 
-        // Precondition: without this the test would pass even if the lookup were removed.
+        // Precondition: the job really does not exist, so the task takes its not-found path.
         $this->assertFalse(audience_job::get_record(['jobid' => $jobid]));
 
         $task = new estimate_audience();

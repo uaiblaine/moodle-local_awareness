@@ -113,13 +113,9 @@ final class purge_audience_jobs_test extends \advanced_testcase {
     /**
      * db/tasks.php declares the task, and its name resolves to a real language string.
      *
-     * A scheduled task with no db/tasks.php entry never runs at all, and a missing
-     * task_<classname> string makes the admin screen throw.
-     *
-     * Reads the FILE via load_default_scheduled_tasks_for_component(), deliberately.
-     * load_scheduled_tasks_for_component() looks at the {task_scheduled} table instead, which
-     * holds whatever was installed when the test site was last built — so it keeps passing after
-     * the declaration is deleted from db/tasks.php, which is the regression worth catching.
+     * Reads db/tasks.php through load_default_scheduled_tasks_for_component(), not
+     * load_scheduled_tasks_for_component(), which reads the {task_scheduled} rows installed when the
+     * test site was built and so keeps passing after the declaration is deleted from the file.
      */
     public function test_the_task_is_declared_and_named(): void {
         $tasks = \core\task\manager::load_default_scheduled_tasks_for_component('local_awareness');

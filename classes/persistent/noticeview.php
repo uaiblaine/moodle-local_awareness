@@ -18,7 +18,7 @@ namespace local_awareness\persistent;
 use core\persistent;
 
 /**
- * Notice view class.
+ * A user's latest interaction with a notice: one row per user and notice, updated in place.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -159,20 +159,10 @@ class noticeview extends persistent {
         if (($result = self::get_cache()->get($USER->id)) === false) {
             $result = [];
             /*
-             * No reqcourse predicate. It used to read `AND sn.reqcourse = 0`, which discarded the
-             * recorded view of every notice tied to a required course — so resetinterval had no
-             * effect on those notices and they returned at the start of every session, however
-             * the author had configured them. The Accept button was worse than useless in the
-             * process: check_if_already_acknowledged_by_user() reads {local_awareness_lastview}
-             * directly, found the row this query had thrown away, and returned early, so pressing
-             * Accept recorded nothing at all.
-             *
-             * reqcourse is an AUDIENCE rule. Six other places already treat it as one — the form
-             * puts it under the audience header, the estimator counts it as an audience rule
-             * labelled "Has not completed required course", is_notice_available_to_user() and
-             * collect_user_notices() use it as an availability gate, and the manage table chips it
-             * as targeting. This clause was the only site reading it as "re-show for ever", and it
-             * carried no comment saying so.
+             * No reqcourse predicate: reqcourse is an audience rule, not a reason to re-show. Dropping
+             * the views of such notices here would make them return every session whatever their
+             * resetinterval, and helper::check_if_already_acknowledged_by_user(), which reads the
+             * table directly, would then find the row and return early, so Accept would record nothing.
              */
             $sql = "SELECT sn.id, lv.timecreated, lv.action, lv.timemodified
                       FROM {local_awareness} sn

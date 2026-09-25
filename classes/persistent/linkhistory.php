@@ -19,7 +19,7 @@ namespace local_awareness\persistent;
 use core\persistent;
 
 /**
- * Links history class.
+ * One click by a user on a tracked link of a notice.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -63,29 +63,19 @@ class linkhistory extends persistent {
     /**
      * How many times a user clicked each link in a notice.
      *
-     * NO PRODUCTION CALLER, AND THAT IS DELIBERATE — DO NOT DELETE IT AS DEAD CODE.
+     * Only tests call it, on purpose; do not delete it as dead code. Nothing the plugin ships shows a
+     * per-user click count (link history reaches reports through the link_history datasource), but
+     * purge_link_history_test::test_two_clicks_on_one_link_are_two_clicks() uses it to pin that two
+     * clicks count as two.
      *
-     * Nothing this plugin ships displays a click count: the two system reports are the acknowledged
-     * and dismissed ones, and link history is a report-builder datasource that exists only once an
-     * administrator has built a report from it. So every caller is a test, and a dead-code sweep
-     * reads that as an unused method.
-     *
-     * It is the measurement audit finding M7's refusal is pinned against.
-     * purge_link_history_test::test_two_clicks_on_one_link_are_two_clicks() calls this through the
-     * real write path to assert that two clicks count as two — which is what forbids the rate limit
-     * M7 asked for, because a throttle of any window would turn a reader who clicked twice into one
-     * who clicked once and stop this being a click count at all. Delete the method and that
-     * guarantee goes with it, silently, leaving the suite green.
-     *
-     * The same shape once nearly cost a sibling plugin its staleness detection: a private method
-     * with no resolvable caller that was in fact load-bearing. Grep the bare name before believing
-     * any tool that calls this unused.
+     * That is why helper::track_link() has no rate limit: a throttle of any window would record a
+     * reader who clicked twice as one who clicked once, and this would stop being a click count.
      *
      * @param int $userid user ID.
      * @param int $noticeid notice ID.
-     * @param int $linkid Link id.
+     * @param int $linkid Link id, or 0 for every link of the notice.
      *
-     * @return array
+     * @return array Records keyed by link id, each with hlinkid, text, link and clickcount.
      */
     public static function count_clicked_links(int $userid, int $noticeid, int $linkid = 0) {
         global $DB;

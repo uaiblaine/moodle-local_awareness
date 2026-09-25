@@ -22,7 +22,8 @@ use local_awareness\persistent\awareness;
  * Tests for the page probe's admission rules.
  *
  * Cases are looped rather than fed through a data provider: Moodle 4.5 vendors PHPUnit 9.6, which
- * predates attribute metadata, and a docblock provider would run the method with no arguments.
+ * ignores a #[DataProvider] attribute and runs the method with no arguments, while the docblock
+ * form raises a runner deprecation under the PHPUnit 11.5 of Moodle 5.x.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -48,7 +49,7 @@ final class page_probe_test extends \advanced_testcase {
     }
 
     /**
-     * The pathmatch rule admits when EITHER URL representation matches, and only rejects on both.
+     * The pathmatch rule admits when either URL form matches, and rejects only when both miss.
      */
     public function test_pathmatch_is_judged_against_both_url_forms(): void {
         $this->resetAfterTest();
@@ -166,7 +167,7 @@ final class page_probe_test extends \advanced_testcase {
     }
 
     /**
-     * Malformed filter payloads leave the rules unapplied, exactly as check_filters() does.
+     * Malformed filter payloads leave the rules unapplied, as check_filters() does.
      */
     public function test_malformed_filters_admit(): void {
         $this->resetAfterTest();
@@ -193,9 +194,9 @@ final class page_probe_test extends \advanced_testcase {
     /**
      * A page that never called set_url() yields an unknown URL — quietly, and failing open.
      *
-     * The has_set_url() guard is what this pins: without it, reading $PAGE->url on such a page
-     * emits the core "did not call set_url" debugging notice on every affected render, which the
-     * assertion below turns into a failure.
+     * Pins the has_set_url() guard: without it, reading $page->url on such a page emits core's
+     * "did not call $PAGE->set_url(...)" debugging notice, which the assertion below turns into a
+     * failure.
      */
     public function test_from_page_without_url_stays_quiet_and_admits(): void {
         $this->resetAfterTest();
@@ -213,10 +214,10 @@ final class page_probe_test extends \advanced_testcase {
     /**
      * The browser's URL form is captured from $FULLME, and it is decisive on its own.
      *
-     * This pins the client-URL derivation itself: with the capture deleted, a page that never
-     * called set_url() would offer no URL form at all and fail open — so the FALSE half below is
-     * what catches that regression. The true half pins that a pattern authored against the
-     * browser's form (a subdirectory install) is honoured.
+     * Changes that must make it fail: deleting the $FULLME capture, which leaves a page that never
+     * called set_url() with no URL form, so it fails open and the false assertion below fails. The
+     * true assertion pins that a pattern authored against the browser's form (a subdirectory
+     * install) is honoured.
      */
     public function test_from_page_captures_the_browser_url_form(): void {
         global $FULLME;
@@ -282,7 +283,7 @@ final class page_probe_test extends \advanced_testcase {
         /*
          * With course or category themes enabled, this render's theme may differ from the one the
          * web service request will resolve, so the theme rule must not be judged: a notice for a
-         * theme this page does not use still has to admit. EITHER override alone must disarm the
+         * theme this page does not use still has to admit. Either override alone must disarm the
          * rule, so both halves of the guard are pinned separately.
          */
         $CFG->allowcoursethemes = 1;

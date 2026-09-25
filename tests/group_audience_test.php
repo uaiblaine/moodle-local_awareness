@@ -188,11 +188,9 @@ final class group_audience_test extends \advanced_testcase {
     /**
      * A member of a group outsiders cannot see still receives its notice: delivery is membership.
      *
-     * MEMBERS visibility is the strictest a notice can reach, and that is core's rule rather than
-     * this plugin's: groups_create_group() and groups_update_group() force participation off for
-     * OWN and NONE visibility (group/lib.php, identical on 4.5 and 5.2), and a group that cannot
-     * participate is never offered for anything — the second half of this test is the control that
-     * the scope refuses one, so nobody later "fixes" the picker into offering it.
+     * MEMBERS is the strictest visibility a notice can target: groups_create_group() and
+     * groups_update_group() force participation off for OWN and NONE visibility (on 4.5 and 5.2
+     * alike), and the scope refuses a group that cannot participate, which the second half pins.
      *
      * The non-member is the control that the group still means something.
      */
@@ -236,9 +234,9 @@ final class group_audience_test extends \advanced_testcase {
      *
      * groups_get_user_groups() runs its answer through the group visibility rules unless the caller
      * asks for hidden groups: a MEMBERS group counts as hidden (any visibility but ALL does), and
-     * for someone ELSE's id it survives only while the asker is a member too. Delivery must not
-     * turn on who resolved the user, so the flag is set — and this is what would notice if it were
-     * unset: the same membership, asked by a stranger, comes back the same.
+     * for someone else's id it survives only while the asker is a member too. Delivery must not
+     * depend on who resolved the user, so helper::user_group_ids() passes includehidden; asked by
+     * a stranger, the same membership must come back.
      */
     public function test_membership_reads_the_same_whoever_is_asking(): void {
         $generator = $this->getDataGenerator();

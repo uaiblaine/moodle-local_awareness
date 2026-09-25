@@ -22,10 +22,8 @@ Feature: Repeating notices competing for the same pages are flagged to the autho
     And I should see "Competing" in the "Beta" "table_row"
     And I should not see "Competing" in the "Gamma" "table_row"
 
-  # A site that has just installed the plugin opens this page with nothing on it. table_sql leaves
-  # rawdata as null rather than an empty array until the first row is added, so the collision lookup
-  # was handed null and the page died — on the one page a new site sees first. Caught by an existing
-  # scenario, not by the ones above, every one of which happens to create notices.
+  # The page a new site sees first. With no rows, table_sql leaves rawdata null rather than an empty
+  # array, and the collision lookup has to survive that (see all_notices::query_db()).
   Scenario: The list opens on a site with no notices at all
     When I navigate to "Awareness > Manage" in site administration
     Then I should see "Create new notice"

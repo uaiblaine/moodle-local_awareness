@@ -14,18 +14,14 @@ Feature: Notices are shown one at a time
     And I click on "Enabled" "checkbox"
     And I click on "Save changes" "button"
 
-  # Two things about the shape of this scenario, both learned by mutation.
+  # Observed from the page login lands on. That page already takes the first turn in the queue, so
+  # navigating somewhere else first would spend it and leave the scenario asserting against the
+  # second notice while reading like the first.
   #
-  # It is observed from the page login lands on. That page is already a page the user "reached", so
-  # it consumes the first turn in the queue — navigating somewhere else first would quietly spend
-  # it and leave the scenario asserting against the second notice while reading like the first.
-  #
-  # The load-bearing assertion is the one AFTER the dismissal, not before it. The module has always
-  # rendered one notice at a time, so a second notice sitting unrendered in the payload is invisible
-  # either way: asserting "should not see" before the dismissal passes just as happily with the
-  # queue removed. What the queue changes is what happens when the first is closed — nothing more
-  # arrives until the user reaches the page again. Verified: removing the queue fails the step
-  # below and nothing else here.
+  # The load-bearing assertion is the one after the dismissal. The module renders one notice at a
+  # time, so a second notice unrendered in the payload is invisible either way; what the queue
+  # changes is that nothing more arrives until the user reaches a page again. Changes that must make
+  # it fail: removing the queue, caught by the step after the dismissal.
   @javascript
   Scenario: A second notice waits until the user meets it again
     Given the following site notices exist

@@ -14,12 +14,13 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Audience estimator widget.
+ * Audience estimator panel of the notice editor.
  *
- *  - When the form has ≤ threshold audience-shaping rules, runs estimate
- *    automatically (debounced) on form changes.
- *  - When > threshold rules, hides auto-trigger and requires explicit click.
- *  - Triggers a server-side ad-hoc task and polls every pollIntervalMs for
+ *  - Estimates automatically (debounced) on form changes while the site is
+ *    under the size limit (data-auto) and the notice has at most `threshold`
+ *    rules; otherwise waits for the Calculate button, which is always shown.
+ *  - Each estimate asks the server for a job (queued as an ad-hoc task,
+ *    reused, or resolved in the request) and polls every pollIntervalMs for
  *    the result, up to pollMax attempts.
  *
  * @module     local_awareness/audience_estimator
@@ -48,8 +49,8 @@ define([
         pollAttempts: 0,
         debounceTimer: null,
         lastCriteriaJson: '',
-        // Monotonic request counter. Same name and shape as collision_warning.js, which already
-        // ships this guard — one spelling for one pattern.
+        // Monotonic request counter: an answer sent under an older value is discarded. Spelled as
+        // in collision_warning.js, which uses the same guard.
         sequence: 0,
         strings: null,
         root: null,
@@ -95,17 +96,12 @@ define([
      */
     function loadStrings() {
         /*
-         * No `param` on the templated strings. Supplying one — even the placeholder's own text —
-         * makes get_string() perform the substitution server-side, and an empty param silently
-         * erased the value from every context chip ("Course category: " with nothing after it).
-         * Omitted, the raw {$a} survives the trip and the replace() calls below can find it.
-         */
-        /*
-         * Requested and mapped BY KEY, never by position. The list used to be a literal array read
-         * back as s[0]..s[20], which meant removing one entry silently re-labelled every chip after
-         * it — and three entries did need removing, because audience:state:idle,
-         * audience:btn:calculate and audience:btn:retry are rendered server-side by
-         * templates/editor/audience_panel.mustache and were fetched here and never read.
+         * No `param` on the templated strings: with one, get_string() substitutes {$a} on the
+         * server, and the replace() calls in this module find nothing left to fill.
+         *
+         * Mapped by key, never by position, so removing an entry cannot re-label the ones after it.
+         * The idle state and the two button labels are rendered by
+         * templates/editor/audience_panel.mustache and are not fetched here.
          */
         var keys = [
             'audience:state:auto_pending',
@@ -262,14 +258,11 @@ define([
     /**
      * Resolve a rule's display label, filling its {$a} placeholder when it has one.
      *
-     * Shared by the context chips and the per-rule breakdown chips, which render the same labels:
-     * the breakdown gained the category, course and format rules when those started counting
-     * towards the audience, and rendering them through a second path is how one of them ends up
-     * showing the placeholder verbatim.
+     * Shared by the context chips and the breakdown chips, so both fill the placeholder the same way.
      *
-     * The substituted text comes from the server, which is the only side that can turn a category
-     * id into a category name — and it resolves them per request, so the names arrive in the
-     * reader's language rather than in whichever one first computed the job.
+     * The substituted text comes from the server, which turns ids into names (rule_describer) on
+     * every get_estimate call, so they arrive in the reader's language rather than in the language
+     * of whoever first computed the job.
      *
      * @param {string} key The criteria key the rule was read from.
      * @param {string} display Server-resolved names for the rule's values; may be empty.
@@ -456,11 +449,9 @@ define([
     /**
      * Toggle visibility of an action button.
      *
-     * The calculate button is the exception and always stays on screen: it is the author's manual
-     * recalculate control, and hiding it whenever an estimate is queued would take away the one
-     * thing they can do about a slow or failed count. Only the retry button follows the requested
-     * state. Documented rather than "fixed", because the asymmetry is the intended behaviour and
-     * it was the JSDoc that was wrong.
+     * The calculate button always stays on screen: it is the author's manual recalculate control,
+     * and hiding it while an estimate is queued would take away the one thing they can do about a
+     * slow or failed count. Only the retry button follows the requested state.
      *
      * @param {string} name Either "calculate" or "retry".
      * @param {boolean} visible Whether the button should be shown. Ignored for "calculate".
@@ -486,17 +477,15 @@ define([
         updateSummary(criteria);
 
         /*
-         * The estimate answers a question about the CRITERIA, so re-asking with the same ones can
+         * The estimate answers a question about the criteria, so re-asking with the same ones can
          * only repaint the same number. Auto mode fires on every change to the form, including the
-         * title and the body — so typing a headline used to blank the reach figure, queue an
-         * ad-hoc task and spend a round trip restoring the answer that was already on screen, once
-         * per pause in typing. Every one of those queued a row nothing deletes.
+         * title and the body, and would otherwise blank the reach figure and ask the server again
+         * after every pause in typing.
          *
-         * A click always asks: pressing Calculate or Retry is the author's way of saying "count it
-         * again", and refusing that would be the dead button this panel already had once. Hence
-         * force, rather than comparing at the debounce.
+         * A click always asks (force): Calculate and Retry are the author's request for a recount,
+         * which is why the comparison is made here and not at the debounce.
          *
-         * The comparison happens BEFORE any side effect. Bumping the sequence or calling
+         * The comparison comes before any side effect: bumping the sequence or calling
          * stopPolling() first would cancel an in-flight estimate the author is still waiting for.
          */
         if (!force && json === state.lastCriteriaJson) {
@@ -512,12 +501,7 @@ define([
         stopPolling();
         var mine = ++state.sequence;
 
-        /*
-         * No early return on an empty criteria set. It used to stop here and reprint the idle
-         * sentence, so pressing "Calculate reach" on an unfiltered notice looked like a dead
-         * button — the one thing the author had asked it to answer. An empty set is a valid
-         * question with a real answer: everyone on the site.
-         */
+        // No early return on an empty criteria set: it is a valid question, answered with everyone on the site.
         setValue('—');
         setState(state.strings.queued);
         showAction('calculate', false);
@@ -600,14 +584,12 @@ define([
         }, DEBOUNCE_MS);
     }
 
-    /** Bind change/input listeners to ALL form fields that affect criteria. */
+    /** Re-evaluate the mode and schedule an estimate on every change or input in the editor's form. */
     function bindFormChanges() {
         /*
-         * The moodleform, by its own class. It used to be found as form.la-shell or inside
-         * #la-moodleform-source, both of which the editor rebuild removed — and this function
-         * returns early when it finds nothing, so the estimator simply stopped reacting to field
-         * changes without a word. Scoped to the editor region first so it cannot latch onto some
-         * other form on the page.
+         * The moodleform, by its own class, looked for inside the editor region first so it cannot
+         * latch onto another form on the page. This returns early when it finds nothing, so a
+         * selector that stops matching silently turns the automatic estimate off.
          */
         var form = document.querySelector('.local-awareness-editor form.mform')
             || document.querySelector('form.mform');

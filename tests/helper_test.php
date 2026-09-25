@@ -80,7 +80,7 @@ final class helper_test extends \advanced_testcase {
      *
      * cohort_get_all_cohorts() returns only the cohorts visible to the caller, and a cohort can
      * simply be deleted, so the id stored on the notice may be absent from the options. An
-     * unguarded array lookup raised a TypeError and took the whole notice list down with it.
+     * unguarded array lookup would raise a TypeError and take the whole notice list down with it.
      *
      * @covers \local_awareness\helper::get_cohort_name
      */
@@ -103,7 +103,7 @@ final class helper_test extends \advanced_testcase {
      *
      * update_hyperlinks() parses the content with DOMDocument to stamp each anchor with its link
      * id. Without LIBXML_HTML_NOIMPLIED|NODEFDTD, saveHTML() returns a complete document, so the
-     * stored row carried a doctype and <html>/<body> that then rendered nested inside the page.
+     * stored row would carry a doctype and <html>/<body> that then render nested inside the page.
      *
      * @covers \local_awareness\helper::create_new_notice
      */
@@ -130,8 +130,8 @@ final class helper_test extends \advanced_testcase {
     /**
      * Filters and file URLs are resolved when the notice is rendered, not when it is saved.
      *
-     * Baking them into storage froze a multilang notice into the author's language for every
-     * reader, and wrote absolute /pluginfile.php URLs that break when wwwroot changes.
+     * Baking them into storage would freeze a multilang notice into the author's language for every
+     * reader, and write absolute /pluginfile.php URLs that break when wwwroot changes.
      *
      * @covers \local_awareness\helper::render_content
      */
@@ -183,7 +183,7 @@ final class helper_test extends \advanced_testcase {
         $actual = reset($allnotices);
         $this->assertStringContainsString($formdata->content, $actual->get('content'));
 
-        // Test for some special UTF-8 characters. HTML reserved characters must be converted in the form.
+        // Non-ASCII characters are stored as HTML entities: the save re-serialises the content through DOMDocument.
         $formdata->content = '<p>Héllo 😃 world &amp; café</p>';
         $expected = '<p>H&eacute;llo &#128515; world &amp; caf&eacute;</p>';
         helper::update_notice($awareness, $formdata);
@@ -278,8 +278,8 @@ final class helper_test extends \advanced_testcase {
     /**
      * The display path refuses to answer without a page to judge against.
      *
-     * The page rules used to be skipped whenever the URL was empty, which made the definitive
-     * filtering optional at the caller's discretion. Refusing is what keeps it mandatory.
+     * Skipping the page rules on an empty URL would make the definitive filtering optional at the
+     * caller's discretion; refusing keeps it mandatory.
      */
     public function test_retrieve_user_notices_requires_a_page_url(): void {
         $this->resetAfterTest();
@@ -292,11 +292,10 @@ final class helper_test extends \advanced_testcase {
     /**
      * The probe is a page-aware superset of the display path.
      *
-     * This deliberately replaces the previous contract, which pinned the probe as page-INDEPENDENT.
-     * The probe may now say "no" for a page — that is the whole point of the footer-hook redesign —
-     * but only from the cheap page rules, and only when given a page: without one it must keep the
-     * old page-independent answer, and with one it must still admit every notice the display path
-     * would show on that page. The display path itself is pinned unchanged in both directions.
+     * The probe may say "no" for a page, so the footer hook can skip loading the module there, but
+     * only from the cheap page rules and only when given a page: without one it gives the
+     * page-independent answer, and with one it must still admit every notice the display path would
+     * show on that page. The display path itself is pinned in both directions.
      */
     public function test_has_candidate_notices_is_a_page_aware_superset_of_display(): void {
         $this->resetAfterTest();
@@ -312,7 +311,7 @@ final class helper_test extends \advanced_testcase {
 
         $this->setUser($user);
 
-        // Without a page the probe answers the page-independent question, as before.
+        // Without a page the probe answers the page-independent question.
         $this->assertTrue(helper::has_candidate_notices());
 
         // With a page it narrows: nothing can appear on a course page...
@@ -327,7 +326,7 @@ final class helper_test extends \advanced_testcase {
         $unknown = new page_probe(null, null, null, null);
         $this->assertTrue(helper::has_candidate_notices($unknown));
 
-        // The display path judges the page, and does so in both directions, exactly as before.
+        // The display path judges the page, in both directions.
         $this->assertCount(1, helper::retrieve_user_notices('/my/'));
         $this->assertSame([], helper::retrieve_user_notices('/'));
     }
@@ -335,10 +334,9 @@ final class helper_test extends \advanced_testcase {
     /**
      * The allow_update setting must gate the write, not merely the form that leads to it.
      *
-     * editnotice.php consulted it only in `case 'edit'`, which decides whether to DISPLAY the form,
-     * and its save branch runs before that switch — so a POST updated the notice with the setting
-     * off. The control below is what makes this test non-vacuous: an identical update WITH the
-     * setting on has to land, or the refusal above would prove nothing about the setting.
+     * helper::update_notice() refuses the write itself, whatever page calls it; editnotice.php's own
+     * check only turns the refusal into a message. The control: an identical update with the setting
+     * on has to land, or the refusal would prove nothing about the setting.
      *
      * @covers \local_awareness\helper::update_notice
      */
@@ -412,17 +410,17 @@ final class helper_test extends \advanced_testcase {
         $stored = array_map('intval', awareness::get_record(['title' => 'Targeted notice'])->get('cohorts'));
 
         $this->assertNotContains((int) $hidden->id, $stored);
-        // Control: the cohort this user CAN see has to survive, or nothing was proven.
+        // Control: the cohort this user can see has to survive, or nothing was proven.
         $this->assertContains((int) $visible->id, $stored);
     }
 
     /**
      * A course that does not exist is refused on save, on both write paths.
      *
-     * Nothing checked this before: the course picker is an ajax autocomplete, whose values core
-     * does not validate, and the write path packed whatever arrived into filtervalues. The real
-     * course saved first is the control — it proves the refusal is about the id and not about
-     * course filters as such — and the row count proves the refused save wrote nothing.
+     * The course picker is an ajax autocomplete, whose values core does not validate, so the write
+     * path is where the id is checked. The real course saved first is the control — it proves the
+     * refusal is about the id and not about course filters as such — and the row count proves the
+     * refused save wrote nothing.
      *
      * @covers \local_awareness\helper::create_new_notice
      * @covers \local_awareness\helper::update_notice
@@ -479,10 +477,9 @@ final class helper_test extends \advanced_testcase {
     /**
      * A list longer than the bound is cut on save, first entries kept, in order.
      *
-     * The scope's existence lookups bind one placeholder per id, so the write path has to be
-     * bounded the way the estimate already was — and it was not, because nothing on it ever ran a
-     * statement over the list before. The one-course save in the test above is the control that a
-     * list within the bound is stored whole.
+     * The scope's existence lookups bind one placeholder per id, so the write path is bounded like
+     * the estimate. The one-course save in the test above is the control that a list within the
+     * bound is stored whole.
      *
      * @covers \local_awareness\helper::create_new_notice
      */
@@ -512,11 +509,11 @@ final class helper_test extends \advanced_testcase {
      * Each level the author can choose survives the trip into storage.
      *
      * helper::sanitise_data() is the only place a chosen level becomes reqack and outsideclick,
-     * and awareness::get_insistence() is its inverse. Nothing exercised level 2 through it: the
-     * Behat generator carries its own copy of the mapping and inserts rows directly, and the form
-     * test covers only the other direction. Changing the Acknowledge comparison from >= to > would
-     * therefore store every "Must acknowledge" notice as Blocking — no checkbox, Accept never
-     * gated, no acknowledgement ever demanded — with the whole suite green.
+     * and awareness::get_insistence() is its inverse. The Behat generator carries its own copy of
+     * the mapping and inserts rows directly, and the form test covers only the load direction, so
+     * this is the test of the save direction. Changes that must make it fail: comparing the
+     * Acknowledge level with > instead of >=, which stores every "Must acknowledge" notice as
+     * Blocking.
      *
      * The stored columns are asserted as well as the level, because get_insistence() short-circuits
      * on reqack: a level assertion alone cannot see outsideclick going astray at level 2.
@@ -560,17 +557,16 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
-     * A refused Blocking notice must still be acknowledgeable. Audit finding M12.
+     * A refused Blocking notice must still be acknowledgeable.
      *
-     * The display path re-shows a notice the reader refused; the acknowledge path did not carry
-     * the same condition, so it reported the notice as already handled and acknowledge_notice()
-     * returned before writing the row and before the event. The reader got the modal back on
-     * every page load with an Accept button that did nothing.
+     * The display path re-shows a notice the reader refused, so the acknowledge path must apply the
+     * same condition; otherwise acknowledge_notice() treats the notice as already handled and
+     * returns before writing the row and firing the event, and the reader gets the modal back on
+     * every page load with an Accept button that does nothing.
      *
-     * The fixture is a Blocking notice because that is what the forced-logout notice this test
-     * was written against becomes: same shape, same trap, and it is the level where a refusal now
-     * writes a compliance row of its own — asserted below, since the two rows are what tell a
-     * refusal and an acceptance apart in the report.
+     * The fixture is Blocking because that is the level where a refusal writes a compliance row of
+     * its own, asserted below: the two rows are what tell a refusal and an acceptance apart in the
+     * report.
      *
      * @covers \local_awareness\helper::acknowledge_notice
      */
@@ -619,8 +615,8 @@ final class helper_test extends \advanced_testcase {
         );
         /*
          * Not assertTrue($result['status']): acknowledge_notice() opens with ['status' => true]
-         * and the M12 failure path returns that same array without writing anything, so such an
-         * assertion is satisfied by exactly the regression this test exists to catch. The row
+         * and the early return described above returns that same array without writing anything,
+         * so such an assertion is satisfied by the regression this test exists to catch. The row
          * count above is the real assertion; this one adds that the event fired, which the early
          * return also skips.
          */
@@ -662,12 +658,11 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
-     * A hidden cohort is a normal way to model a staff-only audience. Audit finding M13.
+     * A notice targeting a hidden cohort reaches its members.
      *
-     * Three code paths disagreed about what membership meant: the form offered hidden cohorts as
-     * targets, the estimator counted their members, and the runtime used cohort_get_user_cohorts(),
-     * whose SQL demands `c.visible = 1`. So the author picked one, the panel confirmed a number,
-     * and nobody was ever shown the notice — with nothing logged anywhere.
+     * A hidden cohort is the ordinary way to model a staff-only audience. The form offers it and the
+     * estimator counts its members, so delivery must agree; core's cohort_get_user_cohorts() demands
+     * `c.visible = 1` and would show the notice to nobody ({@see helper::user_cohort_ids()}).
      *
      * The outsider is the control: without them, a change that stopped filtering by cohort at all
      * would satisfy the first assertion.
@@ -684,8 +679,8 @@ final class helper_test extends \advanced_testcase {
 
         /*
          * Saved through the real path, so this also pins that a hidden cohort in a context the
-         * author can see is still a legal target — phase 1 filters submitted ids by context, not by
-         * the cohort's own visibility flag, and that distinction is what makes M13 fixable at all.
+         * author can see is still a legal target: helper::allowed_cohorts() filters submitted ids by
+         * context, not by the cohort's own visibility flag.
          */
         $this->setAdminUser();
         $formdata = new \stdClass();
@@ -710,11 +705,10 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
-     * Fixing a typo in a link's label must not throw away its click history. Audit finding M14.
+     * Fixing a typo in a link's label must not throw away its click history.
      *
-     * Link identity used to include the anchor text, so a renamed label minted a new id and retired
-     * the old one; the history rows were left behind an id nothing joins to any more, invisible to
-     * every report and impossible to clear by hand.
+     * If link identity included the anchor text, a renamed label would mint a new id and retire the
+     * old one, taking its click history with it.
      *
      * @covers \local_awareness\persistent\noticelink::create_new_link
      */
@@ -790,13 +784,13 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
-     * Reading the competency rule must not write competency state. Audit finding M16.
+     * Reading the competency rule must not write competency state.
      *
-     * The rule used to be evaluated through core_competency\api::get_user_competency_in_course(),
-     * which is not a read: it creates the user_competency_course relation when none exists. It is
-     * reached from local_awareness_getnotices, which db/services.php declares 'type' => 'read', so
-     * merely opening a course page covered by a competency-filtered notice materialised competency
-     * state for a user nobody had assessed, and core's reports began listing them.
+     * core_competency\api::get_user_competency_in_course() is not a read: it creates the
+     * user_competency_course relation when none exists. The rule is reached from the
+     * local_awareness_getnotices service, declared 'type' => 'read', so evaluating it through that
+     * API would create competency state for users nobody had assessed, which core's reports then
+     * list.
      *
      * @covers \local_awareness\helper::retrieve_user_notices
      */
@@ -811,7 +805,7 @@ final class helper_test extends \advanced_testcase {
         $competencygenerator = $generator->get_plugin_generator('core_competency');
         $framework = $competencygenerator->create_framework();
         $competency = $competencygenerator->create_competency(['competencyframeworkid' => $framework->get('id')]);
-        // Linked to the course, or the API this used to call would throw and create nothing anyway.
+        // Linked to the course, or get_user_competency_in_course() would throw and create nothing anyway.
         \core_competency\api::add_competency_to_course($course->id, $competency->get('id'));
 
         $formdata = new \stdClass();
@@ -841,10 +835,8 @@ final class helper_test extends \advanced_testcase {
     /**
      * The theme rule must judge the theme the reader is looking at.
      *
-     * It read $PAGE->theme->name from inside the get_notices web service, where $PAGE never had
-     * set_course() called — so moodle_page::resolve_theme() skipped its course and category
-     * branches and always answered the site theme. A notice filtered by a course theme matched
-     * nowhere it was meant to, and matched everywhere it was not.
+     * Inside the get_notices web service $PAGE has no course set, so its theme ignores course and
+     * category themes; the rule resolves the course's own ({@see helper::current_theme_name()}).
      *
      * @covers \local_awareness\helper::check_filters
      */
@@ -861,7 +853,7 @@ final class helper_test extends \advanced_testcase {
         $courseid = (int) $course->id;
 
         /*
-         * Control. The rule short-circuits whenever it resolves an empty theme name, and then EVERY
+         * Control. The rule short-circuits whenever it resolves an empty theme name, and then every
          * theme filter admits — so a filter naming a theme nobody uses has to be refused, or the
          * assertions below pass without the rule being switched on at all.
          */
@@ -881,9 +873,9 @@ final class helper_test extends \advanced_testcase {
     /**
      * Deleting a notice must take its uploaded files with it.
      *
-     * Nothing removed the content and bgimage file areas, so every image ever uploaded to a deleted
-     * notice stayed in moodledata and {files} for the life of the site — unreachable at the same
-     * time, because the pluginfile gate resolves the notice first and refuses one that is gone.
+     * Nothing in core removes a plugin's file areas when its row goes, and files left behind could
+     * never be reached or cleared through the plugin, because the pluginfile gate resolves the
+     * notice first and refuses one that is gone.
      *
      * @covers \local_awareness\helper::delete_notice
      */

@@ -22,10 +22,9 @@ use local_awareness\persistent\noticeview;
 /**
  * The caches are consulted, including when what they hold is nothing.
  *
- * Both caches guarded their lookup with a falsy test, and an empty array is falsy. The value was
- * stored, found, judged a miss, and the query ran again — on every call, for ever. The state it
- * broke in is the one nearly every site is in nearly all the time: the plugin installed with no
- * notice currently live, paying a query on every page load to be told so.
+ * An empty array is a real answer for both caches. A falsy test on the lookup would take it for a
+ * miss and re-run the query on every call, and a site with no live notice would pay that query on
+ * every page load.
  *
  * These tests count statements rather than inspect the cache, because the cost is the point.
  *

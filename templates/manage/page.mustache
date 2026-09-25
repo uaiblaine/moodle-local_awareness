@@ -17,14 +17,13 @@
 {{!
     @template local_awareness/manage/page
 
-    The manage-notices page: a lede and the create action, a strip of site totals, the filter bar,
-    and the notices table. The table brings its own dynamic-table wrapper, so an AJAX refresh
-    replaces its markup and leaves everything here in place — which is why the result count is
-    updated from the table's data-table-total-rows by manage_list.js rather than rendered here.
+    The manage-notices page: a lede and the create action, a strip of totals, the filter bar, and
+    the notices table. The table brings its own dynamic-table wrapper, so an AJAX refresh replaces
+    its markup and leaves everything here in place; the result count and the empty state are
+    rendered by the table itself for that reason.
 
-    The stat tiles describe the SITE, not the filtered set: the dynamic-table web service returns
-    table HTML and nothing else, so filtered totals would need a web service of the plugin's own.
-    The line under the filter bar is the one that answers "how many matched".
+    The stat tiles count every notice of the scope (the site, or the course) and ignore the
+    filters; see manage_page::stats().
 
     Context variables required for this template:
     * lede (string)

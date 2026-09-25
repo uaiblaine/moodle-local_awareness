@@ -21,14 +21,12 @@ use local_awareness\local\window;
 /**
  * The cached prefilter query, measured against the display decision on a real database.
  *
- * tests/local/window_test.php pins the same invariant in pure logic, but it evaluates the
- * prefilter's MEANING in PHP — a hand-written model that could drift from the SQL it stands for
- * without either file failing. This runs the actual query.
+ * tests/local/window_test.php pins the same invariant in pure logic, against a PHP model of the
+ * prefilter that could drift from the SQL it stands for. This runs the actual query.
  *
  * The invariant: get_enabled_notices() may return notices that window::is_open() then rejects, but
- * it must never DROP one that is_open() accepts. The query is cached in a MODE_APPLICATION store
- * with no TTL and purged only when a notice is written, so a row it drops is not merely late — it
- * never appears at all, for as long as nobody edits a notice.
+ * it must never drop one that is_open() accepts. The result is cached until a notice is written
+ * ({@see window}), so a dropped row is not merely late: it never appears.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -94,10 +92,9 @@ final class enabled_notices_window_test extends \advanced_testcase {
         }
 
         /*
-         * The prefilter must be STRICTLY looser, not merely a superset. A query identical to
-         * is_open() also satisfies the implication above, and it is the thing a later edit is most
-         * likely to "tidy" this into — at which point a notice whose start passes while the cache
-         * is warm stops appearing entirely.
+         * Strictly looser, not merely a superset: a query identical to is_open() also satisfies
+         * the implication above, and would keep a notice whose start passes while the cache is
+         * warm from ever appearing.
          */
         $this->assertGreaterThan(0, $looser, 'the cached query is as strict as the display decision');
     }

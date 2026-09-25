@@ -21,9 +21,8 @@ namespace local_awareness;
  *
  * Three directions, so that an implementation that is secretly always-null or always-throw cannot
  * pass: no id means a new notice, a real id means that notice, and an id that names nothing is
- * refused rather than treated as "new". The last case is the one editnotice.php got wrong: its
- * create-or-update branch keyed on whether a record was found, which is false in both of the first
- * and third cases.
+ * refused rather than treated as "new", which a create-or-update branch keyed on "no record found"
+ * would do.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine

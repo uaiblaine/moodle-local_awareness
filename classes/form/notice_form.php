@@ -39,14 +39,7 @@ class notice_form extends \core\form\persistent {
     /** @var string Persistent class name. */
     protected static $persistentclass = 'local_awareness\persistent\awareness';
 
-    /*
-     * insistence sits here beside perpetual for the same reason: it is a form field, not a stored
-     * property. The author chooses one level and helper::sanitise_data() writes it back to the two
-     * columns that hold it. Listing it is a declaration rather than a fix — core's
-     * filter_data_for_persistent() removes only these names, and from_record() then drops anything
-     * that is not a property anyway — but the next reader should not have to derive that.
-     */
-    /** @var int A carousel starts with this many empty slides, and adds this many per click. */
+    /** @var int A carousel starts with this many empty slides, adds this many per click, and needs this many to save. */
     public const SLIDES_MIN = 2;
 
     /**
@@ -63,6 +56,9 @@ class notice_form extends \core\form\persistent {
         'templategroup', 'positiongroup', 'position_note', 'slide_media',
         'slide_no', 'slide_image', 'slide_videourl', 'slide_caption',
         'slide_id', 'slide_repeats', 'slide_add', 'slide_delete', 'slide_delete-hidden', 'slide_moveup', 'slide_movedown',
+        // The insistence and perpetual fields stand for stored columns: helper::sanitise_data() maps insistence to
+        // reqack and outsideclick, and editnotice.php maps perpetual to timestart and timeend. Neither is a
+        // property, so from_record() would drop them anyway; listing them records that they are form-only.
         'insistence', 'perpetual', 'cohorts', 'filter_role_context', 'filter_role', 'filter_category',
         'filter_course', 'filter_groups', 'filter_format', 'filter_theme', 'filter_competency_rules',
         'filter_competency_requireall', 'bgimage',
@@ -76,14 +72,10 @@ class notice_form extends \core\form\persistent {
         $mform =& $this->_form;
 
         /*
-         * Collapsible short-forms back ON, which is what makes each section an accordion and gets
-         * the expand/collapse-all control for free. They were disabled because the editor used to
-         * hide this whole form and move its rendered rows into cards with JavaScript: core's
-         * collapsesections JS never settled on a hidden form. The form is rendered in place now,
-         * so the reason is gone — and with it the defect that hack produced, where any field the
-         * relocation map forgot stayed inside a 1x1 clipped container: reachable by keyboard and
-         * announced by a screen reader, but painted nowhere. filter_role_context and the competency
-         * label had been invisible that way.
+         * Collapsible short-forms on (the default, stated explicitly): each header becomes an
+         * accordion section with core's expand/collapse-all control. The editor renders this form
+         * in place; moving its rows with JavaScript leaves any row the script misses focusable and
+         * announced by a screen reader while painted nowhere.
          */
         $mform->setDisableShortforms(false);
 
@@ -105,12 +97,7 @@ class notice_form extends \core\form\persistent {
 
         // Content.
         $mform->addElement('header', 'header_content', get_string('editor:section:content', 'local_awareness'));
-        /*
-         * Each section says what it is for, in the author's language. The strings were written
-         * with the collapsible-fieldset rebuild and then never rendered, so five explanations
-         * sat in two language packs helping nobody. A static element is how a moodleform carries
-         * prose — no markup is injected and no row is relocated.
-         */
+        // Each section opens with a sentence saying what it is for, as a static element.
         $mform->addElement(
             'static',
             'header_content_desc',
@@ -148,9 +135,7 @@ class notice_form extends \core\form\persistent {
             ]
         );
         $mform->addHelpButton('bgimage', 'notice:bgimage', 'local_awareness');
-        // The video and carousel layouts fill their media band themselves, and a banner has no room
-        // for a picture; a background behind any of them would be two competing surfaces, so the
-        // field is not offered for them.
+        // Hidden for the layouts that ignore the image; see awareness::uses_bgimage().
         foreach (awareness::TEMPLATES as $template) {
             if (!awareness::uses_bgimage($template)) {
                 $mform->hideIf('bgimage', 'template', 'eq', $template);
@@ -232,10 +217,10 @@ class notice_form extends \core\form\persistent {
         /*
          * Groups, for a course notice. The picker offers exactly what the author may target,
          * decided the way core decides it for an activity: the course's group mode and
-         * moodle/site:accessallgroups, through group_scope. It is offered only while groups are in
-         * use, as core's own group menus are, except that a notice already naming groups keeps its
-         * field whatever the mode, so the author can see and clear what it names. The save narrows
-         * what the scope refuses and extra_validation() reports it on this field.
+         * moodle/site:accessallgroups, through group_scope. It is offered when the author has a
+         * group to target (group_scope::offered()), and a notice already naming groups keeps its
+         * field regardless, so the author can see and clear what it names. The save narrows what
+         * the scope refuses and extra_validation() reports it on this field.
          */
         if ($coursemode) {
             $groups = group_scope::for_author($scope);
@@ -293,10 +278,9 @@ class notice_form extends \core\form\persistent {
         $mform->setDefault('reqcourse', 0);
 
         /*
-         * The competency rules belong to the audience, not to the display restrictions they used to
-         * sit under: they say WHO sees the notice, the same question the cohorts and roles above
-         * answer. Its static label is what carries the help button, and it was one of the two
-         * elements the old JS relocation left behind in the hidden form.
+         * The competency rules are an audience rule: they say who sees the notice, like the cohorts
+         * and roles above. The rules travel in a hidden field, so the static label carries the help
+         * button and extra_validation() reports problems with the rules on it.
          */
         if (helper::is_competency_filter_enabled()) {
             $existingrules = [];
@@ -352,13 +336,7 @@ class notice_form extends \core\form\persistent {
             }
         }
 
-        /*
-         * The estimate, beside the rules it is an estimate of. It used to be rendered by the page
-         * after the whole form, so the number describing the audience sat below the appearance and
-         * scheduling sections and an author narrowing a rule scrolled past both to see what it did.
-         * Rendered here as markup rather than moved here by script: relocating a form's rows with
-         * JavaScript is the mistake this editor already made once.
-         */
+        // The audience estimate, rendered into this section beside the rules it estimates.
         $mform->addElement(
             'html',
             $OUTPUT->render_from_template(
@@ -368,10 +346,9 @@ class notice_form extends \core\form\persistent {
         );
 
         /*
-         * Display restrictions, for a site notice only. Under a course scope this section held one
-         * field — the URL pattern — describing a reach a course notice does not have: it fires on
-         * its course's main page, which author_scope writes for it. A section whose only field is
-         * decided elsewhere is a section to remove, not to disable.
+         * Display restrictions, for a site notice only. A course notice fires on its course's main
+         * page, which author_scope writes for it, and the page filters below are not offered under
+         * a course scope either, so the section would have nothing to decide.
          */
         if (!$coursemode) {
             $mform->addElement('header', 'header_filters', get_string('editor:section:filters', 'local_awareness'));
@@ -387,8 +364,6 @@ class notice_form extends \core\form\persistent {
             $mform->setType('pathmatch', PARAM_RAW);
             $mform->addHelpButton('pathmatch', 'pathmatch', 'local_awareness');
         }
-
-        // Fields moved to header_audience.
 
         /*
          * The four page filters below are the site scope's. Under a course scope the course is
@@ -486,10 +461,8 @@ class notice_form extends \core\form\persistent {
     /**
      * How the notice behaves and when it runs — the last section, because it is the last decision.
      *
-     * It used to sit second, between what the notice says and who gets it, which put "Reset every"
-     * and an expiry date between the author and the audience they were choosing. The order the
-     * sections are added in is the order they are read in, and this one is answered once the rest
-     * is settled: what it says, who gets it, how it looks, when it runs.
+     * The sections are read in the order they are added: what the notice says, who gets it, how it
+     * looks, when it runs.
      *
      * @param \MoodleQuickForm $mform The form.
      */
@@ -511,10 +484,9 @@ class notice_form extends \core\form\persistent {
         $mform->setDefault('resetinterval', 0);
 
         /*
-         * One question, three answers, where there used to be three yes/no questions whose eight
-         * combinations included two that made no sense together and one that did nothing. The
-         * author is choosing how insistent the notice is, and that is a single ordered decision;
-         * awareness::get_insistence() is where the levels are defined and mapped back to storage.
+         * How insistent the notice is, as one ordered choice rather than independent yes/no
+         * switches. awareness::get_insistence() documents how each level is stored, and
+         * helper::sanitise_data() writes it back to those columns.
          */
         $mform->addElement(
             'select',
@@ -583,11 +555,10 @@ class notice_form extends \core\form\persistent {
          * shape the dialogue would take, with the name offscreen — seven phrases describe a place,
          * a picture of one shows it, and a radio with no visible text still needs its name.
          *
-         * A fullscreen dialogue has no position, and the field used to be hidden outright for it.
-         * It stays, covered, with the note below saying why: a control that vanishes reads as a
-         * fault, and the author has no way to learn that the choice stopped applying. The corners
-         * belong to the card alone; notice_form.js greys what does not apply and
-         * extra_validation() refuses it for good.
+         * A fullscreen dialogue has no position, but the field stays, covered, with the note below
+         * saying why: a control that vanishes reads as a fault. Positions a layout cannot take (the
+         * corners outside the card, the centre for a banner) are greyed by notice_form.js and
+         * refused on save by validate_layout().
          */
         $positions = [];
         foreach (self::POSITION_GRID as $position) {
@@ -657,10 +628,8 @@ class notice_form extends \core\form\persistent {
         );
 
         /*
-         * The last two sections start collapsed because most notices never touch them — but a
-         * section that already holds a value opens regardless, and forces past any stored user
-         * preference to do it. Hiding a filter somebody set is worse than showing an empty section:
-         * the author cannot act on what the page does not admit is there.
+         * The display restrictions and appearance sections start collapsed, because most notices
+         * never touch them, unless the notice already uses them; see set_optional_section_state().
          */
         if ($this->scope()->is_site()) {
             // The course form has no display-restrictions section; asking about its state would throw.
@@ -669,9 +638,8 @@ class notice_form extends \core\form\persistent {
             ]);
         }
         /*
-         * The appearance fields are never empty - every notice stores a layout - so "holds a value"
-         * has to mean "holds something other than the default", or the section would open on every
-         * edit of every notice and the collapse would be decoration.
+         * The appearance columns are never empty (every notice stores a layout), so they count as
+         * used only when they differ from these defaults.
          */
         $this->set_optional_section_state(
             'header_appearance',
@@ -702,30 +670,27 @@ class notice_form extends \core\form\persistent {
         $mform->addGroup($buttonarray, 'buttonar', '', ' ', false);
 
         /*
-         * closeHeaderBefore() is not decoration. The renderer wraps the group's HTML in the sticky
-         * footer IN PLACE, so without this the footer is emitted inside the last section's
-         * collapsible container — and collapsing "Modal appearance" took Save and Cancel with it.
-         * It is the same call course/edit_form.php makes for the same reason.
+         * The renderer wraps the group's HTML in the sticky footer in place, so without this the
+         * footer is emitted inside the preceding section's collapsible container and collapses
+         * with it. course/edit_form.php makes the same call for the same reason.
          */
         $mform->closeHeaderBefore('buttonar');
 
         /*
-         * Core's sticky footer, not a hand-rolled one. set_sticky_footer() exists on all supported
-         * branches and is what course/edit_form.php and moodleform_mod.php use; the plugin used to
-         * make the button group position:sticky itself, which left the buttons inside the last
-         * section's card instead of at the foot of the page.
+         * Core's sticky footer: a hand-rolled position: sticky on the group keeps the buttons inside
+         * a section's card instead of at the foot of the page. set_sticky_footer() exists on every
+         * supported branch; course/reset_form.php (4.5) and course/edit_form.php (5.2) use it.
          */
         $mform->set_sticky_footer('buttonar');
     }
 
 
     /**
-     * Refuse a value that names something the site does not have, and say which field.
+     * Report every field the author scope corrects, and every layout rule broken, on its field.
      *
-     * The pickers cannot do this: three of them are ajax autocompletes whose values core declines
-     * to validate, and a non-ajax select skips its allowlist when its option list is empty. So the
-     * same scope the write path enforces is asked here first, where the answer can reach the
-     * author as an error on the field instead of an exception after they pressed Save.
+     * The pickers cannot validate their own values (see author_scope), so the same scope the
+     * write path enforces is asked here first, where the answer reaches the author as an error on
+     * the field instead of an exception after they pressed Save.
      *
      * \core\form\persistent::validation() is final; this is the hook it leaves.
      *
@@ -777,8 +742,9 @@ class notice_form extends \core\form\persistent {
      *
      * hideIf hides a field; it does not stop the value travelling, and a client rule never posts
      * the form. So the combinations the picker cannot express are refused here, on the field the
-     * author can act on: a card has no room for the acknowledgement box, a corner is the card's
-     * alone, the video layout needs a link, and a carousel needs slides to turn.
+     * author can act on: an insistence level the layout cannot honour (see
+     * awareness::insistence_levels_for()), a position it cannot take, a missing text or image, a
+     * video layout without a link, and a carousel without enough slides.
      *
      * @param \stdClass $data The submitted data.
      * @return array Element name => message.
@@ -808,9 +774,8 @@ class notice_form extends \core\form\persistent {
         }
 
         /*
-         * The text is required by every layout but the image, and the image is required by the
-         * image layout alone. Both used to be a client rule, which cannot ask the layout; the
-         * image is read from the draft area the picker posts, the way the slides are.
+         * The text is required by every layout but the image, and the image by the image layout
+         * alone. The image is read from the draft area the picker posts, as the slides' images are.
          */
         if (awareness::requires_content($template)) {
             $content = is_array($data->content ?? null) ? (string) ($data->content['text'] ?? '') : (string) ($data->content ?? '');
@@ -906,7 +871,7 @@ class notice_form extends \core\form\persistent {
              * read as "both" it would refuse a save the author had already corrected on screen. The
              * choice decides, and the unchosen field is not read.
              *
-             * Only when the choice is THERE. A payload that carries none is not a form the author
+             * Only when the choice is there. A payload that carries none is not a form the author
              * corrected; assuming one would silently drop what they sent, which is worse than the
              * refusal below. So the old rule still stands for it, and the picker's guarantee is
              * that an author can no longer reach it.
@@ -962,23 +927,19 @@ class notice_form extends \core\form\persistent {
         }
 
         /*
-         * One row per field, and the stylesheet draws a card ACROSS a slide's rows rather than
-         * around one. Wrapping the five in a group was tried and measured first, because a group
-         * is one row and would have made the card trivial: hideIf and setType do reach a group's
-         * children, and the delete button's client-side hints can be put back by hand. What ends
-         * it is that core renders a group's children WITHOUT THEIR LABELS — two of the three
-         * controls arrived on screen with no visible label and no programmatic one. This editor
-         * has shipped unlabelled reachable fields once already; a border is not worth that.
+         * One row per field, and the stylesheet draws a card across a slide's rows. Not a group,
+         * although a group is one row and would make the card trivial: a grouped element with no
+         * inline template, as the file picker and the URL field have none, is rendered without its
+         * label, visible or programmatic (lib/form/group.php falls back to the default renderer).
          */
         $elements = [
             /*
              * The heading row: the slide's place, and the buttons that rearrange the strip. A
              * static, because a static is the one element the whole row can be hidden through;
              * its value is markup rendered by slide_head(), and the buttons in it post like any
-             * other — the form registers their names as no-submit below, which is exactly how
-             * core's own repeat deletion works. The value is set once the rows on screen are
-             * known, because the number is the slide's place, and the place is not the row index
-             * after a deletion left a gap or a move exchanged two rows.
+             * other, registered as no-submit below as core's own repeat deletion is. The value is
+             * set once the rows on screen are known, because the number is the slide's place, and
+             * the place is not the row index after a deletion left a gap or a move exchanged two rows.
              */
             $mform->createElement('static', 'slide_no', ''),
             $mform->createElement(
@@ -1051,9 +1012,9 @@ class notice_form extends \core\form\persistent {
         }
 
         /*
-         * A slide carries an image or a link, never both. The pair used to sit open together and
-         * the author found out which one counted by saving; the choice now hides the other, and
-         * the save reads only the chosen one — hideIf hides a control without stopping its value.
+         * A slide carries an image or a link, never both: the media choice hides the other
+         * control, and the save reads only the chosen one, because hideIf does not stop a hidden
+         * control's value.
          */
         for ($i = 0; $i < $repeats; $i++) {
             $mform->hideIf("slide_image[{$i}]", "slide_media[{$i}]", 'eq', slide::MEDIA_VIDEO);
@@ -1197,10 +1158,8 @@ class notice_form extends \core\form\persistent {
      * moved — a press on Move exchanges two rows, and the browser posts them back where they now
      * are — so the pairing is read from the ids the rows carry: the id at row i names the slide
      * row i holds, and a row whose id names no slide of this notice (a new row, or a removed one
-     * that posted nothing) has no stored slide behind it. Pairing by stored index instead put a
-     * row's draft area beside the slide stored at that index, which after a move is another slide;
-     * a submitted value outranks a default, so the pairing was discarded, but nothing should rely
-     * on being discarded.
+     * that posted nothing) has no stored slide behind it. Pairing by stored index would put a row's
+     * draft area beside the slide stored at that index, which after a move is another slide.
      *
      * @return slide[] Keyed by row index.
      */
@@ -1279,8 +1238,7 @@ class notice_form extends \core\form\persistent {
      * One line saying what a layout is for, shown on its card in the picker.
      *
      * The same sentences the help text carries, where the author is actually choosing: a help icon
-     * beside the group is not read while six thumbnails are being compared. Literal keys in a
-     * switch, never a built string id.
+     * beside the group is not read while the thumbnails are being compared.
      *
      * @param string $template One of awareness::TEMPLATES.
      * @return string
@@ -1313,10 +1271,11 @@ class notice_form extends \core\form\persistent {
     }
 
     /**
-     * A position's name, from a literal string id per value.
+     * The position radio's label: a cell of the picker's screen showing the dialogue's shape there,
+     * with the name offscreen.
      *
      * @param string $position One of awareness::POSITIONS.
-     * @return string
+     * @return string HTML.
      * @throws \coding_exception For a position with no name.
      */
     public static function position_label(string $position): string {
@@ -1453,8 +1412,9 @@ class notice_form extends \core\form\persistent {
      * element-autocomplete.mustache emits every option as a triple stash and lib/form/select.php
      * passes the text through untouched, so a fullname carrying markup reaches the page as markup
      * and a multilang fullname reaches it as literal {mlang} text. The default escape is what that
-     * sink wants, and it matches what external::search_courses() hands the same widget over AJAX —
-     * the two halves of this picker have to agree, because the author sees both in one field.
+     * sink wants, and it matches what {@see \local_awareness\external\search_courses} hands the same
+     * widget over AJAX: the two halves of this picker have to agree, because the author sees both in
+     * one field.
      *
      * @param \stdClass $course A course record carrying at least id and fullname.
      * @return string The formatted, escaped course name.
@@ -1470,11 +1430,11 @@ class notice_form extends \core\form\persistent {
      *
      * A collapsed section that holds a value is worse than an expanded empty one: the author
      * cannot act on a filter the page does not admit is there, and nothing on screen suggests
-     * looking. $ignoreuserpref is deliberately true in that case — a stored "I keep this closed"
-     * preference must not win over data the notice actually carries.
+     * looking. So a used section is expanded ignoring the user's stored preference, which must not
+     * win over data the notice actually carries.
      *
-     * Reads pathmatch straight off the notice and the rest out of the filtervalues JSON, which is
-     * where the display restrictions and modal dimensions live.
+     * Reads each field out of the filtervalues JSON, where the page filters live, and otherwise
+     * from the notice's own column of that name (pathmatch, the modal dimensions, the layout).
      *
      * @param string $header Name of the header element.
      * @param array $fields Field names the section owns.
@@ -1513,7 +1473,8 @@ class notice_form extends \core\form\persistent {
     }
 
     /**
-     * Returns a default data.
+     * The notice's stored data in the shape the form's fields expect.
+     *
      * @return \stdClass
      */
     protected function get_default_data() {
@@ -1563,7 +1524,7 @@ class notice_form extends \core\form\persistent {
         /*
          * A new notice arrives with a fade; a saved one keeps what it stored, 'none' included.
          * The column default stays 'none' so the upgrade changes nothing a reader sees, and only
-         * the empty form suggests motion. Pinned by a test: editing an old notice must not drift it.
+         * the empty form suggests motion. layout_form_test pins that editing an old notice keeps it.
          */
         if ($noticeid <= 0) {
             $data->animation = 'fade';

@@ -16,8 +16,8 @@
 /**
  * Course picker for the notice editor's audience rules.
  *
- * Feeds the autocomplete from local_awareness_search_courses, which applies the capability check —
- * the field is only ever rendered for a manager.
+ * Feeds the autocomplete from local_awareness_search_courses, which applies the capability check
+ * for the editor's scope and, in a course, offers only that course.
  *
  * @module     local_awareness/course_search
  * @copyright  2026 Anderson Blaine
@@ -40,8 +40,10 @@ define(['core/ajax'], function(Ajax) {
     };
 
     /**
-     * List of options (for pre-existing selections).
-     * The autocomplete module calls this when rendering existing values.
+     * Fetch the courses matching a search.
+     *
+     * core/form-autocomplete calls this as the author types; existing selections are rendered by the
+     * form itself.
      *
      * @param {String} selector The selector of the autocomplete element.
      * @param {String} query The current search query.

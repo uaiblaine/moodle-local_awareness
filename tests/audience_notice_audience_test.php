@@ -25,9 +25,9 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
 /**
  * Tests for the audience size stored against a saved notice.
  *
- * Coverage is declared in this docblock rather than with #[CoversClass]; moodle-cs on the 4.05 leg
- * cannot see attributes and reports every method as missing coverage information, which fails
- * phpcs under --max-warnings 0 while this plugin still supports 4.5.
+ * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
+ * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage. Move to the
+ * attribute when 4.5 support is dropped.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -108,8 +108,8 @@ final class audience_notice_audience_test extends \advanced_testcase {
     /**
      * Changing a filter makes the stored count stale rather than merely old.
      *
-     * The control is the second save with no filter change: it must NOT recompute, which is what
-     * keeps an edit to a title from costing a scan of every user on a large site.
+     * The control is the title-only edit: it must not recompute, which is what keeps an edit to a
+     * title from costing a scan of every user on a large site.
      */
     public function test_changing_filters_marks_the_count_stale_and_leaving_them_does_not(): void {
         set_config('audience_sync_limit', 100000, 'local_awareness');
@@ -276,15 +276,12 @@ final class audience_notice_audience_test extends \advanced_testcase {
     /**
      * Counting an audience is not an authoring act, so it must not look like one.
      *
-     * record() wrote through the persistent, and core\persistent::update() is final and stamps
-     * timemodified unconditionally. In this plugin timemodified IS the "the author changed this"
-     * signal — the first thing helper::must_reshow() reads, and the whole content of
-     * reset_notice() — so every recalculation was a silent Reset: everyone who had already dealt
-     * with the notice got it back.
+     * core\persistent::update() stamps timemodified, which helper::must_reshow() reads as "the
+     * author changed this", so record() writes around the persistent
+     * ({@see \local_awareness\audience\notice_audience::record()}).
      *
-     * The timestamps are forced into the past deliberately. must_reshow() compares with a strict
-     * `<`, so a bump landing in the same second as the last view is forgiven, and without this the
-     * test is a coin flip that mostly passes.
+     * The timestamps are forced into the past because must_reshow() compares with a strict `<`: a
+     * stamp landing in the same second as the last view would go unnoticed.
      *
      * @covers \local_awareness\audience\notice_audience::record
      */
@@ -329,10 +326,9 @@ final class audience_notice_audience_test extends \advanced_testcase {
     /**
      * A job already promised to one notice must not be taken over by another.
      *
-     * refresh() joins an in-flight job by criteria hash, and the hash names a set of filters rather
-     * than a notice — two site-wide notices with no filters hash identically. attach() then
-     * overwrote the job's owner, so the notice that raised it waited for a result that would never
-     * be written to it, and stayed permanently uncounted.
+     * refresh() finds an in-flight job by criteria hash, and two notices with the same filters hash
+     * identically. Re-owning the job would leave the notice that raised it waiting for a result
+     * never written to it ({@see \local_awareness\audience\notice_audience::refresh()}).
      *
      * @covers \local_awareness\audience\notice_audience::refresh
      */

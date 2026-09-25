@@ -21,10 +21,9 @@ use local_awareness\persistent\awareness;
 /**
  * The dialogue's motion and layout rules, pinned in the stylesheet and the JavaScript.
  *
- * Nothing in the pipeline reads a stylesheet for meaning: stylelint checks syntax, and the
- * refused-click shake shipped for a year with no reduced-motion guard while the file's only
- * such block guarded a spinner. So the contract is scanned here. Every scan asserts it found
- * something before it asserts anything about what it found.
+ * Nothing else in the pipeline reads a stylesheet for meaning (stylelint checks syntax), so the
+ * contract is scanned here. Every scan asserts it found something before it asserts anything
+ * about what it found.
  *
  * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
  *
@@ -187,10 +186,8 @@ final class motion_contract_test extends \basic_testcase {
      * utility classes already sets with !important.
      *
      * Bootstrap generates its utilities with !important on both branches, so such a declaration is
-     * dead whatever its specificity - and three had shipped before this test: a banner's and a
-     * fullscreen dialogue's border-radius against `rounded` (since dropped from the template), a
-     * card body's padding-top against `py-3`. The element-to-utility map is read from the template,
-     * so a utility added there is covered without touching this test.
+     * dead whatever its specificity. The element-to-utility map is read from the template, so a
+     * utility added there is covered without touching this test, provided $owners names it.
      */
     public function test_no_rule_fights_a_utility_the_template_wears(): void {
         $owners = [
@@ -261,9 +258,10 @@ final class motion_contract_test extends \basic_testcase {
     /**
      * The JavaScript's own copies of the vocabulary agree with the persistent.
      *
-     * notice_form.js cannot reach PHP, so it carries the corners and the corner layout by hand;
-     * notice.js carries the layouts that honour an author-set size. A value added to the
-     * persistent without these being updated would be greyed or sized wrong in silence.
+     * notice_form.js cannot reach PHP, so it carries the corners, the corner layout, the banner's
+     * strip positions and the insistence ceilings by hand; modal_notice.js carries the sized,
+     * compact and band layouts. A value added to the persistent without these being updated would
+     * be greyed or sized wrong in silence.
      */
     public function test_the_javascript_mirrors_agree_with_the_persistent(): void {
         $formjs = $this->read('amd/src/notice_form.js');
@@ -335,11 +333,10 @@ final class motion_contract_test extends \basic_testcase {
     /**
      * The module knows which layout covers the screen, and only unhides the note the form wrote.
      *
-     * The position field used to be hidden outright for a fullscreen layout by a server-side
-     * hideIf; it stays now, covered, and the module is what says so. Two things are pinned because
-     * nothing else reads them: the layout name, which is a hand copy of a vocabulary value the way
-     * the corners are, and that the note's TEXT comes from the form — a module writing user-facing
-     * prose is a string outside the language packs.
+     * For a fullscreen layout the position field stays on the form, covered, and the module marks
+     * it so. Two things are pinned because nothing else reads them: the layout name, a hand copy of
+     * a vocabulary value like the corners, and that the note's text comes from the form, since a
+     * module writing user-facing prose is a string outside the language packs.
      *
      * @return void
      */
@@ -356,9 +353,8 @@ final class motion_contract_test extends \basic_testcase {
 
         /*
          * The note's words belong to the form; only its visibility is the module's business. Read
-         * with comments stripped, for the reason picker_contract_test states about its own scans: a
-         * comment explaining which sentence the module must NOT write would otherwise fail the
-         * assertion by quoting it.
+         * with comments stripped, so a comment explaining which sentence the module must not write
+         * cannot fail the assertion by quoting it.
          */
         $code = preg_replace('!/\*.*?\*/!s', '', $js);
         $code = preg_replace('!^\s*//.*$!m', '', $code);
@@ -376,8 +372,8 @@ final class motion_contract_test extends \basic_testcase {
      * A grouped radio is <label><input> ...</label> (element-radio-inline.mustache, 4.5 and 5.2):
      * the option template is the input's next sibling and the label is its parent. So the only
      * combinator that reaches the option from the radio's state is "+ .la-layout-option", and a
-     * rule written "+ label" is dead, which is how the chosen layout shipped with no mark at all.
-     * The markup half of this contract is tests/form/picker_render_test.php.
+     * rule written "+ label" is dead. The markup half of this contract is
+     * tests/form/picker_render_test.php.
      */
     public function test_the_picker_state_rules_read_the_radios_next_sibling(): void {
         $states = [];
@@ -404,10 +400,9 @@ final class motion_contract_test extends \basic_testcase {
     /**
      * No rule sets display on one of Bootstrap's display utilities.
      *
-     * .d-flex is display: flex !important on both branches, and the plugin may not write !important
-     * (stylelint), so such a declaration can never win: the position grid was display: grid on
-     * core's .d-flex and never applied. Any layout change on such an element goes on its children
-     * or on its own geometry (width, gap), never on its display.
+     * .d-flex is display: flex !important on both branches, and Moodle's stylelint config forbids
+     * !important, so such a declaration can never win. Any layout change on such an element goes on
+     * its children or on its own geometry (width, gap), never on its display.
      */
     public function test_no_rule_sets_display_on_a_bootstrap_display_utility(): void {
         $utilities = 0;

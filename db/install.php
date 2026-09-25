@@ -28,11 +28,7 @@
  * @return bool Always true; a failure to provision unaccent is not a failure to install.
  */
 function xmldb_local_awareness_install() {
-    /*
-     * Accent-insensitive notice search needs the PostgreSQL unaccent extension, and creating it
-     * is DDL that belongs here rather than on a request path. A database account without the
-     * privilege simply keeps accent-sensitive search — see helper::ensure_unaccent().
-     */
+    // Accent-insensitive notice search on PostgreSQL; see helper::ensure_unaccent().
     \local_awareness\helper::ensure_unaccent();
 
     return true;

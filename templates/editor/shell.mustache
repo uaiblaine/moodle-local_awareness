@@ -1,23 +1,15 @@
 {{!
     @template local_awareness/editor/shell
 
-    The notice editor: a page head, the moodleform rendered in place, and the audience panel
-    underneath it. The preview is a dialogue, opened from the form's own button bar by
-    editor_preview.js.
-
-    The preview is not built here. editor_preview.js reads the title and the body straight out of
-    the form and hands them to a core/modal_cancel — the same shape the manage list uses — so what
-    the author sees is the content itself rather than a drawing of it that has to be kept in step.
+    The notice editor: a page head, the requirements banner, the help note and the moodleform
+    rendered in place. notice_form renders the audience panel into its own audience section, and
+    editor_preview.js opens the preview, from the form's button bar, in the real notice dialogue.
 
     The form declares its own sections, so each one is a core collapsible fieldset — accordion
     behaviour, keyboard handling and the expand/collapse-all control all come from core. Its own
     button group is the sticky action bar, styled in place: buttons outside the form would need a
     form="" attribute, which is real HTML but which the mustache lint cannot validate in a partial
     rendered on its own, and two submit paths where one will do.
-
-    This template used to hide the form in a clipped 1x1 container and let JavaScript move its rendered
-    rows into hand-made cards; any field the relocation map forgot stayed in that container, still
-    focusable and still announced by a screen reader, but painted nowhere.
 
     Context variables required:
     * pagetitle (string), subtitle (string)

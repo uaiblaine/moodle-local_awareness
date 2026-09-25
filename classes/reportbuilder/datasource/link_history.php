@@ -55,12 +55,10 @@ class link_history extends datasource {
         $hlalias  = $lhentity->get_table_alias('local_awareness_hlinks');
 
         $this->set_main_table('local_awareness_hlinks_his', $lhhalias);
-        // Add_entity() calls initialise() which registers the hlinks internal join.
+        // The entity's initialise(), run by add_entity(), registers the hlinks join used below.
         $this->add_entity($lhentity);
 
-        // Notice entity needs the hlinks join to resolve noticeid, plus its own join.
-        // We chain $lhentity->get_joins() (which now includes the hlinks join) before
-        // adding the join to local_awareness itself.
+        // The notice id lives on the hlinks row, so the notice entity carries that join before its own.
         $noticeentity = new notice();
         $noticealias  = $noticeentity->get_table_alias('local_awareness');
         $this->add_entity($noticeentity

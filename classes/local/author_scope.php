@@ -23,68 +23,56 @@ use local_awareness\persistent\awareness;
  * Who a notice is being written AS, and what that lets it target.
  *
  * Every audience and context field reaches the write paths straight from the client. The form
- * cannot be the boundary: three of its pickers are ajax autocompletes, whose values core declines
- * to validate server-side ("when this was an ajax request, we do not know the allowed list of
- * values"), and HTML_QuickForm_select::exportValue() skips its allowlist whenever the option list
- * is empty. So the only place a value can be checked is on the way into storage and into the
- * audience estimate, and the check has to know who is asking.
+ * cannot be the boundary: three of its pickers are ajax autocompletes, whose values core does not
+ * validate server-side (lib/form/autocomplete.php), and HTML_QuickForm_select::exportValue() skips
+ * its allowlist whenever the option list is empty. So values are checked on the way into storage
+ * and into the audience estimate, by a check that knows who is asking.
  *
- * Two scopes. site() is what every author has today: a site-level manager may target anything on
- * the site, so its rule is existence — a course, category, role, competency, format or theme that
- * is named has to be one the site actually has. course($courseid) is what a course-level author
- * will have once a notice can belong to a course: it forces the course, forbids the fields that
- * reach outside it, and intersects the rest against what that course can see. Nothing in
- * production constructs it yet. It is here, and tested, so that the policy is settled as code
- * before any capability is granted against it, and so the change that grants one is wiring rather
- * than a decision taken under time pressure.
+ * Two scopes. site() is a site-level manager's: it may target anything on the site, so its rule is
+ * existence — a course, category, role, competency, format or theme that is named has to be one
+ * the site actually has. course($courseid) is a course author's: it forces the course, forbids the
+ * fields that reach outside it, and intersects the rest against what that course can see.
  *
  * The rule table is the contract, and tests/local/author_scope_test.php asserts it complete against
- * the estimator's own field lists: a field added to one and not the other reddens.
+ * the estimator's own field lists. Why each course rule is what it is (the analysis is in
+ * docs/SCOPE-VALIDATOR-FEASIBILITY.md):
  *
- * Why each course rule is what it is — measured in docs/SCOPE-VALIDATOR-FEASIBILITY.md, not assumed:
- *
- *  - filter_course is FORCED because a notice with no filters goes to the whole site
+ *  - filter_course is forced because a notice with no filters goes to the whole site
  *    (helper::check_filters() returns true on an empty set). Forcing it does not confine the role
  *    rule on its own: role_scope::sql() reads filter_course only inside its CONTEXT_COURSE branch.
- *  - filter_role_context is FORCED, not restricted, because role_scope::sql() has no else branch.
- *    The form's own default of 0 performs no context restriction at all, and 0 or CONTEXT_SYSTEM
- *    also admit the default-user roles, which the estimator turns into a literal 1 = 1.
- *  - filter_category is FORBIDDEN because it is the one field that widens: under CONTEXT_COURSE
+ *  - filter_role_context is forced, not restricted, because role_scope::sql() has no else branch:
+ *    the form's default of 0 restricts no context, and 0 or CONTEXT_SYSTEM also admit the
+ *    default-user roles, which the estimator turns into a literal 1 = 1.
+ *  - filter_category is forbidden because it is the one field that widens: under CONTEXT_COURSE
  *    the role lookup OR-joins "any course in a listed category" with the listed courses.
  *    filter_format and filter_theme are forbidden for tidiness only — with the course forced they
  *    can be redundant or self-defeating, never wider.
- *  - reqcourse is RESTRICTED to the course or none rather than forbidden. "Keep asking until they
- *    finish MY course" is legitimate; naming another course would make the audience count a
+ *  - reqcourse is restricted to the course or none rather than forbidden. "Keep asking until they
+ *    finish my course" is legitimate; naming another course would make the audience count a
  *    completion oracle over a course the author does not teach.
- *  - cohorts are RESTRICTED to the cohorts the course actually enrols from. Not to
+ *  - cohorts are restricted to the cohorts the course actually enrols from. Not to
  *    cohort_get_available_cohorts($coursecontext), which answers a different question — every
  *    visible cohort in the category ancestry plus every system cohort.
- *  - filter_role is RESTRICTED to the roles the site allows at course level,
+ *  - filter_role is restricted to the roles the site allows at course level,
  *    get_roles_for_contextlevels(CONTEXT_COURSE): a fact about the site, not about the caller,
- *    so it does not silently empty for a non-editing teacher. Safe only together with the two
- *    rules above.
- *  - filter_competency_rules is RESTRICTED to the competencies linked to the course.
- *  - pathmatch is FORCED to the course's own main page. A course notice cannot reach beyond its
- *    course — filter_course is forced — so the free URL pattern only ever narrowed it further,
- *    while its help text described a reach the notice does not have. Rather than offer a field
- *    whose every honest answer is a subset of one page, the scope writes that page. The value is a
- *    pattern the existing matcher already understands, so nothing else in the display path changes;
- *    a page-type choice in the shape of a block's ("any course page" / "any course main page") is
- *    the intended successor, and this is its first member.
- *  - filter_groups is RESTRICTED to the groups the author may target in the course, decided the
- *    way core decides it for an activity (group_scope): every participation group in visible
- *    groups mode or with moodle/site:accessallgroups, the author's own groups in separate groups
- *    mode without it. It is FORBIDDEN at the site, which has no course and so no groups.
+ *    so it does not silently empty for a non-editing teacher. Safe only because the forced course
+ *    and role context, and the forbidden category, confine the role lookup to this course.
+ *  - filter_competency_rules is restricted to the competencies linked to the course.
+ *  - pathmatch is forced to COURSE_PATHMATCH, the course's main page. With filter_course forced a
+ *    free URL pattern could only narrow the notice further, while its help text described a reach
+ *    the notice does not have; the value is a pattern check_path_match() already understands.
+ *  - filter_groups is restricted to the groups the author may target in the course, as
+ *    group_scope decides it, and forbidden at the site, which has no course and so no groups.
  *
- * Cohorts are narrowed silently in both scopes, keeping the precedent helper::allowed_cohorts()
- * set: the pickers only ever offer allowed cohorts, so a disallowed id is a hand-made request, and
- * reporting it would confirm that the cohort exists. Every other correction is reported, so the
- * form can point the author at the field to fix, and a caller that bypassed the form is refused
- * rather than quietly edited.
+ * Cohorts are narrowed silently in both scopes, as helper::allowed_cohorts() does: the pickers only
+ * ever offer allowed cohorts, so a disallowed id is a hand-made request, and reporting it would
+ * confirm that the cohort exists. Every other correction is reported, so the form can point the
+ * author at the field to fix, and a caller that bypassed the form is refused rather than quietly
+ * edited.
  *
- * Every list the scope reads is bounded to helper::CRITERIA_LIST_MAX distinct values, because the
- * existence lookups bind one placeholder per id. A caller therefore needs no cap of its own before
- * apply(); the audience estimate keeps one after it, for the statements it builds itself.
+ * Every list the scope reads is bounded to helper::CRITERIA_LIST_MAX distinct values (see
+ * bounded()), so a caller needs no cap of its own before apply(); the audience estimate keeps one
+ * after it, for the statements it builds itself.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -138,10 +126,9 @@ final class author_scope {
     /**
      * Where a course notice fires: the course's own main page.
      *
-     * The wildcard is not decoration. The reader's page arrives as path plus query
-     * (amd/src/notice.js sends location.pathname + location.search), so a course page reads as
-     * "/course/view.php?id=6" and an unanchored-at-the-end pattern is the only one that matches it —
-     * check_path_match() appends '$' to a pattern carrying no '%'.
+     * The wildcard is needed: the reader's page arrives as path plus query (amd/src/notice.js
+     * sends location.pathname + location.search), so a course page reads as "/course/view.php?id=6",
+     * and check_path_match() anchors a pattern carrying no '%' at its end.
      */
     public const COURSE_PATHMATCH = '/course/view.php%';
 
@@ -191,13 +178,10 @@ final class author_scope {
      * The scope a stored notice belongs to.
      *
      * The one way a notice's scope is read. A course notice carries its course id and a site notice
-     * carries 0, and every gate that acts ON a notice asks here rather than testing the column, so
+     * carries 0, and every gate that acts on a notice asks here rather than testing the column, so
      * the answer cannot drift between callers. A notice whose course has since been deleted still
-     * resolves to the course scope it was written under, and helper::require_author() asks exists()
-     * before it resolves a context, because the context is gone too: a course author is refused and
-     * only the site capability, at the system context, may still act — to delete or disable it —
-     * rather than the notice being quietly promoted to the site. The before_course_deleted hook is
-     * what makes that case rare.
+     * resolves to that course scope, never to the site; {@see helper::require_author()} handles it
+     * through exists().
      *
      * @param awareness $notice The notice.
      * @return self
@@ -214,8 +198,8 @@ final class author_scope {
      * The notice's own scope when there is a notice — a page never overrides where a stored notice
      * belongs, whatever its URL says — and otherwise the course the URL names, or the site. The
      * site course and anything at or below it read as the site, so a hand-typed courseid=1 opens
-     * the site page rather than throwing. This is the only place a page turns a raw parameter into
-     * a course scope.
+     * the site page rather than throwing. The pages and web services turn a raw courseid parameter
+     * into a scope here; the manage table reads its own from its filterset (all_notices::scope()).
      *
      * @param awareness|null $notice The notice the page is about, or null for a new one.
      * @param int $courseid The courseid the URL carries, 0 for none.
@@ -269,8 +253,8 @@ final class author_scope {
      * Whether what this scope names still exists.
      *
      * Always, for the site. For a course, whether its row is still there: a notice can outlive its
-     * course when the deletion ran with the plugin uninstalled, at the database, or past the purge's
-     * own catch, and the scope it resolves to then has no context to be decided in. Callers ask this
+     * course when the deletion bypassed the before_course_deleted hook or the purge failed inside
+     * its catch, and the scope it resolves to then has no context to be decided in. Callers ask this
      * before context(), which would throw a missing-record error where a refusal is owed.
      *
      * @return bool
@@ -565,8 +549,8 @@ final class author_scope {
      * The subset of ids that are real courses, in the order submitted.
      *
      * The site course is not one: check_filters() resolves a course only above SITEID, the
-     * estimator excludes it explicitly, and the course picker never offers it. A notice that named
-     * it would reach nobody on the front page and everybody nowhere.
+     * estimator excludes it explicitly, and the course picker never offers it. A course filter
+     * naming only the site course would match no page at all.
      *
      * @param int[] $ids Candidate ids.
      * @return int[]

@@ -14,11 +14,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Orchestrator for the redesigned notice editor.
- *
- * Responsibilities:
- *  - Boots the legacy notice_form/init() (course-completion + competency picker).
- *  - Boots the editor_preview, audience_estimator and save_state AMD modules.
+ * Boots the notice editor's modules once the form has rendered: notice_form, editor_preview,
+ * audience_estimator, collision_warning and save_state.
  *
  * @module     local_awareness/notice_editor
  * @copyright  Anderson Blaine <anderson@blaine.com.br>
@@ -35,17 +32,17 @@ define([
 
     return {
         init: function() {
-            // Wait for the source form's rendering to complete (Moodle injects
-            // some elements late, e.g. autocomplete enhancements). A short
-            // setTimeout + MutationObserver fallback covers both cases.
+            // A short delay after the DOM is ready, because Moodle enhances some
+            // form elements late (the autocompletes, for one). notice_form.init()
+            // carries its own MutationObserver fallback for what arrives later still.
             var ready = false;
             var bootstrap = function() {
                 if (ready) {
                     return;
                 }
                 ready = true;
-                // Boot the legacy notice_form bindings (course → reset/reqack
-                // dependency, plus the competency picker initialiser).
+                // Guarded so a failure in the form bindings cannot stop the
+                // other modules from booting.
                 try {
                     NoticeForm.init();
                 } catch (e) { /* No-op. */ }

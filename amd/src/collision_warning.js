@@ -66,7 +66,7 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
     /**
      * Build the element the warning is written into, once.
      *
-     * @returns {Element|null} The slot, or null when the page has no page-reach field.
+     * @returns {Element|null} The slot, or null when the page has neither the page-reach field nor the Reach line.
      */
     var ensureSlot = function() {
         if (state.slot) {
@@ -173,10 +173,9 @@ define(['core/ajax', 'core/str', 'core/notification'], function(Ajax, Str, Notif
             var pathfield = document.querySelector(SELECTORS.pathmatch);
             var intervalfield = document.querySelector(SELECTORS.resetinterval);
             /*
-             * The repeat interval alone is enough to watch. The course form has no page-reach field
-             * — its reach is written by the scope — and returning early on that used to switch the
-             * whole warning off for a course author, who needs it MORE: every course notice now
-             * aims at the same one page, so two repeating ones always compete.
+             * The repeat interval alone is enough to watch. The course form has no page-reach field,
+             * because the scope writes the reach, and a course author needs the warning most: every
+             * course notice is forced onto the same course pages.
              */
             if (!pathfield && !intervalfield) {
                 return;

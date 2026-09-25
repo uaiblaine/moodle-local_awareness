@@ -19,15 +19,14 @@ namespace local_awareness\local;
 /**
  * Every language string this plugin defines is either used or required by convention.
  *
- * A dead string is not free. It is translated, reviewed and carried in two packs for ever, and the
- * only way anyone finds out it is dead is by trying to grep for it. This repository accumulated ten
- * of them, was told so by an audit, and still had five a year later — prose was the only guard.
+ * A dead string is still translated, reviewed and carried in both packs, and no other gate
+ * reports it.
  *
- * The convention exemptions are named rather than skipped wholesale, because the reason each one
- * looks dead is different: a _help string is fetched by addHelpButton() from the BASE key, a
- * cachedef_ string is fetched by core from db/caches.php using the cache's name, a
- * messageprovider: string comes from db/messages.php and a task_ string from db/tasks.php using the
- * class name. None of the four ever appears as a literal, and none of them may be deleted.
+ * The convention exemptions are named rather than skipped wholesale, because each is required for
+ * a different reason: a _help string is fetched by addHelpButton() from the base key, a cachedef_
+ * string by core from the cache's name in db/caches.php, a messageprovider: string from
+ * db/messages.php, and a task_ string exists for every task class by convention, although core
+ * names an adhoc task from its class and never fetches that one.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -48,9 +47,9 @@ final class lang_usage_test extends \basic_testcase {
     /**
      * Every non-lang source file the plugin ships, concatenated.
      *
-     * Swept from the root with an exclusion list rather than from a list of named directories: a
-     * directory nobody thought of is then covered by default, which is the failure mode an
-     * inclusion list produces silently.
+     * Swept from the root with an exclusion list rather than from a list of named directories, so
+     * a directory added later is covered by default. Tests and comments are read too, so a key
+     * named only there still counts as used.
      *
      * @return string The concatenated sources.
      */
@@ -98,8 +97,7 @@ final class lang_usage_test extends \basic_testcase {
             }
             /*
              * Bounded on both sides, so notice:timemodified is not reported as used merely because
-             * report_notice:timemodified exists. That exact pair is why this is a regex rather than
-             * a str_contains, and it hid a dead string through two audits.
+             * report_notice:timemodified exists; a str_contains() would miss that.
              */
             if (!preg_match('/(?<![A-Za-z0-9_:])' . preg_quote($key, '/') . '(?![A-Za-z0-9_:])/', $sources)) {
                 $dead[] = $key;

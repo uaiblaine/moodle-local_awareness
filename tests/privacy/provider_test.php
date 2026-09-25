@@ -26,16 +26,12 @@ use local_awareness\persistent\noticeview;
 /**
  * Tests for the privacy provider's request and userlist implementations.
  *
- * The audit closed four findings here — the audience-jobs table missing from the provider
- * entirely, and the contextlist, the userlist and the erasure each looking only at
- * local_awareness_lastview — and nothing guarded any of them afterwards. Core's own
- * compliance test checks that a table carrying a userid is DECLARED; it never calls
- * export_user_data() or any delete method, so every one of those repairs could have been
- * reverted with the suite green.
+ * Core's privacy compliance tests check the metadata, including that every table carrying a userid
+ * is declared; they never call get_contexts_for_userid(), export_user_data() or a delete method,
+ * so these cases are the only guard on them.
  *
- * Each table therefore gets its own case, seeded ALONE. Seeding a user with all four rows
- * at once would pass just as happily against the lastview-only SQL the findings describe,
- * because lastview would carry the whole assertion.
+ * Each user-linked table gets its own case, seeded alone: a user holding rows in all four tables
+ * would also satisfy a provider that only reads local_awareness_lastview.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -47,10 +43,9 @@ final class provider_test extends \advanced_testcase {
     /**
      * Start every test with an empty writer.
      *
-     * The privacy writer is a static singleton that survives between tests in a run. Without this,
-     * an export assertion can be satisfied by data a PREVIOUS test wrote — the exact vacuity this
-     * repository has shipped before, and the reason the guard test below would otherwise pass
-     * against an export that writes nothing at all.
+     * The privacy writer is a static singleton that advanced_testcase does not reset (core's
+     * provider_testcase does), so an export assertion could otherwise be satisfied by data an
+     * earlier test wrote.
      *
      * @return void
      */
@@ -60,7 +55,7 @@ final class provider_test extends \advanced_testcase {
     }
 
     /**
-     * Every user-linked table, and a closure seeding exactly one row of it for a user.
+     * Every user-linked table, by name; seed_one() writes a row into each.
      *
      * @return array
      */
@@ -355,10 +350,8 @@ final class provider_test extends \advanced_testcase {
     /**
      * A userlist the data-request approver did NOT approve must delete nothing.
      *
-     * The context of a user context names exactly one user, so it is tempting to take the
-     * userid from the context and ignore the list. That reads the same in the passing case
-     * and inverts the meaning of approval in this one: the approver withheld consent and the
-     * rows go anyway.
+     * A user context names exactly one user, so taking the userid from the context instead of the
+     * list passes every other case and here erases rows the approver withheld.
      */
     public function test_delete_data_for_users_respects_an_empty_approved_list(): void {
         $this->resetAfterTest();
@@ -380,9 +373,8 @@ final class provider_test extends \advanced_testcase {
     /**
      * Erasure drops the user's MUC view cache, not only their database rows.
      *
-     * The view records are read through a MODE_APPLICATION cache keyed by user id. A bulk
-     * $DB->delete_records() does not notify it, so without an explicit purge the deleted
-     * user's viewing history stays readable from the cache for the rest of its life.
+     * See provider::delete_all_data_for_userid(): a bulk delete does not invalidate the per-user
+     * notice_view cache.
      */
     public function test_erasure_purges_the_view_cache(): void {
         global $USER;
@@ -407,14 +399,9 @@ final class provider_test extends \advanced_testcase {
     /**
      * The declaration names every column the export actually ships.
      *
-     * These are two halves of one promise and they had drifted. export_user_data() selects
-     * `lv.*`, `ack.*`, `his.*` and `job.*` — whole rows — while get_metadata() named a subset, and
-     * the declaration is the half a data subject reads BEFORE deciding whether to ask. A narrower
-     * declaration than the export is not a smaller disclosure, it is an inaccurate one.
-     *
-     * The comparison is made against the real table columns rather than a list written here, so
-     * adding a column to any of the four tables without declaring it turns this red — which is the
-     * drift that produced the finding in the first place.
+     * export_user_data() ships whole rows, so get_metadata() must declare every column of the four
+     * tables. The comparison reads the real table columns rather than a list written here, so a
+     * column added to any of them without a declaration fails this test.
      */
     public function test_the_declaration_names_every_exported_column(): void {
         global $DB;
@@ -447,17 +434,10 @@ final class provider_test extends \advanced_testcase {
     }
 
     /**
-     * The notice table is declared for its author column, and deliberately never acted on.
+     * The notice table is declared for its author column, and deliberately never erased.
      *
-     * core\persistent stamps local_awareness.usermodified on every create and update, so a user id
-     * is stored there and has to be declared. It is NOT exported or erased, and that is the
-     * decision rather than an omission: a notice is site configuration, and blanking the column
-     * would rewrite the record of who published a site-wide announcement. Core treats its own
-     * admin-authored configuration the same way — analytics_models and the oauth2_* tables each
-     * carry a usermodified-only entry with no export and no erasure.
-     *
-     * Asserting the second half is what stops a future reader "completing" the provider by wiring
-     * this table into the delete paths.
+     * The reasoning is at {@see provider::get_metadata()}. Asserting the second half stops the
+     * provider from being "completed" by wiring this table into the delete paths.
      */
     public function test_the_notice_table_is_declared_but_never_erased(): void {
         global $DB;
@@ -497,11 +477,8 @@ final class provider_test extends \advanced_testcase {
     /**
      * The export goes only into the subject's own user context.
      *
-     * The loop used to iterate the contextlist without ever reading $context, so every context in
-     * it received the identical, complete payload. get_contexts_for_userid() only ever adds this
-     * user's own context, so the list cannot hold a foreign one today — but delete_data_for_user()
-     * carries this very check, and an export that trusts what an erasure verifies is the asymmetry
-     * worth removing.
+     * get_contexts_for_userid() never lists a foreign context, but the export makes the same check
+     * as delete_data_for_user() rather than relying on that.
      *
      * @return void
      */
@@ -582,8 +559,8 @@ final class provider_test extends \advanced_testcase {
     /**
      * A view row whose notice has since been deleted still exports, simply unnamed.
      *
-     * Click history deliberately outlives the notice it belongs to, so a missing target is an
-     * ordinary state and must not be treated as an error.
+     * Interaction rows outlive a deleted notice unless cleanup_deleted_notice is on, so a missing
+     * target is an ordinary state and must not be treated as an error.
      *
      * @return void
      */

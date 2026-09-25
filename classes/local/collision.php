@@ -35,7 +35,7 @@ use local_awareness\persistent\awareness;
  * what the author meant and is invisible while editing either one on its own. Nothing here blocks
  * anything: it exists so the author is told.
  *
- * Only the PAGE REACH is compared, not the audience. Two notices aimed at the same pages but at
+ * Only the page reach is compared, not the audience. Two notices aimed at the same pages but at
  * disjoint cohorts never actually meet, so this over-reports — deliberately, because the alternative
  * is computing audience overlap while someone types, and a warning that is occasionally unnecessary
  * costs less than one that is occasionally absent.
@@ -50,7 +50,7 @@ class collision {
      * - an empty pattern, or one made only of wildcards, places no restriction at all;
      * - identical patterns, ignoring case;
      * - the FRONTPAGE / MY / MYCOURSES tokens, whose overlap is invisible in the strings and is
-     *   settled by asking the display path's own matcher about each landmark page;
+     *   settled by asking helper::check_path_match() about each landmark page;
      * - a wildcard pattern against a page the other pattern certainly reaches.
      *
      * Two unrelated literal paths are reported as not overlapping, which is right, and two exotic
@@ -233,11 +233,11 @@ class collision {
     }
 
     /**
-     * Every enabled notice that repeats.
+     * Every enabled notice that repeats, whatever its scheduling window.
      *
-     * Read straight from the table rather than through the enabled-notices cache, which also
-     * applies the scheduling window: a notice scheduled for next week still competes for the same
-     * pages, and the author needs to be told before it starts rather than after.
+     * Read straight from the table, with no window applied: a notice scheduled for next week still
+     * competes for the same pages, and the author needs to be told before it starts rather than
+     * after.
      *
      * @return awareness[] Keyed by id.
      * @throws \dml_exception

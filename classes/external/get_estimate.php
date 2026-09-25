@@ -51,7 +51,7 @@ class get_estimate extends external_api {
     /**
      * Poll the result of an audience-estimate job.
      *
-     * @param string $jobid
+     * @param string $jobid Job token returned by estimate_audience.
      * @param int $courseid The course the editor is scoped to, 0 for the site.
      * @return array
      */
@@ -61,12 +61,7 @@ class get_estimate extends external_api {
             ['jobid' => $jobid, 'courseid' => $courseid]
         );
 
-        /*
-         * The scope the caller is writing under, from the courseid the editor sends: the site when
-         * absent. Validated as a context — which also requires login to the course — and then gated
-         * the way every author-side entry point is, so a course author's editor works and a caller
-         * naming a course they do not hold is refused before anything is read.
-         */
+        // The scope gate is explained in estimate_audience::execute().
         $scope = author_scope::for_request(null, (int) $params['courseid']);
         self::validate_context($scope->context());
         helper::require_author($scope, 'manage');
@@ -74,10 +69,10 @@ class get_estimate extends external_api {
         $job = audience_job::get_record(['jobid' => $params['jobid']]);
         /*
          * A job is shared by criteria hash between whoever asks the same question, so it is bound
-         * to the scope rather than to a user: under a course scope the job's criteria must carry
-         * that course as their forced filter, which every job made under the scope does and no
-         * site job or other course's job can. A job outside the scope reads as no job at all, so a
-         * jobid is not an oracle over what other authors have asked.
+         * to the scope rather than to a user: under a course scope the job's criteria must name
+         * exactly that course as filter_course, which every job made under the scope does and a job
+         * made elsewhere does only if it targeted that one course alone. A job outside the scope
+         * reads as no job at all, so a jobid is not an oracle over what other authors have asked.
          */
         if ($job && !$scope->is_site()) {
             $jobcriteria = json_decode($job->get('criteria'), true) ?: [];
@@ -102,12 +97,7 @@ class get_estimate extends external_api {
         $criteria = json_decode($job->get('criteria'), true) ?: [];
         $hasaudience = !empty(estimator::audience_rules_in($criteria));
 
-        /*
-         * Names are resolved here and not stored on the job. Jobs are shared between callers by
-         * criteria hash, so a label written at compute time would be served to the next reader in
-         * the language of the first — the same reason a web service emitting localised strings
-         * cannot cache them without the language in the key.
-         */
+        // Names are resolved on every read, never stored on the shared job; see rule_describer.
         $contextrules = [];
         foreach (estimator::context_rules_in($criteria) as $rule) {
             $rule['display'] = rule_describer::describe($rule['key'], $rule['values']);
@@ -115,11 +105,10 @@ class get_estimate extends external_api {
         }
 
         /*
-         * No per-rule breakdown under a course scope. isolate_rule() reads each rule alone, on
-         * purpose, so every chip answers "how many users hold role X" or "are in cohort Y" over the
-         * whole site — the right reading for an administrator and a site-wide oracle for a course
-         * author. The total is what the course author asked for and is already confined to the
-         * course by the forced filter; the chips are not, so they stay with the site scope.
+         * No per-rule breakdown under a course scope. estimator::isolate_rule() counts each rule
+         * on its own, so a chip such as "in cohort Y" counts over the whole site: right for an
+         * administrator, a site-wide oracle for a course author. The total is already confined to
+         * the course by the forced filter_course, so it is returned; the chips stay with the site.
          */
         $breakdown = $scope->is_site() ? json_decode($job->get('breakdown') ?: '[]', true) : [];
         $breakdown = is_array($breakdown) ? $breakdown : [];

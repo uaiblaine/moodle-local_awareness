@@ -22,7 +22,8 @@ use local_awareness\helper;
  * Tests for the footer-hook loading decision.
  *
  * Cases are looped rather than fed through a data provider: Moodle 4.5 vendors PHPUnit 9.6, which
- * predates attribute metadata, and a docblock provider would run the method with no arguments.
+ * ignores a #[DataProvider] attribute and runs the method with no arguments, while the docblock
+ * form raises a runner deprecation under the PHPUnit 11.5 of Moodle 5.x.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -74,9 +75,8 @@ final class hook_callbacks_test extends \advanced_testcase {
         $this->assertTrue(hook_callbacks::should_load_on($this->make_page('standard')));
 
         /*
-         * The list is spelled out rather than read from the constant on purpose: iterating the
-         * constant would silently drop a layout from the test the moment it was dropped from the
-         * code, which is the exact regression this test exists to catch.
+         * Spelled out rather than read from EXCLUDED_LAYOUTS, so a layout dropped from the constant
+         * still fails here.
          */
         foreach (['maintenance', 'print', 'redirect', 'embedded', 'popup', 'secure'] as $layout) {
             $this->assertFalse(
@@ -134,9 +134,9 @@ final class hook_callbacks_test extends \advanced_testcase {
      * Guests keep receiving notices: they pass isloggedin(), and their delivery is a contract.
      *
      * The guest interaction handling (session-only markers, one guest's dismissal not hiding the
-     * notice from the next) only ever runs if the module loads for guests in the first place.
-     * tool_usertours — the design's model — excludes guests; copying that guard here would
-     * silently end guest delivery, which is exactly what this pins against.
+     * notice from the next) only runs if the module loads for guests. tool_usertours, whose
+     * bootstrap the layout list follows, excludes guests; copying that guard here would end guest
+     * delivery.
      */
     public function test_guests_still_load_the_module(): void {
         $this->resetAfterTest();

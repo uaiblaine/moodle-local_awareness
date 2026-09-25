@@ -55,8 +55,9 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         /**
          * The class prefixes the stylesheet reads for the layout, the position and the entrance.
          *
-         * Mirrors awareness::TEMPLATES and friends only in shape: the values arrive from the
-         * server, already validated, and this file writes whatever it is handed.
+         * The suffixes arrive from the server, already validated, and are written as handed. The
+         * three layout lists are hand copies of the awareness persistent's vocabulary, pinned
+         * against it by tests/local/motion_contract_test.php.
          */
         var APPEARANCE = {
             TEMPLATE: 'la-tpl-',
@@ -67,7 +68,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
             NONE: 'none',
             // The layouts narrower than, or shaped unlike, core's large dialogue. Mirrors awareness::COMPACT.
             COMPACT: ['card', 'minimal', 'banner', 'image'],
-            // The layouts whose author-set width and height mean anything.
+            // The layouts whose author-set width and height apply: every layout neither compact nor fullscreen.
             SIZED: ['classic', 'hero', 'video', 'carousel', 'split'],
             // The layouts that paint the image in the band rather than as a cover. Mirrors awareness::BAND.
             BAND: ['hero', 'split', 'image']
@@ -108,10 +109,10 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         /**
          * Stop whatever is playing inside an element.
          *
-         * core/modal's hide() toggles classes and nothing else, so a video kept playing, audibly,
-         * from a dialogue that was no longer on the screen. A video.js player is paused through its
-         * API when the loader made one; a plain element directly; an iframe cannot be paused from
-         * outside, so its source is written back, which reloads it stopped.
+         * core/modal's hide() leaves the content alone, so media would keep playing, audibly, in a
+         * dialogue no longer on screen. A video.js player is paused through its API when the loader
+         * made one; a plain element directly; an iframe cannot be paused from outside, so its source
+         * is written back, which reloads it stopped.
          *
          * @param {HTMLElement|undefined} container The element to silence.
          */
@@ -182,21 +183,20 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         ModalNotice.create = Modal.create;
 
         /**
-         * Selector for the close button.
+         * Selector for the dialogue's exit buttons.
          *
-         * One constant rather than the same selector spelled out at each of the three places that
-         * need it. The button carries both an id and the data-action hook
-         * (templates/modal_notice.mustache); the data-action form is what the rest of this file
-         * uses, so the close and accept hooks read the same way.
+         * Matches every data-action="close" button in templates/modal_notice.mustache: the header
+         * cross, the footer Close and Not now. The backdrop and Escape paths click the same
+         * selector, so every exit reaches the handler bound to it.
          *
-         * @returns {String} A selector matching the modal's close button.
+         * @returns {String} A selector matching the modal's close buttons.
          */
         ModalNotice.prototype.getCloseButtonSelector = function() {
             return SELECTORS.CLOSE_BUTTON;
         };
 
         /**
-         * Get ID of accept button.
+         * Get the selector of the accept button, by its id.
          * @returns {string}
          */
         ModalNotice.prototype.getAcceptButtonID = function() {
@@ -204,7 +204,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         };
 
         /**
-         * Get ID of accept button.
+         * Get the selector of the acknowledgement checkbox, by its id.
          * @returns {string}
          */
         ModalNotice.prototype.getAckCheckboxID = function() {
@@ -230,9 +230,8 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         /**
          * Dress the dialogue for how insistent this notice is.
          *
-         * One call rather than three, because it is one decision. Everything it touches is already
-         * in the template, so nothing here fetches a string or waits on a promise: the exit button
-         * for this level is shown and the other is hidden.
+         * Everything it touches is already in the template, so nothing here fetches a string or
+         * waits on a promise: the exit buttons for this level are shown and the others hidden.
          *
          *  - Informational  the header cross and a single Close; no Accept, so no acceptance can
          *                   be recorded for a notice that never asked for one.
@@ -310,25 +309,17 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
 
 
         /**
-         * Override registerEventListeners to custom handle backdrop clicks.
+         * Replace core's listeners with the plugin's own backdrop and Escape handling.
          *
-         * IMPORTANT: This MUST be a proper prototype method (not a class field
-         * like `= function() {}`) so that it exists on the prototype chain BEFORE
-         * the parent Modal constructor calls `this.registerEventListeners()`.
-         * Class fields are only initialised after super() returns, which means
-         * the parent would use its own version instead of this override.
+         * A prototype method, not a class field, because the core/modal constructor calls
+         * this.registerEventListeners() before a subclass's fields are initialised.
          *
-         * Replacing core's version rather than extending it means core's own listeners never
-         * register, so what is NOT here is as load-bearing as what is. Deliberately dropped:
-         * core's Escape handler (it calls hide() with no server call, losing the dismissal
-         * record) and its data-action="hide" handler (this template uses data-action="close").
-         * Deliberately NOT reimplemented: the Tab trap. core/modal calls
-         * FocusLock.trapFocus() from attachToDOM() (lib/amd/src/modal.js), and focuslock binds
-         * keydown in the CAPTURE phase, so core already ran by the time a jQuery handler here
-         * would see the key. The copy this file used to carry ran second, fought core for the
-         * same keypress, and matched a narrower set of elements - it could not reach a select,
-         * a textarea or anything with tabindex inside a notice body, all of which an author can
-         * put there through the content editor.
+         * None of core's listeners register, so what is missing here matters as much as what is
+         * here. Dropped on purpose: core's Escape handler (it calls hide() with no server call, so
+         * no dismissal would be recorded), its data-action="hide" handler (this template uses
+         * data-action="close") and its focus return on hidden. Not reimplemented: the Tab trap,
+         * which core/modal installs from attachToDOM() through FocusLock.trapFocus(), listening
+         * for keydown in the capture phase ahead of any handler here.
          */
         ModalNotice.prototype.registerEventListeners = function() {
             var modal = this;
@@ -339,10 +330,8 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
                 }
                 if ($(e.target).closest('[data-region="modal"]').length === 0) {
                     if (modal.insistence >= INSISTENCE.BLOCKING) {
-                        // The shake goes on the dialogue, which is the element carrying `awareness` and
-                        // the element styles.css animates. It used to go on getRoot(), where the rule
-                        // `.awareness.jelly-anim .modal-dialog` could never match - `awareness` sits on
-                        // the dialog, not the root - so a blocked click produced no feedback at all.
+                        // The shake goes on the dialogue, the element carrying `awareness` that styles.css
+                        // animates, not on getRoot().
                         var dialog = modal.getModal();
                         dialog.removeClass('jelly-anim');
                         void dialog[0].offsetWidth;
@@ -355,8 +344,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
 
             /*
              * Namespaced, so destroy() can take this one listener off again: the previews build a
-             * fresh dialogue on every press, and a document listener that outlived its dialogue
-             * was a closure leaked per preview.
+             * fresh dialogue on every press, and each would otherwise leave a document listener behind.
              */
             this.keyns = 'keydown.local_awareness_' + Math.random().toString(36).slice(2);
             $(document).on(this.keyns, function(e) {
@@ -377,7 +365,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         /**
          * Dress the dialogue as one of the layouts.
          *
-         * Swaps the layout class on the dialog, which IS .awareness, and manages modal-lg itself:
+         * Swaps the layout class on the dialog, which is .awareness, and manages modal-lg itself:
          * the template bakes that class in, so configure({large: true}) is a no-op against it and
          * a compact layout has to take it off by hand, for every notice including the first.
          *
@@ -546,8 +534,8 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         /**
          * Hide the dialogue, and stop whatever it was playing.
          *
-         * A prototype method for the reason registerEventListeners() above gives. The media is
-         * silenced first, while the elements are still there to be paused.
+         * A prototype method, so core's own calls to this.hide() (destroy() among them) reach it too.
+         * The media is silenced first, while the elements are still there to be paused.
          */
         ModalNotice.prototype.hide = function() {
             stopMedia(this.getRoot()[0]);
@@ -571,6 +559,9 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
          * One call for every path that shows a notice - the reader's queue, both previews - because
          * the reused instance needs each of these re-applied per notice; core keeps nothing per
          * show(). The entrance is not here: it plays after show(), from the caller.
+         *
+         * Call it once the dialogue is attached (after the first show()): the video.js loader looks
+         * its player up by id in the document, so a band filled while detached gets no player.
          *
          * @param {Object} notice The payload of one notice, as the web services return it.
          * @returns {Promise} Resolved once the media band is filled.

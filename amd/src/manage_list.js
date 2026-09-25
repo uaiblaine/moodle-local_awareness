@@ -128,15 +128,12 @@ export const init = () => {
     }
 
     /*
-     * A page can arrive already filtered — managenotice.php accepts the filter values as URL
-     * parameters so a filtered list can be linked to. The controls render their state server side,
-     * but the way out of the filter did not: the clear button is hidden in the template and was only
-     * ever revealed by applyFilters(), which nothing calls until the reader touches something.
+     * A page can arrive already filtered: managenotice.php accepts the filter values as URL
+     * parameters. The controls render that state server side, but the clear button is hidden in the
+     * template, so its visibility is decided here.
      *
-     * Deliberately not applyFilters() here. That would push a filterset at the table, and the key
-     * order of the one built here need not match PHP's, so core's string comparison could see a
-     * change and fire a pointless request on every page load. Reading the controls to decide the
-     * button's visibility is the whole job.
+     * Not applyFilters(): the filterset built here need not list its keys in PHP's order, so core's
+     * string comparison could see a change and fire a needless request on every page load.
      */
     updateClearButton(root, readValues(root));
 

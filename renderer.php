@@ -49,7 +49,7 @@ class local_awareness_renderer extends plugin_renderer_base {
     }
 
     /**
-     * Render the redesigned notice editor page.
+     * Render the notice editor page.
      *
      * @param editor_page $page renderable
      * @return string

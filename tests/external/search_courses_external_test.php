@@ -21,15 +21,12 @@ use local_awareness\external\search_courses;
 /**
  * Tests for the course-picker web service.
  *
- * search_courses() is registered in db/services.php and had no test of any kind, positive or
- * negative — and it is one of the two functions carrying a capability check, so the check was
- * deletable with the suite green. It also reaches every course on the site by name, which makes
- * an unguarded version a course-catalogue oracle for any authenticated user.
+ * search_courses() matches every course on the site by name, so without its capability check it
+ * would be a course-catalogue oracle for any authenticated user.
  *
- * The calls go through call_external_function(), not the bare static, so execute_returns() is
- * applied to a real payload. That matters here specifically: the returns declaration is an
- * allowlist, and this function ships its results as a JSON blob inside a single PARAM_RAW key,
- * where an added field would never be stripped and never be noticed.
+ * The successful calls go through call_external_function(), so execute_returns() is applied to a
+ * real payload. The courses travel as a JSON string in a single PARAM_RAW key, which
+ * clean_returnvalue() cannot look inside, so the declaration does not allowlist their fields.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -41,7 +38,7 @@ final class search_courses_external_test extends \advanced_testcase {
     /**
      * Log in an ordinary user holding local/awareness:manage.
      *
-     * assign_capability() rather than setAdminUser(), so the tests show that THIS capability is
+     * assign_capability() rather than setAdminUser(), so the tests show that this capability is
      * what the gate reads rather than that an admin passes everything.
      */
     private function login_as_manager(): void {
@@ -124,17 +121,17 @@ final class search_courses_external_test extends \advanced_testcase {
     }
 
     /**
-     * The fullname comes back in the ESCAPED spelling, because the sink renders it as HTML.
+     * The fullname comes back in the escaped spelling, because the sink renders it as HTML.
      *
      * course_search.js hands the label to core's autocomplete, which appends it into the hidden
      * select and re-renders it through the triple stash in form_autocomplete_suggestions.mustache.
      * Nothing between json_encode() and that stash escapes anything, so an unformatted fullname
-     * reaches the notice author's DOM as live markup — and a course fullname is settable by anyone
-     * holding moodle/course:update, a strictly lower privilege than local/awareness:manage.
+     * reaches the notice author's DOM as live markup, and a course fullname is settable by anyone
+     * holding moodle/course:update, which local/awareness:manage does not require.
      *
-     * A bare ampersand is the fixture on purpose. Tag-shaped input like <b>x</b> is stripped
-     * identically whether or not the value was formatted, so it would prove nothing; the ampersand
-     * rule is the one that actually differs between the two spellings.
+     * A bare ampersand is the fixture on purpose: format_string() strips tag-shaped input like
+     * <b>x</b> identically in both escape modes, so it would prove nothing, while the ampersand is
+     * escaped in one mode only.
      */
     public function test_the_fullname_is_returned_escaped(): void {
         $this->resetAfterTest();
@@ -149,11 +146,10 @@ final class search_courses_external_test extends \advanced_testcase {
     }
 
     /**
-     * The query still matches the RAW stored fullname, not the escaped one.
+     * The query still matches the raw stored fullname, not the escaped one.
      *
-     * Deliberate, and the opposite of what WS-03 had to do for roles: the author types the text
-     * they actually entered, so "Physics &" must find the course. Making the two "consistent" by
-     * matching on the formatted string would break exactly this.
+     * The author types the text as it was entered, so "Physics &" must find the course; matching
+     * on the formatted string would break that.
      */
     public function test_the_query_matches_the_unescaped_name(): void {
         $this->resetAfterTest();
@@ -166,7 +162,7 @@ final class search_courses_external_test extends \advanced_testcase {
         $this->assertCount(1, $courses);
         $this->assertSame((int) $wanted->id, $courses[0]['id']);
 
-        // Control: the escaped spelling is NOT what the query is compared against.
+        // Control: the escaped spelling is not what the query is compared against.
         $this->assertSame([], $this->search('Physics &amp; Chem'));
     }
 

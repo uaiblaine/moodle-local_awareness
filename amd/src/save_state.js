@@ -25,8 +25,7 @@
  * 'autosave' => true and helper::get_file_editor_options() does not override it, with tiny_autosave
  * shipping in lib/editor/tiny/plugins/autosave — and formslib already wires core_form/changechecker
  * to warn on tab close. A second store would duplicate the largest and most sensitive field, and
- * would have to write into a moodleform to restore it, which is the pattern that produced this
- * page's last two shipped defects.
+ * would have to write into a moodleform to restore it.
  *
  * The replacement text comes off a data attribute rather than core/str: it is one string, already
  * resolved server side, and a round trip to fetch it would leave the line lying for as long as the
@@ -70,9 +69,8 @@ export const init = () => {
 
     /*
      * Registered once on both, so the listeners remove themselves. 'input' catches typing, 'change'
-     * catches the selects and date pickers that never fire input — and the rich editor, which
-     * writes into its textarea rather than being typed into, fires neither, which is precisely the
-     * field core is already autosaving for us.
+     * catches the selects and date pickers that never fire input. The rich editor fires neither,
+     * because it writes into its textarea rather than being typed into; core autosaves that field.
      */
     form.addEventListener('input', markDirty, {once: true});
     form.addEventListener('change', markDirty, {once: true});

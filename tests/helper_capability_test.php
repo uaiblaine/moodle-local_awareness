@@ -24,14 +24,13 @@ use local_awareness\external\search_roles;
 use local_awareness\persistent\awareness;
 
 /**
- * Tests that every write entry point refuses a user without local/awareness:manage.
+ * Tests that every author entry point refuses a user without local/awareness:manage.
  *
- * check_manage_capability() is the plugin's only write gate and it had no negative test at all:
- * deleting the guard from any of its six call sites turned nothing red. The existing capability
- * tests all live in the external layer, so the helper — which editnotice.php and managenotice.php
- * call directly — was unguarded in the suite.
+ * helper::require_author() is the plugin's only capability gate. The helper's notice writes are
+ * called directly by editnotice.php and managenotice.php, so they are pinned here beside the
+ * author-side web services rather than only through the external layer.
  *
- * Each case runs the SAME call twice: once as a plain user expecting the exception, once as a
+ * Each case runs the same call twice: once as a plain user expecting the exception, once as a
  * capability holder expecting it to succeed. Without the positive half a test passes when the
  * call fails for any reason at all — a bad argument, a missing config — and would keep passing
  * after the capability check it was written for is deleted.
@@ -61,7 +60,7 @@ final class helper_capability_test extends \advanced_testcase {
     }
 
     /**
-     * The six write entry points, each as a callable taking the seeded notice.
+     * The six notice writes and five author-side web services, each as a callable taking the seeded notice.
      *
      * @return array
      */
@@ -105,7 +104,7 @@ final class helper_capability_test extends \advanced_testcase {
                     helper::delete_notice($notice);
                 },
             ],
-            // The author-side web services: gated by the same seam, with no negative test before.
+            // The author-side web services, gated by the same helper::require_author().
             'estimate_audience' => [
                 static function (awareness $notice): void {
                     estimate_audience::execute(json_encode(['pathmatch' => '/my/']));
@@ -153,10 +152,10 @@ final class helper_capability_test extends \advanced_testcase {
     }
 
     /**
-     * The same six calls succeed once the capability is granted.
+     * The same calls succeed once the capability is granted.
      *
      * The control for the test above. It grants local/awareness:manage to an ordinary user with
-     * assign_capability() rather than using setAdminUser(), so what is being proved is that THIS
+     * assign_capability() rather than using setAdminUser(), so what is being proved is that this
      * capability is what the gate reads — a site admin passes every has_capability() check there
      * is and would prove nothing about which one is enforced.
      *

@@ -23,8 +23,7 @@ use core\persistent;
  *
  * A slide shows one media - an image uploaded into the slidemedia file area, keyed by the slide's
  * own id, or an external video link the multimedia filter turns into a player - and a plain-text
- * caption under it. The rows are the author's structured answer to "what are the slides": they are
- * validated when the notice is saved, so a carousel cannot reach a reader half-formed.
+ * caption under it. The notice form validates the slides when the notice is saved.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine

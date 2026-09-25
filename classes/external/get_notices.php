@@ -62,19 +62,17 @@ class get_notices extends external_api {
         self::validate_context(\context_system::instance());
 
         /*
-         * This function returns rendered notice bodies, and the page URL is what drives the
-         * pathmatch and check_filters() rules that decide who may read them. An empty value used
-         * to mean "apply no page rules at all", so any authenticated caller could read every
-         * role-, category-, course-, format-, theme- and competency-targeted notice on the site
-         * just by leaving the parameter out. VALUE_REQUIRED rejects the omission; this rejects the
-         * empty string that would still satisfy it.
+         * The page URL drives the pathmatch and check_filters() rules that decide who may read these
+         * rendered bodies, so it cannot be empty. VALUE_REQUIRED only rejects an omitted one; an
+         * empty one is refused here as a parameter error rather than reaching
+         * retrieve_user_notices(), which throws a coding_exception for it.
          */
         if (trim($params['pageurl']) === '') {
             throw new \invalid_parameter_exception('pageurl must not be empty');
         }
 
-        // See dismiss_notice(): the switch is enforced at the boundary, not in the helper. An empty
-        // list rather than an error — the client renders nothing and says nothing.
+        // Nothing is delivered while delivery is off; dismiss_notice explains why the check sits here.
+        // An empty list rather than an error, so the client renders nothing and says nothing.
         if (!helper::is_delivery_enabled()) {
             return ['status' => true, 'notices' => []];
         }
@@ -82,11 +80,10 @@ class get_notices extends external_api {
         $result = [];
         $result['status'] = true;
         /*
-         * One builder for every service that hands a notice to the dialogue - see notice_payload.
-         * select_for_display() is what makes this one notice at a time: everything the user is
-         * eligible for is computed first; only the head of the queue is sent, so arriving at a
-         * page never stacks modals. array_values(), because it keys its result by notice id and
-         * an external_multiple_structure is a list.
+         * One builder for every service that hands a notice to the dialogue; see notice_payload.
+         * select_for_display() picks what to show now, normally only the head of the queue so a page
+         * never stacks modals (its docblock gives the one exception). It keys its result by notice
+         * id, and an external_multiple_structure is a list, hence array_values().
          */
         $result['notices'] = array_values(
             array_map(
@@ -110,20 +107,9 @@ class get_notices extends external_api {
             [
                 'status' => new external_value(PARAM_BOOL, 'status: true if success', VALUE_DEFAULT, "0"),
                 /*
-                 * A real structure, not a PARAM_RAW JSON blob. While this was a string core could
-                 * not see inside it: clean_returnvalue() had nothing to check, so the allowlist was
-                 * whatever the hand-written loop in execute() happened to copy, guarded by a single
-                 * PHPUnit assertion. Declaring it moves the guarantee into the framework — an
-                 * undeclared key is now stripped by core before it leaves the server, which is what
-                 * audit finding WS-01 asked for.
-                 *
-                 * The prose fields are PARAM_RAW on purpose, and it is not laziness. title and
-                 * content carry rendered HTML that has to reach the client byte for byte, and
-                 * modal_width / modal_height are PARAM_RAW in the persistent, so they can hold a
-                 * character PARAM_TEXT would strip — and a PARAM_TEXT field whose cleaned value
-                 * differs from the original THROWS, killing the whole response for every reader
-                 * rather than dropping one field. The allowlist is the key set; the types are only
-                 * what can safely be said about each value.
+                 * A declared structure rather than a PARAM_RAW JSON blob, so clean_returnvalue()
+                 * strips any key notice_payload::build() returns without declaring it. Why the prose
+                 * fields are PARAM_RAW is explained at notice_payload::structure().
                  */
                 'notices' => new external_multiple_structure(notice_payload::structure(), 'The notices to display now'),
             ]

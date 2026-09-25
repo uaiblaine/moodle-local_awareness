@@ -47,11 +47,9 @@ class provider implements
         $contextlist = new contextlist();
 
         /*
-         * Every user-linked table has to be considered, not just lastview. A link click writes
-         * local_awareness_hlinks_his on its own (the modal stays open, so no view record exists
-         * yet), and an audience-estimate job writes local_awareness_audience_jobs with no view
-         * record at all. Driving the contextlist off lastview alone left those rows outside both
-         * the export and the erasure, while the site reported success.
+         * Every user-linked table, not only lastview: a link click and an audience-estimate job
+         * each write a row without any view record, and a user holding only those rows must still
+         * be exported and erased.
          */
         $sql = "SELECT c.id
                   FROM {context} c
@@ -91,11 +89,8 @@ class provider implements
         $user = $contextlist->get_user();
 
         /*
-         * Only the subject's OWN user context. The loop used to export into every context in the
-         * list without ever reading $context, so each one received the identical, complete payload.
-         * get_contexts_for_userid() only ever adds this user's own context, so today the list
-         * cannot hold another — but delete_data_for_user() carries exactly this check a few methods
-         * below, and an export that trusts what an erasure verifies is the asymmetry worth removing.
+         * Only into the subject's own user context, the same check delete_data_for_user() makes.
+         * get_contexts_for_userid() adds no other context, but the export does not rely on that.
          */
         $usercontext = null;
         foreach ($contextlist->get_contexts() as $context) {
@@ -200,9 +195,9 @@ class provider implements
      * the thing it names. The id columns stay: a data request is also a record, and dropping them
      * would make the export impossible to reconcile against the site.
      *
-     * A referenced notice or link may have been deleted since — the click history deliberately
-     * outlives the notice — so a missing target is simply left unnamed rather than treated as an
-     * error.
+     * A referenced notice may have been deleted since (unless the cleanup_deleted_notice setting is
+     * on, deleting a notice keeps these rows), so a missing target is left unnamed rather than
+     * treated as an error.
      *
      * @param array $rows Rows straight from the database.
      * @param array $titles Notice id => title, from notice_titles().
@@ -262,10 +257,8 @@ class provider implements
         $userid = (int) $contextlist->get_user()->id;
 
         /*
-         * Every approved context, not just the first, and the userid comes from the contextlist
-         * rather than from the context. Taking it from the context happens to agree while the
-         * list holds one user context, and stops agreeing the moment it does not — at which
-         * point the plugin would erase whoever the first context happened to name.
+         * The user id comes from the contextlist, not from a context: erasure runs only when the
+         * approved list holds the subject's own user context, never for whoever a context names.
          */
         foreach ($contextlist->get_contexts() as $context) {
             if ($context->contextlevel === CONTEXT_USER && (int) $context->instanceid === $userid) {
@@ -289,9 +282,8 @@ class provider implements
 
         $params = ['contextid' => $context->id, 'contextlevel' => CONTEXT_USER];
 
-        // Same reasoning as get_contexts_for_userid(): a user can hold link-click or
-        // audience-job rows without ever having a view record, and driving this off lastview
-        // alone meant delete_data_for_users() was never called for them.
+        // Every user-linked table, as in get_contexts_for_userid(): link-click and audience-job
+        // rows exist without any view record.
         $sql = "SELECT c.instanceid AS userid
                   FROM {context} c
                  WHERE c.id = :contextid
@@ -325,10 +317,9 @@ class provider implements
         }
 
         /*
-         * Driven by the APPROVED ids, not by the context's instanceid. The two agree whenever the
-         * approver said yes, which is why the shortcut survives review — but when the approver
-         * withheld a user the list arrives empty and the shortcut erases them anyway, turning a
-         * refusal into a deletion. The context still bounds what may be touched.
+         * Driven by the approved ids, not by the context's instanceid: when the user was not
+         * approved the list is empty, and erasing by the context would turn that refusal into a
+         * deletion. The context still bounds what may be touched.
          */
         foreach ($userlist->get_userids() as $userid) {
             if ((int) $userid === (int) $context->instanceid) {
@@ -366,11 +357,8 @@ class provider implements
      */
     public static function get_metadata(collection $collection): collection {
         /*
-         * Every column export_user_data() actually ships. It selects lv.*, ack.*, his.* and job.*,
-         * so the whole row reaches the export file — while this declaration named a subset, which
-         * is the half of the privacy contract a data subject reads BEFORE deciding whether to ask.
-         * A narrower declaration than the export is not a smaller disclosure; it is an inaccurate
-         * one.
+         * Every column export_user_data() ships. It exports whole rows, so a column added to one of
+         * these tables has to be declared here as well.
          */
         $collection->add_database_table(
             'local_awareness_ack',
@@ -429,14 +417,11 @@ class provider implements
         );
 
         /*
-         * A notice is site configuration rather than one person's data, but core\persistent stamps
-         * the author into local_awareness.usermodified on every create and update, so a user id is
-         * stored here and has to be declared. Core declares exactly this shape for admin-authored
-         * configuration and then declines to act on it — analytics_models, analytics_models_log
-         * and the oauth2_* tables each carry a usermodified-only entry with no export and no
-         * erasure. Blanking this column would rewrite the record of who published a site-wide
-         * notice, so it is declared and deliberately left out of the contextlist, the export and
-         * every delete path.
+         * A notice is configuration rather than one person's data, but core\persistent stamps the
+         * author into usermodified on every create and update, so the user id is declared. As with
+         * core's analytics_models and analytics_models_log, it is left out of the contextlist, the
+         * export and every delete path: blanking it would rewrite the record of who published the
+         * notice.
          */
         $collection->add_database_table(
             'local_awareness',

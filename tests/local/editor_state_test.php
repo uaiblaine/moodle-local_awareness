@@ -54,7 +54,7 @@ final class editor_state_test extends \basic_testcase {
     }
 
     /**
-     * The predicate must agree with helper::is_within_active_window() about every shape.
+     * The predicate must agree with window::is_open(), the display test, about every shape.
      *
      * @dataProvider window_provider
      * @param int $enabled Whether the notice is published.
@@ -71,10 +71,7 @@ final class editor_state_test extends \basic_testcase {
     }
 
     /**
-     * The cases that yield nothing must not all yield nothing for the same trivial reason.
-     *
-     * Without this the provider above would still pass if window_problems() returned [] for
-     * everything — most of its rows expect exactly that.
+     * Across the provider's rows the predicate reports both window problems and nothing else.
      *
      * @return void
      */

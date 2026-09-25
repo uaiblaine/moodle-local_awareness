@@ -20,7 +20,9 @@ use core\persistent;
 use local_awareness\local\window;
 
 /**
- * Site notice class.
+ * A notice: its content, audience filters, display window and dialogue appearance.
+ *
+ * A courseid of 0 is a site notice; any other value is the course the notice belongs to.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -41,18 +43,18 @@ class awareness extends persistent {
     const INSISTENCE_ACKNOWLEDGE = 2;
 
     /**
-     * Dialogue layouts an author may choose. The first is the column default, and it is what every
-     * notice written before layouts existed renders as: the header, body and footer it always had.
+     * Dialogue layouts an author may choose. The first, classic (header, body and footer), is the
+     * column default.
      *
-     * One source for the form, the web service, the JavaScript mirror and the tests; the columns
-     * only hold the choice, and the persistent's `choices` gate is what keeps them inside it.
+     * One source for the form, the web services, the JavaScript copies and the tests; the `choices`
+     * gate in define_properties() keeps the stored value inside it.
      */
     public const TEMPLATES = ['classic', 'hero', 'split', 'minimal', 'fullscreen', 'card', 'banner', 'image', 'video', 'carousel'];
 
     /** Positions on the screen. start/end are logical, so a corner flips under RTL. */
     public const POSITIONS = ['center', 'top', 'bottom', 'top-start', 'top-end', 'bottom-start', 'bottom-end'];
 
-    /** The positions every layout accepts; the corners are for the card alone. */
+    /** The positions of every layout positions_for() does not single out; the corners are for the card alone. */
     public const POSITIONS_EDGE = ['center', 'top', 'bottom'];
 
     /** The four corners, where only a card is small enough to sit. */
@@ -84,8 +86,9 @@ class awareness extends persistent {
      * A fullscreen dialogue covers the screen, so it has no position; a card is compact enough for
      * a corner; a banner is a strip and lies against the top or the bottom edge, never in the
      * middle of the page; everything else sits centred or against the top or bottom edge, where a
-     * wide box still reads as one. The form offers these and extra_validation() refuses the rest,
-     * because a value the CSS has no rule for renders as centred and the stored choice would then lie.
+     * wide box still reads as one. The form offers these and extra_validation() refuses the rest
+     * (fullscreen is instead forced to centre on save), because a value the CSS has no rule for
+     * renders as centred and the stored choice would then lie.
      *
      * @param string $template One of TEMPLATES.
      * @return string[] A subset of POSITIONS.
@@ -130,8 +133,8 @@ class awareness extends persistent {
     /**
      * Whether a layout can carry the acknowledgement checkbox.
      *
-     * The highest level insistence_levels_for() allows: offering it to a layout whose footer has
-     * no room for the box would render an insistence the reader cannot satisfy.
+     * True when insistence_levels_for() includes Acknowledge: offering the box on a layout whose
+     * footer has no room for it would render an insistence the reader cannot satisfy.
      *
      * @param string $template One of TEMPLATES.
      * @return bool
@@ -195,21 +198,18 @@ class awareness extends persistent {
     /**
      * How insistent this notice is, as one ordered value.
      *
-     * Derived rather than stored, so there is no third copy of the truth to drift from the two
-     * columns the display path has always read. The author sets one thing; these are how it lands:
+     * Derived from the two stored columns rather than stored itself, so there is no third copy to
+     * drift. The author sets one level; the columns hold it as:
      *
      *  - Informational  reqack = 0, outsideclick = 1
      *  - Blocking       reqack = 0, outsideclick = 0
      *  - Acknowledge    reqack = 1
      *
-     * The fourth combination — reqack = 1 with outsideclick = 1 — is unreachable from the form but
-     * may exist in data written before the settings were consolidated, or by a web service. It
-     * reads as Acknowledge, because requiring an acknowledgement is the more insistent statement
-     * and because that is already how the dialogue behaves: its block test has always been
-     * `reqack || !outsideclick`.
+     * reqack = 1 with outsideclick = 1 is unreachable from the form but may exist in older data; it
+     * reads as Acknowledge, the more insistent statement.
      *
-     * Ordered on purpose. Callers ask "is this at least Blocking", not "is this exactly Blocking",
-     * so a level added above Acknowledge later does not silently fall out of those tests.
+     * Ordered on purpose: callers ask "is this at least Blocking", not "is this exactly Blocking",
+     * so a level added above Acknowledge does not silently fall out of those tests.
      *
      * @return int One of the INSISTENCE_* constants.
      */
@@ -442,18 +442,15 @@ class awareness extends persistent {
      */
     public static function get_enabled_notices(): array {
         /*
-         * Compared against false, which is the only value the cache uses to say "I do not have
-         * this". A falsy test treats a cached empty array as a miss, and a site with no notice
-         * currently live then re-runs this query on every page load, for ever — which is the state
-         * nearly every site is in nearly all of the time.
+         * Compared with false, the cache's only miss value: a falsy test would treat a cached empty
+         * list as a miss and re-run the query on every page of a site with no live notice.
          */
         if (($result = self::get_enabled_notices_cache()->get('records')) === false) {
             /*
-             * The window's LOWER bound is deliberately absent. This result is cached with no TTL
-             * and purged only by a write, so a condition that turns TRUE as the clock moves would
-             * leave a scheduled notice permanently outside the cached set — it would never appear
-             * at all. local\window explains it in full; helper::is_within_active_window() applies
-             * the lower bound against a live clock on what comes back.
+             * No lower bound on the window: the result is cached without a TTL and purged only by a
+             * write, so a condition that turns true as time passes would keep a scheduled notice out
+             * of the cached set for ever. See local\window; helper::is_within_active_window() applies
+             * the whole window against a live clock on what comes back.
              */
             [$windowsql, $windowparams] = window::open_prefilter_sql('win', time());
             $select = "enabled = :enabled AND {$windowsql}";
@@ -465,9 +462,9 @@ class awareness extends persistent {
     }
 
     /**
-     * Get all notices
+     * Get all notices, most recently modified first.
      *
-     * @return \stdClass[]
+     * @return self[]
      */
     public static function get_all_notices(): array {
         return self::get_records([], 'timemodified', 'DESC');

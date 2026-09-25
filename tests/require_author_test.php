@@ -21,10 +21,9 @@ use local_awareness\local\author_scope;
 /**
  * Tests for the one gate every author-side request passes through.
  *
- * The course branch is exercised against a hand-built course scope and the course capability,
- * which no page can grant yet: the point is that the policy — who may act on a course's notice —
- * is settled and pinned before anything is wired to it. Every test pairs a refusal with a pass in
- * the same call, so neither an always-allow nor an always-deny seam survives.
+ * The course branch is exercised with course scopes built directly and roles created here, since
+ * the course capabilities have no default archetype. Every test pairs a refusal with a pass in the
+ * same call, so neither an always-allow nor an always-deny gate survives.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -80,9 +79,8 @@ final class require_author_test extends \advanced_testcase {
     /**
      * A site manager may act everywhere: the site capability inherits into every course.
      *
-     * The second user is what pins WHERE the site capability is read. Holding it in one course
-     * only, they pass for that course and fail for the site — which a seam that checked the site
-     * capability at the system context whatever the scope would get backwards.
+     * The second user, holding it in one course only, passes for that course and fails for the
+     * site: the site capability is read in the scope's context, not always at the system context.
      */
     public function test_a_site_manager_may_act_everywhere(): void {
         $course = $this->getDataGenerator()->create_course();
@@ -131,8 +129,9 @@ final class require_author_test extends \advanced_testcase {
      *
      * Three users in one test: the site reports capability opens every scope and no manage verb;
      * the course reports capability opens the reports of its own course only, and nothing else;
-     * and managecourse opens no report at all. Each refusal sits beside a pass for the same user,
-     * so a map that pointed the course reports verb at managecourse, or at nothing, reddens.
+     * and managecourse opens no report at all. Each refusal sits beside a pass for the same user.
+     * Changes that must make it fail: mapping the course reports verb to managecourse, or to no
+     * capability.
      */
     public function test_the_reports_verb_reads_its_own_capability(): void {
         $mine = $this->getDataGenerator()->create_course();
@@ -158,12 +157,11 @@ final class require_author_test extends \advanced_testcase {
     /**
      * A scope whose course is gone refuses a course author, not fatally, and leaves the site manager a way out.
      *
-     * The course and its context are deleted behind the plugin's back, the way a deletion that
-     * ran with the plugin uninstalled leaves things. The course author who passed a moment before
-     * is the control: the refusal has to come from the course being gone, and it has to be a
-     * refusal — without the existence check ahead of the context, this test errors on a missing
-     * record instead of asserting anything. The site manager still passes, at the system context,
-     * so an orphan can be disabled or deleted rather than sitting in the table for ever.
+     * The course and its context are deleted directly, bypassing the before_course_deleted purge.
+     * The course author who passed a moment before is the control: the refusal has to come from the
+     * course being gone, and it has to be a refusal; without the existence check ahead of the
+     * context, this test errors on a missing record instead. The site manager still passes, at the
+     * system context, so an orphan can be disabled or deleted.
      */
     public function test_a_scope_whose_course_is_gone_refuses_the_author_and_not_the_site_manager(): void {
         global $DB;

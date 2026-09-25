@@ -27,11 +27,9 @@ require_once($CFG->dirroot . '/local/awareness/lib.php');
 /**
  * A slide's image is served through the notice's gate, though its item id is the slide's.
  *
- * Same technique as lib_test: a successful serve ends in send_stored_file(), which terminates the
- * process, so the positive path is shown by deleting the file first and watching the callback
- * fall out at its own get_file() miss - a line BELOW the gate. The pair carries the meaning:
- * disabled with a file returns false from the gate, enabled without a file returns false from
- * the bottom.
+ * Same technique as lib_test, because a successful serve ends in send_stored_file(), which
+ * terminates the process: a refusal is asserted with the file in place, and the positive path by
+ * deleting the file first so the callback falls out at its own get_file() miss, below the gate.
  *
  * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
  *

@@ -33,6 +33,9 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
  * @covers \local_awareness\external\get_estimate
  */
 final class audience_external_test extends \advanced_testcase {
+    /**
+     * Initial set up.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -56,10 +59,9 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * Polling a job is gated too, and on the same capability.
      *
-     * The read side is the one worth stating: estimate_audience() only queues work, while
-     * get_estimate() hands back the resulting head count for a set of criteria. Gating the write
-     * and leaving the read open would make the poller an audience oracle for anyone who can guess
-     * a job id — and the job id is the ONLY parameter, so guessing is the whole attack.
+     * estimate_audience() returns a job id and its status, never a count; get_estimate() returns the
+     * head count. Left open, the poller would be an audience oracle for anyone holding or guessing a
+     * job id.
      */
     public function test_get_estimate_requires_capability(): void {
         $this->setAdminUser();
@@ -75,9 +77,9 @@ final class audience_external_test extends \advanced_testcase {
     }
 
     /**
-     * Above the inline limit the estimate still goes to cron.
+     * With inline answering switched off the estimate goes to cron.
      *
-     * The limit is set to 0 rather than relying on the site being large, which no test site is.
+     * A limit of 0 switches inline answering off; no test site is large enough to exceed the default.
      */
     public function test_estimate_audience_enqueues_job_and_returns_pending_status(): void {
         global $DB;
@@ -161,11 +163,10 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * The page reach a course scope forces does not reach the job, so it cannot fragment it.
      *
-     * pathmatch is a context field: it never enters a predicate and never changes a count. Carried
-     * into the criteria it would still change their hash, and jobs are shared BY that hash — so the
-     * same question asked by a site manager and by a course author would stop being the same job,
-     * for no difference in the answer. The site half is the control: there the pattern is the
-     * author's own and it stays.
+     * pathmatch is a context field and never changes the count, but it would change the criteria
+     * hash that jobs are shared by, so the same question from a site manager and a course author
+     * would become two jobs. The site half is the control: there the pattern is the author's own
+     * and it stays.
      */
     public function test_a_forced_page_reach_does_not_reach_the_job(): void {
         $course = $this->getDataGenerator()->create_course();
@@ -189,8 +190,8 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * On a site under the limit the answer is ready before the response is written.
      *
-     * The empty adhoc queue is the half that matters: a job that came back ready because cron
-     * happened to run would satisfy the status assertion alone.
+     * The empty adhoc queue is what shows the answer was computed in the request rather than
+     * queued.
      */
     public function test_estimate_audience_answers_inline_on_a_small_site(): void {
         global $DB;
@@ -249,8 +250,8 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * A second request for criteria already queued joins that job instead of queueing another.
      *
-     * The editor re-estimates on every form change, so without this a burst of edits left a burst
-     * of identical adhoc tasks behind. Only the queued path can produce the collision, so the
+     * The editor re-estimates as the form changes, so without this a burst of edits would leave a
+     * burst of identical adhoc tasks behind. Only the queued path can produce the collision, so the
      * inline path is switched off here.
      */
     public function test_estimate_audience_joins_a_job_already_in_flight(): void {
@@ -372,9 +373,9 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * The page-only rules travel back as restrictions, and leave the count at the whole site.
      *
-     * pathmatch and the theme are the only two rules that say nothing about a user. The category
-     * rule used to sit here too, and moved to the count when it turned out to bound reach through
-     * enrolment; a notice carrying nothing but these two still reaches everybody.
+     * pathmatch and the theme are the only rules that say nothing about a user
+     * ({@see \local_awareness\audience\estimator::CONTEXT_FIELDS}); the category rule bounds reach
+     * through enrolment, so it counts. A notice carrying only these two reaches everybody.
      */
     public function test_get_estimate_returns_context_only_filters(): void {
         $this->setAdminUser();
@@ -396,9 +397,9 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * The estimate must not answer "how many people are in this cohort?" for a cohort nobody offered.
      *
-     * The predicate is a bare `cohortid IN (…)` with no visibility join, so an id typed into a
-     * hand-made request used to come back with a population size — a membership oracle for any
-     * cohort on the site, including ones in categories the caller cannot see.
+     * The count's predicate is a bare `cohortid IN (…)` with no visibility join, so the author scope
+     * must drop a cohort the caller may not see before counting, or a hand-made request would learn
+     * the size of any cohort on the site.
      *
      * Both cohorts carry a member, and the visible one is the control: a change that simply dropped
      * every cohort would satisfy the first assertion alone while breaking the feature.
@@ -439,12 +440,9 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * Both audience functions survive a real web-service round trip.
      *
-     * Every other case in this file calls the statics bare, which never applies
-     * estimate_audience_returns() or get_estimate_returns() to a payload. That matters because
-     * clean_returnvalue() SILENTLY STRIPS any key the returns declaration does not name: a field
-     * added to the shared builder reaches the bare call and vanishes on the way to the browser,
-     * and the whole suite stays green while the editor loses a value. This is the only place the
-     * declarations are exercised at all.
+     * Every other case in this file calls execute() directly, which never applies execute_returns().
+     * clean_returnvalue() silently strips any key the returns declaration does not name, so a field
+     * added to a response without it would reach those calls and vanish on the way to the browser.
      */
     public function test_the_audience_functions_round_trip_through_the_web_service_layer(): void {
         $this->setAdminUser();
@@ -484,9 +482,9 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * A course that does not exist is refused before anything is counted.
      *
-     * The estimate is speculative and runs before any save, so this was the one place a hand-made
-     * request could learn something a saved notice never would: the active head count of any
-     * course id it cared to name. The real course queued first is the control.
+     * The author scope checks that each course exists, as it does on save; the estimate runs before
+     * any save, so an unknown id is refused while the author can still correct it. The real course
+     * queued first is the control.
      */
     public function test_an_estimate_naming_a_course_that_does_not_exist_is_refused(): void {
         global $DB;
@@ -508,10 +506,9 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * A legitimate cohort behind a run of junk ids is still counted.
      *
-     * The estimate used to narrow cohorts and then cap; the scope now does the narrowing, so the
-     * cap has to run after it. Capping first would cut the real cohort off at position five
-     * hundred along with the junk in front of it — a hand-made request, but a wrong answer. The
-     * stored criteria are what the job will count from, so they are what is asserted.
+     * The cap runs after the author scope has dropped unknown cohorts; capping first would cut the
+     * real cohort off at helper::CRITERIA_LIST_MAX along with the junk in front of it. The stored
+     * criteria are what the job counts from, so they are what is asserted.
      */
     public function test_a_cohort_behind_a_run_of_junk_is_still_counted(): void {
         global $DB;
@@ -535,10 +532,9 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * A criteria list longer than the cap is trimmed rather than sent whole to the database.
      *
-     * The criteria arrive as client JSON and reach get_in_or_equal() unbounded — one bound
-     * parameter per id, against a PostgreSQL ceiling of 65535 and a query planner that is being
-     * asked to do something nobody intended long before that. The editor's pickers cannot produce
-     * a list this long, so a request that does is hand-made.
+     * The criteria arrive as client JSON and would otherwise reach get_in_or_equal() unbounded, one
+     * bound parameter per id against PostgreSQL's limit of 65535. The editor's pickers cannot
+     * produce a list this long, so a request that does is hand-made.
      */
     public function test_an_oversized_criteria_list_is_capped(): void {
         global $DB;
@@ -588,10 +584,8 @@ final class audience_external_test extends \advanced_testcase {
     /**
      * A failed job records no audience count, and does not look current afterwards.
      *
-     * resultcount is 0 on an errored job. Recording that 0 with a fresh criteria hash told the
-     * editor the answer was measured — "0 people" — and the stored hash then matched the criteria,
-     * so the next unforced refresh saw nothing to do. The failure became sticky AND looked like a
-     * result, which is the worse half.
+     * An errored job's resultcount of 0 is not a measurement, and stamping the criteria hash would
+     * stop the next unforced refresh from retrying; {@see \local_awareness\audience\notice_audience::record()}.
      */
     public function test_a_failed_job_records_no_count(): void {
         $this->setAdminUser();
@@ -619,8 +613,8 @@ final class audience_external_test extends \advanced_testcase {
         $this->assertNull($stored->get('audiencehash'), 'a failed job must not stamp the criteria hash');
 
         /*
-         * Control: the same call with a READY job does record. Without it, a record() that always
-         * returned null — or threw — would satisfy the assertions above.
+         * Control: the same call with a ready job does record, so a record() that always returned
+         * null fails here.
          */
         $ready = new \local_awareness\persistent\audience_job(0, (object) [
             'jobid' => 'readyjob1',

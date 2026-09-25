@@ -19,17 +19,11 @@ namespace local_awareness\event;
 /**
  * Audience estimate requested event.
  *
- * Fired when a job ROW is created, not when a web service is called. The editor re-estimates on
- * every form change (amd/src/audience_estimator.js debounces at 800ms), and criteria already
- * answered inside the dedup window reuse an existing job instead of creating one — so this is one
- * line per distinct criteria set a manager actually asked about, which is the auditable fact: who
- * counted the users matching which rules.
- *
- * It is triggered from persistent\audience_job::trigger_created_event() rather than at either call
- * site, because rows are created in two places — the estimate web service and
- * audience\notice_audience::refresh(), which is what a notice save and the editor's Recalculate
- * button both go through. Instrumenting only the web service would have logged the editor's
- * speculative previews while missing every deliberate recalculation.
+ * Fired once per audience job row created, from
+ * {@see \local_awareness\persistent\audience_job::trigger_created_event()}, not once per web service
+ * call: a request answered by reusing or joining an existing job creates no row and fires nothing.
+ * The log therefore records who counted the users matching which rules, not every re-estimate the
+ * editor makes as the author types.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine

@@ -22,17 +22,14 @@ use local_awareness\persistent\awareness;
 /**
  * A required course that no longer exists withholds its notice, on every path that reads the rule.
  *
- * "Show until they have completed course X" was read as "show unless X is recorded complete", and
- * a deleted course records nothing: the display path skipped the course it could not find and left
- * the notice in, the write-path gate fell through to true, and the estimator's NOT EXISTS over
- * {course_completions} went vacuously true because deleting a course purges those rows. So the one
- * rule meant to narrow the audience widened it to everyone, for ever, the day its course was
- * deleted — in a plugin whose every other rule withholds a notice it cannot evaluate.
+ * Deleting a course purges its {course_completions} rows, so "not recorded complete" would hold for
+ * everyone. The display path, the write-path gate and the estimator each fail closed instead, as
+ * every other rule does for a referent it cannot resolve.
  *
  * Every test keeps a second notice, whose course still exists and is incomplete, beside the one
- * under test, and reads the notice under test BEFORE the deletion as well. The withholding has to
- * be caused by the deletion, not by the notice never having been eligible — a rule that stopped
- * running altogether would otherwise pass the "withheld" half of each test.
+ * under test, and reads the notice under test before the deletion as well, so the withholding is
+ * shown to be caused by the deletion: a rule that stopped running altogether would otherwise pass
+ * the "withheld" half of each test.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -89,7 +86,7 @@ final class reqcourse_missing_course_test extends \advanced_testcase {
     }
 
     /**
-     * Delete the doomed course, and prove the deletion did what the SQL path's failure depended on.
+     * Delete the doomed course, and assert the deletion also purged its completion rows.
      */
     private function delete_doomed_course(): void {
         global $DB;
@@ -169,8 +166,8 @@ final class reqcourse_missing_course_test extends \advanced_testcase {
      * The estimate counts nobody for a deleted required course.
      *
      * One of the two cohort members completed the doomed course before the deletion, so the count
-     * before it is one — proof the predicate discriminates — and the purge of that completion row
-     * is exactly what used to turn the count into two.
+     * before it is one, proof the predicate discriminates; the purge of that completion row is what
+     * would turn the count into two if the estimator did not fail closed.
      */
     public function test_the_estimate_counts_nobody_for_a_deleted_course(): void {
         $generator = $this->getDataGenerator();

@@ -7,9 +7,8 @@
     merely old — it describes a different notice — so it is labelled "filters changed since"
     rather than being silently presented as current.
 
-    bg-warning takes text-dark and bg-info takes text-white explicitly: Bootstrap 4 gives .badge no
-    colour and Bootstrap 5 defaults it to white, so the two branches fail on disjoint fills.
-    tests/local/bootstrap_compat_test.php enforces the pairing.
+    Every badge states its text colour; tests/local/bootstrap_compat_test.php says why and
+    enforces the pairing.
 
     Context variables required:
     * pending (bool) — an estimate is queued, so there is no number yet

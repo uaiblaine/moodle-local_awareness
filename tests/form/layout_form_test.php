@@ -24,7 +24,7 @@ use local_awareness\persistent\slide;
 /**
  * The layout, position, animation, video link and slides: what the form offers, refuses and saves.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
+ * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHPUnit attributes.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -308,7 +308,7 @@ final class layout_form_test extends \advanced_testcase {
      * hideIf hides a control without stopping its value, so a link typed and then switched away
      * from still arrives. Two halves are asserted because they are two code paths: validation must
      * not refuse the save, and the save must not store the abandoned value. The last assertion is
-     * the control that the CHOICE is doing this and not some general leniency — the same payload
+     * the control that the choice is doing this and not some general leniency: the same payload
      * without a choice is still refused.
      */
     public function test_the_slide_says_what_it_shows_and_the_other_control_is_not_read(): void {
@@ -320,7 +320,7 @@ final class layout_form_test extends \advanced_testcase {
             'template' => 'carousel', 'insistence' => 0, 'position' => 'center',
             'slide_media' => [slide::MEDIA_IMAGE, slide::MEDIA_VIDEO],
             'slide_caption' => ['First', 'Second'],
-            // Each slide carries BOTH: the leftovers of a choice the author changed on screen.
+            // Each slide carries both: the leftovers of a choice the author changed on screen.
             'slide_videourl' => ['https://vimeo.com/123456', 'https://vimeo.com/654321'],
             'slide_image' => [$draftid, $draftid],
         ];

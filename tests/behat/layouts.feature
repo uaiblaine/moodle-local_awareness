@@ -24,7 +24,7 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     And I am on site homepage
     Then I should see "get the app for reminders"
     And ".awareness.la-tpl-card.la-pos-top-end" "css_element" should exist
-    # A card is the one layout narrower than core's large dialogue, and the template bakes that class in.
+    # A card is a compact layout, so the modal-lg class the template bakes in is taken off.
     And ".awareness.modal-lg" "css_element" should not exist
     And I click on "awareness-closebtn-footer" "button"
     And I should see "You are logged in as Bilbo Baggins"

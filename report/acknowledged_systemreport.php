@@ -36,11 +36,10 @@ require_login();
 
 $context = context_system::instance();
 
-// Resolved and gated in one call, because the gate depends on whose notice it is, and a notice
-// that is not this viewer's to report on is refused exactly as one that does not exist: the same
-// message, so an id cannot be probed for existence across scopes. An id of zero is refused the
-// same way. The report itself stays in the system context in every scope: its rows are already
-// one notice's, and it decides its viewer the same way.
+// Resolved and gated in one call, because the gate depends on whose notice it is. A notice this
+// viewer may not report on, a missing one and an id of zero all get the same error, so an id cannot
+// be probed for existence across scopes. The report stays in the system context in every scope: its
+// rows are one notice's, and its can_view() decides from that notice's scope.
 $awareness = helper::resolve_notice_as_author($noticeid, 'viewreports');
 if (!$awareness) {
     throw new moodle_exception('notification:noticedoesnotexist', 'local_awareness');
@@ -51,8 +50,8 @@ $PAGE->set_url(new moodle_url('/local/awareness/report/acknowledged_systemreport
 $PAGE->set_title(get_string('report:acknowledged', 'local_awareness', $awareness->get('title')));
 $PAGE->set_heading(get_string('report:acknowledged', 'local_awareness', $awareness->get('title')));
 $PAGE->set_pagelayout('report');
-// The Bootstrap 4 polyfill in styles.css is gated on the body class this adds, so a page that
-// omits it renders unstyled on 4.5 while every static gate stays green.
+// The Bootstrap 4 polyfill in styles.css is gated on the body class this adds; without it the
+// page renders unstyled on 4.5.
 \local_awareness\local\bootstrap::mark_page();
 
 echo $OUTPUT->header();

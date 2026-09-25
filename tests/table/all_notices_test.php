@@ -94,14 +94,10 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * The compliance reports are offered exactly where rows can exist, and nowhere else.
      *
-     * These two buttons used to be gated on reqack, which is one of the two columns the insistence
-     * level is derived from rather than the level itself. A Blocking notice records acceptances and
-     * refusals just as an Acknowledge one does, so gating on reqack hid the reports for precisely
-     * the notices whose rows nothing else in the interface could reach — the manage list is the
-     * only route to them, and the report pages answer a hand-built URL.
-     *
-     * Nothing asserted this before, in either direction: a mutation putting the reqack gate back
-     * survived the whole suite.
+     * The gate is the insistence level, not reqack (one of the two columns it is derived from): a
+     * Blocking notice records acceptances and refusals just as an Acknowledge one does, and the
+     * manage list is the only route to its reports. Changes that must make it fail: gating the
+     * report links on reqack.
      *
      * @return void
      */
@@ -281,11 +277,11 @@ final class all_notices_test extends \advanced_testcase {
     }
 
     /**
-     * Paging counts the FILTERED set, and a page holds no more than its size.
+     * Paging counts the filtered set, and a page holds no more than its size.
      *
-     * This is the assertion the whole SQL rewrite exists for. Narrowing the rows in PHP after the
-     * query would leave the total describing the unfiltered table, so the pager would offer pages
-     * that render fewer rows than they promise — or none at all.
+     * The filters run in SQL: narrowing the rows in PHP after the query would leave the total
+     * describing the unfiltered table, so the pager would offer pages that render fewer rows than
+     * they promise, or none at all.
      */
     public function test_paging_counts_the_filtered_set(): void {
         for ($i = 1; $i <= 7; $i++) {
@@ -312,7 +308,7 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * The table declares the contract the dynamic-table web service relies on.
      *
-     * The service constructs the class with the unique id ALONE and then calls these, so a
+     * The service constructs the class with the unique id alone and then calls these, so a
      * constructor that demanded a URL would fail only over AJAX — never on a page load, and never
      * in a test that built the table the way the page does.
      */
@@ -359,10 +355,9 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * The group line names the notice's groups, and resolves every name on the page in one read.
      *
-     * Same shape as the cohort line below, and the same reason: a name per row per group would put
-     * the page's cost on the size of the course rather than on what is on screen. A group deleted
-     * since the notice was saved keeps its place as an id, so the row still says something is
-     * named — the control for that is the second notice, whose group is real.
+     * Same shape as the cohort line below: the names every row on the page needs are read in one
+     * statement. A group deleted since the notice was saved keeps its place as an id, so the row
+     * still says something is named; the "Named" notice, whose group is real, is the control.
      *
      * @covers \local_awareness\table\all_notices::group_line
      */
@@ -419,10 +414,10 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * One page of rows resolves the cohort option list once, not once per cohort reference.
      *
-     * built_cohorts_options() wraps cohort_get_all_cohorts(0, 0) — a COUNT plus an unbounded scan
-     * of {cohort} joined to {context}, plus a capability walk — and it was paid per cohort id per
-     * row, so the page cost scaled with the size of the site rather than with what is on screen.
-     * The list is a dynamic table, so the filter bar re-paid it on every keystroke.
+     * built_cohorts_options() wraps cohort_get_all_cohorts(0, 0), a COUNT plus an unbounded scan of
+     * {cohort} joined to {context} and a capability walk, so resolving it per cohort id per row
+     * would scale the page with the size of the site. The list is a dynamic table, so every filter
+     * change renders it again.
      *
      * @covers \local_awareness\table\all_notices::cohort_line
      */
@@ -460,8 +455,8 @@ final class all_notices_test extends \advanced_testcase {
         $this->assertCount(10, $lines);
         foreach ($lines as $line) {
             /*
-             * The method returns [sentence, plain list] now: the cell is a Mustache template, so
-             * the markup is assembled there and this hands back the two values it needs.
+             * The method returns [sentence, plain list]; the cell's markup is assembled by its
+             * Mustache template.
              */
             $this->assertStringContainsString('Alpha cohort', $line[0]);
             $this->assertStringContainsString('Beta cohort', $line[0]);
@@ -475,9 +470,9 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * The audience column resolves the in-flight jobs once for the page, not once per row.
      *
-     * col_audience()'s own comment claimed it avoided a per-row query, and then called
-     * notice_audience::state_of(), which runs audience_job::find_in_flight() whenever the stored
-     * hash is missing — which is every notice that predates the audience upgrade.
+     * notice_audience::state_of() runs audience_job::find_in_flight() for every notice whose stored
+     * hash is missing or stale, unless it is handed the in-flight hashes query_db() reads once for
+     * the page.
      *
      * @covers \local_awareness\table\all_notices::col_audience
      */
@@ -499,12 +494,9 @@ final class all_notices_test extends \advanced_testcase {
         $render->setAccessible(true);
 
         /*
-         * One render before the counter starts. The cell is built from a Mustache template now,
-         * and the FIRST render_from_template() of a request pays a one-off setup cost — measured
-         * at nine reads here, then zero for every row after it. Counting from cold would attribute
-         * core's theme and template initialisation to this column and make the assertion below
-         * about the wrong thing. Measured, not assumed: with this warm-up the ten rows below cost
-         * zero reads, so the batching really is per page and not per row.
+         * One render before the counter starts: the first render_from_template() of a request pays
+         * a one-off theme and template setup cost in reads, which would otherwise be counted
+         * against this column.
          */
         $render->invoke($table, reset($table->rawdata));
 
@@ -683,7 +675,7 @@ final class all_notices_test extends \advanced_testcase {
      * The "competing" filter on a course list keeps to that course's competing notices.
      *
      * A clashing pair in another course and a clashing site notice are seeded beside the course's
-     * own pair, so a filter that resolved the site's clashing ids and forgot the course reddens.
+     * own pair, so a filter that resolved the site's clashing ids and forgot the course fails.
      */
     public function test_the_competing_filter_on_a_course_list_keeps_to_the_course(): void {
         $this->setAdminUser();

@@ -22,7 +22,7 @@ use local_awareness\persistent\slide;
 /**
  * The two previews: the editor's, from the form's fields, and the manage list's, from a saved notice.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
+ * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHPUnit attributes.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine

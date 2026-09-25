@@ -93,8 +93,7 @@ final class collision_test extends \advanced_testcase {
     /**
      * A notice that does not repeat competes with nobody, whatever its page reach.
      *
-     * It takes its turn in the queue and leaves. Warning about it would be noise, and the whole
-     * point of the warning is that it stays worth reading.
+     * It takes its turn in the queue and leaves, so a warning about it would be noise.
      */
     public function test_a_notice_that_does_not_repeat_never_clashes(): void {
         $this->setAdminUser();

@@ -51,9 +51,9 @@
 }
 
 /*
- * The panels over the image read the theme's body colour, not a fixed white: Moodle 5.1 and 5.2
- * ship a dark mode, where --bs-body-bg-rgb goes dark with the text, and a white panel under light
- * text was unreadable there. 4.5 defines no rgb token and no dark mode, so its fallback is white.
+ * The panels over the image read the theme's body colour, not a fixed white: under Bootstrap 5's
+ * dark colour mode (Moodle 5.x) --bs-body-bg-rgb goes dark with the text, and a white panel under
+ * light text is unreadable. Moodle 4.5 defines no such token, so its fallback is white.
  */
 .awareness .modal-content.has-bg-image .modal-header {
     background-color: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.85);
@@ -73,12 +73,11 @@
     -webkit-backdrop-filter: blur(4px);
 }
 
-/* Jelly bounce animation — plays when a backdrop click or Escape is refused.
+/* Jelly bounce, played when a blocking notice refuses a backdrop click.
 
-   The class is applied by amd/src/modal_notice.js to getModal(), which IS this element:
-   templates/modal_notice.mustache puts `awareness` on the .modal-dialog. The rule used to read
-   `.awareness.jelly-anim .modal-dialog`, which could never match anything — it asked for a
-   .modal-dialog nested inside .awareness, and .awareness is the .modal-dialog. */
+   modal_notice.js puts the class on getModal(), which is this element: modal_notice.mustache
+   puts `awareness` on the .modal-dialog. So the selector is compound; a descendant selector
+   after .awareness.jelly-anim would match nothing. */
 @keyframes awareness-jelly {
     0% {
         transform: scale(1);
@@ -106,16 +105,12 @@
 
 /* ---------------------------------------------------------------------------
    Manage-notice table cells
-
-   The separator rules the old inline action links needed are gone with them:
-   the row actions are a core action_menu now, which brings its own spacing and
-   its own focus treatment.
    --------------------------------------------------------------------------- */
 
 .local-awareness .local-awareness-action {
     display: inline-flex;
     align-items: center;
-    /* WCAG 2.2 SC 2.5.8 asks for 24x24; the icons alone measured 27x15. */
+    /* WCAG 2.2 SC 2.5.8 asks for a 24x24 target; the icons alone are 27x15. */
     min-width: 24px;
     min-height: 24px;
     justify-content: center;
@@ -228,10 +223,10 @@
 }
 
 /*
- * A notice title has no length cap in the database. Clamp to two lines and keep the whole string
- * in the node — clipped for the eye, intact for a screen reader — with the full name in the title
+ * A notice title can run to 1333 characters. Clamp to two lines and keep the whole string in the
+ * node — clipped for the eye, intact for a screen reader — with the full name in the title
  * attribute. The -webkit- and standard properties are paired, which is the form Moodle's stylelint
- * accepts and what core and sibling plugins already ship.
+ * accepts.
  */
 .local-awareness .local-awareness-celltitle {
     display: -webkit-box;
@@ -261,7 +256,7 @@
 
 /*
  * One appearance only: a chip is present when the setting is on and absent when it is off, so
- * nothing here asks the reader to tell two colours apart. This replaced four yes/no columns.
+ * nothing here asks the reader to tell two colours apart.
  */
 .local-awareness .local-awareness-chips {
     display: flex;
@@ -284,34 +279,31 @@
 /* ===========================================================================
    Notice editor — admin shell
 
-   What keeps this off the rest of the Moodle UI is the PREFIX, not a scoping
-   ancestor. This block used to claim every selector sat under
-   .local-awareness-editor; measured, 65 of the 114 in this section do not, and
-   they cannot: the notice dialogue is attached by core to its own element on
-   document.body, and the Bootstrap 4 polyfill hangs off a body class. The real
-   rule is that every selector this plugin owns is named .la-*, .awareness,
-   .competency-picker-*, or one of the #awareness-* ids — so read a new selector
-   against that, not against a containment promise the file never kept.
+   Not every selector below sits under .local-awareness-editor, and some cannot:
+   core attaches the notice dialogue to its own element on document.body, and
+   the Bootstrap 4 polyfill hangs off a body class. What keeps these rules off
+   the rest of Moodle is the name: every selector the plugin owns is anchored on
+   .la-*, .awareness, .local-awareness-*, .competency-picker-* or an
+   #awareness-* id.
 
-   Every colour is READ FROM THE THEME, never invented. The chain
+   Every colour is read from the theme. The chain
    var(--bs-x, var(--x, literal)) resolves on both branches: Moodle 4.5 defines
    the Bootstrap 4 names on :root (--primary, --success, --danger, --warning)
    and 5.x defines the --bs-* set; neither defines both, and the literal is the
-   last resort for a theme that defines neither. Reading them is also what makes
-   these pages follow the site into dark mode, which 5.1 and 5.2 ship via
-   .theme-dark and [data-bs-theme="dark"] — a hardcoded palette renders a light
-   slab inside a dark page there.
+   last resort for a theme that defines neither. Reading them is also what lets
+   these pages follow Bootstrap 5's dark colour mode ([data-bs-theme="dark"]) on
+   5.x, where a hardcoded palette renders a light slab inside a dark page.
 
    The subtle/emphasis tokens have no Bootstrap 4 equivalent at all, so their
    fallback is a literal chosen to match Boost's light palette.
    =========================================================================== */
 
 /*
- * Declared on the preview root as well as on the editor. Custom properties inherit down the DOM
- * tree, and core attaches a modal to its own element on document.body — a sibling of the editor,
- * not a descendant. Scoped to the editor alone, every var(--la-*) inside the dialogue would resolve
- * to nothing, which does not fall back to the literal: it makes the whole declaration invalid at
- * computed-value time, so the preview would render with no surface, no borders and no colour.
+ * Declared on the notice dialogue (.awareness) as well as on the editor. Custom properties inherit
+ * down the DOM tree, and core attaches a modal to its own element on document.body — a sibling of
+ * the editor, not a descendant. Scoped to the editor alone, every var(--la-*) inside the dialogue
+ * would resolve to nothing, which does not fall back to the literal: it makes the whole declaration
+ * invalid at computed-value time, so the dialogue would render with no surface, borders or colour.
  */
 .local-awareness-editor,
 .awareness {
@@ -341,13 +333,6 @@
     box-sizing: border-box;
 }
 
-/*
- * The preview root is listed for the same reason it is listed above: the dialogue is attached to
- * document.body, outside the editor. Without it the viewport toggles fall back to the browser's own
- * ring — measured on the rendered dialogue as `outline: auto 1px`, so a focus indicator exists and
- * this is not a bare 2.4.7 failure, but it is the wrong one, and the only controls the dialogue
- * owns would be the only controls on the plugin's surfaces not wearing its ring.
- */
 .local-awareness-editor button:focus-visible,
 .local-awareness-editor a:focus-visible,
 .local-awareness-editor input:focus-visible,
@@ -448,9 +433,8 @@
 }
 
 /*
- * Digits line up through font-variant-numeric, not through a monospace family. Swapping the
- * family here was the visible half of the "different typography" the admin pages carried: the
- * theme's own face reads as part of Moodle, a second family reads as a different product.
+ * Digits line up through font-variant-numeric, not through a monospace family: the theme's own
+ * face reads as part of Moodle, a second family as a different product.
  */
 .la-pagehead-autosaved {
     font-size: .74rem;
@@ -506,10 +490,9 @@
 /* ---------------------------------------------------------------------------
    Form sections
 
-   These are moodleform's OWN collapsible fieldsets now, not hand-made cards
-   with relocated rows: the form declares a header per section, so the accordion
-   behaviour, the keyboard handling and the expand/collapse-all control are
-   core's. Styling them as cards is all that is left to do.
+   moodleform's own collapsible fieldsets, one header per section, styled as
+   cards: the accordion behaviour, the keyboard handling and the
+   expand/collapse-all control are core's.
    --------------------------------------------------------------------------- */
 
 .local-awareness-editor .mform > fieldset {
@@ -539,12 +522,9 @@
  * could express this anyway.
  */
 /*
- * Gated on the collapse state, and that gate is the whole point. .fcontainer IS the element
- * Bootstrap collapses — core renders it as `fcontainer collapseable collapse show` — and an
- * ungated `display: flex` here scores (0,3,0) against Bootstrap's `.collapse:not(.show)` at
- * (0,2,0). It won, so removing .show changed nothing on screen: no section ever collapsed, and
- * "Expand all" looked dead because everything was already expanded. A layout rule quietly
- * overriding a behaviour rule, from the one selector that had to stay out of the way.
+ * Gated on the collapse state. .fcontainer is the element Bootstrap collapses — core renders it as
+ * `fcontainer collapseable collapse show` — and an ungated `display: flex` here, at (0,3,0), would
+ * beat Bootstrap's `.collapse:not(.show)` at (0,2,0): no section could collapse.
  */
 .local-awareness-editor .mform .fcontainer:not(.collapse),
 .local-awareness-editor .mform .fcontainer.show,
@@ -562,10 +542,8 @@
 }
 
 /*
- * The section descriptions are prose about the section, not a caption for the first field. As an
- * ordinary form row they inherited the label/element grid and read as if they belonged to Title.
- * Listed by id, which is the rule this file learned the hard way: a guess at a widget's internal
- * markup matches nothing and says nothing when it stops matching.
+ * The section descriptions are prose about the section, not a caption for the first field, so they
+ * span the row without the label column. Listed by id, for the reason given below.
  */
 .local-awareness-editor .mform #fitem_id_header_content_desc,
 .local-awareness-editor .mform #fitem_id_header_behavior_desc,
@@ -594,11 +572,8 @@
  * The wide ones span the row: an editor, a file picker, a multi-select autocomplete and a date
  * selector are all unusable at half width.
  *
- * Listed by field id rather than matched on the widget's internal markup. The first version used
- * :has(.editor_tiny_wrapper) and friends and silently matched nothing — the class names were
- * guesses — which put the content editor in a half-width column with its label wrapped to
- * "Cont/ent". An id cannot miss quietly: if a field is renamed the rule stops applying, and that
- * is visible immediately.
+ * Listed by field id rather than matched on a widget's internal markup: a guessed class matches
+ * nothing in silence, while a renamed field visibly drops back to half width.
  */
 .local-awareness-editor .mform #fitem_id_title,
 .local-awareness-editor .mform #fitem_id_content,
@@ -614,8 +589,8 @@
 .local-awareness-editor .mform #fitem_id_filter_theme,
 .local-awareness-editor .mform #fitem_id_filter_competency_label,
 /*
- * The estimate panel is rendered into the audience section now, so it is a child of the section's
- * flex container rather than a block after the whole form. It spans, like the fields it answers.
+ * The estimate panel is rendered into the audience section by notice_form, so it is a flex item of
+ * that section, and it spans like the fields it answers.
  */
 .local-awareness-editor .mform .fcontainer > .la-audience {
     flex: 1 1 100%;
@@ -623,16 +598,15 @@
 
 /*
  * The title is the notice, so it is written like one: the full row, and type at the size a reader
- * will see it rather than the size of a setting. The border stays. The mockup this came from drew
- * it borderless, and a borderless box in a form whose every other control has an edge reads as
- * something you cannot type in — hierarchy is worth having, affordance is not worth trading for it.
+ * will see it rather than the size of a setting. The border stays: a borderless box in a form
+ * whose every other control has an edge reads as something you cannot type in.
  */
 .local-awareness-editor .mform #id_title {
     /*
-     * Core puts width: auto on a .form-control inside a .d-flex column — which every moodleform
-     * field column is — so widening the ROW left the input at its intrinsic 343px in a row of
-     * 1058. Measured on the rendered page, after the row rule was confirmed to be applying. The id
-     * carries enough specificity to settle it without !important, which this plugin may not write.
+     * Core sets width: auto on a .form-control that is a direct child of a .d-flex, which every
+     * moodleform field column is, so widening the row alone leaves the input at its intrinsic
+     * width. The id carries enough specificity to win without !important, which Moodle's stylelint
+     * forbids.
      */
     width: 100%;
     font-size: 1.3rem;
@@ -671,16 +645,9 @@
  * { margin-left: auto }`, which reads correctly while the column is a narrow col-md-3 and reads as
  * a stray icon once the column spans the row, as it does here.
  *
- * Core's own escape hatch is set_display_vertical(), which adds .full-width-labels — not used
- * because its effect could not be observed cleanly: the compiled stylesheet on the dev stack mixes
- * in a sibling plugin's own .mform.full-width-labels rules, which draw borders and backgrounds
- * from that plugin's variables. Overriding the one property is smaller and has no such reach.
- *
- * The :not() is load-bearing, not decoration. Core's selector scores (0,4,0) — :not() contributes
- * its argument — and so did this one without it, which leaves source order to decide; in the
- * compiled sheet core's rule lands at byte 1295582 against this one at 525383, so core won and the
- * marker stayed at the far end of the row. Measured on the rendered page, not reasoned about:
- * matching core's own :not() takes this to (0,5,0) and settles it whatever the order.
+ * The :not() is needed. Core's selector scores (0,4,0) — :not() contributes its argument — and
+ * without it so would this one, leaving source order to decide; core's rule comes later in the
+ * compiled sheet (plugin sheets precede the theme's SCSS) and would win. With it this is (0,5,0).
  */
 .local-awareness-editor .mform:not(.full-width-labels) .col-form-label .form-label-addon {
     margin-left: 0.35rem;
@@ -699,18 +666,14 @@
 }
 
 /*
- * The buttons live in core's sticky footer now — notice_form calls closeHeaderBefore('buttonar')
- * and then set_sticky_footer('buttonar'), which is what course/edit_form.php does. The
- * closeHeaderBefore is not decoration: the renderer wraps the group IN PLACE, so without it the
- * footer is emitted inside the last section's collapsible container and collapsing that section
- * takes Save and Cancel with it.
+ * The buttons live in core's sticky footer; notice_form::define_appearance() says why it needs
+ * closeHeaderBefore('buttonar') as well.
  *
  * Centred without touching core's own alignment, because that cannot be touched: the bar carries
- * Bootstrap's .justify-content-end, and Bootstrap 5 generates its utilities with !important, which
- * Moodle's stylelint forbids this plugin from outbidding. Giving the group the full width instead
- * leaves the parent's justify-content nothing to distribute, and the centring happens one level
- * down, where no utility is competing. Measured on the rendered page: the group moved from x=763
- * to x=425 in a bar centred at 579.
+ * Bootstrap's .justify-content-end, which Bootstrap declares !important and Moodle's stylelint
+ * forbids this plugin from outbidding. Giving the group the full width instead leaves the parent's
+ * justify-content nothing to distribute, and the centring happens one level down, where no utility
+ * is competing.
  */
 .local-awareness-editor #sticky-footer .sticky-footer-content > .fitem {
     width: 100%;
@@ -746,12 +709,10 @@
 
 /*
  * Core renders each radio of a group as <label><input> ...</label>, on 4.5 and 5.2 alike
- * (element-radio-inline.mustache): the input sits INSIDE its label, and the option template is
+ * (element-radio-inline.mustache): the input sits inside its label, and the option template is
  * the input's next sibling. So the label is the card, the input is hidden, and every state rule
- * reads "+ .la-layout-option", the sibling the input actually has. The first version read
- * "+ label", which matched nothing in that markup: with the radio hidden, the chosen layout
- * showed no mark at all. tests/form/picker_render_test.php pins the markup and
- * motion_contract_test the selectors.
+ * reads "+ .la-layout-option", the sibling the input actually has; "+ label" matches nothing.
+ * tests/form/picker_render_test.php pins the markup and motion_contract_test the selectors.
  */
 .local-awareness-editor #fgroup_id_templategroup fieldset > .d-flex {
     gap: 0.5rem;
@@ -978,8 +939,8 @@
 }
 
 /*
- * The sentence that says what the layout is FOR, on the card where the choice is made. It was only
- * ever in the help text beside the group, which nobody opens while comparing six thumbnails.
+ * The sentence that says what the layout is for, on the card where the choice is made rather than
+ * only in the help text beside the group.
  */
 .la-layout-desc {
     font-size: 0.74rem;
@@ -1001,9 +962,9 @@
  * every cell is a .fitem inside it, margin .1rem .25rem .1rem 0, so the cell pitch is
  * 8rem + 0.25rem + the gap, and nothing here sets a margin. Three cells per row inside a
  * container just wide enough for three, the form emitting the radios in reading order
- * (notice_form::POSITION_GRID), and the centre cell taking a whole row with its content padded
- * over to the middle column. A label is found through the radio it holds with :has(), which
- * core's own Boost stylesheet uses on both branches. The radios keep their own focus rings.
+ * (notice_form::POSITION_GRID), and the centre taking a whole row with its cell centred in it. A
+ * label is found through the radio it holds with :has(), which core's own Boost stylesheet uses
+ * on both branches. The radios keep their own focus rings.
  */
 .local-awareness-editor #fgroup_id_positiongroup fieldset > .d-flex {
     /*
@@ -1099,9 +1060,9 @@
 }
 
 /*
- * Full screen has no position, and the field used to vanish for it — which reads as a fault rather
- * than as a rule. The screen fills instead, and the note beside it says why. notice_form.js adds
- * the class and unhides the note; the covered screen is drawn here so no text is written by script.
+ * Full screen has no position. Hiding the field would read as a fault rather than as a rule, so
+ * the screen fills instead and the note beside it says why. notice_form.js adds la-zones-covered
+ * and unhides the note, whose text the form renders; the covered screen is drawn here.
  */
 .local-awareness-editor .la-zone-note {
     align-self: center;
@@ -1142,24 +1103,18 @@
 /*
  * A slide is five form rows, marked as one by a rail down their left and a heading on the first.
  *
- * Not a continuous card, and that is a constraint rather than a choice. Two routes to one were
- * tried and measured. Wrapping the fields in a GROUP makes a slide a single row — hideIf and
- * setType do reach a group's children, and the delete button's client hints can be restored by
- * hand — but core renders a group's children WITHOUT THEIR LABELS, and two controls arrived on
- * screen unlabelled; this editor has shipped reachable unlabelled fields once already. Drawing one
- * box across the rows instead fails on core's own `.mb-3`, which is 16px of margin declared
- * !important, so the rows cannot be closed up and a background breaks into bands. Measured on the
- * rendered page: margin-bottom 16px, padding-bottom 8px.
- *
- * What is left is a rail, which survives the gap and still says where a slide begins and ends.
+ * Not a continuous card, because neither route to one works. Wrapping the fields in a group makes
+ * a slide a single row, but core renders a group's children without their labels. Drawing one box
+ * across the rows fails on core's `.mb-3` on each row, 16px of margin declared !important, so the
+ * rows cannot be closed up and a background breaks into bands. A rail survives the gap and still
+ * says where a slide begins and ends.
  */
 .local-awareness-editor .mform .fcontainer > .fitem[id^="fitem_id_slide_"] {
     /*
-     * Four classes and an attribute, deliberately: the two-up rule on .fcontainer > .fitem is
-     * itself four classes, and at a tie the rail lost — it drew around half-width cells instead of
-     * around a slide's fields. The Add button, which belongs to no slide, is undone by the rule
-     * after the heading's rather than excluded here with :not(): the exclusion counted as a sixth
-     * step of specificity, and the heading's brand colour below, at five, never applied.
+     * Four classes and an attribute, so it outranks the two-up rule on .fcontainer > .fitem (four
+     * classes) whatever the order. The Add button, which belongs to no slide, is undone by the rule
+     * after the heading's rather than excluded here with :not(): the exclusion would make this six
+     * steps of specificity, and the heading's brand colour below, at five, would never apply.
      */
     flex: 1 1 100%;
     border-left: 3px solid var(--la-line);
@@ -1501,10 +1456,8 @@
     }
 }
 
-/* The notice modal's title carried fw-bold, a Bootstrap 5 utility that resolves to nothing
-   on Moodle 4.5. notice.js shows this modal on arbitrary pages, where the plugin has no body
-   class to gate a polyfill on, so the weight is owned here under the modal's own .awareness
-   scope instead - correct on both branches, no version test involved. */
+/* The title's weight is set here, not with fw-bold: that Bootstrap 5 utility resolves to
+   nothing on Moodle 4.5, and the dialogue shows on pages the polyfill's gate never reaches. */
 .awareness .modal-title {
     font-weight: 700;
 }
@@ -1513,20 +1466,21 @@
    Notice dialogue - layouts, positions, entrances, media
 
    Every class is plugin-owned (la-tpl-*, la-pos-*, la-anim-*, la-media-*,
-   la-carousel-*) and every rule is UNGATED: the dialogue is injected on
+   la-carousel-*) and every rule is ungated: the dialogue is injected on
    arbitrary pages, where the Bootstrap 4 polyfill's body class cannot be, so
-   no Bootstrap 5 utility may appear in it and nothing here waits for a marker.
-   Specificity is not the problem it looks like - .awareness.la-x (0,2,0) beats
-   every core rule on .modal-dialog (0,1,0) whatever the order - and the one
-   thing core does set with !important, its bg-* and border-* utilities, is
-   simply not written in the template any more.
+   no Bootstrap 5 utility may appear in it. Specificity is not the problem:
+   .awareness.la-x (0,2,0) beats core's (0,1,0) .modal-dialog and .modal-lg
+   rules whatever the order. What no plugin rule can beat is a Bootstrap
+   utility, declared !important, so the template carries no bg-* or rounded
+   utility, and no rule here sets a property owned by a utility it does wear
+   (border-0, px-4, d-flex and the rest); motion_contract_test checks it.
 
-   .awareness IS the .modal-dialog, inside a .modal that is fixed, full-viewport
+   .awareness is the .modal-dialog, inside a .modal that is fixed, full-viewport
    and overflow-y auto. The dialog is what is placed, sized and animated; the
    backdrop is core's singleton on the body and is not reachable from here.
    =========================================================================== */
 
-/* Chrome the template used to get from bg-light / bg-white utilities. */
+/* The header and footer grounds, here rather than as bg-* utilities so a layout can clear them. */
 .awareness .modal-header {
     background-color: var(--la-surface);
 }
@@ -1818,7 +1772,7 @@
 }
 
 /* Bootstrap 4 calls this sr-only and 5.x visually-hidden; the dialogue can gate
-   on neither, so the status line carries its own name for the same rule. */
+   on neither, so it (and the position picker) uses its own name for the same rule. */
 .la-offscreen {
     position: absolute;
     width: 1px;
@@ -2139,10 +2093,10 @@
     animation: la-enter-slide-bottom 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-/* Both guards, hand-written because the dialogue cannot @include core's
-   optional-animation mixin: the reader's preference collapses every entrance to
-   a fade and silences the refused-click shake; the test site gets none at all,
-   because WebDriver clicks where the box was a frame ago. */
+/* Both guards, hand-written because a plugin stylesheet is plain CSS and cannot
+   @include core's optional-animation mixin: the reader's preference collapses
+   every entrance to a fade and silences the refused-click shake; the test site
+   gets none at all, because WebDriver clicks where the box was a frame ago. */
 @media (prefers-reduced-motion: reduce) {
     .awareness[class*="la-anim-"] {
         animation: la-enter-fade 200ms ease-out both;
@@ -2162,22 +2116,20 @@ body.behat-site .awareness.jelly-anim {
       BOOTSTRAP 4 UTILITY POLYFILL (Moodle 4.5 only)
       ============================================
 
-      Moodle 4.5's forward bridge (theme/boost/scss/moodle/bs5-bridge.scss) is 116 lines and
-      covers only g-0, btn-close, the ms/me/ps/pe spacers and float/text/border/rounded-start
-      and -end. Moodle 5.x's backward bridge runs past a thousand lines. So BS4 names resolve
-      on both branches and BS5 names do not, and the families below resolve to NOTHING on 4.5.
+      Moodle 4.5's forward bridge (theme/boost/scss/moodle/bs5-bridge.scss) covers only g-0,
+      btn-close, the ms/me/ps/pe spacers and float/text/border/rounded-start and -end, so the
+      Bootstrap 5 families below resolve to nothing on 4.5.
 
-      Writing BS4 names in the markup instead was rejected: 5.x wraps every back-ported BS4
-      name in @include deprecated-styles() and Moodle 6.0 removes that sheet (MDL-84465).
-      Measured on 5.1 with the designer outline on, mr-, ml-, text-left and sr-only are painted
-      as deprecated the moment they appear — bootstrap_compat_test asserts they never do.
+      Writing Bootstrap 4 names in the markup instead is not an option: 5.x back-ports them only
+      inside @include deprecated-styles(), and Moodle 6.0 removes that sheet (MDL-84465);
+      bootstrap_compat_test refuses them.
 
-      GATED on body.local-awareness-bs4, added by local_awareness\local\bootstrap when
-      $CFG->branch < 500. The gate is not optional: plugin CSS loads after core's, so an
-      ungated rule would outrank core's own definition on 5.x and freeze 4.5's metrics there.
+      Gated on body.local-awareness-bs4, which local_awareness\local\bootstrap::mark_page() adds
+      when $CFG->branch < 500. On 5.x, where core defines these classes itself, the rules would
+      override core's values wherever they win on specificity or set a property core leaves alone.
 
-      Only the competency picker and rules markup needs this, and it renders on the plugin's
-      own admin pages. Deletable in one edit when 405 leaves $plugin->supported. */
+      Used by the competency picker and rules and by the manage list, all on the plugin's own
+      pages. Deletable in one edit when 405 leaves $plugin->supported. */
 
 body.local-awareness-bs4 .form-select {
     display: inline-block;
@@ -2239,9 +2191,9 @@ body.local-awareness-bs4 .lh-1 {
 
 /*
  * Bootstrap 4 calls this .sr-only; 5.x renamed it and 4.5 has no .visually-hidden at all. The
- * conflict badge needs it to carry its explanation for assistive technology, so the class has to
- * mean something on both branches — and writing .sr-only alongside is exactly the deprecated
- * pairing bootstrap_compat_test forbids.
+ * conflict badge's explanation and the notice table's caption use it, so the class has to mean
+ * something on both branches — and writing .sr-only alongside is the deprecated pairing
+ * bootstrap_compat_test forbids.
  *
  * Bootstrap's own declaration is all !important, which Moodle's stylelint refuses
  * (declaration-no-important). Nothing competes with this selector on 4.5, so plain declarations
@@ -2261,14 +2213,8 @@ body.local-awareness-bs4 .visually-hidden {
 
 /*
  * The competency picker's rows carry their indent as an inline padding-left, because the depth is
- * computed per row and cannot be a class.
- *
- * The row used to also carry Bootstrap's .px-2, and the inline rule then needed !important to win —
- * Bootstrap 5 generates its spacing utilities with !important, so .px-2 outranked the attribute.
- * That put an !important inside a Mustache style attribute, where stylelint's
- * declaration-no-important cannot see it. Dropping .px-2 removes the conflict instead of forcing
- * it: an inline declaration already outranks a class on both branches, and the horizontal padding
- * the utility supplied is stated here.
+ * computed per row and cannot be a class. So the row wears no horizontal spacing utility: Bootstrap
+ * declares those !important, and one would beat the inline indent. Its right padding is set here.
  */
 .competency-picker-item {
     padding-right: 0.5rem;

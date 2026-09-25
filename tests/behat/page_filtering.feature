@@ -14,20 +14,16 @@ Feature: Notices are filtered by the page the user is actually on
     And I click on "Enabled" "checkbox"
     And I click on "Save changes" "button"
 
-  # Both pages are visited by URL, and neither is the front page. "/" redirects a logged-in user
-  # to whatever the home page setting resolves to — on Moodle 5.2 that happens before the redirect
-  # parameter is even consulted (public/index.php, the enablemyhome block), so both "I am on site
-  # homepage" and "/?redirect=0" land on /my/ and the scenario ends up comparing the Dashboard
-  # with itself. The Dashboard and the profile page render where they are asked for.
+  # Both pages are visited by URL, and neither is the front page: on Moodle 5.2 "/" can redirect a
+  # logged-in user to /my/ before the redirect parameter is consulted (index.php, the enablemyhome
+  # block), which would leave the scenario comparing the Dashboard with itself.
   #
-  # The order matters too. Nothing is dismissed between the two pages, so the only thing that
-  # changes is the URL the browser reports. The closing "should see" is the control for the opening
-  # "should not see": it proves the module loaded, the AJAX call ran and the notice really was live
-  # for this user, so the Dashboard result was a filtering decision and not a dead pipeline.
+  # Nothing is dismissed between the two pages, so only the URL changes. The closing "should see"
+  # is the control for the opening "should not see": it proves the notice was live for this user,
+  # so the Dashboard result was a filtering decision and not a dead pipeline.
   #
-  # The module steps pin the footer-hook probe: on the Dashboard the module must not merely show
-  # nothing, it must not have been delivered at all — that absent module IS the saved request this
-  # change exists for. On the profile page the module must be delivered, or a path-restricted
+  # The module steps pin the page probe in the footer hook: on the Dashboard the module must not be
+  # loaded at all, which saves the request; on the profile page it must be, or a path-restricted
   # notice could never appear anywhere.
   @javascript
   Scenario: A notice restricted to a path is shown there and nowhere else

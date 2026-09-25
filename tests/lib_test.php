@@ -26,15 +26,12 @@ require_once($CFG->dirroot . '/local/awareness/lib.php');
 /**
  * Tests for the plugin's file-serving callback.
  *
- * local_awareness_pluginfile() carries the only gate standing between a direct file URL and the
- * attachments of a notice that is switched off — an unpublished announcement, a notice pulled
- * after a mistake — and nothing exercised it. Every refusal path is a bare `return false`, which
- * is exactly the shape that survives being deleted.
- *
- * Every case asserts false, so each one needs its own reason to believe the false is the gate's
- * and not an accident of setup. The positive case at the end is that proof: the same file, the
- * same disabled notice, a user holding local/awareness:manage — and the callback gets far enough
- * to serve, which no other case does.
+ * local_awareness_pluginfile() is the only gate between a direct file URL and the attachments of
+ * a notice that is switched off or aimed at someone else. Every refusal is a bare `return false`,
+ * and a successful serve ends in send_stored_file(), which terminates the process.
+ * So a refusal by helper::may_serve_files_of() is asserted with the file in place, where a missing
+ * gate would serve it instead of returning, and an admission either asks may_serve_files_of()
+ * directly or deletes the file first, so the callback falls out at its own get_file() miss.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -154,12 +151,10 @@ final class lib_test extends \advanced_testcase {
     }
 
     /**
-     * A plain user cannot fetch a file belonging to a DISABLED notice.
+     * A plain user cannot fetch a file belonging to a disabled notice.
      *
-     * This is the gate the finding is about. The control is
-     * test_a_plain_user_may_fetch_a_file_of_an_enabled_notice() below: same user, same file, same
-     * call, differing only in the notice's enabled flag. Without that pair, a false here would be
-     * satisfied by the file simply not existing.
+     * The control is test_a_plain_user_passes_the_gate_on_an_enabled_notice() below: same kind of
+     * user, same call, differing in the notice's enabled flag.
      */
     public function test_a_plain_user_cannot_fetch_a_file_of_a_disabled_notice(): void {
         $this->resetAfterTest();
@@ -178,17 +173,12 @@ final class lib_test extends \advanced_testcase {
     }
 
     /**
-     * A plain user gets PAST the gate on an enabled notice.
+     * A plain user gets past the gate on an enabled notice.
      *
-     * The control for the disabled case, and it has to be built sideways. A successful serve ends
-     * in send_stored_file(), which writes the file and terminates the process, so the success path
-     * cannot be asserted from inside a test. What can be asserted is how far the callback gets:
-     * the file is deleted first, so an enabled notice falls out at the callback's own get_file()
-     * miss — reaching a line that is BELOW the capability gate.
-     *
-     * The pair is what carries the meaning. Enabled with no file returns false from the bottom of
-     * the function; disabled with a file returns false from the gate. Remove the gate and the
-     * second one stops returning at all: it serves the file and exits, which is the defect.
+     * The control for the disabled case. The file is deleted first, so an enabled notice falls out
+     * at the callback's own get_file() miss, below the gate. That false cannot be told apart from
+     * the gate's; what the pair proves is the disabled case, which with the gate removed would
+     * serve its file and exit instead of returning false.
      */
     public function test_a_plain_user_passes_the_gate_on_an_enabled_notice(): void {
         $this->resetAfterTest();
@@ -253,14 +243,10 @@ final class lib_test extends \advanced_testcase {
     /**
      * A user outside the notice's audience cannot fetch its attachments.
      *
-     * The file URL carries a notice id and nothing else, so before this gate existed the
-     * attachments of a cohort-targeted notice were readable by any authenticated user who guessed
-     * the id — while the notice body itself was correctly withheld from them by get_notices(). The
-     * plugin's own security model treats audience targeting as a confidentiality boundary; the
-     * file callback did not.
-     *
-     * Reproduced rather than reasoned about: with the gate removed this case does not return
-     * false, it reaches send_stored_file() and writes the attachment.
+     * The file URL carries a notice id and nothing else, so without an audience check any
+     * authenticated user who guessed the id could read the attachments of a notice whose body
+     * get_notices() withholds from them. The file is in place: with the gate removed this case
+     * reaches send_stored_file() instead of returning false.
      */
     public function test_a_user_outside_the_audience_cannot_fetch_the_files(): void {
         $this->resetAfterTest();
@@ -286,11 +272,9 @@ final class lib_test extends \advanced_testcase {
     /**
      * A member of the targeted cohort gets past the gate.
      *
-     * The control, and it has to be built sideways for the same reason as the enabled case: a
-     * successful serve ends in send_stored_file(), which terminates the process. The file is
-     * deleted first, so a user who IS in the audience falls out at the callback's own get_file()
-     * miss — a line BELOW the gate. The pair is what carries the meaning: same notice, same file
-     * name, differing only in whether the reader is in the cohort.
+     * The control, built like the enabled case: the file is deleted first, so a user who is in the
+     * audience falls out at the callback's own get_file() miss, below the gate. Same notice, same
+     * file name, differing only in whether the reader is in the cohort.
      */
     public function test_a_member_of_the_targeted_cohort_passes_the_gate(): void {
         $this->resetAfterTest();

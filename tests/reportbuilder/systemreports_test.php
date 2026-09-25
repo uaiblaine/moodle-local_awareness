@@ -26,14 +26,9 @@ use local_awareness\reportbuilder\local\systemreports\dismissed_notice;
 /**
  * Tests the capability gate on both system reports.
  *
- * local/awareness:viewreports had ZERO coverage anywhere in the plugin — the capability existed,
- * was declared in db/access.php, was enforced at four points, and no test mentioned it. It is
- * also the capability separating "may publish notices" from "may see who acknowledged them",
- * which is the distinction that makes the acknowledgement report a compliance record rather than
- * an admin convenience.
- *
- * Both reports get the same pair, because they enforce it in two separate can_view() methods:
- * a fix applied to one and forgotten in the other is exactly the failure a shared test misses.
+ * local/awareness:viewreports separates "may publish notices" from "may see who acknowledged
+ * them". Each case runs against both reports, because each enforces the gate in its own
+ * can_view() method.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -75,10 +70,9 @@ final class systemreports_test extends \advanced_testcase {
     /**
      * Build the report for a notice.
      *
-     * system_report_factory::create() applies can_view() itself and throws report_access_exception
-     * when it is false, so this call IS the enforcement point — the same one a user reaching
-     * report/acknowledged_systemreport.php goes through. can_view() is protected and cannot be
-     * asserted directly; the exception is the observable behaviour and the better thing to pin.
+     * system_report_factory::create() runs can_view() while validating the report and throws
+     * report_access_exception when it is false, the same path report/acknowledged_systemreport.php
+     * takes. can_view() is protected, so the exception is what the tests assert.
      *
      * @param string $class The system report class.
      * @param awareness $notice The notice the report is scoped to.
@@ -98,9 +92,8 @@ final class systemreports_test extends \advanced_testcase {
     /**
      * A user holding local/awareness:manage but NOT viewreports cannot view either report.
      *
-     * The pairing is the point. Holding manage is the realistic case — the person who publishes
-     * notices — and if can_view() ever read the manage capability instead, every "plain user"
-     * test would still pass while the separation the capability exists for had quietly gone.
+     * Holding manage is the realistic case, the person who publishes notices: a can_view() that
+     * checked manage instead of viewreports would still refuse a plain user.
      *
      * @dataProvider report_provider
      * @param string $class The system report class.
@@ -177,14 +170,9 @@ final class systemreports_test extends \advanced_testcase {
     /**
      * The download name identifies the notice, so two notices do not export the same filename.
      *
-     * Named after the datasource alone, every notice's export arrived as "Acknowledged notices" —
-     * byte-indistinguishable, which defeats the point of an export kept as a compliance record.
-     *
-     * reset_caches() between the two builds is load-bearing, and without it this test passes
-     * vacuously. core_reportbuilder\manager caches report instances under
-     * "<reportid>:<userid>" — the PARAMETERS are not in that key — and both notices resolve to the
-     * same report persistent, so the second create() would hand back the first instance verbatim
-     * and the two names would match because they are literally the same object.
+     * core_reportbuilder\manager caches report instances under "reportid:userid", without the
+     * parameters, and both notices resolve to the same report persistent. Without the
+     * reset_caches() between the two builds the second create() returns the first instance.
      *
      * @dataProvider report_provider
      * @param string $class The system report class.
@@ -215,7 +203,7 @@ final class systemreports_test extends \advanced_testcase {
     }
 
     /**
-     * A title carrying an ampersand reaches the filename in the PLAIN spelling.
+     * A title carrying an ampersand reaches the filename in the plain spelling.
      *
      * The sink is a Content-Disposition header, not HTML. With the escaped spelling the title
      * becomes "A &amp; B" and clean_filename() then strips the ampersand, leaving the literal word
@@ -246,10 +234,9 @@ final class systemreports_test extends \advanced_testcase {
     /**
      * The report is decided in the notice's own scope, read from its own parameter.
      *
-     * A course reports holder reads their course's notice and is refused another course's and the
-     * site's — and is refused the site's notice even when the report is created in THEIR course's
-     * context, because the retrieve web service takes context and parameters from the client and
-     * the parameter is the only one that names the rows.
+     * A course reports holder reads their own course's notice and is refused another course's and
+     * the site's, including a site notice requested through their own course's context
+     * ({@see acknowledged_notice::can_view()} gives the reason).
      *
      * @dataProvider report_provider
      * @param string $class The system report class.
@@ -276,10 +263,9 @@ final class systemreports_test extends \advanced_testcase {
         $this->assertInstanceOf($class, $this->make_report($class, $notices['mine']), 'the course reports holder reads their own');
 
         /*
-         * manager::get_report_from_persistent() caches the instance per report row and user, and the
-         * row is keyed on source and context, not on parameters — so without a reset the second
-         * report in the same context is the first one again, carrying the first notice id. One report
-         * per request in production; several in one test.
+         * Reset before each build: manager::get_report_from_persistent() caches the instance per
+         * report row and user, not per parameters, and production builds one report per request
+         * where this test builds several.
          */
         $refused = 0;
         foreach (['theirs', 'site'] as $key) {

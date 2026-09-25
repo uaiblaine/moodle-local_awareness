@@ -21,20 +21,12 @@ use local_awareness\persistent\linkhistory;
 /**
  * Scheduled task that discards link-click history past its configured lifetime.
  *
- * local_awareness_hlinks_his gains a row every time a reader follows a link inside a notice, and
- * nothing time-based ever removed one. The only deletions are linkhistory::delete_link_history(),
- * reached when an author edits a link out of a notice or deletes the notice — and that second path
- * sits behind the cleanup_deleted_notice setting, which ships off — plus privacy erasure, which is
- * per user and only on request. A site therefore kept every click for its whole life.
+ * local_awareness_hlinks_his gains a row every time a reader follows a link inside a notice. Apart
+ * from this task, rows go only through linkhistory::delete_link_history() (a link edited out of a
+ * notice, or a deleted notice with cleanup_deleted_notice on) and per-user privacy erasure.
  *
- * This is the retention half of audit finding M7. The OTHER half of that finding — a reader
- * inflating their own count by posting to the web service in a loop — is deliberately not
- * addressed, and not because it is hard: repeat clicks are the reported quantity. Every throttle
- * considered would have collapsed a genuine second click into the first, which is a worse outcome
- * than the one it prevents.
- *
- * Modelled on logstore_standard's cleanup_task, including its default: zero means keep everything,
- * so an upgrade never silently discards a site's existing history.
+ * Repeat clicks by one reader are not throttled or collapsed: they are the quantity the report
+ * counts. The lifetime is the linkhistory_lifetime setting, in days.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -65,7 +57,7 @@ class purge_link_history extends \core\task\scheduled_task {
 
         $lifetime = (int) get_config('local_awareness', 'linkhistory_lifetime');
         if ($lifetime <= 0) {
-            // Zero is "keep for ever", which is the shipped default and core's own for logs.
+            // Zero, the default, keeps everything; see settings.php.
             return;
         }
 
@@ -73,10 +65,10 @@ class purge_link_history extends \core\task\scheduled_task {
         $started = time();
 
         /*
-         * A day at a time rather than one statement. The span can be years the first time an admin
-         * sets a lifetime, and a single DELETE over millions of rows holds locks for minutes. Same
-         * shape as logstore_standard's cleanup_task, including the runtime ceiling: what this run
-         * does not reach, the next run does.
+         * A day at a time rather than one statement: the span can be years the first time a
+         * lifetime is set, and a single DELETE over that many rows holds locks for a long time.
+         * Same shape as logstore_standard's cleanup_task, including the runtime ceiling: what this
+         * run does not reach, the next run does.
          */
         while (
             $oldest = $DB->get_field_select(

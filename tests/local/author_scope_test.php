@@ -24,11 +24,7 @@ use local_awareness\helper;
  *
  * Every test here pairs the thing that must be dropped with a thing that must survive in the same
  * call. A test that only asserted the drop would pass against a scope that emptied every field,
- * and one that only asserted survival would pass against a scope that touched nothing — both
- * shapes this repository has shipped before.
- *
- * The course scope has no production caller yet: these tests build it by hand, which is the point.
- * The policy is pinned before anything is granted against it.
+ * and one that only asserted survival would pass against a scope that touched nothing.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -232,8 +228,8 @@ final class author_scope_test extends \advanced_testcase {
     /**
      * A course scope drops the fields that reach outside the course, and says so.
      *
-     * Asserted in the same call as a page pattern that must survive, so an implementation that
-     * returned an empty array reddens. An empty submission for these fields is not a problem.
+     * Asserted in the same call as the page pattern the scope forces, so an implementation that
+     * returned an empty array fails. An empty submission for these fields is not a problem.
      */
     public function test_the_course_scope_forbids_the_fields_that_reach_outside_it(): void {
         $course = $this->getDataGenerator()->create_course();
@@ -375,7 +371,7 @@ final class author_scope_test extends \advanced_testcase {
      * The rule table names exactly the fields the estimator knows, and every rule is applicable.
      *
      * Both directions: a field added to the estimator without a rule here, or a rule here for a
-     * field the estimator does not count, reddens. The two modifiers are the only keys outside the
+     * field the estimator does not count, fails. The two modifiers are the only keys outside the
      * estimator's own lists, and they are listed by name.
      */
     public function test_the_rule_table_covers_exactly_the_fields_the_estimator_knows(): void {
@@ -425,10 +421,10 @@ final class author_scope_test extends \advanced_testcase {
         $submitted = ['filter_groups' => [(int) $red->id, (int) $blue->id]];
 
         /*
-         * The declared verb and what apply() does, asserted together. apply() decides in its own
-         * branch and never reads the table, so a table saying one thing while the code does another
-         * is invisible without this: rule_for() is public, and a caller reading it would be misled.
-         * Found by mutation — flipping the site's verb to LEAVE passed the whole suite.
+         * The declared verb and what apply() does, asserted together. apply() decides groups in its
+         * own branch and never reads the table, so a table saying one thing while the code does
+         * another would otherwise go unnoticed: rule_for() is public, and a caller reading it would
+         * be misled. Changes that must make it fail: the site's verb for filter_groups set to LEAVE.
          */
         $this->assertSame(author_scope::RULE_FORBID, author_scope::site()->rule_for('filter_groups'));
         $this->assertSame(
@@ -512,7 +508,7 @@ final class author_scope_test extends \advanced_testcase {
      * A stored notice resolves to the scope it was written under.
      *
      * Three rows in one test — no course, the site course, a real course — so an of() that always
-     * answered either scope reddens, and the site course is pinned as the site rather than as a
+     * answered either scope fails, and the site course is pinned as the site rather than as a
      * course scope that no capability could ever be held in.
      */
     public function test_a_stored_notice_resolves_to_the_scope_it_was_written_under(): void {
@@ -534,7 +530,7 @@ final class author_scope_test extends \advanced_testcase {
      *
      * The notice wins over the URL — a course URL naming a site notice is the site — and the site
      * course, or nothing, is the site. All four shapes in one test, so a for_request() that
-     * ignored either argument reddens.
+     * ignored either argument fails.
      */
     public function test_a_request_resolves_to_the_notice_s_scope_or_the_url_s_course(): void {
         $course = $this->getDataGenerator()->create_course();
@@ -587,7 +583,7 @@ final class author_scope_test extends \advanced_testcase {
      * A scope knows the context its decisions are taken in.
      *
      * Against a real generated course, so the lookup is a real one; and both scopes in one test,
-     * so an implementation returning either context unconditionally reddens.
+     * so an implementation returning either context unconditionally fails.
      */
     public function test_the_scope_knows_the_context_it_is_decided_in(): void {
         $course = $this->getDataGenerator()->create_course();

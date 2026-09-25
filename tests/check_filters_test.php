@@ -19,11 +19,9 @@ namespace local_awareness;
 /**
  * Direct tests for the two page-targeting predicates.
  *
- * check_path_match() had no direct test at all — its only coverage came through two callers, one
- * of which (page_probe) reimplements the category/course/format logic in its own methods, so
- * tests passing there guarded a different copy of the rules. And four of check_filters()' six
- * branches — category, course, format and competency — had no case asserting false, which is the
- * direction that decides whether a notice targeted at one course stays out of every other.
+ * Called directly, not through their callers: page_probe reimplements the category/course/format
+ * logic, so a test passing there guards a different copy of the rules. The false cases matter
+ * most, since they decide whether a notice targeted at one course stays out of every other.
  *
  * The pairing convention throughout: every false assertion is accompanied by the same call with
  * one input changed so it returns true. A false on its own is satisfied by any early return, and
@@ -80,9 +78,9 @@ final class check_filters_test extends \advanced_testcase {
     /**
      * A pattern without a wildcard is anchored at the END only.
      *
-     * Recorded because it is surprising and is its own audit finding: '/course/view.php' does not
-     * match '/course/view.php?id=2', because the pattern gets a '$' appended and the query string
-     * is part of the target. An author writing a plain path therefore has to know to add '%'.
+     * Pinned because it is surprising: '/course/view.php' does not match '/course/view.php?id=2',
+     * because the pattern gets a '$' appended and the query string is part of the target. An author
+     * writing a plain path therefore has to know to add '%'.
      */
     public function test_a_plain_pattern_is_anchored_at_the_end(): void {
         $this->resetAfterTest();
@@ -94,9 +92,9 @@ final class check_filters_test extends \advanced_testcase {
     /**
      * A pattern is anchored at the START, so it cannot match a path that merely contains it.
      *
-     * Without the leading anchor a rule scoping a notice to /mod/quiz/view.php also fired on
-     * /anything/mod/quiz/view.php — the author scoped to one page and got every path ending in
-     * that page. The control is the same pattern against the path it was written for.
+     * Without the leading anchor a rule scoping a notice to /mod/quiz/view.php would also fire on
+     * /anything/mod/quiz/view.php. The control is the same pattern against the path it was
+     * written for.
      */
     public function test_a_pattern_cannot_match_a_path_that_merely_ends_with_it(): void {
         $this->resetAfterTest();
@@ -121,8 +119,8 @@ final class check_filters_test extends \advanced_testcase {
      *
      * The anchor is what makes this necessary: on such a site the target arrives as
      * /moodle/mod/quiz/view.php while the author writes /mod/quiz/view.php, which is what they
-     * see in the URL bar. Anchoring without allowing for the wwwroot segment would have turned
-     * one defect into another — every path rule silently dead on subdirectory installs.
+     * see in the URL bar. Anchoring without allowing for the wwwroot segment would leave every path
+     * rule dead on subdirectory installs.
      */
     public function test_a_subdirectory_install_still_matches_the_authored_path(): void {
         global $CFG;
@@ -152,11 +150,10 @@ final class check_filters_test extends \advanced_testcase {
     /**
      * Create a user, enrol them in the given courses, and log them in.
      *
-     * The enrolment is not decoration. check_filters() resolves the course through
-     * can_access_course($course, null, '', true), and that $onlyactive = true demands an ACTIVE
-     * enrolment — so an un-enrolled user gets $course = null and every branch below returns false
-     * for the "not on a course page" reason rather than the one under test. The positive controls
-     * would fail and the negative ones would pass without exercising anything.
+     * check_filters() resolves the course through can_access_course($course, null, '', true), which
+     * an un-enrolled user fails on a course without guest access. $course is then null and every
+     * branch below returns false for the "not on a course page" reason rather than the one under
+     * test: the positive controls would fail and the negative ones would pass vacuously.
      *
      * @param array $courses Courses to enrol into.
      */
@@ -227,20 +224,15 @@ final class check_filters_test extends \advanced_testcase {
     /**
      * A competency-targeted notice is refused off a course.
      *
-     * The competency subsystem is switched ON first. Without that the branch returns false at
+     * The competency subsystem is switched on first. Without that the branch returns false at
      * is_competency_filter_enabled() and the test would pass while proving nothing about the
-     * course requirement it is written for — the vacuous shape this suite has been bitten by.
+     * course requirement it is written for.
      */
     public function test_the_competency_branch_rejects_off_a_course(): void {
         $this->resetAfterTest();
 
-        /*
-         * The competency subsystem is switched on through set_config('enabled', …,
-         * 'core_competency'), not through $CFG->enablecompetencies: core_competency\api::is_enabled()
-         * reads the plugin config, and setting the $CFG flag leaves it returning true — which would
-         * take this test down the disabled branch and let it pass without ever reaching the course
-         * requirement it is written for.
-         */
+        // Through the core_competency config, which api::is_enabled() reads; $CFG->enablecompetencies
+        // is not what it consults.
         set_config('enabled', 1, 'core_competency');
         $this->setUser($this->getDataGenerator()->create_user());
 

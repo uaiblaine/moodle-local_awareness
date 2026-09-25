@@ -162,13 +162,11 @@ final class notice_form_test extends \advanced_testcase {
     /**
      * Editing a notice shows the insistence level it actually has.
      *
-     * The level is derived rather than stored, so it has to be put into the form on the way in and
-     * mapped back to the two columns on the way out. Only the second direction had a test, and the
-     * first is the one that loses data: a form that silently offers "Informational" for a Blocking
-     * notice demotes it the moment the author saves anything else about it — a title fix would
-     * quietly make an unskippable notice skippable, with nothing on screen to say so.
+     * The level is derived from reqack and outsideclick, so the form has to load it on the way in
+     * as well as map it back on save. A form that offered "Informational" for a Blocking notice
+     * would demote it the moment the author saved any other change, such as a title fix.
      *
-     * The three rows are each other's controls. A mapping stuck on any single value satisfies one
+     * The three rows are each other's controls: a mapping stuck on any single value satisfies one
      * of them and fails the other two.
      *
      * @return void
@@ -207,14 +205,9 @@ final class notice_form_test extends \advanced_testcase {
     /**
      * Every field with a help string actually offers the help button.
      *
-     * "Is perpetual" had `notice:perpetual_help` defined in both language packs and no
-     * addHelpButton() call, so the sentence explaining what the field does existed, was
-     * translated, was maintained — and never reached a single author. Nothing in the pipeline can
-     * see that: a help string with no button is not an unused string (the sniff cannot tell) and
-     * not a broken one.
-     *
-     * Driven from the language pack rather than a hand-kept list, so a field whose help string is
-     * added later without its button turns this red on its own.
+     * A help string with no addHelpButton() call is translated and maintained but never shown, and
+     * no linter reports it. Driven from the language pack rather than a hand-kept list, so a help
+     * string added later without its button fails this test.
      */
     public function test_every_field_with_a_help_string_has_its_help_button(): void {
         global $PAGE;
@@ -225,8 +218,7 @@ final class notice_form_test extends \advanced_testcase {
         /*
          * Rendering the form reaches MoodleQuickForm_editor, which asks TinyMCE for its plugin
          * configuration, and tiny_autosave reads $PAGE->url. Without a URL that emits a
-         * debugging() call — harmless on 5.x, but an unasserted debugging() FAILS PHPUnit on 4.5,
-         * so this line is what makes the test run on the lower half of the supported range.
+         * debugging() call, and an unasserted debugging() fails the test.
          */
         $PAGE->set_url(new \moodle_url('/local/awareness/editnotice.php'));
 
@@ -244,13 +236,9 @@ final class notice_form_test extends \advanced_testcase {
             $element = substr($key, strlen('notice:'), -strlen('_help'));
 
             /*
-             * Both halves read from the rendered page, which is the only place that can answer
-             * "did the author see this". A help string whose field the form does not render is
-             * not this test's business; a field that IS rendered and shows no help is.
-             *
-             * The help TEXT is the anchor, because core's help_icon template carries no field
-             * identifier — it puts the string itself into data-bs-content. Matching the text is
-             * therefore also the stronger check: it proves the right help reached the right field.
+             * Only fields the form renders are checked. The help text is the anchor because core's
+             * help_icon template carries no field identifier: it puts the escaped string into the
+             * popover's data-content attribute (data-bs-content on 5.x).
              */
             if (!str_contains($html, 'name="' . $element . '"')) {
                 continue;
@@ -267,9 +255,8 @@ final class notice_form_test extends \advanced_testcase {
             . implode(', ', $missing));
 
         /*
-         * Non-vacuity, both ways. The loop has to have examined some fields, and the specific one
-         * this test was written for has to be among them — otherwise a rename would leave the
-         * assertion above passing over an empty set.
+         * The loop must have examined some fields, perpetual among them; otherwise a rename would
+         * leave the assertion above passing over an empty set.
          */
         $this->assertNotEmpty($checked, 'no rendered field carried a help string — the scan is broken');
         $this->assertContains(
@@ -280,17 +267,12 @@ final class notice_form_test extends \advanced_testcase {
     }
 
     /**
-     * Admin-set names reach the pickers in the ESCAPED spelling.
+     * Admin-set names reach the pickers in the escaped spelling.
      *
      * Both option lists are rendered by core's element-autocomplete.mustache, which emits every
-     * option as {{{text}}} — a triple stash — and lib/form/select.php passes the text through
-     * untouched. So a course or category name carrying markup arrives as markup, and a multilang
-     * name arrives as literal {mlang} text.
-     *
-     * This is the half of the same defect that lives in PHP rather than in the web service. The
-     * finding named only search_courses(); the picker has two sides and the author sees both in
-     * one field, so fixing one and not the other would have left the AJAX suggestions and the
-     * pre-loaded selection disagreeing about the same course.
+     * option text through a triple stash, and lib/form/select.php passes the text through
+     * untouched. The pre-loaded options must match what the search_courses web service returns
+     * ({@see notice_form::course_label()}).
      *
      * A bare ampersand is the fixture because tag-shaped input is stripped identically in both
      * spellings and would prove nothing.
@@ -356,7 +338,7 @@ final class notice_form_test extends \advanced_testcase {
         $method->setAccessible(true);
         $errors = [];
 
-        // The text is now a server rule, so the payload carries one the way the form would.
+        // The default layout requires a text, so the payload carries one the way the form would.
         $body = ['content' => ['text' => '<p>Body</p>', 'format' => FORMAT_HTML]];
         $clean = $method->invokeArgs($form, [(object) (['filter_course' => [(int) $course->id]] + $body), [], &$errors]);
         $this->assertSame([], $clean);
@@ -375,7 +357,7 @@ final class notice_form_test extends \advanced_testcase {
      * Every field the site scope can report has a message, and a field without one fails loudly.
      *
      * Pinned against author_scope::RULES rather than a list of names, so a field added to the
-     * scope without a message here reddens instead of reaching an author as the wrong message.
+     * scope without a message here fails instead of reaching an author as the wrong message.
      */
     public function test_every_field_the_scope_can_report_has_a_message(): void {
         $this->resetAfterTest();
@@ -561,10 +543,9 @@ final class notice_form_test extends \advanced_testcase {
     /**
      * The audience estimate is rendered inside the audience section, not after the whole form.
      *
-     * It is the answer to that section's question, and it used to sit below the appearance and
-     * scheduling sections — so narrowing a rule meant scrolling past both to see what it did. The
-     * assertion is containment rather than order, because order alone would still pass if the
-     * panel merely moved up a section.
+     * It answers that section's question, so it sits beside the rules it estimates. The assertion is
+     * containment rather than order, because an order check would still pass with the panel in a
+     * later section.
      */
     public function test_the_audience_estimate_sits_inside_the_audience_section(): void {
         global $PAGE;
@@ -587,7 +568,7 @@ final class notice_form_test extends \advanced_testcase {
         $inside = $xpath->query('//*[@id="id_header_audience"]//*[@data-region="la-audience"]');
         $this->assertSame(1, $inside->length, 'the estimate is not inside the audience section');
 
-        // The control: it is not inside the section that used to follow it either.
+        // Control: not inside the appearance section, where an order check alone would also pass.
         $this->assertSame(
             0,
             $xpath->query('//*[@id="id_header_appearance"]//*[@data-region="la-audience"]')->length
@@ -597,11 +578,9 @@ final class notice_form_test extends \advanced_testcase {
     /**
      * The sections are read in the order the author decides things.
      *
-     * What it says, who gets it, how it looks, when it runs. Behaviour used to sit second, which
-     * put a reset interval and an expiry date between the author and the audience they were
-     * choosing; it is the last decision, so it is the last section. The order is the order
-     * definition() adds the headers in and nothing else records it, so it is pinned here — a
-     * reordering is a design change, and one that happens by accident should fail.
+     * What it says, who gets it, where it shows, how it looks, when it runs. Nothing but the order
+     * in which definition() adds the headers records this, so it is pinned here: an accidental
+     * reordering should fail.
      *
      * The course form is the same list without the display restrictions, which a course notice
      * does not have: its page reach is written by the scope.
@@ -691,9 +670,8 @@ final class notice_form_test extends \advanced_testcase {
         $this->assertNull($this->offered_groups($site), 'the site has no groups');
 
         /*
-         * The mode is not what decides the picker: it governs how activities separate participants,
-         * and a course can hold hundreds of groups with the mode left at "No groups", which is how
-         * core ships it. Gating on the mode hid the picker on every real course on the dev site.
+         * The mode governs how activities separate participants, and a course can hold groups with
+         * the mode left at "No groups", core's default, so it must not hide the picker.
          */
         $DB->set_field('course', 'groupmode', NOGROUPS, ['id' => $course->id]);
         $form = new notice_form(null, ['persistent' => null, 'id' => 0, 'scope' => $scope]);
@@ -719,10 +697,9 @@ final class notice_form_test extends \advanced_testcase {
      * The competency picker is handed the course context, from which only 'parents' reaches a framework.
      *
      * Frameworks live at the system or a category context, never at a course, so a listing that
-     * walked 'children' from the course context would be empty on every site, always — which is what
-     * a first cut of this did, silently. The module asks for 'parents' from a course; this pins the
-     * pairing on the server side: the same seeded framework is found from the course context one way
-     * and not the other.
+     * walked 'children' from the course context would be empty on every site. notice_form.js asks
+     * for 'parents' when it has a course; this pins the pairing on the server side: the same seeded
+     * framework is found from the course context one way and not the other.
      */
     public function test_the_picker_s_course_context_reaches_a_framework_only_through_its_parents(): void {
         global $PAGE;

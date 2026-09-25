@@ -3,14 +3,12 @@
 
     The Title cell: the notice title, with the pages it applies to underneath.
 
-    A notice title has no length cap in the database, so the cell clamps it to two lines in CSS and
-    carries the whole string in the title attribute. The full text stays in the node — clipped for
-    the eye, intact for a screen reader.
+    The stylesheet clamps the title to two lines; the title attribute carries it whole.
 
-    The title arrives already through format_string(), which resolves the text filters and applies
-    core's HTML cleaning, so it is emitted with a triple stash: escaping it again would show a
-    multilang or emphasised title as literal markup. The path is the opposite case — a URL pattern
-    rather than prose — so it arrives RAW and is escaped here by Mustache.
+    The title arrives already through format_string(), which resolves the text filters and strips
+    or cleans the markup, so it is emitted with a triple stash: escaping it again would print its
+    entities literally. The path is the opposite case — a URL pattern rather than prose — so it
+    arrives raw and is escaped here by Mustache.
 
     Context variables required:
     * title (string) — the filtered notice title, safe HTML

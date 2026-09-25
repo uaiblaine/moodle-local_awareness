@@ -150,12 +150,10 @@ class acknowledgement extends base {
             ->set_is_sortable(true)
             ->add_callback(static function ($value): string {
                 /*
-                 * Deliberately untyped. Report Builder calls display callbacks from
-                 * reportbuilder/classes/local/aggregation/base.php, which declares
-                 * strict_types=1 — strictness follows the caller, so an aggregation such as
-                 * Average hands a float to a ?int signature and raises a TypeError instead of
-                 * rendering. An aggregate is not one of the two actions, so it is shown as a
-                 * number.
+                 * Untyped on purpose. Under an aggregation the callback is called from
+                 * core_reportbuilder\local\aggregation\base, which declares strict_types, so an
+                 * aggregate such as Average's float would raise a TypeError on a ?int parameter.
+                 * An aggregate is neither action, so it is shown as a number.
                  */
                 if ($value === null || $value === '') {
                     return '';

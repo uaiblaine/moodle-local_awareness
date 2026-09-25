@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Capability to manage notice
+ * Capability definitions.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -27,15 +27,10 @@ defined('MOODLE_INTERNAL') || die();
 
 $capabilities = [
     /*
-     * RISK_XSS is not decoration. A notice's content is PARAM_RAW from the form to the persistent,
-     * helper::render_content() passes it through format_text() with 'noclean' => true, and
-     * notice.js hands the result to core's Modal.setBody(), which is innerHTML. So this capability
-     * lets its holder put arbitrary markup in front of every logged-in user on the site, which is
-     * exactly what Moodle's risk model calls RISK_XSS — and declaring only RISK_CONFIG hid that
-     * from the "Check permissions" report and from anyone reviewing who should hold it.
-     *
-     * The noclean is deliberate: notice bodies legitimately carry embedded media that clean_text()
-     * would strip. Trusting the author is a defensible choice; leaving the trust undeclared is not.
+     * RISK_XSS: a notice's content is stored PARAM_RAW, helper::render_content() formats it with
+     * 'noclean' => true (notice bodies carry embedded media that clean_text() would strip), and
+     * notice.js inserts the result with core's Modal.setBody(). The holder can therefore put
+     * arbitrary markup in front of every user a notice reaches.
      */
     'local/awareness:manage' => [
         'captype' => 'write',
@@ -46,8 +41,8 @@ $capabilities = [
         ],
     ],
     /*
-     * The reports name users and carry their email and idnumber, so the holder sees personal data
-     * about people other than themselves.
+     * The reports name users and show their username and idnumber, so the holder sees personal
+     * data about people other than themselves.
      */
     'local/awareness:viewreports' => [
         'captype' => 'read',
@@ -58,12 +53,10 @@ $capabilities = [
         ],
     ],
     /*
-     * The capability a course-level author will hold, declared before any page can grant it so
-     * that helper::require_author()'s course branch is real code with real tests rather than a
-     * name nothing resolves. CONTEXT_COURSE, and RISK_XSS alone: a course notice is still
-     * format_text(noclean) into Modal.setBody(), so the trust is the same, but it changes no site
-     * configuration — core draws the same line between tool/monitor:managetool and
-     * tool/monitor:managerules. No archetype, by decision: an administrator grants it per role.
+     * The course-level counterpart of manage. RISK_XSS alone: a course notice's content takes the
+     * same format_text(noclean) path, but the capability changes no site configuration (core draws
+     * the same line between tool/monitor:managetool and tool/monitor:managerules). No archetype:
+     * an administrator grants it per role.
      */
     'local/awareness:managecourse' => [
         'captype' => 'write',
@@ -72,11 +65,11 @@ $capabilities = [
         'archetypes' => [],
     ],
     /*
-     * The reports of a course's notices name the course's users and carry their email and idnumber,
-     * so this is RISK_PERSONAL like its site-level sibling. It opens only the reports of notices
-     * that belong to the course it is held in — the reports resolve the notice first and decide in
-     * ITS scope — and it opens nothing else: it does not manage, and managecourse does not read
-     * reports. No archetype, by the same decision as managecourse.
+     * RISK_PERSONAL like its site-level sibling: the reports of a course's notices name its users
+     * and show their username and idnumber. It opens the course's notice list read-only, the
+     * preview, and the reports of notices belonging to the course it is held in (the reports
+     * resolve the notice first and decide in its scope). It does not manage, and managecourse does
+     * not read reports. No archetype, as for managecourse.
      */
     'local/awareness:viewreportscourse' => [
         'captype' => 'read',

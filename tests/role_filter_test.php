@@ -17,23 +17,21 @@
 namespace local_awareness;
 
 /**
- * Characterisation tests for the role rule inside filtervalues.
- *
- * Written against the behaviour as it stood before the rule was extracted from check_filters(),
- * and kept afterwards so the extraction has to reproduce it rather than merely look similar.
+ * Characterisation tests for the role rule inside filtervalues: they pin behaviour that follows
+ * from the implementation rather than from a stated rule, so a refactor has to reproduce it.
  *
  * Two traps shape every test here, and both make a careless test pass while exercising nothing:
  *
- * - filter_category and filter_course appear TWICE in check_filters() with different meanings.
- *   They first scope the role query (a page-independent question about the user), and then act as
- *   page-context filters in their own right. A scenario whose two meanings contradict each other —
- *   a course list naming one course and a category list naming a category that course is not in —
- *   is rejected by the later blocks before the role rule is ever reached.
+ * - filter_category and filter_course have two meanings. They scope the role query
+ *   ({@see \local_awareness\local\role_scope::sql()}, a page-independent question about the user),
+ *   and they are page-context filters in check_filters(). A scenario whose two meanings contradict
+ *   each other (a course list naming one course and a category list naming a category that course
+ *   is not in) is rejected by the page-context blocks, so the role rule's answer is never seen.
  * - The course-context blocks need $course, which check_filters() only resolves through
- *   can_access_course($course, null, '', true). Without an ACTIVE enrolment that call returns
- *   false, $course becomes null, and the course block rejects first. Every test below that names a
- *   course therefore enrols the user in it, and every test that also names a category puts that
- *   course in it.
+ *   can_access_course($course, null, '', true). For a user without an active enrolment that call
+ *   returns false, $course becomes null, and the page-context blocks reject whatever the role rule
+ *   answered. Every test below that names a course therefore enrols the user in it, and every test
+ *   that also names a category puts that course in it.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -120,10 +118,10 @@ final class role_filter_test extends \advanced_testcase {
     /**
      * Moodle's implicit default user role is added only for site-wide role contexts.
      *
-     * It lives in $CFG, not in {role_assignments}, so the query cannot see it. check_filters()
-     * appends it by hand — but only when the rule is unscoped or system-scoped. A notice targeted
-     * at the default role with a course or category context therefore reaches nobody through this
-     * mechanism, which is behaviour worth pinning rather than a rule anyone stated.
+     * It lives in $CFG, not in {role_assignments}, so the query cannot see it, and
+     * user_matches_role_filter() appends it only when the rule is unscoped or system-scoped. A notice
+     * targeted at the default role with a course or category context therefore reaches nobody
+     * through this mechanism.
      */
     public function test_default_user_role_is_added_only_for_site_wide_role_contexts(): void {
         global $CFG;
@@ -155,9 +153,9 @@ final class role_filter_test extends \advanced_testcase {
     /**
      * A course role context takes the UNION of the course list and the category list.
      *
-     * The two lists are joined with OR, so holding the role in any course of a listed category
-     * satisfies the rule even when that course is not the one named in the course list. Nothing
-     * says so anywhere; it follows only from the implode(" OR ") that builds the predicate.
+     * The two lists are joined with OR ({@see \local_awareness\local\role_scope::sql()}), so holding
+     * the role in any course of a listed category satisfies the rule even when that course is not
+     * the one named in the course list.
      *
      * The setup exists to let both meanings of the two lists agree. The current course sits in the
      * listed category and is the one named in the course list, so the page-context blocks accept

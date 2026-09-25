@@ -19,14 +19,14 @@ namespace local_awareness\audience;
 /**
  * Decides whether this site is small enough to estimate an audience interactively.
  *
- * One question, two consequences, and they are deliberately not separable: below the limit the
- * editor re-estimates as the author edits AND the web service answers during the request; above it
- * neither happens — the estimate runs only when asked for, in the background. Splitting them would
- * allow the worst combination, an editor that auto-fires a job it then has to wait on cron for.
+ * One answer drives two behaviours that must not be separated: below the limit the editor
+ * re-estimates as the author edits and the web service resolves the job during the request; above
+ * it the estimate runs only when asked for, as an adhoc task. Split, the editor could auto-fire a
+ * job it then has to wait on cron for.
  *
- * The estimate scans one row per user, so the user count is the cost proxy. It is an imperfect one
- * — a small site with seven rules and twenty competencies can cost more than a large site filtered
- * by one cohort — which is why the limit is a setting and not a constant.
+ * The estimate reads one row per user, so the user count is the cost proxy. It is an imperfect one
+ * (a small site with many rules can cost more than a large site filtered by one cohort), which is
+ * why the limit is a setting and not a constant.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -36,9 +36,8 @@ class live_mode {
     /**
      * Default user count up to which the estimate stays interactive.
      *
-     * Sized for the sites this plugin actually runs on: an author on a 200k-user site should never
-     * see the editor fire an estimate on its own, and the previous default of 25000 was set from
-     * reasoning rather than measurement.
+     * Deliberately low, so the editor never fires an estimate on its own on a large site; a site
+     * where the estimate is cheap can raise the setting.
      */
     public const LIMIT_DEFAULT = 1000;
 
@@ -77,16 +76,14 @@ class live_mode {
     /**
      * The site's user count, cached.
      *
-     * {user}.deleted carries no index, so this is a full scan — cheap on the sites that pass the
-     * limit and emphatically not on the sites that fail it, where it would otherwise be paid on
-     * every estimate only to reach the same "too large" answer. The time-to-live lives in
-     * db/caches.php, which is what enforces it; a site does not change size within it in any way
-     * that matters to this decision.
+     * Counting touches one entry per user: cheap on the sites that pass the limit, costly on the
+     * large sites that fail it, where it would otherwise be paid on every estimate to reach the same
+     * "too large" answer. The time-to-live is set in db/caches.php; a site does not change size
+     * within it enough to change this decision.
      *
-     * Counted with deleted = 0 alone, which is wider than the population the estimate itself counts
-     * (it also drops suspended, unconfirmed and guest users). That is deliberate: the cost being
-     * predicted is the number of rows scanned, and the scan reads those rows before any of the
-     * narrower conditions apply.
+     * Counted with deleted = 0 alone, which is wider than the population the estimate counts (that
+     * also drops suspended, unconfirmed and guest users). Deliberate: the cost being predicted is
+     * the rows the estimate reads, and it reads them before the narrower conditions apply.
      *
      * @return int
      */

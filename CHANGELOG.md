@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Code comments rewritten for Moodle developers (version 2026092400)
+
+Every comment in the plugin was audited against Moodle's guidance on comments. History, incident
+stories, audit and planning identifiers and references to the development environment left the
+code; the non-obvious reasons, contracts and version differences stayed, shorter. 228 comments that
+no longer matched the code they describe were corrected. No code changed: the AMD modules were
+rebuilt only because their source maps carry the comment text.
+
 ### Four more layouts: Split, Minimal, Banner, and the Image alone (version 2026090601)
 
 The three layouts the first release deferred, and a fourth that was asked for since: a notice that

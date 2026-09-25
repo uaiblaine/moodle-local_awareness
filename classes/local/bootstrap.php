@@ -27,17 +27,13 @@ namespace local_awareness\local;
 /**
  * Tells the stylesheet which Bootstrap major version the current site runs.
  *
- * Moodle 4.5 ships Bootstrap 4 and 5.0+ ship Bootstrap 5, and the bridging between
- * them is asymmetric: 4.5's forward bridge (theme/boost/scss/moodle/bs5-bridge.scss)
- * is 116 lines covering only g-0, btn-close, the ms/me/ps/pe spacers and
- * float/text/border/rounded-start/end, while 5.x's backward bridge (bs4-compat.scss)
- * is over a thousand lines. A BS5 utility outside that short list resolves to nothing
- * on 4.5, so styles.css carries a polyfill for the families the plugin uses.
+ * Moodle 4.5 ships Bootstrap 4 and 5.0+ ship Bootstrap 5. 4.5's forward bridge
+ * (theme/boost/scss/moodle/bs5-bridge.scss) covers only g-0, btn-close, the ms/me/ps/pe
+ * spacers and float/text/border/rounded-start/end, so any other BS5 utility resolves to
+ * nothing on 4.5 and styles.css polyfills the ones the plugin uses.
  *
- * That polyfill must not reach 5.x. Plugin CSS loads after core's, so a rule scoped to
- * a plugin surface would outrank core's own definition and freeze 4.5's metrics onto
- * the newer branch. Gating the block on a body class only 4.5 receives is what keeps it
- * inert there.
+ * The polyfill is gated on a body class only 4.5 receives. Plugin CSS loads after core's,
+ * so an ungated rule scoped to a plugin surface would outrank core's own definition on 5.x.
  */
 class bootstrap {
     /** @var string Body class added on sites running Bootstrap 4 (Moodle 4.5). */
@@ -60,11 +56,10 @@ class bootstrap {
     /**
      * Adds the Bootstrap 4 marker to the page when the site needs the polyfill.
      *
-     * Call this from every page the plugin owns — editnotice.php and managenotice.php, which
-     * is where the competency picker and rules markup renders. The notice modal is
-     * deliberately NOT covered: notice.js shows it on arbitrary pages, where this marker
-     * cannot be on the body, so that template uses the plugin's own .awareness scope for its
-     * one weight rule rather than a Bootstrap utility.
+     * Call this from every page the plugin owns (editnotice.php, managenotice.php and the two
+     * report pages); bootstrap_compat_test checks every page that sets a URL. The notice dialogue
+     * is not covered: notice.js shows it on arbitrary pages, whose body never carries this marker,
+     * so its template uses no Bootstrap 5 utility and is styled by the plugin's own .awareness rules.
      *
      * @return void
      */

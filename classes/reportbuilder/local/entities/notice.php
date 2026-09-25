@@ -130,12 +130,9 @@ class notice extends base {
         ))
             ->add_joins($this->get_joins())
             /*
-             * Normalised in SQL rather than shipped raw. The stored value is a COURSE ID, while
-             * the column type promises zero or one and Report Builder aggregates the field
-             * arithmetically — so the percent aggregation over a course id reported a seven-digit
-             * percentage. A searched CASE keeps the boolean contract the type declares, is plain
-             * ANSI so it holds on both PostgreSQL and MariaDB, and leaves every stored
-             * aggregation on this column still valid.
+             * Normalised in SQL: the stored value is a course id, but Report Builder aggregates a
+             * boolean column arithmetically, so percent over the raw id read as a seven-digit
+             * percentage. The portable searched CASE keeps the zero-or-one contract of TYPE_BOOLEAN.
              */
             ->add_field("CASE WHEN {$alias}.reqcourse > 0 THEN 1 ELSE 0 END", 'reqcourse')
             ->set_type(column::TYPE_BOOLEAN)
@@ -145,11 +142,8 @@ class notice extends base {
             });
 
         /*
-         * How insistent the notice is, as one ordered value. Derived in SQL from the two columns
-         * that store it rather than added to the table, so there is no third copy to drift from
-         * awareness::get_insistence() — the CASE below is that method, in ANSI, and the two must
-         * be changed together. A searched CASE keeps this portable across PostgreSQL and MariaDB,
-         * the same reason reqcourse above is written this way.
+         * How insistent the notice is, derived in SQL from reqack and outsideclick. The CASE below
+         * is {@see awareness_persistent::get_insistence()} in portable SQL; keep the two in step.
          */
         $columns[] = (new column(
             'insistence',
@@ -165,14 +159,9 @@ class notice extends base {
             ->set_is_sortable(true)
             ->add_callback(static function ($value): string {
                 /*
-                 * A literal per level. get_string() with a built identifier would read more
-                 * tidily and is banned for a reason: nothing then proves the strings exist, and a
-                 * missing one renders as its own identifier rather than failing.
-                 *
-                 * Compared with >= rather than equality, like every other reader of the level. An
-                 * exact match here would have printed "Informational" for any level added above
-                 * Acknowledge while must_reshow() and the manage list treated it as insistent —
-                 * the report would have contradicted the behaviour it exists to describe.
+                 * A literal string id per level, never a built one. Compared with >=, like every
+                 * other reader of the level, so a level added above Acknowledge is not reported as
+                 * Informational while the display treats it as insistent.
                  */
                 $level = (int) $value;
                 if ($level >= awareness_persistent::INSISTENCE_ACKNOWLEDGE) {
@@ -195,10 +184,8 @@ class notice extends base {
             ->set_is_sortable(true)
             /*
              * Deprecated rather than removed. Force logout no longer does anything at runtime, but
-             * the column records what an author once asked for, and dropping it would silently
-             * empty that column in every saved report carrying it — core drops an unknown column
-             * from a report without telling anyone. Deprecating keeps the history readable and
-             * puts the notice where the person building a report will see it.
+             * the column records what an author once asked for, and core silently drops a column it
+             * no longer knows from every saved report using it.
              */
             ->set_is_deprecated(get_string('report_notice:forcelogout:deprecated', 'local_awareness'))
             ->add_callback(static function ($value): string {
@@ -259,18 +246,14 @@ class notice extends base {
             ->set_type(column::TYPE_INTEGER)
             ->set_is_sortable(true)
             /*
-             * The stored value is a number of seconds, so with no callback the cell printed "86400".
-             * Zero means the notice never repeats and renders empty — the manage table shows nothing
-             * for it either, emitting no repeat chip at all, so this invents no second vocabulary.
+             * Seconds, shown as a duration. Zero means the notice never repeats and renders empty,
+             * as the manage list shows no repeat chip for it.
              *
-             * Two constraints that are not obvious. The type stays TYPE_INTEGER: under TYPE_TEXT the
-             * sum/avg/min/max aggregations become incompatible, and datasource::get_active_columns()
-             * applies a STORED aggregation without rechecking, so a saved report using one would
-             * throw on view — the same trap RB-02 already worked around in this file. And the
-             * parameter is ?float rather than ?int because avg() is compatible with an integer
-             * column and hands the callback the averaged float under strict types; it stays nullable
-             * because four datasources LEFT JOIN this table, so a row pointing at a deleted notice
-             * delivers null.
+             * The type stays TYPE_INTEGER: under TYPE_TEXT the sum/avg/min/max aggregations become
+             * incompatible, and a saved report using one would throw on view, because
+             * column::set_aggregation() rejects an incompatible stored aggregation. The parameter is
+             * ?float because avg hands the callback a float under strict types, and nullable because
+             * four datasources LEFT JOIN this table, so a row pointing at a deleted notice gives null.
              */
             ->add_callback(static function (?float $value, \stdClass $row): string {
                 return empty($value) ? '' : format::format_time($value, $row);
@@ -283,11 +266,10 @@ class notice extends base {
         ))
             ->add_joins($this->get_joins())
             /*
-             * Content is stored as the author wrote it — @@PLUGINFILE@@ placeholders, unfiltered
-             * markup — so it is rendered here exactly as the modal renders it, which is why the
-             * format and the id ride along as extra fields. Content stays FIRST: the callback is
-             * handed reset($values), so the field order is load-bearing and is pinned by a test
-             * rather than by this comment.
+             * Content is stored as the author wrote it (@@PLUGINFILE@@ placeholders, unfiltered
+             * markup), so it is rendered as the dialogue renders it, which needs the format and the
+             * id. Content stays first: the callback receives the first field as $value, and
+             * all_notices_test pins the order.
              */
             ->add_fields("{$alias}.content, {$alias}.contentformat, {$alias}.id")
             ->set_type(column::TYPE_LONGTEXT)

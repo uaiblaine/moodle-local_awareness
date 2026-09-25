@@ -4,9 +4,8 @@
     The Status cell of the notice table: a live/draft badge, plus a conflict badge when this
     notice competes with another repeating one for the same pages.
 
-    Every background states its text colour. Bootstrap 4 gives .badge no colour at all and
-    Bootstrap 5 defaults it to white, so the two branches fail on disjoint sets of fills;
-    tests/local/bootstrap_compat_test.php enforces the pairing.
+    Every badge states its text colour; tests/local/bootstrap_compat_test.php says why and
+    enforces the pairing.
 
     The conflict badge explains itself twice: a title attribute for the pointer, and a
     visually-hidden sibling for assistive technology. An aria-label on a bare span has no role to

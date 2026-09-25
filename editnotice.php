@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * To create, view notice
+ * Create or edit a notice, and run the manage list's per-notice actions.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -36,11 +36,10 @@ $noticeid = optional_param('noticeid', 0, PARAM_INT);
 $action = optional_param('action', 'create', PARAM_TEXT);
 
 /*
- * Two modes, one page, and two scopes to tell apart. The URL's scope is gated FIRST, before the
- * notice is even looked up: in course mode the page knows its course from the URL, so a caller
- * without the course capability is refused before learning whether an id exists. The notice's
- * own scope is gated second, below, once it is resolved — and it wins: a page never overrides
- * where a stored notice belongs, whatever its URL says.
+ * Two modes, one page, and two scopes to tell apart. The URL's scope is gated first, before the
+ * notice is looked up, so a caller without the capability is refused before learning whether an
+ * id exists. The notice's own scope is gated second, once it is resolved, and it wins: a page
+ * never overrides where a stored notice belongs, whatever its URL says.
  */
 $requested = author_scope::for_request(null, $courseid);
 if ($requested->is_site()) {
@@ -72,17 +71,17 @@ $requestedparams = $requested->is_site() ? [] : ['courseid' => $requested->get_c
 $managenoticepage = new moodle_url('/local/awareness/managenotice.php', $requestedparams);
 $thispage = new moodle_url('/local/awareness/editnotice.php', ['noticeid' => $noticeid, 'action' => $action] + $requestedparams);
 $PAGE->set_url($thispage);
-// The notice_editor module boots notice_form, the live preview, the audience estimator and the
-// collision warning. Everything they need is on data attributes in the markup they own.
+// The notice_editor module boots the editor's client modules; each reads what it needs from data
+// attributes in its own markup.
 $PAGE->requires->js_call_amd('local_awareness/notice_editor', 'init');
 
 /*
  * Resolved before the form is built, and refused rather than treated as "new": the create-or-update
- * branch below keys on whether a notice was found, and an id that no longer exists must not look
- * like no id at all. A redirect rather than the resolver's own error page, because the likeliest
- * cause is another administrator deleting the notice while this one had it open. A notice outside
- * this caller's authority gets the same redirect and the same message: the resolver folds the two
- * refusals into one, so an id cannot be probed for existence across scopes.
+ * branch below keys on whether a notice was found, so an id that no longer exists must not look
+ * like no id at all. A redirect rather than an error page, because the likeliest cause is another
+ * administrator deleting the notice meanwhile. A notice outside this caller's authority gets the
+ * same redirect and message (the resolver folds the two refusals into one), so an id cannot be
+ * probed for existence across scopes.
  */
 try {
     $awareness = helper::resolve_notice_as_author($noticeid, 'manage');
@@ -114,8 +113,8 @@ $customdata = [
 ];
 $mform = new notice_form($thispage, $customdata);
 
-// The content editor's draft area is prepared inside notice_form::get_default_data(), which is
-// where the notice id is known; preparing it here against item 0 handed the editor an empty area.
+// The content editor's draft area is prepared in notice_form::get_default_data(), where the
+// notice id is known.
 
 // Prepare draft area for background image.
 $bgdraftitemid = file_get_submitted_draft_itemid('bgimage');
@@ -130,13 +129,9 @@ file_prepare_draft_area(
 // Inject the draft item ID so the form's file picker shows existing files.
 $mform->set_data(['bgimage' => $bgdraftitemid]);
 
-// Proccess form data.
 if ($formdata = $mform->get_data()) {
-    /*
-     * Said out loud, not just refused. helper::update_notice() now returns early when the setting
-     * is off, which closes the hole but leaves the author staring at a list that did not change;
-     * this is the same message the delete path already gives for its own setting.
-     */
+    // Say why when allow_update is off, as the delete path does for allow_delete: the save itself
+    // (helper::update_notice()) refuses silently.
     if ($awareness && !get_config('local_awareness', 'allow_update')) {
         redirect($managenoticepage, get_string('notification:noupdateallowed', 'local_awareness'));
     }
@@ -147,14 +142,9 @@ if ($formdata = $mform->get_data()) {
     }
 
     /*
-     * Told, not blocked. Two repeating notices aimed at the same pages take turns interrupting the
-     * same people, which is rarely intended and is invisible while editing either one alone — but
-     * it is a legitimate thing to want, so this is a warning on the way out and never a validation
-     * error that refuses the save.
-     *
-     * Resolved BEFORE the save. A new notice has no id yet, so once it is in the table it matches
-     * the "every enabled repeating notice" query and, having no id to exclude itself by, reports a
-     * collision with itself.
+     * A warning after the save, never a validation error: two repeating notices on the same pages
+     * take turns interrupting the same people, which is rarely intended but legitimate. Resolved
+     * before the save, because a new notice has no id to exclude itself by once it is in the table.
      */
     $clashes = \local_awareness\local\collision::clashes_for(
         (int) ($awareness ? $awareness->get('id') : 0),
@@ -186,11 +176,8 @@ if ($formdata = $mform->get_data()) {
     }
 
     /*
-     * Ranked below the collision warning on purpose: a competing notice is something the author may
-     * want to go back and change, a queued estimate is only news. It still has to be said, though —
-     * on a site too large to estimate during a request the author is about to land on a list whose
-     * audience column shows the previous number, or none, and an empty column reads as "reaches
-     * nobody" rather than "not counted yet".
+     * Checked after the collision warning, which takes precedence: a competing notice may need
+     * changing, a queued estimate is only news.
      */
     if ($audiencestate === \local_awareness\audience\notice_audience::STATE_PENDING) {
         redirect(
@@ -245,11 +232,9 @@ switch ($action) {
         break;
     case 'unconfirmedreset':
         /*
-         * Confirmed like a delete, because it is closer to one than its old name suggested. Reset
-         * saves the notice, which moves timemodified, which is what every recorded interaction is
-         * judged against - so it asks the whole audience again and every acceptance on record
-         * stops counting as current. The rows survive; their standing does not. The old label,
-         * "Reset notice", said none of that and the action fired on a single click.
+         * Confirmed like a delete: reset saves the notice, which moves timemodified, the time every
+         * recorded interaction is judged against. The whole audience is asked again and no
+         * recorded acceptance counts as current any more; the rows themselves are kept.
          */
         echo $OUTPUT->header();
         echo $OUTPUT->box_start();

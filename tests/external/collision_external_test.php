@@ -122,9 +122,9 @@ final class collision_external_test extends \advanced_testcase {
      * A title with a bare "<" reaches the client instead of failing the whole response.
      *
      * The return slot is PARAM_TEXT, whose cleaner runs strip_tags(), and clean_returnvalue()
-     * throws when the cleaned value differs from the original. "A & B <3" is the fixture that
-     * matters: the "<3" is what used to fail every author's live collision check; a "<b>x</b>"
-     * fixture would prove nothing, because both escape modes strip it identically.
+     * throws when the cleaned value differs from the original. The "<3" in the fixture is what
+     * trips it; a "<b>x</b>" fixture would prove nothing, because format_string() strips it the
+     * same way in both escape modes.
      */
     public function test_a_title_the_cleaner_would_alter_still_reaches_the_client(): void {
         $this->setAdminUser();
@@ -146,8 +146,7 @@ final class collision_external_test extends \advanced_testcase {
      * The same guarantee holds on a site that has switched formatstringstriptags off.
      *
      * With it off, format_string() cleans rather than strips, and a real tag in a title comes back
-     * whole — which the PARAM_TEXT cleaner would then strip, and the response fail. The setting is
-     * a real administration checkbox that core's own Behat suite runs with, not a contrived state.
+     * whole, which the PARAM_TEXT cleaner would then strip, failing the response.
      */
     public function test_a_tagged_title_reaches_the_client_when_the_site_does_not_strip_tags(): void {
         $this->setAdminUser();

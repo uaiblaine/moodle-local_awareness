@@ -43,7 +43,7 @@ final class all_notices_test extends datasource_testcase {
 
         $this->setAdminUser();
 
-        // Insert two notices directly.
+        // Two notices, one of them disabled: the report lists both.
         $now = time();
         $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
             'title' => 'Notice Alpha',
@@ -122,11 +122,9 @@ final class all_notices_test extends datasource_testcase {
         $this->assertEquals('Notice Gamma', $row[0]);
 
         /*
-         * The insistence cell, not just its presence. This column is derived in SQL from two other
-         * columns and then mapped to a label by a callback, so a report can only be trusted if
-         * both halves are exercised: the fixture is deliberately Blocking rather than the default
-         * Informational, which would have been produced by the CASE falling through to ELSE and by
-         * a callback that had been deleted alike.
+         * The insistence column is derived in SQL from two columns and mapped to a label by a
+         * callback. The fixture is Blocking rather than the default Informational, because a CASE
+         * that always fell through to ELSE would still produce Informational.
          */
         $this->assertEquals(get_string('notice:insistence:blocking', 'local_awareness'), $row[2]);
     }
@@ -134,10 +132,8 @@ final class all_notices_test extends datasource_testcase {
     /**
      * The reset interval renders as a duration, and a notice that never repeats renders empty.
      *
-     * The two rows are paired on purpose. Asserting only the empty cell would keep passing with the
-     * callback deleted outright, because the raw column emits "0" for that row and an assertion
-     * loosened to assertEquals would accept it; the repeating row is the control that proves the
-     * callback is actually wired.
+     * The repeating row proves the callback formats the value; the other pins that zero, meaning
+     * the notice never repeats, renders empty.
      */
     public function test_the_reset_interval_renders_as_a_duration(): void {
         $this->resetAfterTest();
@@ -186,15 +182,12 @@ final class all_notices_test extends datasource_testcase {
     /**
      * The content column renders like the modal does: filters applied, file URLs resolved.
      *
-     * Content is stored as the author wrote it, so with no callback the column emitted the raw
-     * stored string — including a literal @@PLUGINFILE@@ in place of every embedded file.
+     * Content is stored as the author wrote it, @@PLUGINFILE@@ placeholders included, so the column
+     * has to render it through its callback.
      *
-     * The three rows are doing different jobs. The FORMAT_MOODLE row proves the format column is
-     * actually reaching the callback: under FORMAT_MOODLE a newline becomes a <br>, and if the
-     * field order were wrong the callback would receive the format NUMBER as its content and this
-     * row would render that number instead. That is the only cheap guard on the field order, which
-     * is load-bearing and which nothing else checks — DML returns every column as a string, so a
-     * wrong order fails silently rather than throwing.
+     * The FORMAT_MOODLE row also guards the entity's field order: the callback takes the first field
+     * as the content, so with the format first it would render the format number instead of text
+     * with a <br>. DML returns every column as a string, so a wrong order does not throw.
      */
     public function test_the_content_column_renders_like_the_modal(): void {
         $this->resetAfterTest();
@@ -299,9 +292,8 @@ final class all_notices_test extends datasource_testcase {
     /**
      * Exercise every column and aggregation the datasource offers.
      *
-     * Not gated behind PHPUNIT_LONGTEST: moodle-plugin-ci never defines it, so gating this
-     * test removed the only coverage of the column/aggregation matrix from every CI run —
-     * which is where two aggregation defects lived while the suite reported green.
+     * Not gated behind PHPUNIT_LONGTEST, which moodle-plugin-ci leaves false: gated, the column
+     * and aggregation matrix would never run in CI.
      */
     public function test_stress_datasource(): void {
         $this->resetAfterTest();
@@ -330,14 +322,11 @@ final class all_notices_test extends datasource_testcase {
     /**
      * The reqcourse column reports a boolean, not the course id it stores.
      *
-     * The column declares TYPE_BOOLEAN while the stored value is a COURSE ID, and Report Builder
-     * aggregates a boolean column arithmetically — so a percent aggregation over a course id
-     * produced a seven-digit percentage, and an average produced the mean course id. The display
-     * callback hid it, because it only ever asked whether the value was empty.
-     *
-     * The aggregation is what the assertion goes through, since that is the path the raw value
-     * reaches. The control is the second notice, which requires no course: without it a
-     * normalisation that returned 0 for everything would pass.
+     * The column is TYPE_BOOLEAN over a stored course id, and Report Builder aggregates a boolean
+     * column arithmetically, so the entity normalises it to 0 or 1 in SQL. The assertion goes
+     * through an aggregation because that is the path the raw value reaches. The second notice,
+     * which requires no course, is the control: without it a normalisation that returned 1 for
+     * everything would pass.
      */
     public function test_the_reqcourse_column_aggregates_as_a_boolean(): void {
         $this->resetAfterTest();

@@ -22,11 +22,9 @@ use local_awareness\persistent\awareness;
 /**
  * A notice belongs to the scope it was written under, and every verb answers to that scope.
  *
- * Nothing in production constructs a course scope yet — these tests build one by hand, the way
- * the scope's own tests do — so what is pinned here is the policy the course editor will be wired
- * to: ownership is set by the scope at creation and never by the submission, it does not change on
- * update, and update, enable, disable, reset and delete are decided in the notice's own scope, so
- * a course author reaches their course's notices and nobody else's while a site manager, whose
+ * Ownership is set by the scope at creation and never by the submission, and it does not change on
+ * update. Update, enable, disable, reset and delete are decided in the notice's own scope, so a
+ * course author reaches their course's notices and nobody else's, while a site manager, whose
  * capability inherits down, reaches them all — within the course's rules.
  *
  * @package    local_awareness
@@ -107,7 +105,7 @@ final class course_ownership_test extends \advanced_testcase {
     /**
      * Creating as a course author pins the course on the row and forces its filter — and only there.
      *
-     * The submission names the OTHER course as its courseid, which must count for nothing: the scope
+     * The submission names the other course as its courseid, which must count for nothing: the scope
      * decides the owner. The same author is refused the other course and the site, which is what
      * makes the pass meaningful.
      */

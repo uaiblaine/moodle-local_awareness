@@ -19,7 +19,7 @@ namespace local_awareness\persistent;
 use core\persistent;
 
 /**
- * Notice link class.
+ * A tracked hyperlink in a notice's content: its destination and anchor text.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -101,15 +101,9 @@ class noticelink extends persistent {
      */
     public static function create_new_link(\stdClass $data) {
         /*
-         * A link is identified by where it goes, not by what it is called. Identity used to include
-         * the anchor text, so fixing a typo in a label — the destination untouched — minted a new id
-         * and retired the old one, and with it every recorded click: the count in each report
-         * dropped to zero and the history rows were left dangling behind an id nothing joined to any
-         * more. Audit finding M14.
-         *
-         * The consequence worth knowing: two anchors in one notice pointing at the same URL now
-         * share one tracked link, so their clicks are counted together. That is the better answer to
-         * "how many people went to this page", and it is the price of a label being editable.
+         * A link is identified by its destination, not its label, so editing the anchor text keeps
+         * the id and the click history recorded against it. Two anchors in one notice pointing at
+         * the same URL therefore share one tracked link, and their clicks are counted together.
          */
         $linkpersistent = self::get_record([
             'noticeid' => $data->noticeid,

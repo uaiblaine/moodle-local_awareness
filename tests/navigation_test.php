@@ -74,7 +74,7 @@ final class navigation_test extends \advanced_testcase {
      * The entry appears for either course capability, carries the course, and appears for nobody else.
      *
      * The reports capability opens the list read-only, so it opens the entry too; a plain enrolled
-     * user sees nothing. The holders are deliberately NOT enrolled: the entry is about the
+     * user sees nothing. The holders are deliberately not enrolled: the entry is about the
      * capability, and require_login() on the page is a gate of its own.
      */
     public function test_the_entry_is_for_the_people_who_may_author_the_course_s_notices(): void {
@@ -100,9 +100,9 @@ final class navigation_test extends \advanced_testcase {
      * The site course is handed to this callback by core, and it must return before building a scope.
      *
      * settings_navigation's CONTEXT_MODULE branch reaches the course callbacks with course id 1 for
-     * every activity on the front page. author_scope::course() refuses the site course by design,
-     * so a callback that asked it would fatal on pages every logged-in user can reach. The site
-     * manager is the control: they would get an entry for any real course.
+     * every activity on the front page. author_scope::course() throws on the site course, so a
+     * callback that asked it would break pages every logged-in user can reach. The site manager is
+     * the control: they get an entry for any real course.
      */
     public function test_the_site_course_gets_no_entry_and_no_exception(): void {
         global $SITE;

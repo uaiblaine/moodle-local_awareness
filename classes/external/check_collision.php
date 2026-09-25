@@ -36,11 +36,6 @@ use local_awareness\persistent\awareness;
  */
 class check_collision extends external_api {
     /**
-     * Parameters for search_roles.
-     *
-     * @return external_function_parameters
-     */
-    /**
      * Incoming params.
      *
      * @return external_function_parameters
@@ -76,14 +71,8 @@ class check_collision extends external_api {
             'courseid' => $courseid,
         ]);
 
-        // Only reached from the notice editor, and it reports on notices the caller may not
-        // otherwise be able to see at all — which is why the titles below are the scope's to give.
-        /*
-         * The scope the caller is writing under, from the courseid the editor sends: the site when
-         * absent. Validated as a context — which also requires login to the course — and then gated
-         * the way every author-side entry point is, so a course author's editor works and a caller
-         * naming a course they do not hold is refused before anything is read.
-         */
+        // Only reached from the notice editor, and it reports on notices the caller may not otherwise
+        // see. The scope gate is explained in estimate_audience::execute().
         $scope = author_scope::for_request(null, (int) $params['courseid']);
         self::validate_context($scope->context());
         helper::require_author($scope, 'manage');
@@ -105,13 +94,11 @@ class check_collision extends external_api {
 
         return [
             /*
-             * Stripped, not escaped: the return slot is PARAM_TEXT, whose cleaner runs strip_tags(),
-             * and clean_returnvalue() throws when the cleaned value differs from the original — a
-             * title carrying a bare "<" before a letter failed the whole response for every author.
-             * escape => false keeps the plain spelling the client's own escaping expects, and the
-             * strip_tags() of our own is not redundant: format_string() only strips when the site's
-             * formatstringstriptags is on, and with it off a "<b>" in a title would come back whole
-             * and fail the same cleaning.
+             * Stripped, not escaped. The slot is PARAM_TEXT, and clean_returnvalue() throws when its
+             * strip_tags() would change the value, so a title with a bare "<" before a letter would
+             * fail the whole response. escape => false keeps the plain spelling collision_warning.js
+             * needs, since it writes through textContent; the extra strip_tags() covers sites with
+             * formatstringstriptags off, where format_string() keeps tags.
              */
             'titles' => array_values(array_map(function (awareness $notice) use ($syscontext, $scope): string {
                 // A rival outside the scope is named for what it is, not by its title.

@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $messageproviders = [
-    // On a site large enough for the audience estimate to run in the background, the answer arrives
-    // long after the author has navigated away from the editor.
+    // Sent when a background audience estimate for a saved notice completes (the estimate_audience
+    // adhoc task).
     'audience_estimate_ready' => [
         'capability' => 'local/awareness:manage',
     ],
