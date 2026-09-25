@@ -33,10 +33,10 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/cohort/lib.php');
 require_once($CFG->dirroot . '/lib/completionlib.php');
 /*
- * render_content() needs file_rewrite_pluginfile_urls(). That call used to be reached only from the
- * save path, where adminlib/formslib had already pulled filelib in; the read path runs inside the
- * AJAX web service, where nothing loads it and the call is a fatal "undefined function". PHPUnit
- * cannot catch that — its bootstrap loads filelib for every test — so Behat is the only guard.
+ * render_content() calls file_rewrite_pluginfile_urls(), and on the AJAX read path nothing has
+ * loaded filelib by then, so without this the call is an undefined-function fatal. A PHPUnit run
+ * rarely notices a missing require here: all tests share one process, and filelib stays loaded
+ * once anything has rendered a template.
  */
 require_once($CFG->libdir . '/filelib.php');
 
@@ -64,7 +64,7 @@ class helper {
     ];
 
     /**
-     * Perform all required manipulations with content.
+     * Save the content editor's draft files and register the content's links for click tracking.
      *
      * @param \local_awareness\persistent\awareness $awareness Notice.
      */
@@ -87,11 +87,10 @@ class helper {
     /**
      * Create new notice
      *
-     * The scope is who the notice is written AS, and it becomes the notice's own: the course it
-     * will belong to, or the site. It defaults to the site, which fails closed — a course author
-     * does not hold the site capability — and it is pinned onto the row here, after the scope has
-     * had its say on the audience fields, so that ownership and reach cannot diverge and nothing a
-     * caller put in $data can choose the owner.
+     * The scope is who the notice is written as, and it becomes the notice's owner: a course, or the
+     * site. The site default fails closed, since a course author does not hold the site capability.
+     * courseid is pinned from the scope after the scope has filtered the audience fields, so
+     * ownership and reach cannot diverge and nothing in $data can choose the owner.
      *
      * @param \stdClass $data form data
      * @param author_scope|null $scope Who the notice is written as; the site when not given.
@@ -128,7 +127,7 @@ class helper {
 
         // Log created event.
         $params = [
-            'context' => \context_system::instance(),
+            'context' => self::event_context($awareness),
             'objectid' => $awareness->get('id'),
             'relateduserid' => $awareness->get('usermodified'),
         ];
@@ -159,11 +158,8 @@ class helper {
         self::require_group_reach($awareness);
 
         /*
-         * The setting, enforced where the write happens. It used to be consulted only in
-         * editnotice.php's `case 'edit'`, which decides whether to DISPLAY the form — and the save
-         * branch runs before that switch reaches it, so a POST updated the notice with the setting
-         * off. delete_notice() has re-checked its own setting here all along; this is the same
-         * guard on the other verb, and the asymmetry is what made the gap easy to miss.
+         * allow_update is enforced here, where the write happens, so no caller can update a notice
+         * with the setting off; delete_notice() does the same for allow_delete.
          */
         if (!get_config('local_awareness', 'allow_update')) {
             return \local_awareness\audience\notice_audience::STATE_NONE;
@@ -171,10 +167,9 @@ class helper {
 
         self::apply_author_scope($data, $scope);
         /*
-         * Ownership is immutable, and it is pinned rather than trusted: sanitise_data() keeps any
-         * key that is a property, so a courseid in the submission would otherwise re-home the notice
-         * to whatever the client sent, judged against the OLD owner's capability. Moving a notice is
-         * a verb of its own with a check in both contexts, if it is ever wanted; it is not an edit.
+         * Ownership is immutable and pinned rather than trusted: sanitise_data() keeps any key that
+         * is a property, so a submitted courseid would re-home the notice under a capability check
+         * made against the old owner. Moving a notice would be a verb of its own, not an edit.
          */
         $data->courseid = (int) $awareness->get('courseid');
         self::apply_layout_rules($data);
@@ -193,7 +188,7 @@ class helper {
 
         // Log updated event.
         $params = [
-            'context' => \context_system::instance(),
+            'context' => self::event_context($awareness),
             'objectid' => $awareness->get('id'),
             'relateduserid' => $awareness->get('usermodified'),
         ];
@@ -207,17 +202,16 @@ class helper {
      * Run the submitted audience and context fields through the author's scope, then pack the
      * filter fields into the filtervalues JSON.
      *
-     * This is the boundary. The form is not one: three of its pickers are ajax autocompletes,
-     * whose values core does not validate server-side, and a non-ajax select skips its allowlist
-     * when its option list is empty. And sanitise_data() cannot be one either — it runs after the
-     * filter fields have been folded into the opaque filtervalues string, so it never sees them.
-     * Both write paths therefore pass through here before anything is stored, with the scope the
-     * caller is writing under; see {@see author_scope} for what each scope allows and why.
+     * This is the validation boundary for those fields. The form is not one: core does not validate
+     * the values of its three ajax autocompletes server-side, and a non-ajax select skips its
+     * allowlist when its option list is empty. Nor is sanitise_data(), which runs after the filter
+     * fields have been folded into filtervalues and never sees them. Both write paths call this
+     * before anything is stored; see {@see author_scope} for what each scope allows.
      *
-     * Refused rather than repaired. The form has already shown the author every problem through
-     * notice_form::extra_validation(), so a value that still arrives here bypassed the form, and a
-     * request like that gets an error, not a notice quietly different from the one it asked for.
-     * Cohorts are the documented exception and are narrowed silently by the scope itself.
+     * Refused rather than repaired: notice_form::extra_validation() has already shown the author
+     * every problem, so a value that still arrives here bypassed the form, and gets an error rather
+     * than a notice quietly different from the one requested. Cohorts are the exception, narrowed
+     * silently by the scope itself.
      *
      * @param \stdClass $data Form data, modified in place: the filter fields leave it and
      *                        filtervalues, cohorts and reqcourse arrive as the scope left them.
@@ -268,9 +262,7 @@ class helper {
 
         /*
          * The three fields the scope may write that are columns of their own rather than keys of
-         * the JSON blob. pathmatch joined them when a course scope started writing the course's own
-         * main page: it had been LEAVE in both scopes, so it reached the row untouched and nothing
-         * here had to carry it, and the first save under the new rule stored null.
+         * the JSON blob. pathmatch is one because a course scope forces it to the course's main page.
          */
         if (array_key_exists('pathmatch', $criteria)) {
             $data->pathmatch = $criteria['pathmatch'];
@@ -467,11 +459,14 @@ class helper {
     }
 
     /**
-     * Extract hyperlink from notice content.
+     * Register the links in a notice's content for click tracking.
+     *
+     * Every anchor gets data-linkid and target="_blank"; links the content no longer carries are
+     * deleted with their history.
      *
      * @param awareness $notice
      * @param string $content notice content
-     * @return string
+     * @return string The content with its anchors tagged.
      */
     private static function update_hyperlinks(awareness $notice, string $content): string {
         if (trim($content) === '') {
@@ -479,13 +474,10 @@ class helper {
         }
 
         /*
-         * The content is stored as authored. It used to be run through
-         * file_rewrite_pluginfile_urls() and format_text() first, which baked three things into
-         * the stored row: absolute /pluginfile.php URLs that break when wwwroot changes, the
-         * output of every text filter — freezing a multilang notice into whichever language the
-         * author happened to be using, for every reader, forever — and a full
-         * <!DOCTYPE html><html><body> wrapper from saveHTML(). All three belong to render time;
-         * see render_content().
+         * The content is stored as authored; resolving file URLs and running the text filters
+         * belong to render time (see render_content()). Doing either here would bake in absolute
+         * URLs that break when wwwroot changes and freeze a multilang notice into the author's
+         * language for every reader.
          */
         $dom = new \DOMDocument();
         $encoded = mb_encode_numericentity($content, [0x80, 0x10FFFF, 0, ~0], 'UTF-8');
@@ -518,10 +510,9 @@ class helper {
         }
 
         /*
-         * Clean up links the notice no longer carries — history first. Deleting the link alone left
-         * its history rows behind, and every consumer inner-joins them back to the links table, so
-         * they became invisible to every report and impossible to clear by hand. delete_notice()
-         * has cleaned both up all along; this is the same pair on the edit path. Audit finding M14.
+         * Clean up links the notice no longer carries, history first: every consumer inner-joins
+         * history to the links table, so orphaned history rows would be invisible to every report
+         * and impossible to clear. purge_notice() deletes the same pair.
          */
         $unusedlinks = array_diff_key($currentlinks, $newlinks);
         if (!empty($unusedlinks)) {
@@ -537,10 +528,9 @@ class helper {
     /**
      * Ask the whole audience again.
      *
-     * The whole of this method is a no-op save: re-read the persistent and update() it. That is
-     * not an oversight — moving timemodified is the entire mechanism. It supersedes every
-     * acceptance on record, which is why the action is labelled "Ask everyone again" rather than
-     * "Reset notice", and is confirmed before it fires. See acceptance_is_current().
+     * A no-op save on purpose: update() stamps timemodified, which supersedes every acceptance on
+     * record. That is why the action is labelled "Ask everyone again" and is confirmed before it
+     * fires. See acceptance_is_current().
      *
      * @param awareness $notice
      * @return void
@@ -554,7 +544,7 @@ class helper {
 
             // Log reset event.
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $notice->get('usermodified'),
             ];
@@ -568,10 +558,9 @@ class helper {
     /**
      * Enable a notice.
      *
-     * The save expires every acceptance on this notice, because update() stamps timemodified and
-     * that is what acceptance_is_current() and must_reshow() both read. Re-displaying on re-enable
-     * is deliberate and always was; expiring recorded consent came with the acceptance predicate,
-     * which reads the same column. See acceptance_is_current() for the whole coupling.
+     * The save stamps timemodified, which must_reshow() and acceptance_is_current() both read: the
+     * notice is shown again to everyone, deliberately, and every acceptance on it expires. See
+     * acceptance_is_current() for the whole coupling.
      *
      * @param awareness $notice
      * @return void
@@ -583,11 +572,9 @@ class helper {
             $notice->set('enabled', 1);
             $notice->update();
 
-            // Log enabled event. awareness_enabled, not awareness_updated: the dedicated class
-            // exists, carries maintained lang strings and appears in the admin event list, where
-            // an admin can build an event-monitor rule on it — one that would never have fired.
+            // Log enabled event.
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $notice->get('usermodified'),
             ];
@@ -601,8 +588,8 @@ class helper {
     /**
      * Disable a notice.
      *
-     * Saves the notice, and so expires every acceptance on it — see enable_notice() and
-     * acceptance_is_current(). Hiding a notice is not a neutral act on the compliance record.
+     * Saves the notice, and so expires every acceptance on it; see enable_notice() and
+     * acceptance_is_current().
      *
      * @param awareness $notice
      * @return void
@@ -614,10 +601,9 @@ class helper {
             $notice->set('enabled', 0);
             $notice->update();
 
-            // Log disable event. See enable_notice() — awareness_disabled was dead for the same
-            // reason.
+            // Log disabled event.
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $notice->get('usermodified'),
             ];
@@ -674,8 +660,8 @@ class helper {
      *
      * Not a verb: the two callers are delete_notice(), which has already gated and consulted its
      * setting, and purge_course_notices(), which runs where there is no author to gate. The event is
-     * logged in the system context whatever the notice's scope, so the audit trail of a deletion does
-     * not fork by how it happened, and the files go with the row, not with the optional cleanup.
+     * logged in the notice's own context however the deletion happened; during a course deletion
+     * that context still exists, because the purge runs from before_course_deleted.
      *
      * @param awareness $notice
      * @return void
@@ -684,7 +670,7 @@ class helper {
         $oldid = $notice->get('id');
         $notice->delete();
         $params = [
-            'context' => \context_system::instance(),
+            'context' => self::event_context($notice),
             'objectid' => $oldid,
             'relateduserid' => $notice->get('usermodified'),
         ];
@@ -692,11 +678,9 @@ class helper {
         $event->trigger();
 
         /*
-         * The files go with the notice, not with the optional cleanup. Once the row is gone the
-         * pluginfile gate refuses to serve them — it resolves the notice first — so every image and
-         * background ever uploaded to a deleted notice was unreachable and undeletable at the same
-         * time, sitting in moodledata and {files} for the life of the site. Nothing else can ever
-         * claim them: the item id IS the notice id, and that id is now free to be reused.
+         * The files go with the notice whatever cleanup_deleted_notice says. With the row gone the
+         * pluginfile gate, which resolves the notice first, serves them to nobody, and nothing else
+         * can claim them: the item id is the notice id.
          */
         $fs = get_file_storage();
         foreach (['content', 'bgimage'] as $filearea) {
@@ -718,17 +702,74 @@ class helper {
     }
 
     /**
+     * The context every event about a notice is logged in: the notice's course for a course notice,
+     * the system context for a site notice.
+     *
+     * So a course's logs, and core's reports and event monitoring on them, include what happened to
+     * that course's notices. A course notice whose course is gone falls back to the system context,
+     * which is the only one left to log it in.
+     *
+     * @param awareness $notice The notice the event is about.
+     * @return \context
+     */
+    private static function event_context(awareness $notice): \context {
+        $scope = author_scope::of($notice);
+        if (!$scope->is_site()) {
+            $context = \context_course::instance($scope->get_courseid(), IGNORE_MISSING);
+            if ($context) {
+                return $context;
+            }
+        }
+
+        return \context_system::instance();
+    }
+
+    /**
      * Built Audience options based on site cohorts.
-     * @return array
+     *
+     * Every cohort, hidden ones included, except those in contexts where the current user can
+     * neither view nor manage cohorts (cohort_get_invisible_contexts()).
+     *
+     * The names are RAW, exactly as stored: the caller formats them for its own sink. A moodleform
+     * menu, which renders option text unescaped, takes cohort_menu_options() instead.
+     *
+     * @return array Cohort id => raw name.
      * @throws \coding_exception
      */
     public static function built_cohorts_options() {
         $options = [];
-        $cohorts = cohort_get_all_cohorts(0, 0);
-        foreach ($cohorts['cohorts'] as $cohort) {
+        foreach (self::listable_cohorts() as $cohort) {
             $options[$cohort->id] = $cohort->name;
         }
         return $options;
+    }
+
+    /**
+     * The cohorts built_cohorts_options() lists, with names formatted for a moodleform menu.
+     *
+     * element-autocomplete.mustache emits every option through a triple stash, so each name goes
+     * through format_string() with its default escaping, in the cohort's own context: an ampersand
+     * arrives as an entity, markup is stripped and a multilang name resolves. The ids are the same
+     * set, so allowed_cohorts() validates exactly what this offers.
+     *
+     * @return array Cohort id => formatted, escaped name.
+     * @throws \coding_exception
+     */
+    public static function cohort_menu_options(): array {
+        $options = [];
+        foreach (self::listable_cohorts() as $cohort) {
+            $options[$cohort->id] = format_string($cohort->name, true, ['context' => (int) $cohort->contextid]);
+        }
+        return $options;
+    }
+
+    /**
+     * The cohort records the two option lists above are built from.
+     *
+     * @return \stdClass[] Cohort records, each carrying id, name and contextid.
+     */
+    private static function listable_cohorts(): array {
+        return cohort_get_all_cohorts(0, 0)['cohorts'];
     }
 
     /**
@@ -737,14 +778,10 @@ class helper {
      * A cohort id arriving by POST is a membership oracle unless it is checked: the estimator counts
      * members with a bare `cohortid IN (…)`, so an id nobody offered still returns a population size.
      *
-     * Checked against built_cohorts_options(), NOT against cohort_get_cohort(). The fleet note names
-     * that helper, and measured on the running stack it is the wrong one here: it tests
-     * `in_array($cohort->contextid, $currentcontext->get_parent_context_ids())`, and for the system
-     * context that list is empty — `/1` with its own id popped off — so it returns false for every
-     * cohort, a visible system-level one included, even for an admin. A site-wide plugin has no
-     * narrower context to pass it. built_cohorts_options() wraps cohort_get_all_cohorts(), which
-     * excludes cohort_get_invisible_contexts(), and is the same call that builds the form's menu, so
-     * validation and menu cannot drift apart.
+     * Checked against built_cohorts_options(), which lists the same cohorts as the form's menu
+     * (cohort_menu_options()), so validation and menu cannot drift apart. Not cohort_get_cohort($id,
+     * $context): it requires the cohort's context to be among $context's parents, and the system
+     * context has none, so there it refuses every cohort, even for an admin.
      *
      * @param array $cohortids Raw cohort ids as submitted.
      * @return array The subset the user may target, as ints, reindexed.
@@ -762,16 +799,13 @@ class helper {
     /**
      * The ids of every cohort a user belongs to, visible or not.
      *
-     * One resolver, so that the form, the estimator and the runtime agree about what membership
-     * means. They did not: the runtime used cohort_get_user_cohorts(), whose SQL demands
-     * `c.visible = 1`, while the selector offered hidden cohorts as targets and the estimator
-     * counted `{cohort_members}` with no visibility predicate at all. An author picked a hidden
-     * cohort — the ordinary way to model a staff-only audience — the panel confirmed a number, and
-     * not one person was ever shown the notice, with nothing logged anywhere. Audit finding M13.
+     * Not cohort_get_user_cohorts(), whose SQL requires `c.visible = 1`: the form offers hidden
+     * cohorts as targets (the ordinary way to model a staff-only audience) and the estimator counts
+     * `{cohort_members}` with no visibility predicate, so the runtime must agree with both or a
+     * hidden cohort's notice reaches nobody.
      *
-     * Visibility is settled here rather than at display time on purpose: it governs who may *target*
-     * a cohort, which helper::allowed_cohorts() enforces when the notice is saved. Whether someone
-     * is *in* one is not a question about who is looking.
+     * Visibility governs who may *target* a cohort, which allowed_cohorts() enforces when the notice
+     * is saved; whether someone is *in* one does not depend on who is looking.
      *
      * @param int $userid The user whose memberships are wanted.
      * @return array Cohort ids as ints.
@@ -785,13 +819,14 @@ class helper {
     /**
      * The groups of a course the user belongs to, hidden ones included.
      *
-     * groups_get_user_groups() reads core's per-user cache, so the cost is one statement for every
-     * course the user is in and nothing after. includehidden is set because delivery is membership
-     * and must not depend on who is asking: without it the answer runs through
-     * core_group\visibility::sql_group_visibility_where(), which keeps a MEMBERS group only while
-     * the id being asked about is the CURRENT user's, so the same user would be in the audience
-     * when they load the page and out of it when anything else resolved them. Nothing on the
-     * reading side shows a group's name, so no visibility rule is being bypassed by saying yes.
+     * includehidden because delivery is membership and must not depend on who is asking. Without it,
+     * unless the current user holds moodle/course:viewhiddengroups, core filters through
+     * core_group\visibility::sql_group_visibility_where(), which drops groups whose visibility is
+     * "none" and keeps another user's "members" groups only when the current user is a member too.
+     * Nothing on the reading side shows a group's name, so no visibility rule is bypassed.
+     *
+     * One statement covers every course the user is in, and core caches the answer per user when
+     * the course has no hidden groups or the current user may see them.
      *
      * @param int $courseid The course.
      * @param int $userid The user.
@@ -866,27 +901,11 @@ class helper {
     }
 
     /**
-     * Get a notice
-     *
-     * @param int $noticeid notice id
-     * @return bool|\stdClass
-     */
-    public static function retrieve_notice(int $noticeid) {
-        $awareness = awareness::get_record(['id' => $noticeid]);
-        if ($awareness) {
-            return $awareness->to_record();
-        } else {
-            return false;
-        }
-    }
-
-    /**
      * Retrieve the notices to show the current user on the page they are currently on.
      *
-     * The page URL is mandatory. Everything this returns is about to be rendered, and the
-     * pathmatch and check_filters() rules that decide the audience can only be evaluated against
-     * a page — so a caller with no page to offer has no business reaching this method. Use
-     * has_candidate_notices() for the page-independent question instead.
+     * The page URL is mandatory: everything this returns is about to be rendered, and the pathmatch
+     * and check_filters() rules that decide the audience can only be evaluated against a page. Use
+     * has_candidate_notices() for the page-independent question.
      *
      * @param string $pageurl The current page URL path (from JS). Must not be empty.
      * @param int $courseid The current course ID (from JS). 0 means not on a course page.
@@ -910,15 +929,14 @@ class helper {
      *
      * The footer hook only has to decide whether to load the JS, so this stays a SUPERSET of what
      * the user will actually be shown: it answers "is it worth asking?", never "what may this user
-     * read". Nothing rendered may be derived from it — the AJAX call, which carries the browser's
+     * read". Nothing rendered may be derived from it; the AJAX call, which carries the browser's
      * page URL, performs the real filtering.
      *
-     * Given a page probe, the superset narrows to the page: candidates that cannot match this
-     * page's cheap, safe rules (pathmatch and the course/category/format/theme filters — see
-     * page_probe) stop counting, so pages where nothing could appear stop loading the module and
-     * stop paying the XHR. Every uncertainty inside the probe admits, so narrowing never crosses
-     * into "the notice was due and the JS did not load". Without a probe the old page-independent
-     * answer is preserved.
+     * Given a page probe, candidates that cannot match this page's cheap rules (pathmatch and the
+     * course/category/format/theme filters, see page_probe) stop counting, so pages where nothing
+     * could appear skip the module and its request. The probe admits whenever it is unsure, so the
+     * narrowing never withholds the JS from a page where a notice is due. Without a probe the answer
+     * is page-independent.
      *
      * @param \local_awareness\local\page_probe|null $page What the current render can tell us, if anything.
      * @return bool
@@ -942,27 +960,22 @@ class helper {
     /**
      * Choose which of the applicable notices to actually put in front of the user now.
      *
-     * Arriving at a site and finding three modals stacked in front of the thing you came to do is
-     * the behaviour this replaces. One notice at a time; the next one waits until the user reaches
-     * its situation again, which in practice means the next page load where it still applies.
+     * One notice at a time rather than a stack of modals; the next one waits until the user is
+     * somewhere it applies again, in practice the next page load.
      *
-     * One at a time on its own would starve the queue, because a notice that keeps coming back
-     * would hold the only slot for ever. So the queue has two tiers, and what separates them is
-     * whether the user has met the notice before:
+     * One at a time alone would starve the queue, because a notice that keeps coming back would hold
+     * the only slot for ever. So the queue has two tiers, separated by whether the user has met the
+     * notice before:
      *
-     * - FIRST OCCURRENCE goes to the front. A repeating notice gets seen promptly the first time,
-     *   which is the whole point of setting one up, and then stops being special.
-     * - ANYTHING SEEN BEFORE goes to the back — a repeat of a repeating notice, an acknowledgement
-     *   the user closed without accepting, or one they simply ignored. All three would otherwise
-     *   occupy the slot indefinitely, which is the same starvation by three different routes.
+     * - FIRST OCCURRENCE goes to the front, so a repeating notice is seen promptly the first time.
+     * - ANYTHING SEEN BEFORE goes to the back: a repeat of a repeating notice, an acknowledgement
+     *   the user closed without accepting, or one they ignored. Each would otherwise hold the slot.
      *
-     * The single exception to one-at-a-time: repeating notices in their first occurrence are shown
-     * as a group. Deferring one of those behind the other only delays a notice that is going to
-     * interrupt again anyway, so nothing is gained by spacing them out.
+     * The one exception to one-at-a-time: repeating notices in their first occurrence are shown
+     * together, since deferring one behind another only delays a notice that will interrupt again.
      *
-     * Within a tier the order is by notice id, oldest first, which is the order this plugin has
-     * always used. Repeats of repeating notices sort behind everything else in the back tier, so
-     * they really do wait until the rest of the queue is clear.
+     * Within a tier the order is by notice id, oldest first. Repeats of repeating notices sort
+     * behind everything else in the back tier, so they wait until the rest of the queue is clear.
      *
      * @param awareness[] $applicable Notices that pass the audience and page rules, keyed by id.
      * @return awareness[] The notices to display now, keyed by id.
@@ -1002,18 +1015,17 @@ class helper {
         }
 
         /*
-         * Remember what was handed over. Two consumers, and they must not be separated.
+         * Remember what was handed over. Two consumers read it.
          *
-         * The queue reads it so an ignored notice stops counting as a first occurrence and yields
-         * the slot on the next page. The WRITE PATH reads it too, through was_notice_delivered():
-         * this loop is the only record that the page-dependent rules — check_path_match() and the
-         * category, course, format, theme and competency blocks of check_filters() — were ever
-         * evaluated for this user, because they run here on the read path and cannot run on a
-         * write. Narrowing or deleting this loop does not merely reorder the queue; it reopens
-         * audit findings M6 and M8.
+         * The queue, so an ignored notice stops counting as a first occurrence and yields the slot
+         * on the next page. And the write paths, through was_notice_delivered(): the page-dependent
+         * rules (check_path_match() and the category, course, format, theme and competency blocks
+         * of check_filters()) run only on the read path, so this marker is the only record that
+         * they admitted this user. Narrowing this loop weakens the write-path gate, not just the
+         * queue order.
          *
          * Session state on purpose: recording a display in the database would put a write on the
-         * read path, which is exactly the cost this plugin cannot afford on every page view.
+         * read path of every page view.
          */
         foreach (array_keys($selected) as $id) {
             $USER->awarenessshown[$id] = true;
@@ -1070,17 +1082,17 @@ class helper {
             return [];
         }
 
-        // Only load at login time.
+        // Loaded once per session.
         if (!isset($USER->viewednotices)) {
             self::load_viewed_notices();
         }
         /*
-         * Check for updated notice
-         * Exclude it from viewed notices if it is updated (based on timemodified)
+         * Drop from the viewed set every notice that must_reshow() says has to be shown again, so
+         * the filter below lets it through.
          */
         $viewednotices = $USER->viewednotices;
         foreach ($viewednotices as $noticeid => $data) {
-            // The notice is disabled during the current session.
+            // Disabled, deleted or expired since it was viewed.
             if (!isset($notices[$noticeid])) {
                 continue;
             }
@@ -1103,11 +1115,9 @@ class helper {
 
             foreach ($notices as $id => $notice) {
                 /*
-                 * The page-dependent rules run only for a caller that supplied a page. This is an
-                 * explicit argument rather than "is $pageurl empty" on purpose: while it was
-                 * inferred from the string, the get_notices() web service could be called with the
-                 * parameter simply left out, and every rule below was skipped for a request that
-                 * went on to return the rendered notice bodies.
+                 * The page-dependent rules run only for a caller that supplied a page. An explicit
+                 * flag rather than an empty $pageurl, so that a get_notices() call leaving the page
+                 * out cannot skip them and still receive the rendered notice bodies.
                  */
                 if ($checkpagerules) {
                     // Check Path Match (using the URL passed from JavaScript).
@@ -1147,9 +1157,8 @@ class helper {
 
             /*
              * Filter out notices by group. A course notice may name groups of its own course, and
-             * the reader must belong to one of them. Not hoisted like the cohorts above because
-             * groups_get_user_groups() already answers from core's per-user cache, one read for
-             * every course the user is in; the loop costs a statement once, not once per notice.
+             * the reader must belong to one of them. Resolved per notice rather than hoisted like
+             * the cohorts above; see user_group_ids() for what that costs.
              */
             if ($checkgroups) {
                 foreach ($notices as $notice) {
@@ -1162,12 +1171,9 @@ class helper {
             /*
              * Filter out notices by course completion.
              *
-             * Resolved for the whole set before the loop, exactly as the cohort rule above hoists
-             * cohort_get_user_cohorts() out of its loop. Fetching the course inside the loop cost a
-             * statement per notice, and repeated it outright when two notices required the same
-             * course. This block runs during page generation, so that cost sat inside the TTFB of
-             * every page load rather than in the asynchronous call like the rest of the per-notice
-             * work — it is the only rule in the plugin that delays the paint.
+             * Each required course is resolved once for the whole set, as the cohort rule above
+             * hoists user_cohort_ids(). This also runs from has_candidate_notices() while the page
+             * is generated, so a statement per notice would add to every page's response time.
              */
             if ($checkcompletion) {
                 $requiredids = [];
@@ -1182,10 +1188,8 @@ class helper {
                  * entry, and a notice requiring it is withheld: the rule asks "has this user
                  * finished that course?", which has no answer once the course is gone, and every
                  * other rule in this plugin withholds a notice whose referent it cannot resolve.
-                 * This used to read the other way — "no entry leaves its notices shown" — which
-                 * turned a completion gate into a notice for everyone, for ever, the day its
-                 * course was deleted. is_notice_available_to_user() and the estimator's predicate
-                 * make the same choice; keep the three in step.
+                 * is_notice_available_to_user() and the estimator's predicate make the same choice;
+                 * keep the three in step.
                  */
                 $pending = [];
                 foreach ($DB->get_records_list('course', 'id', array_keys($requiredids)) as $course) {
@@ -1241,26 +1245,25 @@ class helper {
     /**
      * Whether a notice may currently be acted on by the logged-in user.
      *
-     * The web services need this because they take a notice id straight from the client: without
-     * it any authenticated user can acknowledge, dismiss or record a click for a notice that was
-     * never shown to them, and the acknowledgement reports — the reason this plugin exists —
-     * cannot be trusted.
+     * The web services take a notice id straight from the client, so without this any authenticated
+     * user could acknowledge, dismiss or record a click for a notice never shown to them, and the
+     * acknowledgement reports could not be trusted.
      *
-     * It is deliberately looser than the display test in two places:
+     * Deliberately looser than the display test in two places:
      *
-     * - Only the START of the scheduling window is enforced, not the end. Blocking an unpublished
-     *   notice is the point; discarding a genuine Accept because the notice expired while the
-     *   modal was open would silently lose the very record this plugin exists to keep.
-     * - The PAGE-DEPENDENT checks in check_filters() are not repeated, because they need the page
-     *   URL and a write request has no trustworthy source for it. Category, course, format, theme
-     *   and competency rules are therefore not enforced HERE. On the write path they are covered
-     *   by a different route: may_act_on_notice() also requires that select_for_display() served
-     *   this notice to this session, which is where those rules did run. This method is the
-     *   audience half on its own, and local_awareness_pluginfile() uses it that way, having no
-     *   delivery to point at; that gate stays partial by construction. The role rule is applied
-     *   below through user_matches_role_filter(), with the whole filters array so a course- or
-     *   category-scoped rule keeps its scope. The group rule is applied too: a course notice's
-     *   groups are its own course's, so no page is needed to find them.
+     * - Only the START of the scheduling window is enforced. Blocking an unpublished notice is the
+     *   point; refusing a genuine Accept because the notice expired while the modal was open would
+     *   lose the record the reports exist to keep.
+     * - The page-dependent rules in check_filters() (category, course, format, theme, competency)
+     *   are not applied: they need the page URL, and a write request has no trustworthy source for
+     *   it. may_act_on_notice() covers them on the write path by also requiring that
+     *   select_for_display() served this notice to this session, where those rules did run.
+     *   may_serve_files_of() uses this method on its own, having no delivery to point at, so that
+     *   gate stays partial by construction.
+     *
+     * The role rule is applied through user_matches_role_filter() with the whole filters array, so a
+     * course- or category-scoped rule keeps its scope. The group rule is applied too: a course
+     * notice's groups are its own course's, so no page is needed to find them.
      *
      * @param awareness $notice Notice.
      * @return bool
@@ -1312,20 +1315,18 @@ class helper {
      * Whether this session was actually served this notice.
      *
      * select_for_display() marks every notice it hands to the client, and it only ever sees
-     * notices that survived retrieve_user_notices() — the ONE place the page-dependent rules run:
+     * notices that survived retrieve_user_notices(), the one place the page-dependent rules run:
      * check_path_match() against the browser's URL, and check_filters() against a course the
-     * server re-resolved through can_access_course(). The marker is therefore a record that all of
-     * those passed for this user, at some point in this session, on some page. That is the fact
-     * is_notice_available_to_user() cannot establish from a write request and does not try to.
+     * server re-resolved through can_access_course(). The marker therefore records that those
+     * passed for this user, on some page, in this session: the fact is_notice_available_to_user()
+     * cannot establish from a write request.
      *
-     * The session is the right lifetime and needs no expiry of its own. A shorter one would
-     * discard an Accept from a modal left open over lunch, which is the loss the window rules
-     * deliberately refuse to take. When the session ends the caller is not logged in at all, so
-     * the web service rejects the request long before this is consulted.
+     * The session is the right lifetime and needs no expiry of its own: a shorter one would discard
+     * an Accept from a modal left open for a long time, which the window rules deliberately refuse
+     * to do, and once the session ends the web service rejects the request anyway.
      *
-     * Deliberately NOT folded into is_notice_available_to_user(): that answers "is this notice's
-     * audience you", which local_awareness_pluginfile() asks of a file request that has no
-     * delivery to point at. Two questions, two methods, joined in may_act_on_notice().
+     * Kept apart from is_notice_available_to_user(), which may_serve_files_of() asks of a file
+     * request that has no delivery to point at; may_act_on_notice() joins the two.
      *
      * @param awareness $notice Notice.
      * @return bool True when this session was handed this notice.
@@ -1342,24 +1343,19 @@ class helper {
      *
      * One predicate behind dismiss, acknowledge and link tracking, so the three cannot drift.
      *
-     * It is the conjunction of two independent facts, and the conjunction is not a tautology.
-     * Delivery says the page-dependent rules passed at some point in this session. The audience
-     * test says they still hold NOW — it is what catches state that changed between the delivery
-     * and the write, inside one session: the notice disabled, the user removed from the cohort,
-     * the role unassigned, the required course completed. Neither half implies the other.
+     * Two independent facts, neither implying the other. Delivery says the page-dependent rules
+     * passed at some point in this session; the audience test says the other rules still hold now,
+     * which catches changes between delivery and write: the notice disabled, the user removed from
+     * the cohort, the role unassigned, the required course completed.
      *
-     * What this closes, precisely: a user who is in a notice's cohort and holds its role, but is
-     * not in the course it is targeted at, could post an acknowledgement that landed in the
-     * compliance report as consent given after display. The report is the reason this plugin
-     * exists, so a row that cannot be distinguished from a real one is the defect that matters.
+     * It stops a user who is in a notice's cohort and holds its role, but is not in the course it
+     * targets, from posting an acknowledgement the compliance report would show as consent. It does
+     * not stop a reader who lies about their URL, since pathmatch is a client assertion on the read
+     * path too: forging a write costs what forging a read already costs, and no less.
      *
-     * What it does NOT close: pathmatch is a client assertion on the read path too, so a reader
-     * who lies about their URL is no worse off here than there. The guarantee is exactly this —
-     * forging a write now costs what forging a READ already costs, and no less.
-     *
-     * One thing it narrows, stated so nobody is surprised: a notice delivered while live, then
-     * expired, then acted on after the session was replaced is lost for good, because
-     * is_within_active_window() will not serve it again for the marker to be re-minted.
+     * One consequence: a notice delivered while live, then expired, then acted on after the session
+     * was replaced cannot be recorded, because is_within_active_window() will not serve it again to
+     * re-mint the marker.
      *
      * @param awareness $notice Notice.
      * @return bool True when an interaction may be recorded.
@@ -1394,19 +1390,18 @@ class helper {
         global $USER;
 
         /*
-         * Guests get the session marker only. Every guest session shares the single guest user id,
-         * so a persisted row would hide the notice from every guest who came after — but the marker
-         * is still required: retrieve_user_notices() suppresses a notice solely by finding it in
-         * $USER->viewednotices, so skipping it altogether reopens the modal on every page load with
-         * no way for the guest to stop it.
-         */
-        /*
-         * Either way the user has now met this notice, so it stops counting as a first occurrence
-         * and gives up its place at the front of the queue. Kept in step here rather than re-read,
-         * so acting on a notice costs no extra statement.
+         * The user has now met this notice, so it stops counting as a first occurrence and gives up
+         * its place at the front of the queue. Kept in step here rather than re-read, so acting on a
+         * notice costs no extra statement.
          */
         $USER->awarenessinteracted[$notice->get('id')] = $notice->get('id');
 
+        /*
+         * Guests get the session marker only: every guest session shares the single guest user id,
+         * so a stored row would hide the notice from every later guest. The marker is still needed,
+         * because collect_user_notices() suppresses a notice only by finding it in
+         * $USER->viewednotices; without it the modal reopens on every page load.
+         */
         if ($sessiononly) {
             $USER->viewednotices[$notice->get('id')] = ['timeviewed' => time(), 'action' => $action];
             return;
@@ -1420,18 +1415,15 @@ class helper {
     /**
      * Trim every criteria list to a length a single statement can carry.
      *
-     * The criteria arrive as client JSON and reach get_in_or_equal() unbounded. A list of tens of
-     * thousands of ids builds a statement with one placeholder per id: PostgreSQL refuses past
-     * 65535 bound parameters outright, and long before that the estimator's conditional-column
-     * query is being parsed and planned at a size nobody intended. The editor's own pickers cannot
-     * produce a list this long, so a request that does is hand-made.
+     * The criteria arrive as client JSON and reach get_in_or_equal() unbounded, one placeholder per
+     * id: PostgreSQL refuses more than 65535 bound parameters, and long before that the estimator's
+     * conditional-column query is parsed and planned at a size nobody intended. The editor's own
+     * pickers cannot produce a list this long, so a request that does is hand-made.
      *
-     * Trimmed rather than rejected, which is what the surrounding code already does with a
-     * disallowed cohort id — and deliberately NOT applied inside estimator::normalise(). That
-     * function also runs over an ALREADY-STORED notice, so capping there would let the estimate
-     * and the hash describe the first {@see self::CRITERIA_LIST_MAX} ids while check_filters()
-     * kept honouring all of them: the panel would quietly stop describing the notice, which is the
-     * exact failure this plugin has been bitten by before.
+     * Trimmed rather than rejected, as a disallowed cohort id is. Deliberately not applied inside
+     * estimator::normalise(), which also runs over already-stored notices: capping there would let
+     * the estimate and its hash describe the first {@see self::CRITERIA_LIST_MAX} ids while
+     * check_filters() kept honouring all of them.
      *
      * @param array $raw Raw criteria, as decoded from the request.
      * @return array The same criteria with every list trimmed.
@@ -1453,9 +1445,9 @@ class helper {
      * keep working while it is off, which is what makes staging a notice before publishing
      * possible; what stops is showing notices to readers and recording what they did with them.
      *
-     * The setting defaults to 0, so a plain truthy read is right here — this is not one of the
-     * default-ON checkboxes where only a stored '0' counts as off. Same test the footer hook
-     * already applies, shared so the two cannot drift.
+     * The setting defaults to 0, so a plain truthy read is right here; this is not a default-ON
+     * checkbox where only a stored '0' counts as off. The four delivery web services and the footer
+     * hook ({@see \local_awareness\local\hook_callbacks::should_load_on()}) all ask here.
      *
      * @return bool True when notices may be delivered.
      * @throws \dml_exception
@@ -1468,23 +1460,16 @@ class helper {
      * Whether this user already has a row of this kind for this notice.
      *
      * The acknowledgement table is the plugin's compliance record: it answers "who dismissed
-     * this" and "who accepted this". There is no unique key to lean on — adding one to a live
-     * table would fail the upgrade on any site that has already accumulated duplicates — so the
-     * check happens in PHP.
+     * this" and "who accepted this". No unique key backs it, so the check happens in PHP.
      *
-     * It has exactly ONE caller: the dismissal path. The docblock used to claim it ran "at the
-     * only two writers", which was never true, and the absence is deliberate rather than an
-     * oversight — so it is written here as a difference instead of leaving the next reader to
-     * notice it. A repeat DISMISSAL of the same notice is the same refusal recorded twice, and
-     * the dismissed report would list one person once per page load. A repeat ACCEPTANCE is not
-     * the same fact: once the author edits the notice or its reset interval elapses, the earlier
-     * acceptance no longer covers the current text, and a fresh row is exactly what was asked
-     * for. Deduplicating the acknowledge path would silently discard periodic re-acknowledgement,
-     * which is the whole point of resetinterval.
+     * The only caller is the dismissal path, deliberately. A repeat DISMISSAL of the same notice is
+     * the same refusal recorded twice, and the dismissed report would list one person once per page
+     * load. A repeat ACCEPTANCE is a new fact: once the author edits the notice or its reset
+     * interval elapses, the earlier acceptance no longer covers the current text, so deduplicating
+     * the acknowledge path would discard periodic re-acknowledgement.
      *
-     * What that leaves is a table where a user may hold several ACKNOWLEDGED rows for one notice.
-     * That is intended, and acceptance_is_current() is what turns those rows back into a single
-     * yes/no by reading the newest one.
+     * A user may therefore hold several ACKNOWLEDGED rows for one notice; acceptance_is_current()
+     * turns them back into a single yes/no by reading the newest one.
      *
      * @param awareness $notice Notice.
      * @param int $userid User id.
@@ -1541,11 +1526,8 @@ class helper {
         $result = [];
         /*
          * A refusal is recorded wherever the notice asked for an answer, which is every level from
-         * Blocking up — not only the ones demanding a tick. This used to read `reqack`, and pairing
-         * that with a manage list that offers the Dismissed report from Blocking upwards would have
-         * produced the worst possible reading: a report that exists, is reachable, and is empty no
-         * matter how many people refused. An empty compliance report does not read as "not
-         * recorded", it reads as "nobody refused".
+         * Blocking up, not only Acknowledge: the manage list offers the Dismissed report from
+         * Blocking up, and an empty compliance report reads as "nobody refused", not "not recorded".
          *
          * Informational stays out. It asks nothing, so there is nothing to refuse; its dismissal is
          * carried by the event and the lastview row, and the manage list offers it no report.
@@ -1554,13 +1536,10 @@ class helper {
          */
         if ($notice->get_insistence() >= awareness::INSISTENCE_BLOCKING && !$isguest) {
             /*
-             * One row per reader per notice. An insistent notice is deliberately put back in front
-             * of a user who refused it — that is the whole point of the level — so an unguarded
-             * insert writes another row on every refusal, and the dismissed report, whose heading
-             * is "List of users who dismissed the notice", lists the same person once per page
-             * load. The event still fires each time — it is triggered below, outside this branch —
-             * because a repeated refusal is a real event; it is the compliance ROW that must not
-             * be duplicated.
+             * One row per reader per notice (see has_acknowledgement_record()): an insistent notice
+             * is put back in front of a user who refused it, so an unguarded insert would add a row
+             * on every refusal. The event below still fires each time, because a repeated refusal
+             * is a real event; only the compliance row must not be duplicated.
              */
             if (!self::has_acknowledgement_record($notice, $userid, acknowledgement::ACTION_DISMISSED)) {
                 // Record dismiss action.
@@ -1569,18 +1548,16 @@ class helper {
         }
 
         /*
-         * Every dismissal is logged, not only the ones that also write a compliance row. This
-         * trigger used to sit inside the reqack branch above, so dismissing an ordinary notice left
-         * no trace an admin could reach: local_awareness_ack only ever holds reqack rows, and
-         * local_awareness_lastview records that the notice was met without recording who acted.
+         * Every dismissal is logged, not only those that also write a compliance row:
+         * local_awareness_ack holds dismissals from Blocking up only, and local_awareness_lastview
+         * keeps only each user's latest action.
          *
-         * Guests stay out for the same reason their row does — every guest session shares the one
-         * guest user id, so the log would read as a single person dismissing the same notice for
-         * ever.
+         * Guests stay out for the same reason their row does: the log would read as one person
+         * dismissing the same notice for ever.
          */
         if (!$isguest) {
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $userid,
             ];
@@ -1609,11 +1586,7 @@ class helper {
         $isguest = isguestuser();
 
         if ($isguest) {
-            /*
-             * No shared row for a guest — every guest session shares one user id, so the row would
-             * be nobody's — but the session marker still has to be set or the modal reopens on
-             * every page load.
-             */
+            // A guest gets the session marker only, as add_to_viewed_notices explains.
             self::add_to_viewed_notices($notice, acknowledgement::ACTION_ACKNOWLEDGED, true);
         } else if (self::check_if_already_acknowledged_by_user($notice, $USER->id)) {
             // Already acknowledged in another browser.
@@ -1623,7 +1596,7 @@ class helper {
             self::add_to_viewed_notices($notice, acknowledgement::ACTION_ACKNOWLEDGED);
             // Log acknowledged event.
             $params = [
-                'context' => \context_system::instance(),
+                'context' => self::event_context($notice),
                 'objectid' => $notice->get('id'),
                 'relateduserid' => $persistent->get('usermodified'),
             ];
@@ -1654,12 +1627,10 @@ class helper {
          * The link id arrives from the client. Without these checks any authenticated user could
          * post arbitrary ids and fabricate click history for a notice never aimed at them.
          *
-         * What is NOT guarded here, deliberately: how often a user clicks their own link. Audit
-         * finding M7 asked for a rate limit and it is refused, because repeat clicks are the
-         * quantity being reported — see linkhistory::count_clicked_links(), whose docblock carries
-         * the reasoning, and the test that pins it. The table's growth is bounded by age instead,
-         * through the purge_link_history scheduled task, and both columns it is queried by now
-         * carry an index by way of their foreign keys (db/install.xml).
+         * Repeat clicks are deliberately not rate-limited: each click is one row of the link history
+         * report source, so a throttle of any window would record a reader who clicked twice as one
+         * who clicked once. The table's growth is bounded by age instead, through the
+         * purge_link_history scheduled task.
          */
         $link = noticelink::get_record(['id' => $linkid]);
         if (!$link) {
@@ -1677,12 +1648,9 @@ class helper {
         $persistent = new linkhistory(0, $data);
         $persistent->create();
 
-        /*
-         * The click is a write like any other, so it is logged. Guests returned at the top of this
-         * method, so nothing here needs a second guard.
-         */
+        // Log link clicked event; guests returned at the top.
         $params = [
-            'context' => \context_system::instance(),
+            'context' => self::event_context($notice),
             'objectid' => $linkid,
             'other' => ['noticeid' => (int) $notice->get('id')],
         ];
@@ -1695,42 +1663,16 @@ class helper {
     }
 
     /**
-     * Format date interval.
-     *
-     * @param string $time Time.
-     * @return string
-     */
-    public static function format_interval_time(string $time): string {
-        // Datetime for 01/01/1970.
-        $datefrom = new \DateTime("@0");
-        // Datetime for 01/01/1970 after the specified time (in seconds).
-        $dateto = new \DateTime("@$time");
-        // Format the date interval.
-        return $datefrom->diff($dateto)->format(get_string('timeformat:resetinterval', 'local_awareness'));
-    }
-
-    /**
-     * Format boolean value
-     *
-     * @param bool $value boolean
-     * @return string
-     */
-    public static function format_boolean(bool $value): string {
-        if ($value) {
-            return get_string('booleanformat:true', 'local_awareness');
-        } else {
-            return get_string('booleanformat:false', 'local_awareness');
-        }
-    }
-
-    /**
      * Get audience name from the audience options.
+     *
+     * The name is RAW, as built_cohorts_options() returns it, and so is any name in $options: the
+     * caller formats it for its own sink. The two placeholders are plain text.
      *
      * @param int $cohortid Cohort id
      * @param array|null $options A cohort option list already in hand, to save resolving it again.
      *                            Callers rendering many rows pass one; everyone else omits it and
      *                            gets the ordinary lookup.
-     * @return string
+     * @return string The raw cohort name, the "all" string for 0, or '-' for a cohort not listed.
      */
     public static function get_cohort_name(int $cohortid, ?array $options = null): string {
         if ($cohortid == 0) {
@@ -1741,63 +1683,17 @@ class helper {
 
         // A notice outlives the cohort it targets, and cohort_get_all_cohorts() only returns the
         // cohorts visible to the caller. Either way the id can be absent, and an unguarded lookup
-        // makes the whole manage-notices page fatal. Match get_course_name()'s treatment.
+        // makes the whole manage-notices page fatal.
         return $cohorts[$cohortid] ?? '-';
     }
-
-    /**
-     * Get course name
-     * @param int $courseid course id
-     * @return mixed
-     * @throws \coding_exception
-     */
-    public static function get_course_name(int $courseid): string {
-        global $DB;
-
-        if ($courseid == 0) {
-            return get_string('booleanformat:false', 'local_awareness');
-        }
-
-        $course = $DB->get_record('course', ['id' => $courseid]);
-        if ($course) {
-            return $course->fullname;
-        } else {
-            return '-';
-        }
-    }
-
-    /**
-     * Return all courses as an options array suitable for autocomplete elements.
-     * Excludes the site course (id=1). Sorted alphabetically by fullname.
-     *
-     * @return array  [id => fullname, ...]
-     * @throws \dml_exception
-     */
-    public static function get_all_courses_options(): array {
-        global $DB;
-        $courses = $DB->get_records_select(
-            'course',
-            'id <> :siteid',
-            ['siteid' => SITEID],
-            'fullname ASC',
-            'id, fullname'
-        );
-        $options = [];
-        foreach ($courses as $course) {
-            $options[$course->id] = $course->fullname;
-        }
-        return $options;
-    }
-
 
     /**
      * Whether the current user may perform an authoring verb under a scope, refusing when not.
      *
      * The one place "which capability, in which context" is decided. Every page, helper verb and
      * web service that acts as an author asks here; nothing else in the plugin checks its own
-     * capabilities. Today every caller passes author_scope::site(), which is what the old
-     * check_manage_capability() meant; once a notice can belong to a course, the caller passes the
-     * scope the notice belongs to and this is what makes the course grant real.
+     * capabilities. Pages and web services pass the scope the request names (the site, or a
+     * course); verbs acting on a stored notice pass author_scope::of($notice).
      *
      * The site capability is checked in the scope's own context, so a system-level assignment
      * inherits down and a site manager may act on a course's notice. The course capability is
@@ -1821,12 +1717,10 @@ class helper {
         /*
          * Asked BEFORE the context is resolved: a course scope whose course is gone has no context
          * to resolve, and context_course::instance() would throw a missing-record error where a
-         * refusal is owed. Nobody holds anything in a context that no longer exists, so a course
-         * author is refused — and the notice is never read as the site, which would publish an
-         * orphaned course notice site-wide. The one way out is the site capability at the system
-         * context: without it an orphan could never be disabled or deleted through the plugin and
-         * its files never removed, the exact state a manual delete was once fixed to end. Its
-         * forced course filter keeps it from displaying meanwhile.
+         * refusal is owed. A course author is refused, and the notice is never read as the site's,
+         * which would publish an orphaned course notice site-wide. The site capability at the system
+         * context still reaches it, so an orphan can be disabled or deleted and its files removed;
+         * its forced course filter keeps it from displaying meanwhile.
          */
         if (!$scope->exists()) {
             $allowed = has_capability($sitecapability, \context_system::instance());
@@ -1884,15 +1778,14 @@ class helper {
      *
      * The gate local_awareness_pluginfile() stands behind, kept here so it can be tested without
      * serving a file. A file URL carries a notice id and nothing about where the reader came from,
-     * so the audience is resolved the way the web-service writes resolve it: the enabled flag, the
-     * start of the window, the cohort list and the role rule. It deliberately does NOT cover the
-     * page-dependent rules in check_filters() — category, course, format, theme, competency — which
-     * need a page URL this request has not got, exactly as documented on
-     * is_notice_available_to_user(); this gate is PARTIAL by construction.
+     * so the audience is resolved the way the web-service writes resolve it, through
+     * is_notice_available_to_user(). The page-dependent rules in check_filters() (category, course,
+     * format, theme, competency) need a page URL this request has not got, so this gate is PARTIAL
+     * by construction.
      *
-     * Managers bypass it so the editor and the manage table can render an unpublished notice, and
-     * "manager" is decided in the notice's own scope: a course author reaches the unpublished files
-     * of their course's notices and nobody else's; a site manager, inheriting down, reaches them all.
+     * Authors bypass it so the editor and the manage table can render an unpublished notice, judged
+     * in the notice's own scope and within its group reach: a course author reaches the files of
+     * their course's notices and nobody else's; a site manager, inheriting down, reaches them all.
      * Everyone else needs access to a course notice's course before the audience is even consulted.
      *
      * @param awareness $notice The notice whose files are asked for.
@@ -1927,12 +1820,10 @@ class helper {
     /**
      * The notice a request names, or null when it names none.
      *
-     * Fails closed on an id that names nothing. editnotice.php used to read the record with
-     * IGNORE_MISSING and branch on its truthiness, which is false both for "no id" and for "an id
-     * that no longer exists" — so a save posted against a notice deleted in the meantime, or
-     * against a forged id, ran the CREATE branch and produced a duplicate with every
-     * acknowledgement gone and nothing said. One resolver, called before the form is built, so no
-     * later branch can confuse the two cases.
+     * Fails closed on an id that names nothing, so a save posted against a notice deleted in the
+     * meantime, or against a forged id, cannot fall through to the create branch and silently
+     * produce a duplicate without its acknowledgements. Pages call it before the form is built, so
+     * no later branch can confuse "no id" with "an id that no longer exists".
      *
      * @param int $noticeid The id from the request; 0 means a new notice.
      * @return awareness|null The notice, or null for a new one.
@@ -1953,6 +1844,10 @@ class helper {
 
     /**
      * Check if notice has already been acknowledged by a user.
+     *
+     * Reads the user's latest interaction ({local_awareness_lastview}) through must_reshow(), so a
+     * stale acceptance does not count. When it answers true it also writes the answer into
+     * $USER->viewednotices, which is only right when $userid is the current user.
      *
      * @param awareness $notice
      * @param int $userid
@@ -1982,15 +1877,11 @@ class helper {
     /**
      * Whether a notice this user has already seen has to be put in front of them again.
      *
-     * One predicate, two callers, and it is written once for a reason worth keeping: it used to be
-     * two copies of the same conditions, the copy here silently short of one, and a reader
-     * comparing them had to notice an ABSENCE rather than read a difference. That was audit
-     * finding M12.
+     * Shared by collect_user_notices() and check_if_already_acknowledged_by_user(), so the display
+     * path and the acknowledge path judge a recorded interaction the same way.
      *
-     * The refusal clause reads the insistence LEVEL rather than testing the old booleans, which is
-     * what lets it be one clause instead of two. It is deliberately `>=`: a level added above
-     * Acknowledge later must not fall out of this test in silence, which is the same failure the
-     * M12 note above is about.
+     * The refusal clause reads the insistence level, deliberately with `>=`, so a level added above
+     * Acknowledge later does not silently fall out of it.
      *
      * A refused notice comes back, but it does not jump the queue — select_for_display() leaves it
      * behind notices the reader has not met yet. That is the point of offering an exit at all: the
@@ -2015,15 +1906,10 @@ class helper {
     /**
      * Whether an interaction recorded at this time no longer speaks for the notice as it stands.
      *
-     * Two rules, and neither depends on WHAT the user did — only on when they did it. That is why
-     * this is separate: must_reshow() applies them to a recorded view to decide whether to put the
-     * modal back, and acceptance_is_current() applies the same two to an acknowledgement row to
-     * decide whether a recorded acceptance still counts. They were previously written once, inside
-     * must_reshow(), and so were available only to the display path.
-     *
-     * The consequence of them being available only there: "this user accepted this notice" could
-     * be answered ONLY as "a row exists", which never becomes false. An author who sets a reset
-     * interval is saying the opposite — that acceptance expires and has to be given again.
+     * Two rules that depend only on when the user acted, not on what they did: the notice has been
+     * saved since, or its reset interval has elapsed. must_reshow() applies them to a recorded view
+     * to decide whether to put the modal back; acceptance_is_current() applies them to an
+     * acknowledgement row, so a recorded acceptance expires instead of counting for ever.
      *
      * @param awareness $notice The notice being judged.
      * @param int $when When the user acted, as a unix timestamp.
@@ -2042,40 +1928,30 @@ class helper {
      * Whether this user currently stands as having accepted this notice.
      *
      * The plugin's answer to "has user U accepted notice N", and deliberately the only public one.
-     * Three properties that the private predicates next door do not have, each of which was a
-     * reason a caller outside the display path could not use them:
+     * Unlike the private predicates next door:
      *
-     *  - It reads {local_awareness_ack}, the COMPLIANCE record, not {local_awareness_lastview},
-     *    which records that a notice was met without recording consent.
-     *  - It has no side effects. check_if_already_acknowledged_by_user() writes the answer into
-     *    $USER->viewednotices — correct for the session it is judging, corrupting for any other
-     *    user, and it takes $userid as a parameter.
+     *  - It reads {local_awareness_ack}, the compliance record, not {local_awareness_lastview},
+     *    which keeps only each user's latest interaction.
+     *  - It has no side effects. check_if_already_acknowledged_by_user() writes its answer into
+     *    $USER->viewednotices, which is wrong for any user but the current one.
      *  - It expires. A user may hold several ACKNOWLEDGED rows for one notice (see
      *    has_acknowledgement_record()); this reads the newest and asks whether it still speaks for
-     *    the notice as it now stands. "A row exists" only ever grows, which is the opposite of
-     *    what a reset interval means.
+     *    the notice as it now stands.
      *
-     * A DISMISSAL is never an acceptance. The two actions are stored in the same table and told
-     * apart by the action column; a caller gating access on consent must not be satisfied by a
-     * refusal.
+     * A dismissal is never an acceptance: both actions share the table, told apart by the action
+     * column, and a caller gating access on consent must not be satisfied by a refusal.
      *
-     * WHAT EXPIRES AN ACCEPTANCE, and it is more than editing. This predicate shares its staleness
-     * rule with the display decision, so it reads {local_awareness}.timemodified — and
-     * core\persistent::update() is final and stamps that column unconditionally, whether or not
-     * anything changed. Every authoring action that saves the notice therefore expires every
-     * acceptance on it:
+     * What expires an acceptance is more than editing. The staleness rule reads
+     * {local_awareness}.timemodified, and core\persistent::update() is final and stamps that column
+     * whether or not anything changed, so every authoring action that saves the notice expires every
+     * acceptance on it: reset_notice() by design, and disable_notice() and enable_notice() as a side
+     * effect of the save. An administrator hiding a notice for a week and putting it back has
+     * expired every acceptance on record. The rows are kept, and the reports still show them, but
+     * they stop counting as current. tests/consent_expiry_test.php pins this beside an untouched
+     * control.
      *
-     *  - reset_notice(), where that is the whole point and the label now says so;
-     *  - disable_notice() and enable_notice(), where it is a side effect of the save and NOTHING in
-     *    either name suggests it. An administrator hiding a notice for a week and putting it back
-     *    has changed no word of it and has expired every acceptance on record.
-     *
-     * The rows are not deleted — the reports still show them — but they stop counting as current.
-     * tests/consent_expiry_test.php pins all of this, including the untouched control.
-     *
-     * Anything gating ACCESS on this predicate inherits that coupling: a course or activity opened
+     * Anything gating access on this predicate inherits that coupling: a course or activity opened
      * by acceptance closes again the next time an administrator toggles the notice's visibility.
-     * Decide deliberately whether that is what you want before consuming it.
      *
      * @param awareness $notice The notice to test.
      * @param int $userid The user to test.
@@ -2106,10 +1982,9 @@ class helper {
     /**
      * The theme the reader is actually looking at, not the one this request happens to run under.
      *
-     * The rule used to read $PAGE->theme->name from inside the get_notices web service, where $PAGE
-     * never had set_course() called — so moodle_page::resolve_theme() skipped its course and
-     * category branches and always answered the site or user theme. A notice filtered by a course
-     * theme therefore matched nowhere it was meant to.
+     * Inside the get_notices web service $PAGE has no course set, so moodle_page::resolve_theme()
+     * skips its course and category branches and answers the site or user theme; reading
+     * $PAGE->theme there would match a course-theme filter nowhere.
      *
      * A throwaway page that does know the course puts those branches back without reimplementing
      * $CFG->themeorder or the two override settings. It is built only when a theme filter exists and
@@ -2190,8 +2065,8 @@ class helper {
      * This is where the file URLs are resolved and the text filters run, so a multilang notice
      * resolves per reader and the stored row survives a wwwroot change.
      *
-     * file_rewrite_pluginfile_urls() leaves absolute URLs alone, so notices written before the
-     * storage format was corrected render unchanged.
+     * Content that already holds absolute pluginfile URLs renders unchanged, because
+     * file_rewrite_pluginfile_urls() replaces only the placeholder.
      *
      * @param awareness $notice Notice.
      * @return string HTML ready to place in the modal.
@@ -2212,8 +2087,8 @@ class helper {
      * report builder content column is one: a column callback is handed the row's fields, and
      * building a persistent per row would cost one extra query per report row.
      *
-     * Both entry points come through here so the rules exist once. A second copy is exactly how the
-     * report and the modal would drift apart without anything failing.
+     * Both entry points come through here so the rules exist once, and the report and the modal
+     * cannot drift apart.
      *
      * @param string $content Stored content, as the author wrote it.
      * @param int $contentformat One of the FORMAT_* constants.
@@ -2528,22 +2403,26 @@ class helper {
     private static function get_user_competency_proficiency(int $userid, int $courseid, int $competencyid): bool {
         global $DB;
 
-        static $cache = [];
-
-        $cachekey = $userid . ':' . $courseid . ':' . $competencyid;
-        if (array_key_exists($cachekey, $cache)) {
-            return $cache[$cachekey];
+        /*
+         * A request cache, not a static: several notices may name the same competency, and MUC is
+         * purged between PHPUnit tests where a static is not, while generated ids repeat from one
+         * test to the next. Stored as 0 or 1 because get() answers false for a miss.
+         */
+        $cache = \cache::make_from_params(\cache_store::MODE_REQUEST, 'local_awareness', 'proficiency', [], ['simplekeys' => true]);
+        $cachekey = "{$userid}_{$courseid}_{$competencyid}";
+        $cached = $cache->get($cachekey);
+        if ($cached !== false) {
+            return (bool) $cached;
         }
 
         /*
-         * Read the row; do not ask core's API for it. get_user_competency_in_course() is not a pure
-         * read — it creates the user_competency_course relation when none exists — and this runs
-         * from check_filters(), reached from local_awareness_getnotices, which db/services.php
-         * declares 'type' => 'read'. So merely loading a course page covered by a
-         * competency-filtered notice materialised competency state for a user nobody had assessed,
-         * and core's competency reports began listing them. Audit finding M16.
+         * Read the row; do not ask core's API for it. get_user_competency_in_course() creates the
+         * user_competency_course relation when none exists, and this runs from check_filters() on
+         * the local_awareness_getnotices path, which db/services.php declares 'type' => 'read'.
+         * Through the API, merely loading a course page covered by a competency-filtered notice
+         * would create competency state for a user nobody had assessed.
          *
-         * A missing row means not proficient, which is what the absent relation meant anyway.
+         * A missing row means not proficient, which is what the absent relation means anyway.
          */
         $proficiency = $DB->get_field('competency_usercompcourse', 'proficiency', [
             'userid' => $userid,
@@ -2551,13 +2430,25 @@ class helper {
             'competencyid' => $competencyid,
         ]);
 
-        $cache[$cachekey] = !empty($proficiency);
+        $cache->set($cachekey, empty($proficiency) ? 0 : 1);
 
-        return $cache[$cachekey];
+        return !empty($proficiency);
     }
 
     /**
      * Check if the current page matches the path pattern.
+     *
+     * The page is its path plus query string, as the browser reports it. Besides the FRONTPAGE, MY
+     * and MYCOURSES tokens, a pattern is matched from the first character of the page, and whether
+     * it must also reach the last one depends on a '%':
+     *
+     *  - Without a '%' the whole page must match: '/course/view.php' does not match
+     *    '/course/view.php?id=2'.
+     *  - With a '%' anywhere, each '%' stands for any text and the end is left open: '/mod/%/view.php'
+     *    matches '/mod/forum/view.php?id=5', and also '/mod/forum/view.phpx'.
+     *
+     * The open end is deliberate: pages carry query strings, and stored patterns would lose reach
+     * if it closed. The pathmatch_help string tells authors the same.
      *
      * @param string $pathmatch The URL pattern.
      * @param string $pageurl The current page URL path (from JS via AJAX).
@@ -2599,12 +2490,10 @@ class helper {
         }
 
         /*
-         * The pattern is anchored at BOTH ends. It used to carry only a trailing '$', so a rule
-         * for '/mod/quiz/view.php' also matched '/anything/mod/quiz/view.php' — an author scoping
-         * a notice to one page silently scoped it to every path ending in that page. Anchoring the
-         * start is the fix, but it cannot be done against the raw target alone: a Moodle installed
-         * in a subdirectory reports '/moodle/mod/quiz/view.php', and the author writes the path
-         * they see in the URL bar. So the pattern is tried against the target and against the
+         * The pattern is anchored at the start, so a rule for '/mod/quiz/view.php' does not match
+         * '/anything/mod/quiz/view.php', and at the end only when it carries no '%'. A Moodle installed
+         * in a subdirectory reports '/moodle/mod/quiz/view.php' while the author may write the path
+         * with or without that segment, so the pattern is tried against the target and against the
          * target with the wwwroot's own path segment removed, and either may match.
          */
         global $CFG;
@@ -2634,24 +2523,23 @@ class helper {
     /**
      * Check if the filters match the current context.
      *
-     * Takes no page URL, and never did: path matching belongs to check_path_match(), and the
-     * course context here is decided by $courseid alone. The parameter used to sit between the two
-     * arguments below without a single read, which invited the reader to assume the URL was
-     * consulted and made every call pass an empty string past it to reach $courseid.
+     * Path matching belongs to check_path_match(); the course here is decided by $courseid alone.
+     * An empty or undecodable payload, a scalar one, or one whose lists are all empty, admits, as
+     * page_probe::filters_admit() and is_notice_available_to_user() do.
      *
      * @param string|null $filtervalues JSON encoded filter values.
      * @param int $courseid The current course ID (from JS via M.cfg.courseId).
      * @return bool
      */
     public static function check_filters(?string $filtervalues, int $courseid = 0): bool {
-        global $PAGE, $USER, $DB;
+        global $USER, $DB;
 
         if (empty($filtervalues)) {
             return true;
         }
 
         $filters = json_decode($filtervalues, true);
-        if (empty($filters)) {
+        if (empty($filters) || !is_array($filters)) {
             return true;
         }
 
@@ -2681,17 +2569,16 @@ class helper {
              * user could name a course they cannot enter and pull that notice's content.
              *
              * $onlyactive = true is deliberate. can_access_course() defaults it to false, which
-             * accepts any {user_enrolments} row — including suspended ones and ones whose window
-             * has closed — so a suspended participant would keep receiving the course's notices.
-             * Passing true restricts it to active enrolments in enabled plugins, within their
-             * time restrictions, which is what "is currently in this course" has to mean for a
-             * targeted notice.
+             * accepts any {user_enrolments} row, suspended or expired ones included, so a
+             * suspended participant would keep receiving the course's notices. True restricts
+             * its enrolment test to active enrolments in enabled plugins, within their dates.
+             * The function still admits a user with moodle/course:view and, where the course
+             * allows it, guest access.
              *
-             * Also deliberate, and easy to mistake for a bug: a user who is not yet enrolled
-             * fails this check on the course's own enrolment page, so a course-targeted notice
-             * does NOT appear at /enrol/index.php. That is the intended behaviour — the
-             * alternative leaks targeted content to anyone who guesses a course id. Use a cohort
-             * or category filter for notices meant to reach people before they enrol.
+             * Otherwise a user not yet enrolled fails this on the course's own enrolment page,
+             * so a course- or category-targeted notice does not appear at /enrol/index.php. That
+             * is intended: the alternative leaks targeted content to anyone who guesses a course
+             * id. Use a cohort filter for notices meant to reach people before they enrol.
              */
             if ($course && !can_access_course($course, null, '', true)) {
                 $course = null;
@@ -2746,9 +2633,16 @@ class helper {
             try {
                 $currenttheme = self::current_theme_name($course);
             } catch (\Throwable $e) {
-                $currenttheme = '';
+                /*
+                 * No theme can be resolved for this reader: the course sits in a category that no
+                 * longer exists while category themes are on, or the page has no context. A notice
+                 * aimed at named themes is withheld, as every rule whose referent cannot be
+                 * resolved is. The get_notices service validates its context first, so an ordinary
+                 * request never lands here.
+                 */
+                return false;
             }
-            if (!empty($currenttheme) && !in_array($currenttheme, $filters['filter_theme'])) {
+            if (!in_array($currenttheme, $filters['filter_theme'])) {
                 return false;
             }
         }
@@ -2792,17 +2686,15 @@ class helper {
     /**
      * Whether the role rule inside a notice's filters admits the current user.
      *
-     * Lifted out of check_filters() unchanged. It is the one rule in filtervalues that asks a
-     * question about the USER rather than about the page — "do they hold role X?" — so unlike the
-     * category, course, format, theme and competency rules beside it, it can be answered without a
-     * page URL. That is what lets is_notice_available_to_user() apply it to writes, where the
-     * client supplies a notice id and nothing trustworthy about where it came from.
+     * Unlike the category, course, format, theme and competency rules beside it in check_filters(),
+     * it asks about the USER alone ("do they hold role X?"), so it can be answered without a page
+     * URL. That is what lets is_notice_available_to_user() apply it to writes, where the client
+     * supplies a notice id and nothing trustworthy about where it came from.
      *
      * The whole $filters array is passed, not just filter_role, because filter_category and
-     * filter_course carry a SECOND meaning in here: they scope which contexts the role assignment
-     * is looked for in. (Their first meaning, as page-context filters in their own right, belongs
-     * to the blocks in check_filters() and stays there.) Splitting them out would silently widen a
-     * course-scoped rule into a site-wide one on the write path.
+     * filter_course also scope which contexts the role assignment is looked for in (see
+     * role_scope::sql()). Passing filter_role alone would silently widen a course-scoped rule into a
+     * site-wide one on the write path.
      *
      * @param array $filters Decoded filtervalues.
      * @return bool
@@ -2830,12 +2722,20 @@ class helper {
         $records = $DB->get_records_sql($sql, $params);
         $userroleids = array_map('intval', array_keys($records));
 
-        // Include Moodle's implicit default roles (not stored in role_assignments).
-        if ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM) {
-            if (!empty($CFG->defaultuserroleid) && isloggedin() && !isguestuser()) {
+        /*
+         * Core's two implicit roles have no {role_assignments} row. Every logged-in user but the
+         * guest holds the default user role in the system context and the front page role in the
+         * site course's context (get_user_accessdata()), so each counts only for a rule whose
+         * context covers where it is held: the default role for any context or the system, the front
+         * page role for any context only, since the site course is neither the system context nor
+         * one of the courses a course-level rule means. {@see \local_awareness\audience\estimator}
+         * makes the same choice in predicate().
+         */
+        if (isloggedin() && !isguestuser()) {
+            if (!empty($CFG->defaultuserroleid) && ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM)) {
                 $userroleids[] = (int) $CFG->defaultuserroleid;
             }
-            if (!empty($CFG->defaultfrontpageroleid) && isloggedin()) {
+            if (!empty($CFG->defaultfrontpageroleid) && $rolectx == 0) {
                 $userroleids[] = (int) $CFG->defaultfrontpageroleid;
             }
         }

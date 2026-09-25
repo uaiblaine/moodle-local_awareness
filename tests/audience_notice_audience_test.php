@@ -16,6 +16,7 @@
 
 namespace local_awareness;
 
+use local_awareness\audience\estimator;
 use local_awareness\audience\live_mode;
 use local_awareness\audience\notice_audience;
 use local_awareness\persistent\audience_job;
@@ -25,9 +26,9 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
 /**
  * Tests for the audience size stored against a saved notice.
  *
- * Coverage is declared in this docblock rather than with #[CoversClass]; moodle-cs on the 4.05 leg
- * cannot see attributes and reports every method as missing coverage information, which fails
- * phpcs under --max-warnings 0 while this plugin still supports 4.5.
+ * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
+ * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage. Move to the
+ * attribute when 4.5 support is dropped.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -36,6 +37,9 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
  * @covers \local_awareness\audience\notice_audience
  */
 final class audience_notice_audience_test extends \advanced_testcase {
+    /**
+     * Each test runs as the administrator, with the cached site user count forgotten.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -106,10 +110,147 @@ final class audience_notice_audience_test extends \advanced_testcase {
     }
 
     /**
+     * Saving a course notice joins the job the editor raised for the same form.
+     *
+     * Under a course scope the editor's web service leaves the forced page reach out of the
+     * question, so the saved notice must hash without it too, or the save queues a second estimate
+     * of the same thing. The notice's stored reach is asserted first: it is what the two used to
+     * disagree about.
+     */
+    public function test_a_course_notice_joins_the_editor_s_job(): void {
+        global $DB;
+
+        set_config('audience_sync_limit', 0, 'local_awareness');
+        live_mode::reset_cache();
+        $course = $this->getDataGenerator()->create_course();
+
+        $_POST['sesskey'] = sesskey();
+        $response = \core_external\external_api::call_external_function(
+            'local_awareness_estimate_audience',
+            ['criteria' => json_encode([]), 'courseid' => (int) $course->id],
+            false
+        );
+        $this->assertFalse($response['error']);
+        $editorjob = audience_job::get_record(['jobid' => $response['data']['jobid']]);
+        $this->assertSame(audience_job::STATUS_PENDING, $editorjob->get('status'));
+
+        $state = helper::create_new_notice(
+            $this->form_data(['title' => 'Course notice']),
+            \local_awareness\local\author_scope::course((int) $course->id)
+        );
+
+        $notice = awareness::get_record(['title' => 'Course notice']);
+        $this->assertSame(\local_awareness\local\author_scope::COURSE_PATHMATCH, $notice->get('pathmatch'));
+        $this->assertSame(notice_audience::STATE_PENDING, $state);
+        $this->assertSame($editorjob->get('criteriahash'), notice_audience::hash_for($notice));
+        $this->assertSame(1, $DB->count_records(audience_job::TABLE), 'the save queued a second estimate');
+        $joined = audience_job::get_record(['jobid' => $editorjob->get('jobid')]);
+        $this->assertSame((int) $notice->get('id'), (int) $joined->get('noticeid'));
+    }
+
+    /**
+     * A site notice keeps its page reach in the criteria, as the editor's web service does at the site.
+     *
+     * The control for the course case: the reach is dropped for the course scope alone.
+     */
+    public function test_a_site_notice_keeps_its_page_reach_in_the_criteria(): void {
+        set_config('audience_sync_limit', 100000, 'local_awareness');
+
+        helper::create_new_notice($this->form_data(['title' => 'Dashboard', 'pathmatch' => '/my/']));
+        $notice = awareness::get_record(['title' => 'Dashboard']);
+
+        $this->assertSame('/my/', notice_audience::criteria_for($notice)['pathmatch'] ?? null);
+    }
+
+    /**
+     * An estimate that fails during the request is reported as failed, and stores nothing.
+     *
+     * resolve() swallows the failure into the job, so only the job's status can tell. A job whose
+     * criteria the estimator cannot read is the failure; the same notice's own criteria are the
+     * control that the path reports a computed count as current.
+     */
+    public function test_a_failed_inline_estimate_is_reported_as_an_error(): void {
+        set_config('audience_sync_limit', 100000, 'local_awareness');
+        helper::create_new_notice($this->form_data(['title' => 'Counted']));
+        $notice = awareness::get_record(['title' => 'Counted']);
+        $count = $notice->get('audiencecount');
+        $computed = $notice->get('audiencecomputed');
+        $this->assertNotNull($count, 'the notice starts with a stored count');
+
+        $job = $this->job_for($notice, json_encode(['cohorts' => 'not a list']));
+        $this->assertSame(notice_audience::STATE_ERROR, notice_audience::resolve_inline($job));
+        $this->assertSame(audience_job::STATUS_ERROR, $job->get('status'));
+        $reread = awareness::get_record(['id' => $notice->get('id')]);
+        $this->assertSame($count, $reread->get('audiencecount'));
+        $this->assertSame($computed, $reread->get('audiencecomputed'));
+
+        $control = $this->job_for($notice, json_encode(notice_audience::criteria_for($notice)));
+        $this->assertSame(notice_audience::STATE_CURRENT, notice_audience::resolve_inline($control));
+        $this->assertSame(audience_job::STATUS_READY, $control->get('status'));
+    }
+
+    /**
+     * refresh() reports an inline estimate that failed as an error, and one that succeeded as current.
+     *
+     * A stored notice's criteria pass through estimator::normalise(), so no real notice makes the
+     * estimate throw; the estimator is replaced in core's DI container instead, which is where
+     * estimate_audience::resolve() takes it from. Putting the real estimator back and refreshing the
+     * same notice is the control.
+     */
+    public function test_refresh_reports_a_failed_inline_estimate_as_an_error(): void {
+        set_config('audience_sync_limit', 100000, 'local_awareness');
+        helper::create_new_notice($this->form_data(['title' => 'Counted']));
+        $notice = awareness::get_record(['title' => 'Counted']);
+        $count = $notice->get('audiencecount');
+        $computed = $notice->get('audiencecomputed');
+        $this->assertNotNull($count, 'the notice starts with a stored count');
+        $this->assertTrue(live_mode::is_live(), 'the refresh resolves during the request');
+
+        $failing = $this->createStub(estimator::class);
+        $failing->method('estimate')->willThrowException(new \dml_read_exception('estimate failed'));
+        \core\di::set(estimator::class, $failing);
+
+        $this->assertSame(notice_audience::STATE_ERROR, notice_audience::refresh($notice, true));
+        $jobs = audience_job::get_records(['noticeid' => (int) $notice->get('id')], 'id', 'DESC');
+        $this->assertSame(audience_job::STATUS_ERROR, reset($jobs)->get('status'));
+        $reread = awareness::get_record(['id' => $notice->get('id')]);
+        $this->assertSame($count, $reread->get('audiencecount'));
+        $this->assertSame($computed, $reread->get('audiencecomputed'));
+
+        \core\di::set(estimator::class, new estimator());
+        $this->assertSame(notice_audience::STATE_CURRENT, notice_audience::refresh($reread, true));
+        $jobs = audience_job::get_records(['noticeid' => (int) $notice->get('id')], 'id', 'DESC');
+        $this->assertSame(audience_job::STATUS_READY, reset($jobs)->get('status'));
+    }
+
+    /**
+     * A pending job raised for a saved notice, with the given criteria.
+     *
+     * @param awareness $notice The notice.
+     * @param string $criteria The criteria JSON the job carries.
+     * @return audience_job
+     */
+    private function job_for(awareness $notice, string $criteria): audience_job {
+        global $USER;
+
+        $job = new audience_job(0, (object) [
+            'jobid' => audience_job::new_jobid(),
+            'userid' => (int) $USER->id,
+            'noticeid' => (int) $notice->get('id'),
+            'criteriahash' => notice_audience::hash_for($notice),
+            'criteria' => $criteria,
+            'status' => audience_job::STATUS_PENDING,
+        ]);
+        $job->create();
+
+        return $job;
+    }
+
+    /**
      * Changing a filter makes the stored count stale rather than merely old.
      *
-     * The control is the second save with no filter change: it must NOT recompute, which is what
-     * keeps an edit to a title from costing a scan of every user on a large site.
+     * The control is the title-only edit: it must not recompute, which is what keeps an edit to a
+     * title from costing a scan of every user on a large site.
      */
     public function test_changing_filters_marks_the_count_stale_and_leaving_them_does_not(): void {
         set_config('audience_sync_limit', 100000, 'local_awareness');
@@ -276,15 +417,12 @@ final class audience_notice_audience_test extends \advanced_testcase {
     /**
      * Counting an audience is not an authoring act, so it must not look like one.
      *
-     * record() wrote through the persistent, and core\persistent::update() is final and stamps
-     * timemodified unconditionally. In this plugin timemodified IS the "the author changed this"
-     * signal — the first thing helper::must_reshow() reads, and the whole content of
-     * reset_notice() — so every recalculation was a silent Reset: everyone who had already dealt
-     * with the notice got it back.
+     * core\persistent::update() stamps timemodified, which helper::must_reshow() reads as "the
+     * author changed this", so record() writes around the persistent
+     * ({@see \local_awareness\audience\notice_audience::record()}).
      *
-     * The timestamps are forced into the past deliberately. must_reshow() compares with a strict
-     * `<`, so a bump landing in the same second as the last view is forgiven, and without this the
-     * test is a coin flip that mostly passes.
+     * The timestamps are forced into the past because must_reshow() compares with a strict `<`: a
+     * stamp landing in the same second as the last view would go unnoticed.
      *
      * @covers \local_awareness\audience\notice_audience::record
      */
@@ -329,10 +467,9 @@ final class audience_notice_audience_test extends \advanced_testcase {
     /**
      * A job already promised to one notice must not be taken over by another.
      *
-     * refresh() joins an in-flight job by criteria hash, and the hash names a set of filters rather
-     * than a notice — two site-wide notices with no filters hash identically. attach() then
-     * overwrote the job's owner, so the notice that raised it waited for a result that would never
-     * be written to it, and stayed permanently uncounted.
+     * refresh() finds an in-flight job by criteria hash, and two notices with the same filters hash
+     * identically. Re-owning the job would leave the notice that raised it waiting for a result
+     * never written to it ({@see \local_awareness\audience\notice_audience::refresh()}).
      *
      * @covers \local_awareness\audience\notice_audience::refresh
      */

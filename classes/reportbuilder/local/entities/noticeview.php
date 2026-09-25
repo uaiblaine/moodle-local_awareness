@@ -31,7 +31,7 @@ use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
  * Notice view entity for Report Builder.
  *
  * Maps to local_awareness_lastview which holds one row per (userid, noticeid),
- * recording when a user last viewed a notice and the action taken.
+ * recording the user's latest dismissal or acknowledgement of the notice and when it happened.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -87,15 +87,15 @@ class noticeview extends base {
             ->add_joins($this->get_joins())
             ->add_fields("{$alias}.action")
             /*
-             * TYPE_TEXT, not TYPE_INTEGER: local_awareness_lastview.action is a char column
-             * (db/install.xml) holding '0'/'1', and noticeview declares it PARAM_RAW_TRIMMED.
-             * Claiming TYPE_INTEGER let Report Builder offer Sum/Average, whose generated
-             * `AVG(1.0 * action)` is a hard PostgreSQL error on a varchar.
+             * TYPE_TEXT although the column is an integer: the value is an action code, and the
+             * text type keeps Sum and Average off it, whose 0 or 1 the callback below would print
+             * as an action. The aggregations it does allow (the counts and the concatenations)
+             * read the same under either type.
              */
             ->set_type(column::TYPE_TEXT)
             ->set_is_sortable(true)
             ->add_callback(static function ($value): string {
-                // Untyped for the same reason as the acknowledgement entity's action column.
+                // Compared as strings: a text column hands the database value over uncast.
                 if ($value === null || $value === '') {
                     return '';
                 }

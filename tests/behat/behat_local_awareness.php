@@ -28,6 +28,8 @@
 require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
 
 use Behat\Gherkin\Node\TableNode;
+use local_awareness\persistent\awareness;
+use local_awareness\persistent\slide;
 
 /**
  * Site notice step definitions.
@@ -70,15 +72,14 @@ class behat_local_awareness extends behat_base {
 
             /*
              * A scenario may say `insistence` and mean the level an author would choose, rather
-             * than spell out the two columns it is stored in. The mapping is the same one
-             * helper::sanitise_data() applies to the form, and it is written out rather than
-             * shared because this file is loaded by Behat BEFORE config.php, so it cannot reach
-             * the plugin's classes. Keep the two in step.
+             * than spell out the two columns it is stored in. Mapped as helper::sanitise_data()
+             * maps it, through the same constants: a step body runs after config.php, so the
+             * plugin's classes autoload here.
              */
             if (isset($noticeinfo['insistence'])) {
                 $level = (int) $noticeinfo['insistence'];
-                $noticeinfo['reqack'] = $level >= 2 ? 1 : 0;
-                $noticeinfo['outsideclick'] = $level >= 1 ? 0 : 1;
+                $noticeinfo['reqack'] = $level >= awareness::INSISTENCE_ACKNOWLEDGE ? 1 : 0;
+                $noticeinfo['outsideclick'] = $level >= awareness::INSISTENCE_BLOCKING ? 0 : 1;
                 unset($noticeinfo['insistence']);
             }
             $noticeinfo['outsideclick'] = $noticeinfo['outsideclick'] ?? 1;
@@ -103,9 +104,8 @@ class behat_local_awareness extends behat_base {
 
         /*
          * Inserted straight into the table, so the persistent's after_create() never runs and the
-         * enabled-notices cache is never invalidated. That was harmless while an empty cached result
-         * was re-read on every call — the cache healed itself by being broken. Now that an empty
-         * result is honoured, a notice created this way stays invisible until something purges.
+         * enabled-notices cache is never invalidated. The cache keeps an empty result too, so a
+         * notice created this way would stay invisible until something purged it.
          */
         \cache::make('local_awareness', 'enabled_notices')->purge();
     }
@@ -113,9 +113,8 @@ class behat_local_awareness extends behat_base {
     /**
      * Creates carousel slides for notices that already exist, named by title.
      *
-     * The image column names a placeholder file written into the slide's own area, keyed by the
-     * slide id as the plugin keys it; the area name is spelled out because this file is loaded
-     * before config.php and cannot read the persistent's constant at that point.
+     * The image column names a placeholder file written into the slide's own area
+     * (slide::FILEAREA), keyed by the slide id as the plugin keys it.
      *
      * @Given the following site notice slides exist
      * @param TableNode $slidedata notice (a title), sortorder, videourl, caption, image.
@@ -140,7 +139,7 @@ class behat_local_awareness extends behat_base {
                 get_file_storage()->create_file_from_string([
                     'contextid' => \context_system::instance()->id,
                     'component' => 'local_awareness',
-                    'filearea' => 'slidemedia',
+                    'filearea' => slide::FILEAREA,
                     'itemid' => $slideid,
                     'filepath' => '/',
                     'filename' => $row['image'],
@@ -165,8 +164,8 @@ class behat_local_awareness extends behat_base {
      * Checks the notice module was queued into the current page.
      *
      * "I should see" on the modal text proves display; this proves delivery. Its negative twin
-     * below is what pins the footer-hook redesign: a page where no notice could appear must not
-     * merely show nothing, it must not have loaded the module — or fired its AJAX call — at all.
+     * below pins the page probe in the footer hook: a page where no notice could appear must not
+     * load the module, and so never fires its AJAX call.
      *
      * @Then the awareness notice module should be loaded
      * @throws \Behat\Mink\Exception\ExpectationException When the module is absent.

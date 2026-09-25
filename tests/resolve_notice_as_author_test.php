@@ -83,7 +83,7 @@ final class resolve_notice_as_author_test extends \advanced_testcase {
             'one answer for all three, so an id cannot be probed across scopes'
         );
 
-        // The reports verb reads its own capability: the manage holder is refused the reports of their own notice.
+        // The reports verb reads its own capability: the managecourse holder is refused the reports of their own notice.
         $this->expectException(\moodle_exception::class);
         helper::resolve_notice_as_author((int) $own->get('id'), 'viewreports');
     }

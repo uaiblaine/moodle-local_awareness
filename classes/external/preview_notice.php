@@ -29,12 +29,10 @@ use local_awareness\persistent\awareness;
 /**
  * The editor's preview: the notice as the form currently holds it, rendered as the reader would get it.
  *
- * The preview used to hand the editor's raw HTML to a dialogue on the client. That was merely
- * imprecise while a notice was text and images; with a video, a carousel and a layout it would be
- * misleading, because the multimedia filter runs on the server and the slides are rows the form
- * has not saved yet. So the form's fields travel here, are rendered exactly as notice_payload
- * renders a saved notice, and come back in the same shape - draft file URLs standing in for the
- * pluginfile URLs a save will mint. Nothing is written.
+ * Rendered on the server because the multimedia filter runs there and the slides are rows the form
+ * has not saved yet. The form's fields are rendered the way notice_payload renders a saved notice
+ * and come back in the same shape, with draft file URLs standing in for the pluginfile URLs a save
+ * will mint. Nothing is written.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -129,15 +127,14 @@ class preview_notice extends external_api {
         $context = \context_system::instance();
         $template = in_array($params['template'], awareness::TEMPLATES, true) ? $params['template'] : awareness::TEMPLATES[0];
         /*
-         * A layout that IS its picture has nothing to preview until one is uploaded: the band would
-         * stay hidden and the dialogue collapse to a floating close. It previews as the classic
-         * until then, the way a value outside the vocabulary does; the save refuses it anyway.
+         * A layout that is only its picture has nothing to preview until one is uploaded: the band
+         * would stay hidden and the dialogue collapse to a floating close. It previews as the
+         * classic until then, the way a value outside the vocabulary does; the save refuses it anyway.
          */
         $bgimageurl = awareness::uses_bgimage($template) ? self::draft_file_url((int) $params['bgimagedraftid']) : '';
         if (awareness::requires_bgimage($template) && $bgimageurl === '') {
             $template = awareness::TEMPLATES[0];
         }
-        // A position the layout cannot take previews as its first: the centre for most, the top for a strip.
         // A position the layout cannot take previews as its first: the centre for most, the top for a strip.
         $position = in_array($params['position'], awareness::positions_for($template), true)
             ? $params['position']

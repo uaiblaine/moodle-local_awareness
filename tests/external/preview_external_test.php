@@ -22,7 +22,7 @@ use local_awareness\persistent\slide;
 /**
  * The two previews: the editor's, from the form's fields, and the manage list's, from a saved notice.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
+ * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHPUnit attributes.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -203,26 +203,29 @@ final class preview_external_test extends \advanced_testcase {
     }
 
     /**
-     * A stranger cannot render a notice, and an id that names nothing is refused before any gate.
+     * A stranger cannot render a notice, and is told the same as for an id that names nothing.
+     *
+     * One answer for both, so the preview cannot be used to learn which ids name notices. The
+     * administrator rendering the same notice is the control that the refusal is the stranger's.
      */
     public function test_the_list_preview_is_refused_to_a_stranger_and_for_an_unknown_id(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
         $notice = new awareness(0, (object) ['title' => 'Plain', 'content' => '<p>Plain.</p>']);
         $notice->create();
+        $this->assertSame((int) $notice->get('id'), (int) render_notice::execute((int) $notice->get('id'))['id']);
 
+        $answers = [];
         $this->setUser($this->getDataGenerator()->create_user());
-        try {
-            render_notice::execute((int) $notice->get('id'));
-            $this->fail('a plain user rendered a notice');
-        } catch (\required_capability_exception $e) {
-            // The message is localised; the type is the contract.
-            $this->assertInstanceOf(\required_capability_exception::class, $e);
+        foreach (['stranger' => (int) $notice->get('id'), 'unknown' => 987654] as $key => $id) {
+            try {
+                render_notice::execute($id);
+                $this->fail("{$key}: the preview rendered");
+            } catch (\moodle_exception $e) {
+                $answers[$key] = get_class($e) . '/' . $e->errorcode;
+            }
         }
-
-        // The resolver fails closed on an id that names nothing, before any gate is consulted.
-        $this->setAdminUser();
-        $this->expectException(\moodle_exception::class);
-        render_notice::execute(987654);
+        $this->assertSame($answers['unknown'], $answers['stranger'], 'the stranger is told something an unknown id is not');
+        $this->assertStringEndsWith('/notification:noticedoesnotexist', $answers['stranger']);
     }
 }

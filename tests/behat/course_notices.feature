@@ -45,12 +45,11 @@ Feature: Notices that belong to a course
     And I should see "Notices found: 1"
     And I should not see "Site-wide notice"
 
-  # Only the picker and the save are here. Who RECEIVES a group notice is
-  # tests/group_audience_test.php's, and it stays there on purpose: showing it in a browser means
-  # switching the plugin's display on, and then the seeded notices above render as modals over the
-  # course navigation and intercept the clicks these scenarios need — the headless fragility the
-  # fleet's Behat rule is about. A group the save had refused would re-render the form with an
-  # error instead of listing the notice, so the assertion below does prove the value was accepted.
+  # Only the picker and the save are here; who receives a group notice is pinned by
+  # tests/group_audience_test.php. Showing it in a browser means switching the plugin's display on,
+  # and the seeded notices above would then render as modals over the course navigation and
+  # intercept the clicks these scenarios need. A group the save had refused would re-render the form
+  # with an error instead of listing the notice, so the assertion below proves the value was accepted.
   Scenario: A course author aims a notice at one of their own groups
     Given the following "groups" exist:
       | name | course | idnumber |

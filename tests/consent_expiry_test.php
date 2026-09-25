@@ -28,8 +28,7 @@ use local_awareness\persistent\awareness;
  * disable and enable each expire every acceptance on the notice, whatever their labels suggest.
  *
  * This is pinned rather than described because the coupling is invisible at each call site: none of
- * helper::reset_notice(), enable_notice() or disable_notice() mentions acknowledgements, and the
- * column they move is three files away from the predicate that reads it.
+ * helper::reset_notice(), enable_notice() or disable_notice() mentions acknowledgements.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -117,10 +116,9 @@ final class consent_expiry_test extends \advanced_testcase {
     /**
      * Disabling and re-enabling expires it too - and nothing in either name says so.
      *
-     * This is the surprising one. An administrator hiding a notice for a week and putting it back
-     * has changed no word of it, yet every acceptance on record stops counting as current. The
-     * re-display half of that is deliberate and documented; the consent half arrived with
-     * acceptance_is_current(), which reads the same column.
+     * An administrator hiding a notice for a week and putting it back has changed no word of it,
+     * yet every acceptance on record stops counting as current: acceptance_is_current() reads the
+     * same column that deliberately makes the notice display again.
      *
      * @return void
      */
@@ -141,10 +139,10 @@ final class consent_expiry_test extends \advanced_testcase {
     /**
      * ...and so does enabling, on its own.
      *
-     * The notice starts DISABLED so that enable_notice() is the only write in the test. Pairing the
+     * The notice starts disabled so that enable_notice() is the only write in the test. Pairing the
      * two verbs in one scenario - disable, then enable - proves nothing about the second: the first
      * has already moved timemodified, so the assertion passes with enable_notice() saving nothing
-     * at all. That version of this test survived exactly that mutation.
+     * at all.
      *
      * @return void
      */

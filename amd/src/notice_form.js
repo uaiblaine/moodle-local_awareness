@@ -14,7 +14,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Editor behaviour for the notice form: the competency picker and the rules table.
+ * Editor behaviour for the notice form: the repeat and insistence fields a required course disables,
+ * the positions and insistence levels each layout allows, and the competency picker with its rules
+ * table.
  *
  * The picker resolves competencies against the framework the author chose and renders the rules the
  * notice will be filtered by.
@@ -153,10 +155,9 @@ define([], function() {
         var cornersAllowed = layout === CORNER_LAYOUT;
         var strip = layout === STRIP_LAYOUT;
         /*
-         * Full screen covers the window, so it has no position at all. The group used to be hidden
-         * for it by a server-side hideIf, and a control that vanishes reads as a fault: the screen
-         * fills instead and the note says why. The stylesheet draws both states; nothing here
-         * writes text.
+         * Full screen covers the window, so no position applies. The group stays on screen, drawn as
+         * covered, and the form's note says why, since a control that vanished would read as a
+         * fault. The stylesheet draws both states; nothing here writes text.
          */
         var covered = layout === COVERED_LAYOUT;
         var displaced = false;
@@ -227,10 +228,8 @@ define([], function() {
      * ends in jQuery .html() (lib/amd/src/modal.js, identical on 4.5 and 5.2), and
      * Notification.addNotification() renders through a triple stash in notification_base.mustache,
      * whose docblock asks for "a cleaned string". Both receive language strings from data-*
-     * attributes here, so they are escaped exactly once on the way in.
-     *
-     * The escaping is the browser's own rather than a hand-written character table — a table is a
-     * thing to get wrong, and this cannot be.
+     * attributes here, so they are escaped exactly once on the way in, by the browser rather than by
+     * a hand-written character table.
      *
      * @param {String} text The raw string.
      * @returns {String} The same string, safe to place in an HTML sink.
@@ -243,13 +242,12 @@ define([], function() {
     };
 
     /**
-     * Replace an element's contents with a single message box, written as TEXT.
+     * Replace an element's contents with a single message box, written as text.
      *
      * The message is a language string the server put in a data-* attribute, so it arrives as text
      * and has to be written as text. Concatenated into innerHTML it is re-parsed as markup, and an
      * ampersand or an angle bracket a translator wrote renders wrong or swallows the rest of the
-     * fragment. Nothing in the pipeline reads a JS string literal, so the guard is a source-contract
-     * test rather than a linter.
+     * fragment. Pinned by tests/local/picker_contract_test.php.
      *
      * @param {Element} target Element whose contents are replaced.
      * @param {String} text The message to show.
@@ -504,7 +502,7 @@ define([], function() {
                 ['core/modal_save_cancel', 'core/modal_events', 'core/ajax', 'core/notification', 'core/templates'],
                 function(ModalSaveCancel, ModalEvents, Ajax, Notification, Templates) {
 
-                    // The course's competency ids and the frameworks they live in; empty sets mean "no limit".
+                    // The course's competency ids and their frameworks; null (the site) means no limit.
                     var allowed = null;
                     var allowedFrameworks = null;
                     var courseScope = courseid > 0
@@ -527,10 +525,10 @@ define([], function() {
                     // Fetch frameworks, then open the modal.
                     courseScope.then(function() {
                         /*
-                         * Frameworks live at the system or a category context, never at a course:
-                         * from a course context 'children' finds nothing, on every site, always,
-                         * while 'parents' walks up to the category and the system. The site page
-                         * keeps 'children', which from the system context is every framework.
+                         * Frameworks live at the system or a category context, never at a course,
+                         * so from a course context 'children' finds nothing while 'parents' walks up
+                         * to the category and the system. The site page keeps 'children', which from
+                         * the system context is every framework.
                          */
                         return Ajax.call([{
                             methodname: 'core_competency_list_competency_frameworks',
@@ -549,11 +547,9 @@ define([], function() {
                         if (!frameworks || !frameworks.length) {
                             /*
                              * Under a course scope the filter above keeps only the frameworks
-                             * holding a competency LINKED TO THE COURSE, so an empty list there
-                             * almost always means the course has none — not that the site has no
-                             * frameworks. Saying the latter sends the author looking for the wrong
-                             * thing: reported from the browser, on a site with two frameworks and
-                             * no course linked to either.
+                             * holding a competency linked to the course, so an empty list there
+                             * almost always means the course has none, not that the site has no
+                             * frameworks.
                              */
                             Notification.addNotification({
                                 message: escapeText(courseid > 0 ? labels.noCourseLinked : labels.noFrameworks),
@@ -744,12 +740,10 @@ define([], function() {
             }
 
             setTimeout(function() {
-                if (bind()) {
-                    competencyBound = initCompetencyFilter() || competencyBound;
-                } else {
-                    competencyBound = initCompetencyFilter() || competencyBound;
-                }
-                if (bind() && competencyBound) {
+                // Both binders are idempotent, so a second pass only binds what the first missed.
+                var courseBound = bind();
+                competencyBound = initCompetencyFilter() || competencyBound;
+                if (courseBound && competencyBound) {
                     return;
                 }
 

@@ -19,16 +19,10 @@ namespace local_awareness\local;
 /**
  * Guards the audience-criteria contract between the editor's JavaScript and the estimator.
  *
- * The estimator reads a criteria array; audience_criteria.js builds it. Nothing made the two lists
- * agree, and they drifted: the client never sent filter_role_context, so a role rule scoped to one
- * course was estimated as if it applied everywhere, and where the role was the site's default the
- * estimator took its "1 = 1" shortcut and reported the entire user base. The runtime honoured the
- * stored context the whole time, so the panel and the notice disagreed by orders of magnitude.
- *
- * That was audit finding M3, written down in August and still true in the code six releases later.
- * Nothing in the pipeline could see it: the field is absent, not wrong, and no PHP gate reads a
- * JavaScript file. This test is that missing observer — the same reason bootstrap_compat_test
- * exists beside it.
+ * The estimator reads a criteria array; audience_criteria.js builds it, and no other gate compares
+ * the two. A key the client omits is not an error: it normalises to its default, so, for example,
+ * a role rule without filter_role_context is estimated as if it applied in every context while
+ * the displayed notice honours the stored context.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -49,10 +43,8 @@ final class criteria_contract_test extends \basic_testcase {
     /**
      * Every criteria key estimator::normalise() reads out of the raw array.
      *
-     * Taken from normalise() itself rather than from AUDIENCE_FIELDS/CONTEXT_FIELDS, because those
-     * constants are not the whole story: filter_role_context is a modifier kept alongside
-     * filter_role and appears in neither. Reading the method is what makes this list complete, and
-     * completeness is the entire point — the field that broke was the one nobody had listed.
+     * Taken from normalise() itself rather than from AUDIENCE_FIELDS/CONTEXT_FIELDS: modifiers such
+     * as filter_role_context, kept beside filter_role, appear in neither constant.
      *
      * @return array Sorted list of key names.
      */
@@ -116,9 +108,9 @@ final class criteria_contract_test extends \basic_testcase {
     /**
      * And it must not invent fields the estimator will drop on the floor.
      *
-     * The reverse direction is the cheaper half of the same drift: a key the client sends and the
-     * server never reads is work the author sees no result from, and it changes the criteria hash
-     * that keys job reuse, so two identical estimates stop sharing a job.
+     * The reverse direction of the same drift: normalise() drops a key it does not read before the
+     * estimate and its hash are computed, so whatever the author set through that field has no
+     * effect on the count.
      *
      * @return void
      */

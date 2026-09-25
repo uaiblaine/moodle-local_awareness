@@ -10,11 +10,9 @@ Feature: The notice editor's collapsible sections
     And I click on "Create new notice" "link"
 
   Scenario: Every field of the form is on the page
-    # This is the regression the whole editor rebuild exists for. The old editor hid the moodleform
-    # in a clipped 1x1 container and moved its rendered rows into cards with JavaScript, driven by a
-    # map of field names; anything the map forgot stayed in that container — focusable and announced
-    # by a screen reader, but painted nowhere. Role context was one of the two that were lost, which
-    # is why it is named here rather than left to the section headings.
+    # Fields are asserted, not only the section headings: a field left out of the painted layout
+    # can stay focusable and announced by a screen reader while nobody sees it. Expand all opens the
+    # sections the form collapses.
     When I click on "Expand all" "link"
     Then I should see "Role context"
     And I should see "Apply to URL match"

@@ -19,6 +19,8 @@ declare(strict_types=1);
 namespace local_awareness\reportbuilder\local\entities;
 
 use lang_string;
+use core_reportbuilder\local\aggregation\avg;
+use core_reportbuilder\local\aggregation\sum;
 use core_reportbuilder\local\entities\base;
 use core_reportbuilder\local\filters\date;
 use core_reportbuilder\local\filters\select;
@@ -148,26 +150,7 @@ class acknowledgement extends base {
             ->add_fields("{$alias}.action")
             ->set_type(column::TYPE_INTEGER)
             ->set_is_sortable(true)
-            ->add_callback(static function ($value): string {
-                /*
-                 * Deliberately untyped. Report Builder calls display callbacks from
-                 * reportbuilder/classes/local/aggregation/base.php, which declares
-                 * strict_types=1 — strictness follows the caller, so an aggregation such as
-                 * Average hands a float to a ?int signature and raises a TypeError instead of
-                 * rendering. An aggregate is not one of the two actions, so it is shown as a
-                 * number.
-                 */
-                if ($value === null || $value === '') {
-                    return '';
-                }
-                if ((float) $value === (float) acknowledgement_persistent::ACTION_ACKNOWLEDGED) {
-                    return get_string('report_ack:action_acknowledged', 'local_awareness');
-                }
-                if ((float) $value === (float) acknowledgement_persistent::ACTION_DISMISSED) {
-                    return get_string('report_ack:action_dismissed', 'local_awareness');
-                }
-                return format_float((float) $value, 2);
-            });
+            ->add_callback([self::class, 'format_action']);
 
         $columns[] = (new column(
             'timecreated',
@@ -181,6 +164,43 @@ class acknowledgement extends base {
             ->add_callback([format::class, 'userdate']);
 
         return $columns;
+    }
+
+    /**
+     * Format the action column: the action's name, or a number under Sum and Average.
+     *
+     * Sum is the number of acknowledgements among the grouped rows and Average their share, so
+     * neither names an action even when it equals 0 or 1. Min, Max and the concatenations keep the
+     * action's own values and show their names. The aggregate is read from the row rather than from
+     * $value, because 4.5 casts $value to this column's integer type first, which turns an Average of
+     * 0.5 into 0.
+     *
+     * $value is untyped: under an aggregation core passes the aggregate from strict-typed code, and
+     * Average's float would raise a TypeError on an int parameter.
+     *
+     * @param mixed $value The action, or the aggregate cast to the column type.
+     * @param \stdClass $row The column's values as the query returned them, keyed by field alias.
+     * @param mixed $arguments The callback's additional arguments; none are passed.
+     * @param string|null $aggregation Name of the aggregation applied to the column, null for none.
+     * @return string
+     */
+    public static function format_action($value, \stdClass $row, $arguments = null, ?string $aggregation = null): string {
+        if ($value === null || $value === '') {
+            return '';
+        }
+        if ($aggregation === sum::get_class_name()) {
+            return format_float((float) ($row->action ?? $value), 0);
+        }
+        if ($aggregation === avg::get_class_name()) {
+            return format_float((float) ($row->action ?? $value), 2);
+        }
+        if ((float) $value === (float) acknowledgement_persistent::ACTION_ACKNOWLEDGED) {
+            return get_string('report_ack:action_acknowledged', 'local_awareness');
+        }
+        if ((float) $value === (float) acknowledgement_persistent::ACTION_DISMISSED) {
+            return get_string('report_ack:action_dismissed', 'local_awareness');
+        }
+        return format_float((float) $value, 2);
     }
 
     /**

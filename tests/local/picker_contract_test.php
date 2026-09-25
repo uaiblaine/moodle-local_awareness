@@ -19,17 +19,14 @@ namespace local_awareness\local;
 /**
  * Source contracts for the competency picker's message rendering and its label plumbing.
  *
- * Nothing in the pipeline reads a JS string literal. phpcs reads PHP, the mustache lint reads
- * structure, stylelint reads CSS, and eslint has no opinion about which sink a translated string
- * lands in — so these rules are enforced here or not at all, the same argument that produced
- * bootstrap_compat_test and criteria_contract_test.
+ * No other gate checks which JavaScript sink a translated string lands in, so these rules are
+ * enforced here.
  *
- * The defect class: the picker builds its messages from language strings the server renders into
- * data-* attributes, and it used to concatenate them into innerHTML. A translator's ampersand then
- * renders wrong and an angle bracket swallows the rest of the fragment. Two of core's own sinks —
- * Modal.setTitle(), which ends in jQuery .html(), and Notification.addNotification(), which renders
- * through a triple stash — take HTML and cannot be handed a text node, so those are escaped once
- * on the way in instead.
+ * The picker builds its messages from language strings the server renders into data-* attributes.
+ * Concatenated into innerHTML, a translator's ampersand renders wrong and an angle bracket swallows
+ * the rest of the fragment, so they are written as text. Two of core's sinks, Modal.setTitle(),
+ * which ends in jQuery .html(), and Notification.addNotification(), which renders through a triple
+ * stash, take HTML and cannot be handed a text node, so those are escaped once on the way in.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -50,9 +47,8 @@ final class picker_contract_test extends \basic_testcase {
     /**
      * Read one AMD source file, with comments stripped.
      *
-     * Comments are removed because these assertions are about what the code DOES. A docblock that
-     * quotes the very literal an assertion forbids would otherwise fail the test for explaining
-     * itself, which is how a rule gets weakened to keep a prose sentence.
+     * Comments are removed because these assertions are about what the code does: a comment quoting
+     * a literal an assertion forbids would otherwise fail the test.
      *
      * @param string $module Module file name, e.g. "notice_form.js".
      * @return string File contents with block and line comments removed.
@@ -132,10 +128,10 @@ final class picker_contract_test extends \basic_testcase {
      * a label added on one side and forgotten on the other reaches the user as the English
      * fallback baked into the module.
      *
-     * Two flags are excluded deliberately — data-initialized and data-awareness-bound — because
-     * they are the module's own idempotency markers, written and read by the JS. The server side
-     * is the form OR a Mustache template: the picker's own rows carry their competency id and
-     * index from local_awareness/competency_picker_items, not from the form.
+     * data-initialized and data-awareness-bound are excluded: they are the module's own idempotency
+     * markers, written and read by the JS. The server side is the form or a Mustache template: the
+     * picker's own rows carry their competency id and index from
+     * local_awareness/competency_picker_items, not from the form.
      *
      * @return void
      */
@@ -177,11 +173,9 @@ final class picker_contract_test extends \basic_testcase {
         $block = substr($php, $start, 2200);
 
         /*
-         * EVERY data-* attribute in the block is enumerated first, and only then is its value form
-         * checked. An earlier draft matched the well-formed shape directly, so an attribute written
-         * as a hardcoded literal did not appear in the results at all and passed unexamined — the
-         * scan could only see the cases that were already correct. Mutation-checked: hardcoding one
-         * label now fails this test.
+         * Every data-* attribute in the block is enumerated first, and only then is its value
+         * checked: matching the well-formed shape directly would never see an attribute written as
+         * a hardcoded literal.
          */
         preg_match_all('/(data-[a-z-]+)="([^"]{0,12})/', $block, $found);
         $this->assertGreaterThan(5, count($found[1]), 'implausibly few data-* attributes in the container markup');
@@ -202,12 +196,10 @@ final class picker_contract_test extends \basic_testcase {
     /**
      * An empty framework list under a course scope does not blame the site.
      *
-     * The picker filters the frameworks down to those holding a competency LINKED TO THE COURSE, so
-     * an empty list under a course scope almost always means the course has none — while the
-     * site-wide string says there are no frameworks at all, which sends the author looking for
-     * something the site already has. Reported from the browser on a site with two frameworks and
-     * no course linked to either; nothing in the pipeline reads which label a branch picks, so the
-     * rule is enforced here or not at all.
+     * The picker filters the frameworks down to those holding a competency linked to the course, so
+     * an empty list under a course scope almost always means the course has none, while the
+     * site-wide string says there are no frameworks at all and sends the author looking for
+     * something the site already has.
      *
      * @return void
      */
@@ -244,7 +236,7 @@ final class picker_contract_test extends \basic_testcase {
     public function test_the_preview_chain_is_terminated(): void {
         $code = $this->amd_code('preview.js');
 
-        // The real notice dialogue, since the preview started rendering layouts; not a plain cancel modal.
+        // The preview opens the real notice dialogue, so it can render every layout.
         $this->assertStringContainsString('ModalNotice.create', $code, 'the preview modal is gone — assertion blind.');
         $this->assertStringContainsString('.catch(', $code, 'the preview chain has no rejection path');
         $this->assertStringContainsString('core/notification', $code, 'core/notification is not required');
@@ -253,8 +245,9 @@ final class picker_contract_test extends \basic_testcase {
     /**
      * Every selector the dialogue declares is used, and every one it uses is declared.
      *
-     * The block is sliced before it is swept: a naive scan of the file picks up the ATTRIBUTE map
-     * beside it, which sits at the same indent and is read under a different name.
+     * The block is sliced before it is swept: a scan of the whole file would also pick up the
+     * TEMPLATES and APPEARANCE maps beside it, which sit at the same indent and are read under
+     * other names.
      *
      * @return void
      */

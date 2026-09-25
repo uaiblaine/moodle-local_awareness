@@ -23,17 +23,18 @@ use local_awareness\helper;
 use local_awareness\persistent\awareness;
 
 /**
- * What the dialogue is told about one notice: the one builder, and the one declaration of it.
+ * What the dialogue is told about one notice: the builder for a saved notice, and the returns
+ * declaration every service that hands one over shares.
  *
- * Three web services hand a notice to the dialogue - the reader's queue, the manage list's preview
- * and the editor's preview - and clean_returnvalue() strips whatever a returns declaration does
- * not name. Keeping the builder and the declaration side by side is what stops a field added to
- * one from being silently dropped by another; it is not a class a web service extends, because
- * core registers one external_api class per function.
+ * get_notices (the reader's queue) and render_notice (the manage list's preview) return build();
+ * preview_notice (the editor's) builds its payload from the author's draft areas against the same
+ * structure(). clean_returnvalue() silently strips whatever a returns declaration does not name,
+ * so keeping the builder beside the one declaration stops a field added to one from being dropped
+ * by another. It is not a class a web service extends, because core registers one external_api
+ * class per function.
  *
- * Only what the modal reads crosses the boundary. The record used to be serialised whole, which
- * shipped the notice's segmentation metadata and its author's id to every reader; the builder is
- * the allowlist, and the declaration is what core enforces it with.
+ * Only what the modal reads crosses the boundary: build() is the allowlist and structure() is how
+ * core enforces it, so the notice's segmentation metadata and its author's id never reach a reader.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -78,7 +79,7 @@ class notice_payload {
      *
      * The prose fields are PARAM_RAW on purpose: title and content carry rendered HTML that has to
      * reach the client byte for byte, the width and height are PARAM_RAW in the persistent, and a
-     * PARAM_TEXT field whose cleaned value differs from the original THROWS, killing the whole
+     * PARAM_TEXT field whose cleaned value differs from the original throws, failing the whole
      * response for every reader rather than dropping one field. The allowlist is the key set; the
      * types are only what can safely be said about each value.
      *

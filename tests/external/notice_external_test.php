@@ -52,12 +52,9 @@ final class notice_external_test extends \advanced_testcase {
         $this->resetAfterTest(true);
 
         /*
-         * Delivery requires the site switch, which defaults to off. Every case in this file
-         * exercises the reader-facing web services, so the switch being on is their precondition
-         * rather than part of what they assert — and it is stated once, here, instead of being
-         * scattered. That the switch really does gate these four functions is asserted separately,
-         * in test_the_site_switch_gates_every_delivery_web_service(), so turning it on for the rest
-         * of the file cannot hide the behaviour.
+         * Delivery requires the plugin's 'enabled' setting, which defaults to off, so it is a
+         * precondition of every case here. That it gates the reader-facing web services is asserted
+         * in test_the_site_switch_gates_every_delivery_web_service().
          */
         set_config('enabled', 1, 'local_awareness');
     }
@@ -81,18 +78,14 @@ final class notice_external_test extends \advanced_testcase {
     }
 
     /**
-     * Serve a notice to the current session through the REAL read path.
+     * Serve a notice to the current session through the real read path.
      *
-     * The write gate now requires that select_for_display() actually handed this notice over, and
-     * that marker is the only record that the page-dependent rules ran. Setting it by hand would
-     * make every test below assert against a fiction, so this goes through get_notices and then
-     * asserts the marker really appeared — a delivery that silently failed would otherwise turn
-     * each caller into a test of nothing.
+     * The write gate refuses a notice that select_for_display() never handed over, the only record
+     * that the page-dependent rules ran. So this calls get_notices rather than setting the session
+     * marker by hand, and asserts the notice was delivered.
      *
-     * It takes the URL because that is what the page-dependent rules are evaluated against, and it
-     * deliberately does NOT accept a notice to single out: select_for_display() hands over the head
-     * of the queue, so a test that needs one specific notice among several must not pretend it can
-     * name one. Those tests say so at their own call site.
+     * $notice is only checked, not selected: the queue hands over its head, so a test needing one
+     * notice among several arranges that at its own call site.
      *
      * @param awareness $notice The notice expected to be delivered.
      * @param string $url The page the reader is on.
@@ -124,6 +117,22 @@ final class notice_external_test extends \advanced_testcase {
     }
 
     /**
+     * Call one of the reader-facing write services by name, the way the browser reaches it.
+     *
+     * @param string $name The function name without its local_awareness_ prefix.
+     * @param array $args Its arguments, keyed.
+     * @return bool The status the service answered.
+     */
+    private function call_status(string $name, array $args): bool {
+        $_POST['sesskey'] = sesskey();
+        $response = \core_external\external_api::call_external_function('local_awareness_' . $name, $args, false);
+
+        $this->assertFalse($response['error'], "local_awareness_{$name} raised an exception");
+
+        return (bool) $response['data']['status'];
+    }
+
+    /**
      * An enabled notice that applies to the user is recorded — the control for every
      * "nothing was recorded" assertion below.
      */
@@ -146,9 +155,9 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice();
 
         /*
-         * Delivered while enabled, then disabled. A notice created disabled is never served at all,
-         * so the delivery half would reject it on its own and the enabled clause in
-         * is_notice_available_to_user() would keep passing with its test deleted.
+         * Delivered while enabled, then disabled: a notice created disabled is never delivered, so
+         * the delivery check alone would refuse it and the enabled clause of
+         * is_notice_available_to_user() would go untested.
          */
         $this->deliver($notice);
         $notice->set('enabled', 0);
@@ -172,14 +181,11 @@ final class notice_external_test extends \advanced_testcase {
         $notice = $this->create_notice(['cohorts' => (string) $cohort->id]);
 
         /*
-         * The outsider is never delivered the notice, so the delivery half alone would reject them
-         * and the cohort clause would go untested — the whole suite would stay green with
-         * is_notice_available_to_user()'s cohort block deleted.
-         *
-         * So the cohort membership is taken away from someone who WAS delivered it. The delivery
-         * marker survives in the session; only the audience answer changes. That isolates the
-         * clause, and it is the realistic shape too: a user removed from a cohort while their
-         * modal is open.
+         * The outsider is never delivered the notice, so the delivery check alone would refuse them
+         * and the cohort clause of is_notice_available_to_user() would go untested. So membership is
+         * removed from a user who was delivered it: the delivery marker survives in the session and
+         * only the audience answer changes, as for a user removed from a cohort while the modal is
+         * open.
          */
         $this->setUser($member);
         $this->deliver($notice);
@@ -204,11 +210,9 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * A guest's dismissal is remembered for their session but never written to a shared table.
      *
-     * Both halves matter and they pull in opposite directions. Persisting it would hide the
-     * notice from every later guest, because all guest sessions share one user id. Recording
-     * nothing at all is worse: retrieve_user_notices() suppresses a notice solely by finding it
-     * in $USER->viewednotices, so the modal would reopen on every page load — and for a notice
-     * with reqack the JS blocks both the backdrop and Escape, leaving no way out.
+     * Persisting it would hide the notice from every later guest, because all guest sessions share
+     * one user id. Recording nothing would reopen the modal on every page load, because
+     * retrieve_user_notices() suppresses a notice only by finding it in $USER->viewednotices.
      */
     public function test_a_guest_dismissal_is_session_scoped_and_not_persisted(): void {
         global $DB;
@@ -258,8 +262,8 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * A guest acknowledging a notice that requires acknowledgement also stops seeing it.
      *
-     * This is the path that matters most: with reqack the modal blocks the backdrop and Escape,
-     * so a guest with no working Accept has no way out of it at all.
+     * With reqack the modal refuses the backdrop and Escape, leaving Accept and Not now as the
+     * guest's only exits, so Accept must stop the notice reappearing too.
      */
     public function test_a_guest_acknowledgement_suppresses_the_notice_for_the_session(): void {
         global $DB;
@@ -290,10 +294,9 @@ final class notice_external_test extends \advanced_testcase {
         ]);
 
         /*
-         * Delivered while live, then expired under the reader — which is exactly the modal left
-         * open across the expiry. A notice created already-expired can never be delivered at all,
-         * so building the fixture that way would test the delivery gate and never reach the
-         * window rule this test is about.
+         * Delivered while live, then expired, as for a modal left open across the expiry. A notice
+         * created already expired is never delivered, so the delivery gate would refuse it before
+         * the window rule is reached.
          */
         $this->deliver($notice);
         $notice->set('timeend', time() - HOURSECS);
@@ -442,11 +445,9 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * A notice targeted at a role must never reach a user who does not hold it.
      *
-     * This is the disclosure the empty-pageurl bypass produced, and the one worth pinning: the
-     * same user and the same notice returned zero results with a page URL and the full rendered
-     * body without one. get_notices() returns content, not metadata, so the bypass published the
-     * text of every role-, category-, course-, format-, theme- and competency-targeted notice on
-     * the site to any authenticated caller.
+     * get_notices() returns rendered content, so an empty page URL must not skip the page rules:
+     * that would hand any authenticated caller the text of every role-, category-, course-,
+     * format-, theme- and competency-targeted notice. The last assertion pins the refusal.
      */
     public function test_a_role_targeted_notice_is_not_disclosed_to_a_user_without_the_role(): void {
         global $DB;
@@ -480,14 +481,9 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * Leaving pageurl out altogether is rejected by the parameter structure.
      *
-     * This is the shape the defect actually took. pageurl was VALUE_DEFAULT '', so a web service
-     * client could simply omit the key; retrieve_user_notices() read the empty string as "apply no
-     * page rules" and answered with content. Only a call through call_external_function()
-     * exercises that layer — invoking the method directly cannot, because PHP fills the default in
-     * before the web service layer is ever consulted.
-     *
-     * The narrow half of this lives in the test below: this one cannot tell which layer refused,
-     * because the parameter structure and the empty-string guard raise the same exception.
+     * Only a call through call_external_function() can omit the key; execute() itself declares no
+     * default for it. This test cannot tell which layer refused, because the parameter structure and
+     * the empty-string guard raise the same exception; the test below pins the declaration itself.
      */
     public function test_get_notices_rejects_an_omitted_pageurl(): void {
         $this->setUser($this->getDataGenerator()->create_user());
@@ -519,11 +515,10 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * The page URL is declared VALUE_REQUIRED, so the key cannot simply be left out.
      *
-     * Asserted against the parameter structure directly and on purpose. Every route through
-     * get_notices() also meets the empty-string guard inside the method, which raises the very
-     * same invalid_parameter_exception — so an end-to-end test passes just as happily with the
-     * parameter back to VALUE_DEFAULT, and proves nothing about this declaration. Verified by
-     * mutation: reverting it to VALUE_DEFAULT leaves every other test in this file green.
+     * Asserted against the parameter structure directly: every route through get_notices() also
+     * meets the empty-string guard inside the method, which raises the same
+     * invalid_parameter_exception, so an end-to-end test would still pass with the parameter back
+     * at VALUE_DEFAULT.
      */
     public function test_get_notices_parameters_declares_the_page_url_required(): void {
         $this->expectException(\invalid_parameter_exception::class);
@@ -537,10 +532,9 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * A notice targeted at a role must not be acknowledgeable by someone who does not hold it.
      *
-     * The role rule lives in filtervalues alongside the page-context rules, so the write gate used
-     * to skip all of them together and anyone in the right cohort could confirm a notice meant for
-     * teachers. Acknowledgement reporting is the reason this plugin exists, so a row from someone
-     * the notice never targeted is not a cosmetic problem.
+     * The role rule is stored in filtervalues beside the page-context rules, but it does not depend
+     * on the page, so the write gate must evaluate it; otherwise anyone could put a row in the
+     * acknowledgement report for a notice meant for teachers.
      */
     public function test_acknowledging_a_role_targeted_notice_records_nothing_without_the_role(): void {
         global $DB;
@@ -561,10 +555,9 @@ final class notice_external_test extends \advanced_testcase {
         $notice = awareness::get_record(['title' => 'Teachers only']);
 
         /*
-         * The role is taken away from someone who WAS served the notice, rather than pointing an
-         * outsider at it. An outsider is never delivered it, so the delivery half alone would
-         * reject them and the role rule would go untested — user_matches_role_filter() could be
-         * deleted with this file green.
+         * The role is removed from a user who was served the notice: an outsider is never
+         * delivered it, so the delivery check alone would refuse them and the role rule would go
+         * untested.
          */
         $this->setUser($teacher);
         $this->deliver($notice);
@@ -590,7 +583,7 @@ final class notice_external_test extends \advanced_testcase {
      * A course-scoped role rule keeps its scope on the write path.
      *
      * filter_course has two jobs. As a page-context filter it says which course the reader must be
-     * in, and that cannot be enforced on a write. But it ALSO narrows which contexts the role
+     * in, and that cannot be enforced on a write. But it also narrows which contexts the role
      * assignment is looked for in, and that part is page-independent and must survive. Passing
      * only filter_role to the check would widen "teacher in this one course" into "teacher
      * anywhere on the site", which is why the whole filters array is handed over.
@@ -668,17 +661,14 @@ final class notice_external_test extends \advanced_testcase {
     }
 
     /**
-     * Repeated dismissals of a reqack notice write ONE row, not one per refusal.
+     * Repeated dismissals of a reqack notice write one row, not one per refusal.
      *
-     * A notice requiring acknowledgement is deliberately shown again to a user who dismissed it,
-     * so the dismissal path runs on every page load until they accept. Each run used to insert
-     * another acknowledgement row, and the dismissed report — headed "List of users who dismissed
-     * the notice" — listed the same person once per refusal. The compliance record it exists to
-     * provide counted page loads.
+     * A notice requiring acknowledgement is shown again to a user who dismissed it, so the
+     * dismissal path runs on every page load until they accept; one row per refusal would list the
+     * same person once per page load in the dismissed report.
      *
-     * The control is the second user: the dedupe is per person, not a global "one row per
-     * notice", and a guard keyed on the notice alone would pass the first assertion and fail the
-     * second.
+     * The control is the second user: the dedupe is per person, not one row per notice, and a guard
+     * keyed on the notice alone would pass the first assertion and fail the second.
      */
     public function test_repeated_dismissals_write_one_row_per_user(): void {
         global $DB;
@@ -711,13 +701,10 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * A standard role is findable by the label the picker actually shows.
      *
-     * Standard roles ship with an EMPTY role.name and take their label from the language pack
-     * through role_get_name(), so the old LIKE over name and shortname could not reach it. Four of
-     * the eight standard roles were unfindable in English — "Non-editing teacher", "Course
-     * creator", "Authenticated user", "Authenticated user on site home" — and under a translated
-     * pack none of them was findable at all. The autocomplete does no client-side filtering: it
-     * sends the typed string and renders the answer verbatim, so what this misses cannot be
-     * selected.
+     * Standard roles store an empty role.name and take their label from the language pack through
+     * role_get_name(), so a LIKE over name and shortname cannot find "Non-editing teacher", nor,
+     * under a translated pack, any standard role by its label. The autocomplete does no client-side
+     * filtering, so what the search misses cannot be selected.
      */
     public function test_search_roles_finds_a_standard_role_by_its_displayed_label(): void {
         $this->setAdminUser();
@@ -776,16 +763,9 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * The notices payload carries exactly what the modal reads, and nothing else.
      *
-     * The record used to be serialised whole, shipping pathmatch, filtervalues, cohorts, the
-     * scheduling window, resetinterval, the timestamps and the author's user id to every user the
-     * notice was displayed to.
-     *
-     * Two gates now, and this asserts both. The first is the allowlist in execute(); the second is
-     * core, because the payload is a declared structure rather than a PARAM_RAW JSON string. While
-     * it was a string clean_returnvalue() had nothing to look inside, so a key added to the loop
-     * reached the browser whether or not anyone had thought about it — audit finding WS-01. The
-     * second half of this test is the one that proves the framework is now doing the work: it
-     * hands core a payload carrying a field nobody declared and shows it does not survive.
+     * Targeting metadata (pathmatch, filtervalues, cohorts, the schedule, the author's user id) must
+     * not reach readers. Two gates, both asserted: the key set notice_payload::build() produces, and
+     * core's clean_returnvalue(), which strips any key the declared structure does not name.
      */
     public function test_get_notices_payload_is_limited_to_what_the_modal_reads(): void {
         $this->setUser($this->getDataGenerator()->create_user());
@@ -822,10 +802,9 @@ final class notice_external_test extends \advanced_testcase {
         $this->assertStringContainsString('Read the policy.', $payload['content']);
 
         /*
-         * And core enforces it, which is the half the exact-set assertion above cannot show: it
-         * only ever sees what execute() chose to build. Hand clean_returnvalue() a payload with an
-         * undeclared field and it must not come back. Revert the returns declaration to
-         * PARAM_RAW and this assertion fails while everything above it still passes.
+         * Core enforces the declaration too, which the exact-set assertion above cannot show: it
+         * only sees what notice_payload::build() chose to build. An undeclared field handed to
+         * clean_returnvalue() must not come back.
          */
         $leaky = $payload;
         $leaky['pathmatch'] = '/secret/%';
@@ -850,63 +829,77 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * With the site switch off, none of the four reader-facing services does anything.
      *
-     * The switch is the only way an admin can stop this plugin talking to users, and it used to
-     * reach the footer hook alone: the JS was never injected, but every web service stayed
-     * answerable to a direct POST, so a notice could still be read, dismissed, acknowledged and
-     * click-tracked on a site whose administrator had switched the plugin off.
+     * The switch is the only way an admin can stop this plugin talking to users, so it must gate
+     * each web service and not only the footer hook, or a direct POST could still read, dismiss,
+     * acknowledge and click-track a notice.
      *
-     * Each half of the pair runs the same call — switch off, then switch on — so a failure to
-     * write cannot be mistaken for the fixture being wrong.
+     * The notice is delivered while the switch is on, so the write services' other gate,
+     * helper::may_act_on_notice(), admits every write below: each refusal can only come from that
+     * service's own switch check. Each write leaves a row only it writes (a dismissal row, an
+     * acceptance row, a click row), and the control repeats the same three calls with the switch
+     * back on and finds each row.
      */
     public function test_the_site_switch_gates_every_delivery_web_service(): void {
         global $DB;
 
         $notice = $this->create_notice();
+        $noticeid = (int) $notice->get('id');
         $link = noticelink::create_new_link((object) [
-            'noticeid' => $notice->get('id'),
+            'noticeid' => $noticeid,
             'text' => 'the policy',
             'link' => 'https://example.com/policy',
         ]);
+        $linkid = (int) $link->get('id');
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
+        $this->deliver($notice);
+
         set_config('enabled', 0, 'local_awareness');
 
-        $off = get_notices::execute('/my/', 0);
-        $this->assertSame([], $off['notices'], 'no notice may be served while off');
+        $this->assertSame([], get_notices::execute('/my/', 0)['notices'], 'no notice may be served while off');
 
-        dismiss_notice::execute((int) $notice->get('id'));
-        acknowledge_notice::execute((int) $notice->get('id'));
-        track_link::execute((int) $link->get('id'));
+        // Precondition: apart from the switch, each write below would be recorded.
+        $this->assertTrue(helper::may_act_on_notice($notice), 'the delivery marker must survive the switch');
 
-        $this->assertSame(0, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
-        $this->assertSame(0, $DB->count_records('local_awareness_lastview', ['noticeid' => $notice->get('id')]));
-        $this->assertSame(0, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->get('id')]));
+        $this->assertFalse($this->call_status('dismiss', ['noticeid' => $noticeid]));
+        $this->assertFalse($this->call_status('acknowledge', ['noticeid' => $noticeid]));
+        $this->assertFalse($this->call_status('tracklink', ['linkid' => $linkid]));
 
-        // Control: with the switch on, the same four calls all take effect.
+        $dismissed = ['noticeid' => $noticeid, 'action' => acknowledgement::ACTION_DISMISSED];
+        $accepted = ['noticeid' => $noticeid, 'action' => acknowledgement::ACTION_ACKNOWLEDGED];
+        $this->assertSame(0, $DB->count_records('local_awareness_ack', $dismissed), 'dismiss_notice wrote while off');
+        $this->assertSame(0, $DB->count_records('local_awareness_ack', $accepted), 'acknowledge_notice wrote while off');
+        $clicks = ['hlinkid' => $linkid];
+        $this->assertSame(0, $DB->count_records('local_awareness_hlinks_his', $clicks), 'track_link wrote while off');
+        $this->assertSame(0, $DB->count_records('local_awareness_lastview', ['noticeid' => $noticeid]));
+
+        /*
+         * Control: with the switch on, the same three calls each record their own row. Acceptance
+         * runs before dismissal because helper::acknowledge_notice() reads the latest recorded view
+         * and helper::dismiss_notice() does not, so neither sees what the other left behind.
+         */
         set_config('enabled', 1, 'local_awareness');
 
-        $on = get_notices::execute('/my/', 0);
-        $this->assertCount(1, $on['notices'], 'the fixture notice is deliverable');
+        $this->assertTrue($this->call_status('tracklink', ['linkid' => $linkid]));
+        $this->assertTrue($this->call_status('acknowledge', ['noticeid' => $noticeid]));
+        $this->assertTrue($this->call_status('dismiss', ['noticeid' => $noticeid]));
 
-        acknowledge_notice::execute((int) $notice->get('id'));
-        track_link::execute((int) $link->get('id'));
-
-        $this->assertSame(1, $DB->count_records('local_awareness_ack', ['noticeid' => $notice->get('id')]));
-        $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->get('id')]));
+        $this->assertSame(1, $DB->count_records('local_awareness_ack', $dismissed));
+        $this->assertSame(1, $DB->count_records('local_awareness_ack', $accepted));
+        $this->assertSame(1, $DB->count_records('local_awareness_hlinks_his', $clicks));
+        $this->assertSame(1, $DB->count_records('local_awareness_lastview', ['noticeid' => $noticeid]));
     }
 
     /**
      * A notice requiring a course obeys its reset interval like any other.
      *
-     * reqcourse is an AUDIENCE rule — six places in this plugin already treat it as one. A single
-     * SQL clause read it as "re-show for ever" instead, discarding the recorded view of any such
-     * notice, so resetinterval had no effect on it and it came back at the start of every session
-     * however the author had configured it.
+     * reqcourse is an audience rule, not a re-show rule: the recorded view of such a notice is
+     * kept, so resetinterval decides when it returns.
      *
-     * The control is the second half: with the interval elapsed the notice DOES return, so the
-     * suppression asserted first is the interval doing its job rather than the notice having
-     * quietly stopped being deliverable.
+     * The control is the second half: with the interval elapsed the notice does return, so the
+     * suppression asserted first is the interval and not the notice having stopped being
+     * deliverable.
      */
     public function test_a_reqcourse_notice_obeys_its_reset_interval(): void {
         global $DB, $USER;
@@ -951,17 +944,12 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * An acknowledged reqcourse notice is not put back in front of the user.
      *
-     * The second half of the same defect, and the sharper one. Because the recorded view was
-     * discarded, the notice was re-shown after it had been accepted — and pressing Accept the
-     * second time recorded NOTHING, because check_if_already_acknowledged_by_user() reads the
-     * lastview table directly, found the row this query had thrown away, and returned early. The
-     * user was shown a notice they had already accepted, by a button that could not clear it.
+     * Were the recorded view discarded, the accepted notice would be shown again, and a second
+     * Accept could not clear it: check_if_already_acknowledged_by_user() finds the existing lastview
+     * row and returns early without recording anything.
      *
-     * The assertion is on being re-shown rather than on the second Accept, because that is the
-     * observable half: dropping the clause stops the situation arising rather than changing what
-     * acknowledge_notice() does once it has. The control is the first count, which proves the
-     * acknowledgement really was recorded — without it an empty second list would be satisfied by
-     * a notice that had simply stopped being deliverable.
+     * The control is the first count, which proves the acknowledgement was recorded, so the empty
+     * second list is not a notice that simply stopped being deliverable.
      */
     public function test_an_acknowledged_reqcourse_notice_is_not_shown_again(): void {
         global $DB, $USER;
@@ -998,18 +986,13 @@ final class notice_external_test extends \advanced_testcase {
     }
 
     /**
-     * A user who is in the audience but was never SERVED the notice cannot record against it.
+     * A user who is in the audience but was never served the notice cannot record against it.
      *
-     * This is audit findings M6 and M8, and it is the only test that isolates the delivery half of
-     * may_act_on_notice() — every other test in this file delivers first and then changes some
-     * audience fact, so deleting the delivery requirement would leave all of them green.
-     *
-     * The shape matters. The user passes is_notice_available_to_user() completely: the notice is
-     * enabled, live, has no cohort and no role rule. What they are missing is the PAGE-dependent
-     * half — the notice is targeted at one course, and that rule can only ever be evaluated on the
-     * read path, against a page. Before this gate they could post an acknowledgement from anywhere
-     * and it would land in the compliance report as consent given after display, indistinguishable
-     * from a real one. The report is the reason this plugin exists.
+     * The only test in this file that isolates the delivery half of may_act_on_notice(). The user
+     * passes is_notice_available_to_user() (enabled, live, no cohort or role rule), but the notice
+     * targets one course, a page-dependent rule that is only evaluated on the read path. Without
+     * the delivery check, an acknowledgement posted from anywhere would enter the compliance report
+     * as consent given after display.
      *
      * Same user and same audience answer on both halves below; only the delivery differs.
      */

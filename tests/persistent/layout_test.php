@@ -19,7 +19,7 @@ namespace local_awareness\persistent;
 /**
  * The layout, position and animation a notice stores stay inside their vocabularies.
  *
- * Test metadata stays in docblocks while 405 is supported: moodle-cs on that leg cannot see PHP
+ * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHP
  * attributes and reports every method of a class carrying only #[CoversClass].
  *
  * @package    local_awareness
@@ -80,8 +80,9 @@ final class layout_test extends \advanced_testcase {
     /**
      * A value made of legal letters but outside the vocabulary is refused, on the property it was given for.
      *
-     * The PARAM types only constrain the character set, so this is the test that proves the
-     * `choices` gate exists: delete one `choices` line and exactly one assertion here reddens.
+     * The PARAM types only constrain the character set, so this proves the `choices` gate exists.
+     * Changes that must make it fail: removing any one property's `choices`, which fails exactly
+     * one data set.
      *
      * @dataProvider out_of_vocabulary_provider
      * @param string $property The property under test.
@@ -151,8 +152,9 @@ final class layout_test extends \advanced_testcase {
     /**
      * The levels each layout can honour: no box for the compact ones, a close and nothing else for two.
      *
-     * The order of the refusing list is the picker's order, so a layout added to the vocabulary
-     * without a decision here fails the first assertion rather than being offered all three.
+     * The refusing list is compared in TEMPLATES order, so it pins exactly which layouts cannot
+     * carry the acknowledgement box. A layout added to TEMPLATES is offered all three levels
+     * unless insistence_levels_for() names it.
      */
     public function test_the_insistence_levels_a_layout_can_honour(): void {
         $refusing = array_values(array_filter(awareness::TEMPLATES, static function (string $template): bool {

@@ -20,18 +20,13 @@ namespace local_awareness\local;
  * Guards the plugin's Bootstrap 4 / Bootstrap 5 contract.
  *
  * Moodle 4.5 ships Bootstrap 4 and 5.0+ ship Bootstrap 5, and the bridging is asymmetric:
- * 4.5's forward bridge (theme/boost/scss/moodle/bs5-bridge.scss) is 116 lines covering only
- * g-0, btn-close, the ms/me/ps/pe spacers and float/text/border/rounded-start/end, while 5.x's
- * backward bridge runs past a thousand. A BS5 utility outside that short list resolves to
- * nothing on 4.5.
+ * 4.5's forward bridge (theme/boost/scss/moodle/bs5-bridge.scss) covers only g-0, btn-close,
+ * the ms/me/ps/pe spacers and float/text/border/rounded-start/end, while 5.x's backward bridge
+ * (bs4-compat.scss) back-ports most Bootstrap 4 names. A BS5 utility outside that short list
+ * resolves to nothing on 4.5.
  *
- * This defect class has shipped three times - see CHANGELOG.md and commit f84d30a - and was
- * correctly root-caused and documented each time. It recurred anyway, and a 2026-08-06 sweep
- * still found 90 sites. The reason is enforcement, not diligence: the sibling rule about JS
- * data attributes has held at 100% compliance because the 4.05 Behat leg throws when a dropdown
- * fails to open, while the class rules failed silently with CI fully green. Nothing else in the
- * pipeline can see a class name that resolves to nothing - not phpcs, not the mustache lint, not
- * stylelint, which never reads a Mustache or JS file. This test is that missing observer.
+ * Nothing else in the pipeline sees a class name that resolves to nothing: phpcs, the mustache
+ * lint and stylelint never read a class name out of a Mustache, JS or PHP file.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -51,14 +46,6 @@ final class bootstrap_compat_test extends \basic_testcase {
      */
     private function bs5_only_utilities(): array {
         /*
-         * Re-measured on the running stacks on 2026-08-15 by diffing the class vocabulary of the
-         * compiled theme CSS — 9108 selectors on 4.5 (boost_union) against 9815 on 5.2 (boost).
-         * Two caveats that make the raw diff lie, both handled here: the compiled sheet contains
-         * every plugin mounted on that stack, so plugin-owned names look like core's; and a family
-         * this plugin already polyfills disappears from the diff, which is why gap-*, fw-*,
-         * form-select, form-label and lh-1 had to be confirmed by reading the rule that defines
-         * them (all of them resolved to body.local-awareness-bs4, i.e. to us, not to 4.5).
-         *
          * The list is wider than current usage on purpose: it is a detector, not a polyfill, and
          * it costs nothing until somebody reaches for one of these.
          */
@@ -90,9 +77,8 @@ final class bootstrap_compat_test extends \basic_testcase {
             '/\\bvr\\b/' => 'vr',
             '/\\bfst-normal\\b/' => 'fst-normal',
             /*
-             * The three the layouts reached for first, measured absent from 4.5's compiled Boost
-             * and Boost Union sheets (0 rules each) and present on 5.2: rounded-1..5 (Bootstrap 4
-             * has rounded-lg only), sticky-bottom, and modal-fullscreen with its -down variants.
+             * Absent from Bootstrap 4: rounded-1..5 (Bootstrap 4 has only rounded-sm and
+             * rounded-lg), sticky-bottom, and modal-fullscreen with its -down variants.
              */
             '/\\brounded-[1-5]\\b/' => 'rounded-*',
             '/\\bsticky-bottom\\b/' => 'sticky-bottom',
@@ -103,14 +89,12 @@ final class bootstrap_compat_test extends \basic_testcase {
     /**
      * Bootstrap 4 class names that Moodle 5.x back-ports but marks deprecated.
      *
-     * The asymmetry runs both ways. These names DO resolve on 5.x, through bs4-compat.scss — but
-     * every one of them is wrapped in @include deprecated-styles(), which paints a red outline
-     * under behat-site and themedesignermode, and Moodle 6.0 removes that sheet entirely
-     * (MDL-84465). Their Bootstrap 5 spellings are all inside the 116-line forward bridge Moodle
-     * 4.5 ships, so the BS5 name alone is correct on both branches.
-     *
-     * Writing both spellings side by side therefore buys nothing and costs a deprecation: it is
-     * the mistake this rule exists to stop, and it had shipped once, in the collision badge.
+     * Most of these resolve on 5.x only through bs4-compat.scss, which wraps each in
+     * deprecated-styles() (a red outline under behat-site and themedesignermode) and which
+     * Moodle 6.0 removes (MDL-84465). Their Bootstrap 5 spellings resolve on 4.5 too: through
+     * core's forward bridge, except visually-hidden, which the plugin's Bootstrap 4 polyfill
+     * defines. So the BS5 name alone is correct on both branches, and writing both spellings
+     * side by side only adds a deprecation.
      *
      * @return array Regex matching the deprecated name => the Bootstrap 5 spelling to use instead.
      */
@@ -137,10 +121,9 @@ final class bootstrap_compat_test extends \basic_testcase {
      * Saturated background utilities that need an explicit light text colour.
      *
      * Bootstrap 4's .badge sets no colour at all, so a saturated badge renders near-black text
-     * on a dark fill; Bootstrap 5's .badge defaults to white, so a LIGHT background renders white
-     * on near-white. Both directions were measured on the running stacks: bg-success gives 3.07:1
-     * on 4.5 and bg-secondary gives 1.49:1 on 5.2, against the 4.5:1 AA floor. The only markup
-     * that is correct on both branches states its text colour explicitly.
+     * on a dark fill; Bootstrap 5's .badge defaults to white, so a light background renders white
+     * on near-white: bg-success gives 3.07:1 on 4.5 and bg-secondary 1.49:1 on 5.2, against the
+     * 4.5:1 AA floor. Only markup that states its text colour is correct on both branches.
      *
      * @return array Background utility => the text utility it requires.
      */
@@ -177,12 +160,9 @@ final class bootstrap_compat_test extends \basic_testcase {
         $root = $this->plugin_root();
 
         /*
-         * An EXCLUSION list walked from the plugin root, not an inclusion list of three
-         * directories. The inclusion form named templates/, amd/src/ and classes/, which meant
-         * report/, renderer.php and every entry point at the root were outside every assertion in
-         * this file — and report/*_systemreport.php is exactly the kind of page that emits markup
-         * by hand. An inclusion list also fails silently the day a new directory appears: nothing
-         * reports that it is unscanned, because nothing knows it should have been.
+         * An exclusion list walked from the plugin root rather than an inclusion list of
+         * directories, so report/, the root entry points and any directory added later are
+         * scanned by default.
          */
         $skip = ['amd/build', 'tests', 'docs', 'lang', '.git', 'node_modules', 'vendor'];
 
@@ -210,30 +190,91 @@ final class bootstrap_compat_test extends \basic_testcase {
     }
 
     /**
-     * Whether a line is prose rather than markup.
+     * The lines of a source that are markup or code rather than prose, keyed by 0-based line index.
      *
-     * The rules below are about what reaches the browser. A comment that names an attribute in
-     * order to explain the rule - as amd/src/central/context.js does - is not a violation of it.
+     * The rules below are about what reaches the browser. A comment that names a class or an
+     * attribute in order to explain a rule is not a violation of it.
      *
-     * @param string $line One raw source line.
-     * @return bool True when the line opens with a PHP, JS or Mustache comment marker.
+     * A comment is recognised when its opener starts a line: `//`, `/*` or `{{!`. A block or
+     * Mustache comment then runs to its closer, however many lines later, so the continuation lines
+     * of a template docblock are prose too even though nothing marks them; whatever follows the
+     * closer on its line is kept. A line starting with `*` outside a tracked comment is taken as the
+     * body of a docblock whose opener shared a line with code.
+     *
+     * @param string $source A whole PHP, JS or Mustache source.
+     * @return array Line index => the code on that line, comments removed.
      */
-    private function is_comment_line(string $line): bool {
-        $trimmed = ltrim($line);
+    private function code_lines(string $source): array {
+        $openers = ['{{!' => '}}', '/*' => '*/'];
+        $code = [];
+        $closer = null;
+        foreach (preg_split('/\R/', $source) as $index => $line) {
+            $rest = $line;
+            while (true) {
+                if ($closer !== null) {
+                    $end = strpos($rest, $closer);
+                    if ($end === false) {
+                        continue 2;
+                    }
+                    $rest = substr($rest, $end + strlen($closer));
+                    $closer = null;
+                }
+                $rest = ltrim($rest);
+                if ($rest === '' || str_starts_with($rest, '//') || str_starts_with($rest, '*')) {
+                    continue 2;
+                }
+                $opened = false;
+                foreach ($openers as $opener => $end) {
+                    if (str_starts_with($rest, $opener)) {
+                        $rest = substr($rest, strlen($opener));
+                        $closer = $end;
+                        $opened = true;
+                        break;
+                    }
+                }
+                if (!$opened) {
+                    break;
+                }
+            }
+            $code[$index] = $rest;
+        }
 
-        return $trimmed === ''
-            || str_starts_with($trimmed, '//')
-            || str_starts_with($trimmed, '/*')
-            || str_starts_with($trimmed, '*')
-            || str_starts_with($trimmed, '{{!');
+        return $code;
+    }
+
+    /**
+     * The markup lines of a plugin file.
+     *
+     * @param string $path Absolute path.
+     * @return array Line index => the code on that line.
+     */
+    private function file_code_lines(string $path): array {
+        $source = file_get_contents($path);
+        $this->assertNotFalse($source, "Could not read {$path}");
+
+        return $this->code_lines($source);
+    }
+
+    /**
+     * The rules behind the Bootstrap 4 gate that backport a Boost 5.x behaviour, not a utility.
+     *
+     * Their classes are core's and the plugin's own, never a Bootstrap 5 utility the markup uses,
+     * so the utility checks below leave them out; test_the_row_menu_escapes_its_scroll_wrapper()
+     * checks them instead.
+     *
+     * @return array Exact selector => the declaration it must carry.
+     */
+    private function backports(): array {
+        return [
+            'body.' . bootstrap::BODY_CLASS_BS4 . ' .local-awareness-manage .no-overflow .dropdown' => 'position: static;',
+        ];
     }
 
     /**
      * The exact class tokens the polyfill block defines behind the Bootstrap 4 gate.
      *
-     * Deliberately token-level, not family-level. A family-level check ("is gap-* covered?")
-     * passes while gap-2 alone is missing, which is precisely the silent gap this whole test
-     * exists to close.
+     * Token-level, not family-level: a family-level check ("is gap-* covered?") passes while
+     * gap-2 alone is missing.
      *
      * @return array List of class tokens, e.g. gap-2, without the leading dot.
      */
@@ -246,6 +287,9 @@ final class bootstrap_compat_test extends \basic_testcase {
         foreach (explode('}', $css) as $block) {
             $selector = explode('{', $block)[0];
             if (!preg_match('/body\.' . $gate . '\b/', $selector)) {
+                continue;
+            }
+            if (array_key_exists(trim($selector), $this->backports())) {
                 continue;
             }
             preg_match_all('/\.([a-z][a-z0-9-]*)/', $selector, $matches);
@@ -264,10 +308,7 @@ final class bootstrap_compat_test extends \basic_testcase {
     private function used_bs5_tokens(): array {
         $used = [];
         foreach ($this->markup_files() as $path) {
-            foreach (file($path) as $line) {
-                if ($this->is_comment_line($line)) {
-                    continue;
-                }
+            foreach ($this->file_code_lines($path) as $line) {
                 foreach ($this->bs5_only_utilities() as $pattern => $unusedlabel) {
                     if (!preg_match_all($pattern, $line, $matches)) {
                         continue;
@@ -325,13 +366,8 @@ final class bootstrap_compat_test extends \basic_testcase {
         $polyfilled = $this->polyfilled_tokens();
 
         /*
-         * One structural entry, not ten. The list used to name form-check, btn-close, modal and
-         * friends as "helpers the polyfill needs", plus local-dimensions-central-page, which
-         * belongs to a different plugin entirely. Measured against styles.css, NINE of the ten
-         * named nothing this polyfill defines — so they excluded classes that were never in the
-         * result, and the prose describing them described rules that do not exist here. The body
-         * gate is the only real one: it is the selector every polyfill rule hangs off, so it can
-         * never appear as a class the markup "uses".
+         * The body gate is the selector every polyfill rule hangs off, so it can never appear as
+         * a class the markup uses.
          */
         $structural = [bootstrap::BODY_CLASS_BS4];
 
@@ -344,6 +380,48 @@ final class bootstrap_compat_test extends \basic_testcase {
             $unused,
             'The Bootstrap 4 polyfill defines classes nothing uses any more; delete them: '
                 . implode(', ', $unused)
+        );
+    }
+
+    /**
+     * The manage list's row menu escapes the table's scroll wrapper on 4.5, as Boost lets it on 5.x.
+     *
+     * flexible_table wraps a responsive table in an overflow container, and the action menu is
+     * positioned against its .dropdown inside it, so the menu of a row near the end of a short list
+     * is clipped. Boost 5.x makes that .dropdown static inside .table-responsive; 4.5 names the
+     * wrapper .no-overflow and has no such rule, so the plugin supplies it behind the Bootstrap 4
+     * gate. The wrapper name comes from core, so it is read from core on the branch the test runs on.
+     *
+     * @return void
+     */
+    public function test_the_row_menu_escapes_its_scroll_wrapper(): void {
+        global $CFG;
+
+        $css = preg_replace('~/\*.*?\*/~s', '', file_get_contents($this->plugin_root() . '/styles.css'));
+        preg_match_all('/([^{}]+)\{([^{}]*)\}/', $css, $matches, PREG_SET_ORDER);
+        $rules = [];
+        foreach ($matches as $match) {
+            $rules[trim($match[1])] = trim($match[2]);
+        }
+        $this->assertNotEmpty($this->backports(), 'no backport is listed, so nothing is checked');
+        foreach ($this->backports() as $selector => $declaration) {
+            $this->assertArrayHasKey($selector, $rules, "styles.css no longer has {$selector}");
+            $this->assertStringContainsString($declaration, $rules[$selector], "{$selector} no longer sets {$declaration}");
+        }
+
+        $table = file_get_contents($CFG->libdir . '/table/classes/flexible_table.php');
+        $this->assertNotFalse($table, 'core\'s flexible_table could not be read');
+        $wrapper = bootstrap::is_bs4() ? 'no-overflow' : 'table-responsive';
+        $this->assertStringContainsString(
+            "'class' => '{$wrapper}'",
+            $table,
+            "core no longer wraps a responsive table in .{$wrapper}, which the row menu's rule depends on"
+        );
+
+        $this->assertMatchesRegularExpression(
+            '/class="local-awareness-manage".*\{\{\{tablehtml\}\}\}/s',
+            file_get_contents($this->plugin_root() . '/templates/manage/page.mustache'),
+            'the list is no longer rendered inside .local-awareness-manage, which the rule is scoped to'
         );
     }
 
@@ -367,7 +445,7 @@ final class bootstrap_compat_test extends \basic_testcase {
 
         /*
          * data-target and data-parent are only Bootstrap's when a toggle sits beside them; on their
-         * own they are ordinary custom attributes, and this plugin uses data-target as its own hook.
+         * own they are ordinary custom attributes.
          */
         $wired = preg_match('/(?<![-\w])data-(bs-)?toggle(?![-\w])/', $line);
 
@@ -394,24 +472,15 @@ final class bootstrap_compat_test extends \basic_testcase {
      */
     public function test_badges_state_their_text_colour(): void {
         /*
-         * Checked on every line carrying a background utility, NOT only lines that also say
-         * "badge". An earlier version filtered on that word and stayed green against a method whose
-         * NAME carried it while the returned class did not.
-         *
-         * The required colour is matched exactly, not against a set. Accepting any of
-         * text-white|dark|body|muted let text-muted and text-body satisfy a saturated background,
-         * and neither of those is a contrast answer: the whole point is that Bootstrap 4 gives
-         * .badge no colour while Bootstrap 5 defaults it to white, so the pairing has to be the
-         * specific one the table names. There is no exception list — every live badge in this
-         * plugin already states the right colour, so an exception would only be a place to hide.
+         * Every line carrying a background utility is checked, not only lines that also say
+         * "badge": code returning a badge's classes often names the badge elsewhere, such as in
+         * its method name. The required colour is matched exactly, because text-muted or text-body
+         * is not a contrast answer for a saturated background.
          */
         $offenders = [];
         $checked = 0;
         foreach ($this->markup_files() as $path) {
-            foreach (file($path) as $number => $line) {
-                if ($this->is_comment_line($line)) {
-                    continue;
-                }
+            foreach ($this->file_code_lines($path) as $number => $line) {
                 foreach ($this->badge_text_colours() as $background => $required) {
                     if (!preg_match('/\b' . preg_quote($background, '/') . '\b/', $line)) {
                         continue;
@@ -425,9 +494,8 @@ final class bootstrap_compat_test extends \basic_testcase {
         }
 
         /*
-         * Non-vacuity: the sweep found background utilities at all. Without it the assertion below
-         * is satisfied by a scan that reads nothing — which is what a renamed template directory or
-         * a broken markup_files() would produce, and it would read as a pass.
+         * Non-vacuity: without it the assertion below is satisfied by a scan that reads nothing,
+         * such as a broken markup_files().
          */
         $this->assertGreaterThan(0, $checked, 'Found no background utility to check — the scan is broken, not the code.');
 
@@ -443,18 +511,15 @@ final class bootstrap_compat_test extends \basic_testcase {
     /**
      * A component wired through Bootstrap's markup data-API must carry both attribute spellings.
      *
-     * This rule has never been broken, because the 4.05 Behat leg catches it. It is asserted here
-     * so the guarantee survives a change in what Behat covers.
+     * Behat on Moodle 4.5 catches an unpaired toggle only where a scenario opens that component;
+     * this checks every line.
      *
      * @return void
      */
     public function test_data_api_attributes_are_paired(): void {
         $offenders = [];
         foreach ($this->markup_files() as $path) {
-            foreach (file($path) as $number => $line) {
-                if ($this->is_comment_line($line)) {
-                    continue;
-                }
+            foreach ($this->file_code_lines($path) as $number => $line) {
                 foreach ($this->data_api_offences($line) as $offence) {
                     $offenders[] = basename($path) . ':' . ($number + 1) . ' has only ' . $offence;
                 }
@@ -462,11 +527,9 @@ final class bootstrap_compat_test extends \basic_testcase {
         }
 
         /*
-         * NO non-vacuity guard here, deliberately, and this is the one place in the file where its
-         * absence is correct: the plugin currently wires nothing through Bootstrap's markup
-         * data-API, so a count guard would be red on a tree that has no defect to find. The rule is
-         * kept honest by test_the_data_api_detector_works instead, which proves the detector can
-         * still fail — a guarantee a tree-count could not give at zero sites anyway.
+         * No non-vacuity guard: the plugin currently wires nothing through Bootstrap's markup
+         * data-API, so a count guard would fail on a correct tree. test_the_data_api_detector_works
+         * proves the detector can still fail.
          */
         $this->assertSame(
             [],
@@ -479,10 +542,8 @@ final class bootstrap_compat_test extends \basic_testcase {
     /**
      * The pairing detector reports what it should and stays quiet about what it should not.
      *
-     * The sweep above reads zero lines today, so without this the rule is an assertion over an
-     * empty set: it would keep passing if the detector were deleted, and it would keep passing on
-     * the day someone adds an unpaired data-toggle, because by then nobody would think to re-check
-     * that the detector still worked. Fixtures let the rule be proven without a live offender.
+     * The sweep above finds no data-API markup today, so it would keep passing with the detector
+     * deleted. Fixtures prove the rule without a live offender.
      *
      * @return void
      */
@@ -502,9 +563,8 @@ final class bootstrap_compat_test extends \basic_testcase {
         );
 
         /*
-         * data-target on its own is this plugin's own hook, read back with getAttribute, and is not
-         * Bootstrap's unless a toggle sits beside it. Requiring a data-bs-target there would be a
-         * false positive with no correct fix, so that exemption is asserted rather than trusted.
+         * A bare data-target is an ordinary custom attribute, not Bootstrap's, unless a toggle sits
+         * beside it. Requiring a data-bs-target there would be a false positive with no correct fix.
          */
         $this->assertSame(
             [],
@@ -522,11 +582,46 @@ final class bootstrap_compat_test extends \basic_testcase {
     }
 
     /**
+     * The scans skip every line of a comment, the unmarked ones inside it included, and nothing else.
+     *
+     * A multi-line Mustache docblock has continuation lines that carry no marker of their own. Each
+     * prose line of the fixture names a class one of the scans reports, so a reader that lets one
+     * through fails here, and the markup lines around them prove it still reads code.
+     *
+     * @return void
+     */
+    public function test_comments_are_told_from_markup(): void {
+        $source = implode("\n", [
+            '{{!',
+            '    A docblock line naming badge bg-success and sr-only.',
+            '}}',
+            '<span class="badge bg-success text-white">',
+            '/*',
+            '   A block comment line naming fw-bold.',
+            '*/ <b class="after-block">',
+            '{{! One line. }}<i class="after-mustache">',
+            '// A line comment naming data-toggle.',
+            ' * A docblock body naming ml-1.',
+            '',
+            '<div class="last">',
+        ]);
+
+        $this->assertSame(
+            [
+                3 => '<span class="badge bg-success text-white">',
+                6 => '<b class="after-block">',
+                7 => '<i class="after-mustache">',
+                11 => '<div class="last">',
+            ],
+            $this->code_lines($source)
+        );
+    }
+
+    /**
      * The markup must never carry a Bootstrap 4 name that Moodle 5.x has deprecated.
      *
-     * Includes the paired form — "ml-1 ms-1" — which reads like belt and braces and is instead a
-     * deprecation with no upside: ms-1 alone already resolves on 4.5. Skipping comment lines keeps
-     * the rule's own prose, and the block comment above the polyfill, from tripping it.
+     * The paired form ("ml-1 ms-1") counts too: ms-1 alone already resolves on 4.5, so the pair
+     * only adds a deprecation. Comment lines are skipped so prose naming a class cannot trip it.
      *
      * @return void
      */
@@ -535,10 +630,7 @@ final class bootstrap_compat_test extends \basic_testcase {
         $scanned = 0;
         foreach ($this->markup_files() as $path) {
             $scanned++;
-            foreach (file($path) as $number => $line) {
-                if ($this->is_comment_line($line)) {
-                    continue;
-                }
+            foreach ($this->file_code_lines($path) as $number => $line) {
                 foreach ($this->deprecated_bs4_names() as $pattern => $replacement) {
                     if (preg_match($pattern, $line, $matches)) {
                         $offenders[] = basename($path) . ':' . ($number + 1)
@@ -554,19 +646,17 @@ final class bootstrap_compat_test extends \basic_testcase {
             [],
             $offenders,
             'Moodle 5.x back-ports these Bootstrap 4 names only through bs4-compat.scss, which marks '
-                . 'them deprecated and which Moodle 6.0 removes; their Bootstrap 5 spellings are in '
-                . '4.5\'s own forward bridge, so the BS5 name alone is correct on both branches: '
-                . implode('; ', $offenders)
+                . 'them deprecated and which Moodle 6.0 removes; their Bootstrap 5 spellings resolve on '
+                . '4.5 too, through core\'s forward bridge or, for visually-hidden, the plugin\'s own '
+                . 'polyfill, so use the BS5 name alone: ' . implode('; ', $offenders)
         );
     }
 
     /**
      * The plugin must not declare custom properties inside core's design-system namespace.
      *
-     * Moodle 5.2 ships theme/boost/scss/design-system/ with $mds-* tokens and 5.3 LTS brings MDS
-     * React, so an --mds-* declaration in the plugin's stylesheet is squatting a namespace core is
-     * actively expanding. The design kit's own --mds-* references document core's palette and are
-     * not covered here - only shipped CSS is.
+     * Moodle 5.2 ships theme/boost/scss/design-system/ with $mds-* tokens, so an --mds-*
+     * declaration in the plugin's stylesheet squats a namespace core is expanding.
      *
      * @return void
      */
@@ -596,10 +686,10 @@ final class bootstrap_compat_test extends \basic_testcase {
     }
 
     /**
-     * The Bootstrap 4 marker must be added wherever the plugin sets one of its page body classes.
+     * Every plugin page, i.e. every file calling $PAGE->set_url(), must call bootstrap::mark_page().
      *
-     * The polyfill is gated on that marker, so an entry point that forgets it renders unstyled on
-     * 4.5 while every static gate stays green.
+     * The polyfill is gated on the marker that method adds, so a page that forgets it renders
+     * unstyled on 4.5 while every static gate stays green.
      *
      * @return void
      */
@@ -608,11 +698,8 @@ final class bootstrap_compat_test extends \basic_testcase {
         $offenders = [];
         $pages = 0;
         /*
-         * Every PHP file the plugin ships, not glob('*.php') on the root. The root-only form left
-         * report/*_systemreport.php outside the check — pages that call $PAGE->set_url() and were
-         * never asked whether they mark the Bootstrap version. markup_files() already walks the
-         * whole tree with the right exclusions, so the scan reuses it rather than growing a second
-         * list that can drift from the first.
+         * Every PHP file markup_files() walks, not only the root, so report/*_systemreport.php is
+         * checked too.
          */
         foreach ($this->markup_files() as $path) {
             if (pathinfo($path, PATHINFO_EXTENSION) !== 'php') {
@@ -629,25 +716,23 @@ final class bootstrap_compat_test extends \basic_testcase {
             }
         }
         /*
-         * Guard against the assertion passing by finding nothing to check. Keyed on a page
-         * count rather than on a body class: this plugin sets none, so the local_dimensions
-         * version of this test would have looped over an empty set and stayed green forever.
+         * Non-vacuity, keyed on a page count rather than on a body class: the plugin sets no body
+         * class of its own, so a body-class key would find nothing to check.
          */
         $this->assertGreaterThan(0, $pages, 'Found no plugin pages to check — the scan is broken, not the code.');
         $this->assertSame(
             [],
             $offenders,
-            'These entry points set a plugin body class but never call bootstrap::mark_page(), so the '
-                . 'Bootstrap 4 polyfill will not reach them: ' . implode(', ', $offenders)
+            'These pages call $PAGE->set_url() but never bootstrap::mark_page(), so the Bootstrap 4 '
+                . 'polyfill will not reach them: ' . implode(', ', $offenders)
         );
     }
 
     /**
      * The Bootstrap 4 verdict follows the core branch and flips at Moodle 5.0.
      *
-     * Every rule above is a scan over source text; this one runs the class those scans name, so
-     * the coverage this file claims is coverage it actually has. The threshold is the whole
-     * behaviour: inverted, the polyfill would ship to 5.x and freeze 4.5's metrics onto it.
+     * The threshold is the whole behaviour: inverted, the polyfill would ship to 5.x and freeze
+     * 4.5's metrics onto it.
      *
      * @return void
      */
@@ -683,10 +768,9 @@ final class bootstrap_compat_test extends \basic_testcase {
         global $CFG, $PAGE;
 
         /*
-         * A fresh page, restored afterwards. mark_page() writes to the global $PAGE and this is a
-         * basic_testcase, which does not call reset_all_data() — so without this the body class
-         * added below would outlive the test, and the negative assertion would be reading a class
-         * left behind by an earlier run rather than by this one.
+         * A fresh page, restored afterwards: mark_page() writes to the global $PAGE and a
+         * basic_testcase does not call reset_all_data(), so the body class added below would
+         * otherwise outlive the test.
          */
         $originalpage = $PAGE;
         $PAGE = new \moodle_page();

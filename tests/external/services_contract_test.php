@@ -24,10 +24,8 @@ namespace local_awareness\external;
  * in the admin list, and throws only when a client calls it — which on this plugin means in the
  * browser of whoever is editing a notice.
  *
- * The nine functions used to live in one 822-line class, which is what the fleet standard exists to
- * prevent: each is now its own file under classes/external/, and the standard's shape — execute(),
- * execute_parameters(), execute_returns() on a subclass of core_external\external_api — is what
- * these assertions pin.
+ * Each function is its own class under classes/external/, with execute(), execute_parameters() and
+ * execute_returns() on a subclass of core_external\external_api; these tests pin that shape.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -88,9 +86,6 @@ final class services_contract_test extends \basic_testcase {
     /**
      * One class per file, one function per class — no service shares a class with another.
      *
-     * This is the whole point of the split. Two entries pointing at the same class is how the
-     * monolith comes back one function at a time.
-     *
      * @return void
      */
     public function test_no_two_services_share_a_class(): void {
@@ -128,7 +123,7 @@ final class services_contract_test extends \basic_testcase {
         $this->assertNotEmpty($files, 'no classes found under classes/external/ — the scan is broken');
         $this->assertSame($files, $registered, 'the directory and db/services.php disagree');
 
-        // And the monolith is gone, not merely unused.
+        // The single classes/external.php these classes replaced must not come back.
         $this->assertFileDoesNotExist($root . '/classes/external.php', 'the monolithic external class is back');
     }
 }

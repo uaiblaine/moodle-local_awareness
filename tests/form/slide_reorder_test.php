@@ -384,9 +384,9 @@ final class slide_reorder_test extends \advanced_testcase {
     /**
      * The defaults pair each row with the slide it carries, not with the slide stored at that index.
      *
-     * After a move the browser posts the rows where they now are, ids included. The defaults —
-     * which a submitted value outranks, so nothing ever showed — used to pair row 1's draft area
-     * with the slide stored second. Read straight from get_default_data(), where the pairing is made.
+     * After a move the browser posts the rows where they now are, ids included. A submitted value
+     * outranks a default, so a wrong pairing never shows on the page; the test reads
+     * get_default_data() directly, where the pairing is made.
      */
     public function test_the_defaults_pair_each_row_with_the_slide_it_carries(): void {
         $this->resetAfterTest();

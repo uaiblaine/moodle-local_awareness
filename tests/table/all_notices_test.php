@@ -19,6 +19,8 @@ namespace local_awareness\table;
 use core_table\local\filter\filter;
 use core_table\local\filter\integer_filter;
 use core_table\local\filter\string_filter;
+use local_awareness\helper;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 
 /**
@@ -94,14 +96,10 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * The compliance reports are offered exactly where rows can exist, and nowhere else.
      *
-     * These two buttons used to be gated on reqack, which is one of the two columns the insistence
-     * level is derived from rather than the level itself. A Blocking notice records acceptances and
-     * refusals just as an Acknowledge one does, so gating on reqack hid the reports for precisely
-     * the notices whose rows nothing else in the interface could reach — the manage list is the
-     * only route to them, and the report pages answer a hand-built URL.
-     *
-     * Nothing asserted this before, in either direction: a mutation putting the reqack gate back
-     * survived the whole suite.
+     * The gate is the insistence level, not reqack (one of the two columns it is derived from): a
+     * Blocking notice records acceptances and refusals just as an Acknowledge one does, and the
+     * manage list is the only route to its reports. Changes that must make it fail: gating the
+     * report links on reqack.
      *
      * @return void
      */
@@ -281,11 +279,11 @@ final class all_notices_test extends \advanced_testcase {
     }
 
     /**
-     * Paging counts the FILTERED set, and a page holds no more than its size.
+     * Paging counts the filtered set, and a page holds no more than its size.
      *
-     * This is the assertion the whole SQL rewrite exists for. Narrowing the rows in PHP after the
-     * query would leave the total describing the unfiltered table, so the pager would offer pages
-     * that render fewer rows than they promise — or none at all.
+     * The filters run in SQL: narrowing the rows in PHP after the query would leave the total
+     * describing the unfiltered table, so the pager would offer pages that render fewer rows than
+     * they promise, or none at all.
      */
     public function test_paging_counts_the_filtered_set(): void {
         for ($i = 1; $i <= 7; $i++) {
@@ -312,7 +310,7 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * The table declares the contract the dynamic-table web service relies on.
      *
-     * The service constructs the class with the unique id ALONE and then calls these, so a
+     * The service constructs the class with the unique id alone and then calls these, so a
      * constructor that demanded a URL would fail only over AJAX — never on a page load, and never
      * in a test that built the table the way the page does.
      */
@@ -359,10 +357,9 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * The group line names the notice's groups, and resolves every name on the page in one read.
      *
-     * Same shape as the cohort line below, and the same reason: a name per row per group would put
-     * the page's cost on the size of the course rather than on what is on screen. A group deleted
-     * since the notice was saved keeps its place as an id, so the row still says something is
-     * named — the control for that is the second notice, whose group is real.
+     * Same shape as the cohort line below: the names every row on the page needs are read in one
+     * statement. A group deleted since the notice was saved keeps its place as an id, so the row
+     * still says something is named; the "Named" notice, whose group is real, is the control.
      *
      * @covers \local_awareness\table\all_notices::group_line
      */
@@ -419,10 +416,10 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * One page of rows resolves the cohort option list once, not once per cohort reference.
      *
-     * built_cohorts_options() wraps cohort_get_all_cohorts(0, 0) — a COUNT plus an unbounded scan
-     * of {cohort} joined to {context}, plus a capability walk — and it was paid per cohort id per
-     * row, so the page cost scaled with the size of the site rather than with what is on screen.
-     * The list is a dynamic table, so the filter bar re-paid it on every keystroke.
+     * built_cohorts_options() wraps cohort_get_all_cohorts(0, 0), a COUNT plus an unbounded scan of
+     * {cohort} joined to {context} and a capability walk, so resolving it per cohort id per row
+     * would scale the page with the size of the site. The list is a dynamic table, so every filter
+     * change renders it again.
      *
      * @covers \local_awareness\table\all_notices::cohort_line
      */
@@ -460,8 +457,8 @@ final class all_notices_test extends \advanced_testcase {
         $this->assertCount(10, $lines);
         foreach ($lines as $line) {
             /*
-             * The method returns [sentence, plain list] now: the cell is a Mustache template, so
-             * the markup is assembled there and this hands back the two values it needs.
+             * The method returns [sentence, plain list]; the cell's markup is assembled by its
+             * Mustache template.
              */
             $this->assertStringContainsString('Alpha cohort', $line[0]);
             $this->assertStringContainsString('Beta cohort', $line[0]);
@@ -475,9 +472,9 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * The audience column resolves the in-flight jobs once for the page, not once per row.
      *
-     * col_audience()'s own comment claimed it avoided a per-row query, and then called
-     * notice_audience::state_of(), which runs audience_job::find_in_flight() whenever the stored
-     * hash is missing — which is every notice that predates the audience upgrade.
+     * notice_audience::state_of() runs audience_job::find_in_flight() for every notice whose stored
+     * hash is missing or stale, unless it is handed the in-flight hashes query_db() reads once for
+     * the page.
      *
      * @covers \local_awareness\table\all_notices::col_audience
      */
@@ -499,12 +496,9 @@ final class all_notices_test extends \advanced_testcase {
         $render->setAccessible(true);
 
         /*
-         * One render before the counter starts. The cell is built from a Mustache template now,
-         * and the FIRST render_from_template() of a request pays a one-off setup cost — measured
-         * at nine reads here, then zero for every row after it. Counting from cold would attribute
-         * core's theme and template initialisation to this column and make the assertion below
-         * about the wrong thing. Measured, not assumed: with this warm-up the ten rows below cost
-         * zero reads, so the batching really is per page and not per row.
+         * One render before the counter starts: the first render_from_template() of a request pays
+         * a one-off theme and template setup cost in reads, which would otherwise be counted
+         * against this column.
          */
         $render->invoke($table, reset($table->rawdata));
 
@@ -637,53 +631,148 @@ final class all_notices_test extends \advanced_testcase {
     }
 
     /**
+     * A user holding the given capabilities in a context, through a role of their own.
+     *
+     * @param \context $context Where the role is assigned and the capabilities allowed.
+     * @param array $capabilities The capabilities the role allows.
+     * @return \stdClass The user.
+     */
+    private function user_with(\context $context, array $capabilities): \stdClass {
+        $user = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        foreach ($capabilities as $capability) {
+            assign_capability($capability, CAP_ALLOW, $roleid, $context->id, true);
+        }
+        role_assign($roleid, $user->id, $context->id);
+
+        return $user;
+    }
+
+    /**
+     * The action menu the current user gets on the only row of a course list.
+     *
+     * @param int $courseid The course.
+     * @return string The rendered menu.
+     */
+    private function actions_on_course_list(int $courseid): string {
+        $table = $this->scoped_table($courseid);
+        $table->query_db(all_notices::PER_PAGE, false);
+
+        return $table->format_row(reset($table->rawdata))['actions'];
+    }
+
+    /**
+     * The two report pages of a notice, as the escaped href the menu carries.
+     *
+     * @param int $noticeid The notice.
+     * @return array The acknowledged report's href and the dismissed report's.
+     */
+    private function report_hrefs(int $noticeid): array {
+        return [
+            (new \moodle_url('/local/awareness/report/acknowledged_systemreport.php', ['noticeid' => $noticeid]))->out(),
+            (new \moodle_url('/local/awareness/report/dismissed_systemreport.php', ['noticeid' => $noticeid]))->out(),
+        ];
+    }
+
+    /**
      * A reports-only viewer sees the course list, with the reports and the preview and none of the verbs.
      *
-     * The manage holder beside them, on the same row, is the control that the verbs exist to be
-     * withheld; the report actions appear for both, because the notice is one that records answers.
+     * The report links lead to the report pages themselves, which gate on the reports verb: the
+     * viewer is asserted to pass that gate and to fail the manage gate editnotice.php applies, so a
+     * report link routed through editnotice.php would be a link to a permission error. Nothing in
+     * the viewer's menu may go to editnotice.php at all.
      */
     public function test_a_reports_only_viewer_gets_a_read_only_list(): void {
         $course = $this->getDataGenerator()->create_course();
         $this->setAdminUser();
         $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
-        $generator->create_notice(['title' => 'mine', 'courseid' => $course->id, 'reqack' => 1]);
-        $context = \context_course::instance($course->id);
-
-        $reader = $this->getDataGenerator()->create_user();
-        $roleid = $this->getDataGenerator()->create_role();
-        assign_capability('local/awareness:viewreportscourse', CAP_ALLOW, $roleid, $context->id, true);
-        role_assign($roleid, $reader->id, $context->id);
-
-        $author = $this->getDataGenerator()->create_user();
-        $authorrole = $this->getDataGenerator()->create_role();
-        assign_capability('local/awareness:managecourse', CAP_ALLOW, $authorrole, $context->id, true);
-        role_assign($authorrole, $author->id, $context->id);
+        $notice = $generator->create_notice(['title' => 'mine', 'courseid' => $course->id, 'reqack' => 1]);
+        $noticeid = (int) $notice->get('id');
+        $reader = $this->user_with(\context_course::instance($course->id), ['local/awareness:viewreportscourse']);
 
         $this->setUser($reader);
-        $table = $this->scoped_table((int) $course->id);
-        $this->assertTrue($table->has_capability(), 'the reports capability opens the list');
-        $table->query_db(all_notices::PER_PAGE, false);
-        $actions = $table->format_row(reset($table->rawdata))['actions'];
-        $this->assertStringContainsString('action=acknowledged_report', $actions);
-        $this->assertStringContainsString('action=dismissed_report', $actions);
-        $verbs = ['action=edit', 'action=disable', 'action=unconfirmeddelete', 'action=unconfirmedreset', 'action=recalculate'];
-        foreach ($verbs as $verb) {
-            $this->assertStringNotContainsString($verb, $actions, "a reader is offered no {$verb}");
-        }
+        $this->assertFalse(
+            helper::require_author(author_scope::of($notice), 'manage', false),
+            'precondition: editnotice.php would refuse this viewer'
+        );
+        $this->assertSame(
+            $noticeid,
+            (int) helper::resolve_notice_as_author($noticeid, 'viewreports')->get('id'),
+            'precondition: the report pages admit this viewer'
+        );
 
-        $this->setUser($author);
-        $table = $this->scoped_table((int) $course->id);
-        $table->query_db(all_notices::PER_PAGE, false);
-        $actions = $table->format_row(reset($table->rawdata))['actions'];
-        $this->assertStringContainsString('action=edit', $actions, 'the author is offered the verbs: the control');
-        $this->assertStringContainsString('action=acknowledged_report', $actions);
+        $this->assertTrue($this->scoped_table((int) $course->id)->has_capability(), 'the reports capability opens the list');
+        $actions = $this->actions_on_course_list((int) $course->id);
+        foreach ($this->report_hrefs($noticeid) as $href) {
+            $this->assertStringContainsString('href="' . $href . '"', $actions, 'each report link goes to its report page');
+        }
+        $this->assertStringNotContainsString('editnotice.php', $actions, 'nothing a reader is offered needs the manage verb');
+        $this->assertStringContainsString(get_string('notice:preview', 'local_awareness'), $actions);
+    }
+
+    /**
+     * The report links follow the reports capability, not the manage one.
+     *
+     * An author holding only the course manage capability is offered the verbs and no report, since
+     * managecourse does not read reports and the report pages would refuse them. The author who
+     * also holds the course reports capability is the control that this notice offers reports at
+     * all, and that an author gets them from the same report pages.
+     */
+    public function test_the_report_links_follow_the_reports_capability(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $context = \context_course::instance($course->id);
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $notice = $generator->create_notice(['title' => 'mine', 'courseid' => $course->id, 'reqack' => 1]);
+        [$ackhref, $dishref] = $this->report_hrefs((int) $notice->get('id'));
+
+        $this->setUser($this->user_with($context, ['local/awareness:managecourse']));
+        $actions = $this->actions_on_course_list((int) $course->id);
+        $this->assertStringContainsString('action=edit', $actions, 'the author is offered the verbs');
+        $this->assertStringNotContainsString('systemreport.php', $actions, 'and no report they may not read');
+        $this->assertStringNotContainsString(get_string('report:button:ack', 'local_awareness'), $actions);
+        $this->assertStringNotContainsString(get_string('report:button:dis', 'local_awareness'), $actions);
+
+        $this->setUser($this->user_with($context, ['local/awareness:managecourse', 'local/awareness:viewreportscourse']));
+        $actions = $this->actions_on_course_list((int) $course->id);
+        $this->assertStringContainsString('action=edit', $actions);
+        $this->assertStringContainsString('href="' . $ackhref . '"', $actions, 'an author who reads reports is offered them');
+        $this->assertStringContainsString('href="' . $dishref . '"', $actions);
+    }
+
+    /**
+     * An empty list offers the create button to an author and to nobody else.
+     *
+     * The empty-state message is asserted for both viewers, so the absence of the button for the
+     * reader is the absence of the button and not of the whole empty state.
+     */
+    public function test_the_empty_list_offers_create_only_to_an_author(): void {
+        global $PAGE;
+
+        $course = $this->getDataGenerator()->create_course();
+        $PAGE->set_url(new \moodle_url('/local/awareness/managenotice.php', ['courseid' => $course->id]));
+        $context = \context_course::instance($course->id);
+        $message = get_string('manage:empty:none', 'local_awareness');
+        $createlabel = get_string('notice:create', 'local_awareness');
+
+        $this->setUser($this->user_with($context, ['local/awareness:viewreportscourse']));
+        $html = $PAGE->get_renderer('local_awareness')->render($this->scoped_table((int) $course->id));
+        $this->assertStringContainsString($message, $html, 'the empty state rendered');
+        $this->assertStringNotContainsString('editnotice.php', $html, 'a reader is offered nothing to create');
+        $this->assertStringNotContainsString($createlabel, $html);
+
+        $this->setUser($this->user_with($context, ['local/awareness:managecourse']));
+        $html = $PAGE->get_renderer('local_awareness')->render($this->scoped_table((int) $course->id));
+        $this->assertStringContainsString($message, $html);
+        $this->assertStringContainsString('editnotice.php', $html, 'an author is: the control');
+        $this->assertStringContainsString($createlabel, $html);
     }
 
     /**
      * The "competing" filter on a course list keeps to that course's competing notices.
      *
      * A clashing pair in another course and a clashing site notice are seeded beside the course's
-     * own pair, so a filter that resolved the site's clashing ids and forgot the course reddens.
+     * own pair, so a filter that resolved the site's clashing ids and forgot the course fails.
      */
     public function test_the_competing_filter_on_a_course_list_keeps_to_the_course(): void {
         $this->setAdminUser();

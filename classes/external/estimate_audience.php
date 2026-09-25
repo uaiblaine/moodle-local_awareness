@@ -56,11 +56,10 @@ class estimate_audience extends external_api {
     /**
      * Resolve, enqueue or reuse an audience-estimate job. Returns the job id the client should poll.
      *
-     * The estimate is a handful of COUNT queries, so on most sites it is finished before the
-     * response is written and there is nothing to wait for. Handing every one of them to cron cost
-     * the author minutes of "Calculating in the background…" for work that took milliseconds, and
-     * on a site with no cron it never resolved at all. Above the configured user count the async
-     * path remains, because there the cost is real.
+     * A recently completed job for the same criteria is reused and a pending one is joined.
+     * Otherwise a new job is created and, on a site within {@see live_mode}'s user limit, resolved
+     * during this request, so the author does not wait on cron for a quick count and a site without
+     * cron still gets one; above the limit it is queued as an adhoc task.
      *
      * @param string $criteria JSON-encoded criteria object
      * @param int $courseid The course the editor is scoped to, 0 for the site.
@@ -77,9 +76,9 @@ class estimate_audience extends external_api {
 
         /*
          * The scope the caller is writing under, from the courseid the editor sends: the site when
-         * absent. Validated as a context — which also requires login to the course — and then gated
-         * the way every author-side entry point is, so a course author's editor works and a caller
-         * naming a course they do not hold is refused before anything is read.
+         * it is 0. Validated as a context, which also requires login to the course, then gated like
+         * every author-side entry point, so a caller naming a course they do not author for is
+         * refused before anything is read. The other editor services gate the same way.
          */
         $scope = author_scope::for_request(null, (int) $params['courseid']);
         self::validate_context($scope->context());
@@ -91,14 +90,12 @@ class estimate_audience extends external_api {
         }
 
         /*
-         * Run through the author's scope — the same check the save path applies, so a count and a
-         * saved notice cannot disagree about what a value means. The scope is what stops the panel
-         * answering "how many people are in course N?" for any N a caller cares to type: cohorts it
-         * narrows silently, for the reason given in its docblock, and anything else that does not
-         * exist is refused outright, because this request is speculative and the caller can fix it
-         * now. The scope bounds every list it reads before it looks anything up; the cap below
-         * bounds whatever it did not read, and runs AFTER it so that a legitimate cohort is never
-         * cut off for sitting behind a run of ids the scope was about to drop anyway.
+         * The same scope check the save path applies, so a count and a saved notice agree on what a
+         * value means, and the panel cannot be asked how many users are in an arbitrary course.
+         * Cohorts are narrowed silently (see author_scope); anything else missing or outside the
+         * scope is refused, since the author can fix it now. cap_criteria_lists() bounds the lists
+         * the scope does not read, and runs after it so a legitimate cohort is not cut off behind
+         * ids the scope drops anyway.
          */
         $scoped = $scope->apply($raw);
         if (!$scoped->is_clean()) {
@@ -109,12 +106,11 @@ class estimate_audience extends external_api {
         $raw = helper::cap_criteria_lists($scoped->criteria());
         if (!$scope->is_site()) {
             /*
-             * The page reach a course scope FORCES is not part of the question being counted:
-             * pathmatch is a CONTEXT field, so it never enters a predicate, and carrying it here
-             * would change the criteria hash without changing a single number — fragmenting the
-             * shared job cache, whose whole point is that the same question is the same job whoever
-             * asks. The scope is already in the job, as the forced filter_course that get_estimate
-             * checks a job against.
+             * The page reach a course scope forces is not part of the question: pathmatch is a
+             * context field and never enters a count, so carrying it would change the criteria hash
+             * without changing a number and split the job cache, which relies on the same question
+             * being the same job whoever asks. The scope is already in the job, as the forced
+             * filter_course that get_estimate::execute() checks a job against.
              */
             unset($raw['pathmatch']);
         }

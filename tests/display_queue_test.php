@@ -110,7 +110,7 @@ final class display_queue_test extends \advanced_testcase {
         $repeat = $this->notice('Repeat', 1);
         $this->notice('Ordinary');
 
-        // First occurrence: it has priority, and is shown before the older ordinary notice.
+        // First occurrence: the repeating notice has priority over the ordinary one.
         $this->assertSame(['Repeat'], $this->on_screen());
 
         // The user deals with it, and its interval elapses so it falls due again.

@@ -21,10 +21,9 @@ use local_awareness\persistent\audience_job;
 /**
  * Scheduled task that discards spent audience-estimate jobs.
  *
- * Every click of "Calculate reach" in the notice editor writes a row to
- * local_awareness_audience_jobs, and nothing ever removed one. The table therefore grew
- * without bound, carrying a userid, the criteria JSON and timestamps for as long as the
- * site lived.
+ * Audience estimates (the editor's "Calculate reach", and refreshes of a saved notice's count)
+ * write rows to local_awareness_audience_jobs carrying a userid and the criteria JSON; nothing else
+ * removes them.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -34,10 +33,9 @@ class purge_audience_jobs extends \core\task\scheduled_task {
     /**
      * How long a job is kept, in seconds.
      *
-     * A completed job stops being reusable after audience_job::DEDUP_WINDOW (5 minutes) and the
-     * editor's poller gives up long before that, so a day is already generous. It is deliberately
-     * not tighter: a job whose ad-hoc task is merely queued behind a slow cron must still be there
-     * when the task finally runs.
+     * A completed job stops being reusable after audience_job::DEDUP_WINDOW (5 minutes), and the
+     * editor's poller gives up after about as long, so a day is generous. It is not shorter because
+     * a job whose adhoc task is queued behind a slow cron must still exist when the task runs.
      */
     const RETENTION = DAYSECS;
 
@@ -62,8 +60,8 @@ class purge_audience_jobs extends \core\task\scheduled_task {
 
         $cutoff = time() - self::RETENTION;
 
-        // Deleted by timecreated, not timecompleted: a job that errored or was never picked up by
-        // its ad-hoc task has no completion time and would otherwise be kept for ever.
+        // Deleted by timecreated, not timecompleted: a job whose adhoc task never ran has no
+        // completion time and would otherwise be kept for ever.
         $count = $DB->count_records_select(
             audience_job::TABLE,
             'timecreated < :cutoff',

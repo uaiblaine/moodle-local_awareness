@@ -24,20 +24,15 @@ use templatable;
 /**
  * The audience estimate panel, beside the rules it is an estimate of.
  *
- * It used to be rendered by the editor page, after the whole form — so the number describing the
- * audience sat several sections below the fields that decide it, and an author narrowing a rule
- * had to scroll past the appearance and scheduling sections to see what it did. The panel is the
- * answer to the audience section's question, so it is rendered INTO that section, by the form.
- *
- * That move is why this class exists: the context was built inside editor_page::export_for_template(),
- * which runs after the form has already been rendered and handed to it. Both sides now ask this.
+ * notice_form renders it into its own audience section, so the number sits next to the fields
+ * that decide it rather than below the whole form.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class audience_panel implements renderable, templatable {
-    /** Threshold above which the audience estimator stops auto-running. */
+    /** Number of audience rules above which the estimator stops re-estimating on every change. */
     public const RULE_THRESHOLD = 3;
 
     /** How often the client asks a queued job whether it has finished, in milliseconds. */

@@ -46,7 +46,7 @@ class search_courses extends external_api {
     }
 
     /**
-     * Search courses by name, returning up to 50 matches.
+     * Search courses by name, returning up to 50 matches; a query under two characters returns none.
      *
      * @param string $query Search term.
      * @param int $courseid The course the editor is scoped to, 0 for the site.
@@ -60,12 +60,7 @@ class search_courses extends external_api {
             ['query' => $query, 'courseid' => $courseid]
         );
 
-        /*
-         * The scope the caller is writing under, from the courseid the editor sends: the site when
-         * absent. Validated as a context — which also requires login to the course — and then gated
-         * the way every author-side entry point is, so a course author's editor works and a caller
-         * naming a course they do not hold is refused before anything is read.
-         */
+        // The scope gate is explained in estimate_audience::execute().
         $scope = author_scope::for_request(null, (int) $params['courseid']);
         self::validate_context($scope->context());
         helper::require_author($scope, 'manage');
@@ -73,7 +68,8 @@ class search_courses extends external_api {
         $query = trim($params['query']);
         $results = [];
 
-        if (strlen($query) >= 2) {
+        // Two characters, not two bytes: one accented or CJK character is several bytes in UTF-8.
+        if (\core_text::strlen($query) >= 2) {
             $likesql = $DB->sql_like('fullname', ':search', false);
             /*
              * Under a course scope the only course a notice may name is its own — the scope forces
@@ -89,22 +85,17 @@ class search_courses extends external_api {
             $courses = $DB->get_records_select('course', $where, $sqlparams, 'fullname ASC', 'id, fullname', 0, 50);
             foreach ($courses as $course) {
                 /*
-                 * The ESCAPED spelling, because this label is rendered as HTML twice over:
-                 * course_search.js hands it to core's autocomplete, which appends it into the
-                 * hidden select (lib/amd/src/form-autocomplete.js, updateAjax) and then renders it
-                 * back through the triple stash in lib/templates/form_autocomplete_suggestions.
-                 * mustache. Nothing between json_encode() and that stash escapes anything, so the
-                 * default escape is applied exactly once. It also resolves a multilang fullname,
-                 * which otherwise reaches the picker as literal {mlang} markup.
+                 * The escaped spelling, because the label is parsed as HTML twice: course_search.js
+                 * hands it to core's autocomplete, which appends it to the hidden select
+                 * (form-autocomplete.js, updateAjax) and renders it back through the triple stash in
+                 * form_autocomplete_suggestions.mustache. Nothing on the way escapes it, so the
+                 * default escape is applied exactly once. It also runs the string filters, so with
+                 * filterall on a multilang fullname is resolved.
                  *
-                 * Deliberately NOT \core_external\util::format_string(): that helper honours
-                 * external_settings, whose constructor only sets filter = true when the request is
-                 * neither AJAX_SCRIPT, CLI_SCRIPT nor WS_SERVER — and this function is only ever
-                 * reached over AJAX, so the core helper would leave the multilang markup unresolved.
-                 * The plain call is the one that does what this sink needs.
-                 *
-                 * The LIKE above still matches the RAW stored fullname, which is what makes a course
-                 * called "R&D methods" findable by typing the text its author actually typed.
+                 * Not \core_external\util::format_string(): external_settings enables filters only
+                 * outside AJAX_SCRIPT, CLI_SCRIPT and WS_SERVER, and this function is reached over
+                 * AJAX, so the filters would never run. The LIKE above matches the raw stored
+                 * fullname, so "R&D methods" is found by the text its author typed.
                  */
                 $coursecontext = \context_course::instance($course->id, IGNORE_MISSING) ?: \context_system::instance();
                 $results[] = [

@@ -23,12 +23,12 @@ use local_awareness\persistent\awareness;
 /**
  * Where a course notice fires: its course's main page, and the author is not asked.
  *
- * The free URL pattern described a reach a course notice does not have — it cannot leave its
- * course, so every honest answer was a subset of one page — and the field is gone from the course
- * form. The scope writes the page instead, which is why these tests read the stored value rather
- * than a submitted one.
+ * A course notice cannot leave its course, so the course form has no URL-pattern field and the
+ * scope writes the page itself, which is why these tests read the stored value rather than a
+ * submitted one.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
+ * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
+ * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -124,12 +124,12 @@ final class course_page_reach_test extends \advanced_testcase {
             'courseid' => (int) $this->course->id,
         ]);
 
-        // The client claims a reach that does NOT overlap the course's main page.
+        // The client claims a reach that does not overlap the course's main page.
         $incourse = \local_awareness\external\check_collision::execute(0, '/my/%', true, (int) $this->course->id);
         $this->assertSame(['Course page rival'], $incourse['titles']);
 
         /*
-         * The control, at the site, where the same claimed reach IS the author's: there the rival's
+         * The control, at the site, where the same claimed reach is the author's: there the rival's
          * course page is out of reach and nothing is reported. So the assertion above can only be
          * the scope having replaced the pattern.
          */

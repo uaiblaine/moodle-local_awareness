@@ -22,19 +22,17 @@ use local_awareness\persistent\awareness;
  * Which groups an author may target in a course, decided the way core decides it.
  *
  * Core has no course-level "who may address a group" helper; the nearest is
- * groups_get_activity_allowed_groups(), and this is that rule lifted to the course. In visible
- * groups mode, or with moodle/site:accessallgroups in the course, every participation group; in
- * separate groups mode without the capability, only the groups the author belongs to; with groups
- * off, nothing is offered, but nothing is refused either, because separation is what the mode
- * switches off. Participation is the flag core reads to decide which groups may be picked for an
- * activity, and it is read the same way here.
+ * groups_get_activity_allowed_groups(), and this is that rule lifted to the course. In separate
+ * groups mode without moodle/site:accessallgroups in the course, only the participation groups the
+ * author belongs to; in any other case (visible groups, groups off, or the capability), every
+ * participation group of the course. Participation is the flag core reads to decide which groups
+ * may be picked for an activity, and it is read the same way here.
  *
- * Reaching and receiving are two questions, and this class answers only the first. Who RECEIVES a
+ * Reaching and receiving are two questions, and this class answers only the first. Who receives a
  * notice is membership, checked by the delivery path against {groups_members} whatever the group's
- * visibility, because a member of a hidden group is still a member. Who may TARGET a group, and act
- * on a notice that targets it, is decided here, and it is the whole of what "separate groups" means
- * for a notice: a teacher of one group neither sees nor edits a notice aimed only at another, and a
- * manager who can access all groups does both.
+ * visibility, because a member of a hidden group is still a member. Who may target a group, and act
+ * on a notice that targets it, is decided here: a teacher confined to one group neither sees nor
+ * edits a notice aimed only at another, and a manager who can access all groups does both.
  *
  * The site scope has no course and so no groups: applies() is false and every list is empty.
  * author_scope's rule table forbids the field at the site for the same reason.
@@ -70,10 +68,8 @@ final class group_scope {
     /**
      * The reach of the current user writing under a scope.
      *
-     * Always the current user, and it cannot honestly be anyone else: groups_get_all_groups()
-     * applies the group visibility rules for whoever is logged in, so asking it about another
-     * person's groups answers through the asker's own eyes. The capability half would take a user
-     * id; the group list would not, and half an answer is worse here than none.
+     * Always the current user: groups_get_all_groups() applies the group visibility rules for
+     * whoever is logged in, so it cannot answer for another user.
      *
      * @param author_scope $scope The scope the author writes under.
      * @return self
@@ -127,14 +123,22 @@ final class group_scope {
     /**
      * The course's group mode: NOGROUPS, SEPARATEGROUPS or VISIBLEGROUPS.
      *
-     * @return int NOGROUPS for the site scope.
+     * A course that is gone reads as NOGROUPS: it separates nobody, as a deleted group confines
+     * nobody in admits(), so its orphaned notices stay reachable to the site capability that
+     * helper::require_author() admits for them.
+     *
+     * @return int NOGROUPS for the site scope and for a course that no longer exists.
      */
     public function groupmode(): int {
+        global $DB;
+
         if (!$this->applies()) {
             return NOGROUPS;
         }
 
-        return (int) get_course($this->courseid)->groupmode;
+        $groupmode = $DB->get_field('course', 'groupmode', ['id' => $this->courseid]);
+
+        return $groupmode === false ? NOGROUPS : (int) $groupmode;
     }
 
     /**
@@ -157,13 +161,10 @@ final class group_scope {
     /**
      * Whether a form should offer the group picker at all.
      *
-     * Whether the course HAS groups this user may address — not what its group mode is. The mode
-     * decides how ACTIVITIES separate participants, and a course can hold hundreds of groups with
-     * the mode left at "No groups", which is how core ships it; group management works there
-     * unchanged. An earlier version gated on the mode, by analogy with the activity group menus
-     * that do disappear, and hid the picker on every real course on the dev site — the three with
-     * the most groups, 300, 30 and 9, all sit at NOGROUPS. Separation is still the mode's business
-     * and is is_restricted()'s alone.
+     * Whether the course has groups this user may address, not what its group mode is. The mode
+     * decides how activities separate participants, and a course can hold many groups with the
+     * mode left at "No groups", core's default. Separation is the mode's business, and
+     * is_restricted()'s alone.
      *
      * @return bool
      */
@@ -198,17 +199,15 @@ final class group_scope {
     /**
      * Whether the separation of groups keeps the user away from a notice aimed at these.
      *
-     * Two questions live in this class and they are not the same one. narrow() answers what an
-     * author may SAVE: their own participation groups, the set the picker offers. This answers who
-     * may REACH what is already saved, and only separate groups keep anyone away — visible groups,
-     * the accessallgroups capability, groups switched off and the site scope all confine nobody,
-     * so they admit everything.
+     * narrow() answers what an author may save: the set the picker offers. This answers who may
+     * reach what is already saved, and only separate groups keep anyone away: visible groups, the
+     * accessallgroups capability, groups switched off and the site scope all confine nobody, so they
+     * admit everything.
      *
      * A group that no longer exists is skipped rather than refused. Otherwise deleting a group
-     * would hide the notices naming it from every single person, the administrator included, and
-     * the one row that needs fixing would be the one nobody could see — the same trap
-     * author_scope::exists() exists to avoid for a deleted course. A notice naming a live group of
-     * someone else's and a dead one is still refused, on the live one.
+     * would hide the notices naming it from everyone, the administrator included, the same trap
+     * author_scope::exists() avoids for a deleted course. A notice naming someone else's live
+     * group and a dead one is still refused, on the live one.
      *
      * @param int[] $groupids Group ids.
      * @return bool
@@ -255,7 +254,7 @@ final class group_scope {
      * The groups the user may target, read once.
      *
      * groups_get_all_groups() with a user id returns that user's groups, without one every group;
-     * both honour the group visibility settings for the CURRENT user, which is right for a picker
+     * both honour the group visibility settings for the current user, which is right for a picker
      * and for a gate and would be wrong for delivery, which is why delivery never reads this class.
      * Participation only, as core's activity pickers.
      *

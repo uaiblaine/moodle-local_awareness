@@ -6,6 +6,103 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixes to access, escaping and behaviour found by the code audit (version 2026092401)
+
+**Access and group reach.** A course author confined to their own groups (separate groups, without
+"Access all groups") could still preview, from the notice list, a notice aimed only at another
+group, and open its acknowledgement and dismissal reports, including through core's report web
+services. The preview and both reports now apply the same reach as the list and the pages. The
+preview also gives the same "The notice does not exist" answer for every notice the viewer may not
+see, so it can no longer tell which ids name notices in other courses or at the site. The "Saved.
+This repeating notice reaches the same pages as…" warning no longer shows a course author the titles
+of site notices or of other courses' notices; it describes them instead.
+
+**Who gets which link.** Users who hold only "View reports" can now open Site administration >
+Awareness > Manage notice, read-only; creating and editing still need the manage capability. The
+list's acknowledgement and dismissal report links now open the reports directly, so a reports-only
+user is no longer sent to a permission error, and they are offered only to users who may read that
+notice's reports. An empty list offers "Create new notice" only to users who may create one. Course
+authors now receive the "Audience estimate finished" notification and can configure it in their
+preferences; it links a course notice to that course's list. As a side effect, every user now sees
+that notification in their preferences. The web service definitions list the course-level
+capabilities each service accepts.
+
+**Logs.** Events about a course notice (created, updated, enabled, disabled, reset, deleted,
+dismissed, acknowledged, link clicked) are logged in that course's context, so they appear in the
+course's logs, and their links open the course's notice list. Site notices are still logged in the
+system context.
+
+**Audience rules.** The front page role in a role rule now follows core: it counts only with the role
+context "All", never with "System", and never for the guest; the audience estimate agrees. A notice
+aimed at named themes is withheld when the reader's theme cannot be worked out, as every other rule
+withholds a notice whose referent it cannot resolve; it used to be shown to everyone. A notice whose
+stored filter data is a bare value no longer raises a PHP warning. The help for "Apply to URL match"
+now says when a pattern must match the whole address (no %) and when only its beginning (any %).
+"Role context" has a help text too, saying what each choice counts, including the default role for
+all users and the default site home role, which count for "All" (both) and "System" (the default
+role for all users only).
+
+**Names and titles.** Names holding "&", "<" or ">" are no longer shown double-escaped ("A &amp;amp;
+B") in the notice list: the title's tooltip, the course name on the site list and the group line.
+Cohort names and competing notices' titles in the list, and cohort names in the editor's cohort
+picker, now go through the text filters, so a multi-language name shows one language. Titles in the
+collision warning, in the audience messages after a save or a recalculation and in the reset and
+delete confirmations are formatted the same way.
+
+**Behaviour.** A failed audience recalculation is reported as an error instead of "up to date", and a
+failure during a save as a warning. A repeating notice whose end date has passed no longer counts as
+competing, in the list's badge, its "Competing" filter or the editor's warning; one scheduled to start
+later still does. The editor's warning, and the one shown after a save, also stay silent while the
+notice being edited has itself ended, since it can never show again; the editor checks again when
+"Perpetual" or the end date changes, and for this the `local_awareness_check_collision` web service
+takes two optional parameters, `perpetual` and `timeend` (the end date as the form's date selector
+holds it, read in the user's calendar and timezone), and a client that sends neither gets the answer it
+got before. Saving a course notice no longer queues a second audience estimate when the editor has
+already started one for the same form, and an upgrade step keeps the counts already stored for course
+notices current rather than marking them "Filters changed". Clicking a link in a notice that the plugin
+does not track, such as a video link no player embedded or a link a text filter added, no longer shows
+the reader an error. Closing an informational notice by clicking outside it or pressing Escape presses
+one close button rather than all three. The editor's preview uses the notice's own course even when the
+page address does not name it. The audience panel shows a translated message when the server gives no
+usable answer. The course picker needs two characters, not two bytes, before it searches. The notice
+list no longer fails when a notice aimed at groups belongs to a course that was deleted, and an
+administrator can preview it and open its reports; the list no longer reads every course to decide
+which group-targeted notices a viewer may see. A course notice left behind when its course was deleted
+used to make the editor page fail on every action; a site administrator can now delete, disable,
+enable, reset and recalculate it, and every action returns to the site list, while opening it for
+editing is refused with an explanation, because no page can show it. In the acknowledged and dismissed
+notices custom reports, the Action column now shows a number under Sum or Average, the number of
+acknowledgements or their share, where it used to show an action name whenever the result was 0 or 1
+(and, on Moodle 4.5, for an Average of 0.5); reports already saved with these aggregations show the
+number too. The audience estimate task shows its translated name in the task logs. The carousel slides
+table is now declared in the privacy metadata.
+
+**Accessibility and layout.** The notice dialogue's buttons, close button, acknowledgement checkbox
+and carousel controls show a clear keyboard focus ring, a 3px outline in the site's brand colour; the
+carousel's own ring could never show before. In the editor, Preview, Save and Cancel now come after
+the Behaviour section, so keyboard users reach the scheduling fields before Save. On Moodle 4.5 the
+actions menu of the last rows in the notice list is no longer cut off. The editor's page title is
+back at its designed size, and the rule hiding the dropdown arrow of the two course search fields now
+applies only in the editor.
+
+**Removed.** Unused internal API: `helper::retrieve_notice()`, `format_interval_time()`,
+`format_boolean()`, `get_course_name()`, `get_all_courses_options()`, `awareness::get_all_notices()`,
+`window::open_sql()` and `linkhistory::count_clicked_links()`; the unused string
+`timeformat:resetinterval`; the editor page's `acknowledged_report` and `dismissed_report` actions,
+which nothing links to any more; and unused style rules. The fixes are pinned by PHPUnit tests that
+fail when they are reverted, except the messages the editor page passes to a redirect, which no test
+can read, and the source-scanning tests were tightened so that they can fail again. The audience
+estimate task now takes its estimator from core's dependency injection container (`\core\di`), so a
+test can make an estimate fail; its behaviour is unchanged.
+
+### Code comments rewritten for Moodle developers (version 2026092400)
+
+Every comment in the plugin was audited against Moodle's guidance on comments. History, incident
+stories, audit and planning identifiers and references to the development environment left the
+code; the non-obvious reasons, contracts and version differences stayed, shorter. 228 comments that
+no longer matched the code they describe were corrected. No code changed: the AMD modules were
+rebuilt only because their source maps carry the comment text.
+
 ### Four more layouts: Split, Minimal, Banner, and the Image alone (version 2026090601)
 
 The three layouts the first release deferred, and a fourth that was asked for since: a notice that

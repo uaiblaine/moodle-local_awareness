@@ -80,7 +80,7 @@ Feature: A notice is as hard to get past as its author asked, and never ends the
     And I am on site homepage
     Then I should see "refusing this must not eject you"
     And I click on "awareness-notnowbtn" "button"
-    # The assertion this scenario has always really been about: refusing ends nothing.
+    # The point of this scenario: refusing ends nothing.
     Then I should see "You are logged in as Bilbo Baggins"
     And I am on site homepage
     Then I should see "refusing this must not eject you"

@@ -17,13 +17,11 @@
 namespace local_awareness\audience;
 
 /**
- * Turns a rule's stored values into the text the editor's chips show.
+ * Turns a rule's stored values into the text the editor's chips show, e.g. a category id into its name.
  *
- * The chips used to render the raw criteria — "Course category: 4" — which is the one thing the
- * author cannot check against the form they just filled in. Resolving happens here rather than in
- * {@see estimator}, which stays free of presentation, and at READ time rather than when the job is
- * computed: a job is reused across users by criteria hash, so a label baked into the stored result
- * would hand the next reader the first reader's language.
+ * Kept out of {@see estimator}, which stays free of presentation, and run at read time rather than
+ * when the job is computed: a job is reused across users by criteria hash, so a label stored with
+ * the result would reach the next reader in the first reader's language.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine

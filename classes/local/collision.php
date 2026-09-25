@@ -35,7 +35,7 @@ use local_awareness\persistent\awareness;
  * what the author meant and is invisible while editing either one on its own. Nothing here blocks
  * anything: it exists so the author is told.
  *
- * Only the PAGE REACH is compared, not the audience. Two notices aimed at the same pages but at
+ * Only the page reach is compared, not the audience. Two notices aimed at the same pages but at
  * disjoint cohorts never actually meet, so this over-reports — deliberately, because the alternative
  * is computing audience overlap while someone types, and a warning that is occasionally unnecessary
  * costs less than one that is occasionally absent.
@@ -50,7 +50,7 @@ class collision {
      * - an empty pattern, or one made only of wildcards, places no restriction at all;
      * - identical patterns, ignoring case;
      * - the FRONTPAGE / MY / MYCOURSES tokens, whose overlap is invisible in the strings and is
-     *   settled by asking the display path's own matcher about each landmark page;
+     *   settled by asking helper::check_path_match() about each landmark page;
      * - a wildcard pattern against a page the other pattern certainly reaches.
      *
      * Two unrelated literal paths are reported as not overlapping, which is right, and two exotic
@@ -96,20 +96,23 @@ class collision {
     }
 
     /**
-     * Enabled repeating notices, other than the one given, whose page reach overlaps it.
+     * Enabled repeating notices that have not ended, other than the one given, whose page reach overlaps it.
      *
-     * Returns nothing when the notice itself does not repeat: a notice shown once takes its turn
-     * and leaves, so it competes with nobody.
+     * Returns nothing when the notice itself does not repeat, or when its own end has passed: a
+     * notice shown once takes its turn and leaves, and one that has ended can never show again, so
+     * neither competes with anybody. The end is judged as enabled_repeating_notices() judges the
+     * rivals' ends.
      *
      * @param int $noticeid Id of the notice being checked; 0 while it is still being created.
      * @param string|null $pathmatch Its page reach.
      * @param int $resetinterval Its repeat interval; zero means it does not repeat.
+     * @param int $timeend Its end as the save stores it; 0 for none, which is what a perpetual notice has.
      * @return awareness[] Clashing notices, keyed by id.
      * @throws \coding_exception
      * @throws \dml_exception
      */
-    public static function clashes_for(int $noticeid, ?string $pathmatch, int $resetinterval): array {
-        if ($resetinterval <= 0) {
+    public static function clashes_for(int $noticeid, ?string $pathmatch, int $resetinterval, int $timeend = 0): array {
+        if ($resetinterval <= 0 || window::has_ended($timeend, time())) {
             return [];
         }
 
@@ -124,6 +127,28 @@ class collision {
         }
 
         return $clashes;
+    }
+
+    /**
+     * The rivals a save of these form values competes with, for the warning shown after the save.
+     *
+     * The page reach is the scope's, which writes a course notice's forced reach where the form
+     * offers no field, and the submitted end counts as it does in the editor's warning.
+     *
+     * @param awareness|null $notice The notice being saved, or null while it is being created.
+     * @param \stdClass $formdata The submitted values, timeend already zeroed for a perpetual notice.
+     * @param author_scope $scope The scope the notice is saved under.
+     * @return awareness[] Clashing notices, keyed by id.
+     * @throws \coding_exception
+     * @throws \dml_exception
+     */
+    public static function clashes_for_save(?awareness $notice, \stdClass $formdata, author_scope $scope): array {
+        return self::clashes_for(
+            $notice ? (int) $notice->get('id') : 0,
+            (string) $scope->apply(['pathmatch' => $formdata->pathmatch ?? ''])->criteria()['pathmatch'],
+            (int) ($formdata->resetinterval ?? 0),
+            (int) ($formdata->timeend ?? 0)
+        );
     }
 
     /**
@@ -144,7 +169,8 @@ class collision {
 
         $map = [];
         foreach ($notices as $notice) {
-            if ($notice->get('resetinterval') <= 0 || !$notice->get('enabled')) {
+            // A notice that does not compete itself is not badged: the set clashing_ids() walks, so the two agree.
+            if (!isset($repeating[(int) $notice->get('id')])) {
                 continue;
             }
             $titles = [];
@@ -186,6 +212,31 @@ class collision {
             $courseid > 0 ? 'collision:redacted:course' : 'collision:redacted:site',
             'local_awareness'
         );
+    }
+
+    /**
+     * The competing notices' titles, as an author under the given scope may see them, formatted for a sink.
+     *
+     * Two sinks, two spellings. A notification message is rendered as HTML, so it takes the escaped
+     * spelling ($escape true). A PARAM_TEXT return written through textContent takes the plain one
+     * ($escape false), stripped of tags as well: clean_returnvalue() throws when PARAM_TEXT's
+     * strip_tags() would change the value, and with formatstringstriptags off format_string() keeps
+     * tags.
+     *
+     * @param awareness[] $clashes The competing notices, as clashes_for() returns them.
+     * @param author_scope $scope The scope of the author being warned.
+     * @param bool $escape Whether the sink renders HTML raw.
+     * @return string[] One title or description per notice, in the order given.
+     */
+    public static function formatted_titles(array $clashes, author_scope $scope, bool $escape = true): array {
+        $context = \context_system::instance();
+        $titles = [];
+        foreach ($clashes as $notice) {
+            $title = format_string(self::visible_title($notice, $scope), true, ['context' => $context, 'escape' => $escape]);
+            $titles[] = $escape ? $title : strip_tags($title);
+        }
+
+        return $titles;
     }
 
     /**
@@ -233,16 +284,22 @@ class collision {
     }
 
     /**
-     * Every enabled notice that repeats.
+     * Every enabled notice that repeats and has not ended for good.
      *
-     * Read straight from the table rather than through the enabled-notices cache, which also
-     * applies the scheduling window: a notice scheduled for next week still competes for the same
-     * pages, and the author needs to be told before it starts rather than after.
+     * Only the upper bound of the window applies. A notice scheduled for next week still competes for
+     * the same pages, and the author needs to be told before it starts rather than after; one whose
+     * end has passed can never display again, so it competes with nobody.
      *
      * @return awareness[] Keyed by id.
      * @throws \dml_exception
      */
     private static function enabled_repeating_notices(): array {
-        return awareness::get_records_select('enabled = ? AND resetinterval > ?', [1, 0], 'id');
+        [$windowsql, $windowparams] = window::open_prefilter_sql('clash', time());
+
+        return awareness::get_records_select(
+            "enabled = :enabled AND resetinterval > :norepeat AND {$windowsql}",
+            ['enabled' => 1, 'norepeat' => 0] + $windowparams,
+            'id'
+        );
     }
 }

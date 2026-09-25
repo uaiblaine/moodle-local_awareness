@@ -16,32 +16,21 @@
 /**
  * Course picker for the notice editor's audience rules.
  *
- * Feeds the autocomplete from local_awareness_search_courses, which applies the capability check —
- * the field is only ever rendered for a manager.
+ * Feeds the autocomplete from local_awareness_search_courses, which applies the capability check
+ * for the editor's scope and, in a course, offers only that course.
  *
  * @module     local_awareness/course_search
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define(['core/ajax'], function(Ajax) {
+define(['core/ajax', 'local_awareness/editor_scope'], function(Ajax, EditorScope) {
 
     /**
-     * The course the editor writes for, read once from the editor root; 0 for the site.
+     * Fetch the courses matching a search.
      *
-     * Every web service the editor calls takes it, so that a course author's requests are gated and
-     * scoped as a course author's rather than refused at the site.
-     *
-     * @returns {number}
-     */
-    var courseId = function() {
-        var root = document.querySelector('[data-region="la-editor"]');
-        return root ? (parseInt(root.getAttribute('data-courseid'), 10) || 0) : 0;
-    };
-
-    /**
-     * List of options (for pre-existing selections).
-     * The autocomplete module calls this when rendering existing values.
+     * core/form-autocomplete calls this as the author types; existing selections are rendered by the
+     * form itself.
      *
      * @param {String} selector The selector of the autocomplete element.
      * @param {String} query The current search query.
@@ -51,7 +40,7 @@ define(['core/ajax'], function(Ajax) {
     var transport = function(selector, query, callback, failure) {
         var request = {
             methodname: 'local_awareness_search_courses',
-            args: {query: query, courseid: courseId()}
+            args: {query: query, courseid: EditorScope.courseId()}
         };
 
         Ajax.call([request])[0]

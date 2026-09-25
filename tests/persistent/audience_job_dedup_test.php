@@ -22,15 +22,13 @@ use local_awareness\external\estimate_audience;
  * The dedup predicates on audience_job::find_reusable(), one negative control each.
  *
  * find_reusable() answers "has this exact question already been answered, recently enough to hand
- * back". Three conditions carry that: the criteria hash, the READY status, and a timecompleted
- * inside DEDUP_WINDOW. Only the hash had coverage — the other two could each be deleted with the
- * whole suite green, and deleting either is a real defect: without the status test a job that
- * ERRORED is served as an answer, and without the window test a count from any point in the site's
- * history is served as current.
+ * back". Three conditions carry that: the criteria hash, the ready status, and a timecompleted
+ * inside DEDUP_WINDOW. Without the status test a job that errored is served as an answer, and
+ * without the window test a count from any point in the site's history is served as current.
  *
- * Driven directly rather than through estimate_audience::execute() on purpose. The end-to-end path
- * runs through live_mode, cohort visibility, criteria normalisation and the adhoc task, any of which
- * can make a case pass or fail for a reason that has nothing to do with the predicate under test.
+ * Driven directly rather than through estimate_audience::execute(): the end-to-end path runs
+ * through live_mode, the author scope, criteria normalisation and the adhoc task, any of which can
+ * make a case pass or fail for a reason unrelated to the predicate under test.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -81,7 +79,7 @@ final class audience_job_dedup_test extends \advanced_testcase {
     }
 
     /**
-     * A ready job older than DEDUP_WINDOW is NOT reused.
+     * A ready job older than DEDUP_WINDOW is not reused.
      *
      * @return void
      */
@@ -98,7 +96,7 @@ final class audience_job_dedup_test extends \advanced_testcase {
     }
 
     /**
-     * An errored job is NOT reused, however recent it is.
+     * An errored job is not reused, however recent it is.
      *
      * @return void
      */
@@ -114,9 +112,8 @@ final class audience_job_dedup_test extends \advanced_testcase {
         $this->assertFalse(audience_job::find_reusable('errorhash'), 'a failed job was served as an answer');
 
         /*
-         * And the same row flipped to ready IS reused. That is what proves the refusal above came
-         * from the status rather than from anything else about the row — the age, the hash and the
-         * id are all unchanged across the flip.
+         * And the same row flipped to ready is reused, which proves the refusal above came from the
+         * status: the age, the hash and the id are unchanged across the flip.
          */
         $failed->set('status', audience_job::STATUS_READY);
         $failed->update();
@@ -124,7 +121,7 @@ final class audience_job_dedup_test extends \advanced_testcase {
     }
 
     /**
-     * A job that never completed is NOT reused, even with a ready status.
+     * A job that never completed is not reused, even with a ready status.
      *
      * @return void
      */

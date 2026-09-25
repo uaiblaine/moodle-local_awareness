@@ -19,16 +19,13 @@ namespace local_awareness\local;
 /**
  * Guards two asynchronous contracts in the plugin's JavaScript.
  *
- * Neither can be reached by the tests this fleet runs. PHPUnit never loads a JS file; Behat drives
- * a real browser, where a response arriving out of order is exactly the thing that will not
- * reproduce on demand — and the notice case additionally cannot be provoked at all, because the
- * failure it guards is a web-service call that never answers. So the observer is a source
- * contract, the same mechanism and the same justification as criteria_contract_test and
- * bootstrap_compat_test beside it.
+ * PHPUnit never loads a JS file, and in Behat's real browser a response arriving out of order will
+ * not reproduce on demand; the notice case cannot be provoked at all, because the failure it guards
+ * is a web-service call that never answers. So the check is a source contract, like
+ * criteria_contract_test and bootstrap_compat_test beside it.
  *
- * A source scan pins a shape rather than a behaviour, which is a real limitation and the reason
- * each assertion below names the defect it exists for. What it does buy is the thing that was
- * missing: deleting either guard stops being invisible.
+ * A source scan pins a shape rather than a behaviour, which is why each assertion below names the
+ * defect it exists for. What it buys is that deleting either guard fails a test.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -64,9 +61,8 @@ final class async_contract_test extends \basic_testcase {
      *
      * The terminator is explicit because the two modules nest differently: audience_estimator.js
      * declares its functions at four spaces, notice.js at eight inside its define() wrapper. A
-     * single hard-coded terminator silently over-reads in one of them — it did, and the body of
-     * dismissNotice() came back with acknowledgeNotice() attached, so a guard deleted from the
-     * first was still "found" in the second and the mutation survived.
+     * single hard-coded terminator over-reads in one of them: dismissNotice()'s body would include
+     * acknowledgeNotice(), so a guard deleted from the first would still be found in the second.
      *
      * @param string $source The module source.
      * @param string $needle The line the function starts with.
@@ -92,8 +88,8 @@ final class async_contract_test extends \basic_testcase {
      * answer can land last and overwrite a fresher count. The author is shown a number for a
      * question they have already changed, with nothing on screen to say so.
      *
-     * The guard is a monotonic counter captured at send time, spelled exactly as
-     * collision_warning.js spells it: one pattern, one name.
+     * The guard is a monotonic counter captured at send time, with the same names
+     * collision_warning.js uses for the same pattern.
      */
     public function test_the_estimator_guards_its_async_answers_with_a_sequence(): void {
         $source = $this->amd_source('audience_estimator.js');
@@ -105,15 +101,13 @@ final class async_contract_test extends \basic_testcase {
         );
 
         /*
-         * Two comparisons per function, not one, and counted rather than merely found. Both the
-         * success path and the failure path have to be guarded: an answer that arrives late is
-         * just as stale when it is an error, and an error panel raised for a question the author
-         * has already changed is the same defect wearing different clothes.
+         * Two comparisons per function, counted rather than merely found. Both the success path
+         * and the failure path have to be guarded: an answer that arrives late is just as stale
+         * when it is an error.
          *
-         * Counting is what makes this bite. A first draft asserted only that "state.sequence"
-         * appeared somewhere in the body — and it passed with the .then guard deleted, because the
-         * capture line and the .catch guard still mentioned it. Mutation testing is the only
-         * reason that is not still true.
+         * Counting the comparison is what makes this bite: a check that "state.sequence" merely
+         * appears in the body would pass with the .then guard deleted, because the capture line
+         * and the .catch guard still mention it.
          */
         foreach (['function pollOnce()', 'function trigger(force)'] as $needle) {
             $body = $this->body_after($source, $needle);
@@ -139,14 +133,12 @@ final class async_contract_test extends \basic_testcase {
     /**
      * The notice modal is hidden in exactly one place, and it is not the click handler.
      *
-     * Hiding on click meant the modal closed before the server had answered. A dismissal or an
-     * acknowledgement that never arrived — an expired session, a network drop, a 500 — looked
-     * identical to one that did: the notice vanished, the failure went to the browser console, and
-     * the acknowledgement report simply had no row. For a plugin whose entire purpose is evidence
-     * that a notice was seen, that is the worst available failure mode.
+     * Hiding on click would close the modal before the server answered, so a dismissal or an
+     * acknowledgement that failed (an expired session, a network drop, a 500) would look identical
+     * to one that succeeded, and the acknowledgement report would silently lack the row.
      *
-     * The hide now happens only where the queue is empty, so a call that did not succeed leaves
-     * the notice on screen.
+     * The hide happens only where the queue is empty, so a call that did not succeed leaves the
+     * notice on screen.
      */
     public function test_the_notice_modal_is_hidden_only_when_the_queue_is_empty(): void {
         $source = $this->amd_source('notice.js');
@@ -168,10 +160,9 @@ final class async_contract_test extends \basic_testcase {
     /**
      * A second click cannot start a second write while the first is in flight.
      *
-     * Required by the change above, not incidental to it. modal.hide() on click was what made a
-     * double dismissal impossible; with the modal staying up until the server answers, the window
-     * is open again — and it is not only a fast double-tap, because modal_notice.js routes
-     * outside-click and escape into a synthetic close-button click.
+     * The modal stays up until the server answers (see the test above), so a second write can be
+     * started while the first is in flight — and not only by a fast double-tap, because
+     * modal_notice.js routes outside-click and escape into a synthetic close-button click.
      */
     public function test_the_notice_write_paths_are_guarded_against_re_entry(): void {
         $source = $this->amd_source('notice.js');
@@ -194,9 +185,8 @@ final class async_contract_test extends \basic_testcase {
     /**
      * The shipped bundles were rebuilt from the sources above.
      *
-     * amd/build is tracked and is what Moodle serves. A source fix committed without its rebuilt
-     * bundle changes nothing on any site, and the failure is silent — which is precisely the shape
-     * of defect this file exists to stop.
+     * Moodle serves amd/build, not amd/src, so a source fix committed without its rebuilt bundle
+     * changes nothing on any site.
      */
     public function test_the_built_bundles_carry_the_guards(): void {
         $root = $this->plugin_root();
@@ -206,7 +196,7 @@ final class async_contract_test extends \basic_testcase {
         $this->assertStringContainsString(
             'sequence',
             $estimator,
-            'amd/build/audience_estimator.min.js predates the sequence guard — run mdl grunt and commit the bundle.'
+            'amd/build/audience_estimator.min.js predates the sequence guard: rebuild it with grunt amd and commit the bundle.'
         );
 
         $notice = file_get_contents($root . '/amd/build/notice.min.js');
@@ -214,21 +204,19 @@ final class async_contract_test extends \basic_testcase {
         $this->assertStringContainsString(
             'inflight',
             $notice,
-            'amd/build/notice.min.js predates the in-flight guard — run mdl grunt and commit the bundle.'
+            'amd/build/notice.min.js predates the in-flight guard: rebuild it with grunt amd and commit the bundle.'
         );
     }
 
     /**
      * An automatic estimate is skipped when the criteria have not changed, and a click never is.
      *
-     * Auto mode fires on every change to the form — including the title and the body — so typing a
-     * headline used to blank the reach figure, queue an ad-hoc task and spend a round trip
-     * restoring the number that was already on screen, once per pause in typing. Each of those
-     * queued a job row that nothing deletes.
+     * Auto mode fires on every change to the form, the title and the body included, so without the
+     * comparison each pause in typing would blank the reach figure, queue an ad-hoc task and spend
+     * a round trip restoring the number already on screen.
      *
-     * The two halves have to be asserted together. Comparing at the debounce instead of inside
-     * trigger() would also have stopped the button working, and a dead Calculate button is a
-     * defect this panel has already shipped once.
+     * The two halves are asserted together: comparing at the debounce instead of inside trigger()
+     * would also stop the Calculate button working.
      */
     public function test_an_unchanged_estimate_is_not_re_queued_but_a_click_still_asks(): void {
         $source = $this->amd_source('audience_estimator.js');
@@ -241,9 +229,8 @@ final class async_contract_test extends \basic_testcase {
         );
 
         /*
-         * The comparison has to come BEFORE the side effects. Superseding the sequence or
-         * cancelling the poll first would abandon an estimate the author is still waiting for, so
-         * the order is part of the fix rather than an accident of layout.
+         * The comparison has to come before the side effects: superseding the sequence or
+         * cancelling the poll first would abandon an estimate the author is still waiting for.
          */
         $this->assertLessThan(
             strpos($body, 'stopPolling();'),

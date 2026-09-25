@@ -17,11 +17,11 @@
 namespace local_awareness;
 
 use local_awareness\persistent\awareness;
-use local_awareness\persistent\linkhistory;
 use local_awareness\persistent\noticelink;
+use local_awareness\persistent\noticeview;
 
 /**
- * Test cases
+ * Tests for creating, resetting, enabling and delivering notices, and for acting on them.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -53,14 +53,6 @@ final class awareness_test extends \advanced_testcase {
         set_config('allow_delete', $allowdeletion, 'local_awareness');
         set_config('cleanup_deleted_notice', $cleanup, 'local_awareness');
 
-        /*
-         * No cohort branch here. There was one, assigning a BARE id where the four sibling loops in
-         * this file all assign [id] — and create_notices_provider has never supplied a 'cohorts'
-         * key, so it never ran. Dead code that disagreed with its own neighbours about the shape of
-         * the value is worse than no code: the day the provider gained a cohort case it would have
-         * written a scalar into a field the persistent stores as a list, and the four loops that do
-         * cover the array shape would still have been green.
-         */
         foreach ($formdata as $data) {
             helper::create_new_notice($data);
         }
@@ -93,8 +85,8 @@ final class awareness_test extends \advanced_testcase {
      * The cohorts autocomplete posts a hidden '_qf__force_multiselect_submission' value so an
      * empty selection still submits. Core strips it in HTML_QuickForm_select::exportValue(), but
      * only inside its `!empty($this->_options)` branch — with no cohorts on the site the option
-     * list is empty and the marker survives. Stored as a cohort it matches nobody, so every
-     * notice created through the form became invisible to every user.
+     * list is empty and the marker survives. Stored as a cohort it would match nobody, hiding the
+     * notice from every user.
      *
      * @covers \local_awareness\helper::create_new_notice
      */
@@ -161,6 +153,8 @@ final class awareness_test extends \advanced_testcase {
      * @param array $formdata Array of form data to create notices
      */
     public function test_reset_notices(array $formdata): void {
+        global $DB;
+
         $this->setAdminUser();
 
         foreach ($formdata as $data) {
@@ -172,14 +166,18 @@ final class awareness_test extends \advanced_testcase {
 
         $allnotices = awareness::get_enabled_notices();
         $this->assertEquals(4, count($allnotices));
-        $oldnotice1 = array_shift($allnotices);
-        $oldnotice2 = array_shift($allnotices);
+        /*
+         * timemodified has one-second resolution, so every notice is moved an hour into the past
+         * rather than waiting for the clock: the reset below is then strictly later. Read back by
+         * id, because the enabled-notices cache still holds the values from before the move.
+         */
+        $DB->set_field('local_awareness', 'timemodified', time() - HOURSECS);
+        $oldnotice1 = new awareness(array_shift($allnotices)->get('id'));
+        $oldnotice2 = new awareness(array_shift($allnotices)->get('id'));
         // Only reset Notice 1.
-        sleep(1);
         helper::reset_notice($oldnotice1);
-        $allnotices = awareness::get_enabled_notices();
-        $newnotice1 = array_shift($allnotices);
-        $newnotice2 = array_shift($allnotices);
+        $newnotice1 = new awareness($oldnotice1->get('id'));
+        $newnotice2 = new awareness($oldnotice2->get('id'));
         $this->assertEquals("Notice 1", $newnotice1->get('title'));
         $this->assertGreaterThan($oldnotice1->get('timemodified'), $newnotice1->get('timemodified'));
         $this->assertEquals($oldnotice1->get('timecreated'), $newnotice1->get('timecreated'));
@@ -237,7 +235,7 @@ final class awareness_test extends \advanced_testcase {
      * @param array $formdata Data to test on.
      */
     public function test_user_notice($formdata): void {
-        global $USER;
+        global $DB, $USER;
 
         $this->setAdminUser();
         foreach ($formdata as $data) {
@@ -285,14 +283,23 @@ final class awareness_test extends \advanced_testcase {
         $this->assertEquals(2, count($usernotices));
         $this->assertEquals(1, count($USER->viewednotices));
 
-        // User 1 acknowledged notice 1, there will be 1 notice for the user.
+        // User 1 acknowledged cohort notice 1, there will be 1 notice for the user.
         helper::acknowledge_notice($cohortnotice1);
         $usernotices = helper::retrieve_user_notices('/my/');
         $this->assertEquals(1, count($usernotices));
         $this->assertEquals(2, count($USER->viewednotices));
 
+        /*
+         * Move the recorded interactions an hour back, and the notices further still, so the reset
+         * below is strictly later than the dismissal without waiting for the clock, while the
+         * acknowledgement stays later than the notice it acknowledges. The user's cached views are
+         * dropped, because the set_field() calls bypass the persistents that would purge them.
+         */
+        $DB->set_field('local_awareness_lastview', 'timemodified', time() - HOURSECS, ['userid' => $user1->id]);
+        $DB->set_field('local_awareness', 'timemodified', time() - 2 * HOURSECS);
+        noticeview::purge_user_cache((int) $user1->id);
+
         // Admin user reset notice 1.
-        sleep(1);
         $this->setAdminUser();
         helper::reset_notice($notice1);
 
@@ -312,6 +319,8 @@ final class awareness_test extends \advanced_testcase {
      * @param array $formdata Data to test on.
      */
     public function test_user_hlink_interact($formdata): void {
+        global $DB;
+
         $this->setAdminUser();
         foreach ($formdata as $data) {
             if (property_exists($data, 'cohorts')) {
@@ -332,14 +341,11 @@ final class awareness_test extends \advanced_testcase {
         $link2 = array_shift($links);
 
         /*
-         * Delivery through the real read path, because track_link() now requires it. The site
-         * switch is off by default, so turning it on is a precondition rather than the subject.
-         *
-         * select_for_display() hands over the HEAD of the queue, and with four applicable notices
-         * that head is not guaranteed to be the one this test picked with array_shift(). It is
-         * today, and the assertion below is what makes that a checked fact instead of a lucky one:
-         * change the queue order and this fails loudly rather than quietly clicking links on a
-         * notice nobody delivered.
+         * track_link() records clicks only on a notice this session was served, so delivery goes
+         * through the real read path; the site switch is off by default, so enabling it is a
+         * precondition. select_for_display() serves the head of the queue, which with four
+         * applicable notices need not be the one array_shift() picked: the assertion below checks
+         * it rather than assuming it.
          */
         set_config('enabled', 1, 'local_awareness');
         \local_awareness\external\get_notices::execute('/my/');
@@ -348,11 +354,15 @@ final class awareness_test extends \advanced_testcase {
             'the queue served a different notice, so this test would be clicking links on an undelivered one'
         );
 
-        // Clink on links.
+        // Click on links.
         helper::track_link($link1->id);
         helper::track_link($link2->id);
-        $userlinks = linkhistory::count_clicked_links($user1->id, $notice1->get('id'));
-        $this->assertEquals(2, count($userlinks));
+        foreach ([$link1, $link2] as $link) {
+            $this->assertSame(
+                1,
+                $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $link->id, 'userid' => $user1->id])
+            );
+        }
     }
 
 
@@ -438,7 +448,7 @@ final class awareness_test extends \advanced_testcase {
         ];
 
         helper::create_new_notice($formdata);
-        $allnotices = awareness::get_all_notices();
+        $allnotices = awareness::get_records();
         $notice = array_shift($allnotices);
 
         // Must see 1 notice.
@@ -467,7 +477,7 @@ final class awareness_test extends \advanced_testcase {
         ];
 
         helper::create_new_notice($formdata);
-        $allnotices = awareness::get_all_notices();
+        $allnotices = awareness::get_records();
         $notice = array_shift($allnotices);
 
         // Must see 1 notice.
@@ -475,7 +485,7 @@ final class awareness_test extends \advanced_testcase {
 
         // After notice is dismissed, should still see 1 as it's required.
         helper::dismiss_notice($notice);
-        // User should be logged out after dismissing.
+        // A fresh session: dismissing does not settle a notice that requires acknowledgement.
         $this->setAdminUser();
         $this->assertCount(1, helper::retrieve_user_notices('/my/'));
 
@@ -492,18 +502,9 @@ final class awareness_test extends \advanced_testcase {
     /**
      * A Blocking notice comes back when it is refused, for everybody, and logs nobody out.
      *
-     * This replaces the forced-logout test, and pins two deliberate changes rather than one.
-     *
-     * Nobody is ejected. The session is left alone on both write paths, so the assertion that used
-     * to read "user should be logged out" is now the opposite and is made for the ordinary user
-     * as well as the admin — the half most likely to regress if the levels are ever rewired.
-     *
-     * The site administrator is no longer exempt from being asked again. must_reshow() used to
-     * carry `&& !is_siteadmin()` on the forced-logout clause, and it was there to stop an admin
-     * being ejected, not to excuse them from reading notices — a notice requiring acknowledgement
-     * has always come back for admins too. With the ejection gone the exemption had nothing left
-     * to protect, and leaving it would have made Blocking the one level an admin could dismiss
-     * for good by accident.
+     * Refusing leaves the session alone, for an ordinary user as well as the admin. The site
+     * administrator is not exempt from being asked again, just as a notice requiring
+     * acknowledgement comes back for admins too.
      *
      * @covers \local_awareness\helper::retrieve_user_notices
      */
@@ -529,7 +530,7 @@ final class awareness_test extends \advanced_testcase {
         ]);
 
         $notices = [];
-        foreach (awareness::get_all_notices() as $candidate) {
+        foreach (awareness::get_records() as $candidate) {
             $notices[$candidate->get('title')] = $candidate;
         }
         $notice = $notices['Notice 1'];

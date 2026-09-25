@@ -19,15 +19,11 @@ namespace local_awareness\local;
 /**
  * Tests the scheduling-window truth table and, above all, the relation between its projections.
  *
- * BIZ-11 was two predicates that disagreed: the cached query in awareness::get_enabled_notices()
- * dropped any notice with only one bound set, while helper::is_within_active_window() had its own
- * opinion. Latent, because the editor writes both bounds together — but the plugin's own
- * editor_state carried a warning class invented to paper over one half of it.
- *
- * The load-bearing test here is test_the_prefilter_is_a_superset_of_the_decision. The prefilter is
- * deliberately LOOSER than the decision, and that asymmetry is the thing a future edit is most
- * likely to "tidy" into symmetry — which would be a real bug, because the query is cached with no
- * TTL and a notice whose start passes while the cache is warm would never appear at all.
+ * The load-bearing test is test_the_prefilter_is_a_superset_of_the_decision. The prefilter is
+ * deliberately looser than the decision, for the reason given in {@see window}: made symmetric, it
+ * would keep a notice whose start passes while the enabled-notices cache is warm from ever
+ * appearing. tests/persistent/enabled_notices_window_test.php runs the same invariant against the
+ * real query.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -78,13 +74,8 @@ final class window_test extends \basic_testcase {
     /**
      * The cached prefilter never hides a notice the display decision would show.
      *
-     * This is the invariant the whole class exists for. The prefilter omits the LOWER bound on
-     * purpose — awareness::get_enabled_notices() caches its result in a MODE_APPLICATION store with
-     * no TTL, purged only when a notice is written, so a condition that turns from false to TRUE as
-     * the clock moves would leave a scheduled notice permanently outside the cached set.
-     *
-     * Stated as an implication rather than an equality, because the two are deliberately NOT equal:
-     * open implies prefiltered, never the reverse.
+     * The prefilter omits the lower bound on purpose ({@see window}), so this is stated as an
+     * implication rather than an equality: open implies prefiltered, never the reverse.
      *
      * @return void
      */
@@ -109,10 +100,9 @@ final class window_test extends \basic_testcase {
         }
 
         /*
-         * Non-vacuity, and the point of the whole test: the implication above is satisfied trivially
-         * by a prefilter that matches everything AND by one identical to is_open(). This asserts the
-         * prefilter is genuinely in between — it lets rows through that is_open() then rejects,
-         * which is exactly the not-yet-started case the live clock has to catch.
+         * Non-vacuity: the implication above also holds for a prefilter identical to is_open().
+         * This asserts the prefilter lets through rows is_open() then rejects, the not-yet-started
+         * case the live clock has to catch.
          */
         $this->assertGreaterThan(0, $strictlylooser, 'the prefilter is not looser than the decision');
     }
@@ -135,26 +125,21 @@ final class window_test extends \basic_testcase {
     }
 
     /**
-     * Both SQL builders name each placeholder once per occurrence.
-     *
-     * fix_sql_params() counts placeholder OCCURRENCES against the parameter array and throws
-     * duplicateparaminsql when a name appears more often than the array explains — which is why
-     * open_sql() binds the same instant under two names rather than reusing one.
+     * The SQL builder names each placeholder once and binds exactly the names it uses.
      *
      * @return void
      */
-    public function test_the_sql_builders_bind_every_placeholder_exactly_once(): void {
-        foreach ([window::open_prefilter_sql('a', self::NOW), window::open_sql('b', self::NOW)] as [$sql, $params]) {
-            preg_match_all('/:([a-z0-9_]+)/', $sql, $found);
+    public function test_the_sql_builder_binds_every_placeholder_exactly_once(): void {
+        [$sql, $params] = window::open_prefilter_sql('a', self::NOW);
+        preg_match_all('/:([a-z0-9_]+)/', $sql, $found);
 
-            $this->assertNotEmpty($found[1], 'the fragment names no placeholders at all');
-            $this->assertSame(count($found[1]), count(array_unique($found[1])), 'a name appears twice');
-            $this->assertSame(
-                array_values(array_unique($found[1])),
-                array_values(array_keys($params)),
-                'the named placeholders and the bound parameters disagree'
-            );
-        }
+        $this->assertNotEmpty($found[1], 'the fragment names no placeholders at all');
+        $this->assertSame(count($found[1]), count(array_unique($found[1])), 'a name appears twice');
+        $this->assertSame(
+            array_values(array_unique($found[1])),
+            array_values(array_keys($params)),
+            'the named placeholders and the bound parameters disagree'
+        );
     }
 
     /**
@@ -163,8 +148,8 @@ final class window_test extends \basic_testcase {
      * @return void
      */
     public function test_distinct_prefixes_do_not_collide(): void {
-        [, $first] = window::open_sql('one', self::NOW);
-        [, $second] = window::open_sql('two', self::NOW);
+        [, $first] = window::open_prefilter_sql('one', self::NOW);
+        [, $second] = window::open_prefilter_sql('two', self::NOW);
 
         $this->assertSame([], array_intersect_key($first, $second));
     }

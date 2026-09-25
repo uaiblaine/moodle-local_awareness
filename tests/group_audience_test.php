@@ -16,11 +16,16 @@
 
 namespace local_awareness;
 
+use core_reportbuilder\exception\report_access_exception;
+use core_reportbuilder\system_report_factory;
 use core_table\local\filter\filter;
 use core_table\local\filter\integer_filter;
 use local_awareness\audience\rule_describer;
+use local_awareness\external\render_notice;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
+use local_awareness\reportbuilder\local\systemreports\acknowledged_notice;
+use local_awareness\reportbuilder\local\systemreports\dismissed_notice;
 use local_awareness\table\all_notices;
 use local_awareness\table\all_notices_filterset;
 
@@ -29,9 +34,10 @@ use local_awareness\table\all_notices_filterset;
  *
  * Receiving is membership. Reaching is core's separate-groups rule: a teacher without
  * moodle/site:accessallgroups neither sees nor changes a notice aimed only at groups they are not
- * in, and the four places that enforce it — the page resolver, the action methods, the file gate's
- * author branch and the manage list's query — are each pinned here against the same three notices,
- * with an editing teacher as the control that the capability opens all of them.
+ * in, and the places that enforce it — the page resolver, the action methods, the file gate's
+ * author branch, the manage list's query, the list's preview web service and the two system
+ * reports' can_view() — are each pinned here against the same notices, with an editing teacher as
+ * the control that the capability opens all of them.
  *
  * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
  *
@@ -41,6 +47,9 @@ use local_awareness\table\all_notices_filterset;
  * @covers     \local_awareness\helper
  * @covers     \local_awareness\table\all_notices
  * @covers     \local_awareness\audience\rule_describer
+ * @covers     \local_awareness\external\render_notice
+ * @covers     \local_awareness\reportbuilder\local\systemreports\acknowledged_notice
+ * @covers     \local_awareness\reportbuilder\local\systemreports\dismissed_notice
  */
 final class group_audience_test extends \advanced_testcase {
     /** @var \stdClass The course, in separate groups mode. */
@@ -188,11 +197,9 @@ final class group_audience_test extends \advanced_testcase {
     /**
      * A member of a group outsiders cannot see still receives its notice: delivery is membership.
      *
-     * MEMBERS visibility is the strictest a notice can reach, and that is core's rule rather than
-     * this plugin's: groups_create_group() and groups_update_group() force participation off for
-     * OWN and NONE visibility (group/lib.php, identical on 4.5 and 5.2), and a group that cannot
-     * participate is never offered for anything — the second half of this test is the control that
-     * the scope refuses one, so nobody later "fixes" the picker into offering it.
+     * MEMBERS is the strictest visibility a notice can target: groups_create_group() and
+     * groups_update_group() force participation off for OWN and NONE visibility (on 4.5 and 5.2
+     * alike), and the scope refuses a group that cannot participate, which the second half pins.
      *
      * The non-member is the control that the group still means something.
      */
@@ -236,9 +243,9 @@ final class group_audience_test extends \advanced_testcase {
      *
      * groups_get_user_groups() runs its answer through the group visibility rules unless the caller
      * asks for hidden groups: a MEMBERS group counts as hidden (any visibility but ALL does), and
-     * for someone ELSE's id it survives only while the asker is a member too. Delivery must not
-     * turn on who resolved the user, so the flag is set — and this is what would notice if it were
-     * unset: the same membership, asked by a stranger, comes back the same.
+     * for someone else's id it survives only while the asker is a member too. Delivery must not
+     * depend on who resolved the user, so helper::user_group_ids() passes includehidden; asked by
+     * a stranger, the same membership must come back.
      */
     public function test_membership_reads_the_same_whoever_is_asking(): void {
         $generator = $this->getDataGenerator();
@@ -306,6 +313,73 @@ final class group_audience_test extends \advanced_testcase {
         [$titles, $total] = $this->listed((int) $this->course->id);
         $this->assertEqualsCanonicalizing(['Red briefing', 'Everyone'], $titles);
         $this->assertSame(2, $total);
+    }
+
+    /**
+     * The list's preview and both reports keep to the same reach as the list.
+     *
+     * The preview answers an unreachable notice as it answers a missing one, as the pages do. The
+     * reports are built the way core's report web services build them, from the client's
+     * parameters, so can_view() is the only gate they meet. Both roles are given the course reports
+     * capability here; the editing teacher, who may access all groups, is the control.
+     */
+    public function test_the_preview_and_the_reports_keep_to_the_reach(): void {
+        global $DB;
+
+        $context = \context_course::instance($this->course->id);
+        foreach (['teacher', 'editingteacher'] as $shortname) {
+            $roleid = (int) $DB->get_field('role', 'id', ['shortname' => $shortname]);
+            assign_capability('local/awareness:viewreportscourse', CAP_ALLOW, $roleid, $context->id, true);
+        }
+        accesslib_clear_all_caches_for_unit_testing();
+        $reports = [acknowledged_notice::class, dismissed_notice::class];
+
+        $this->setUser($this->teacher);
+        $this->assertSame((int) $this->forred->get('id'), (int) render_notice::execute((int) $this->forred->get('id'))['id']);
+        try {
+            render_notice::execute((int) $this->forblue->get('id'));
+            $this->fail('the preview rendered a notice aimed at another group for a confined author');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('notification:noticedoesnotexist', $e->errorcode);
+        }
+        foreach ($reports as $class) {
+            $this->assertInstanceOf($class, $this->report($class, $this->forred));
+            try {
+                $this->report($class, $this->forblue);
+                $this->fail("{$class} opened for a confined author on a notice aimed at another group");
+            } catch (report_access_exception $e) {
+                $this->assertInstanceOf(report_access_exception::class, $e);
+            }
+        }
+
+        $this->setUser($this->editor);
+        $this->assertSame((int) $this->forblue->get('id'), (int) render_notice::execute((int) $this->forblue->get('id'))['id']);
+        foreach ($reports as $class) {
+            $this->assertInstanceOf($class, $this->report($class, $this->forblue));
+        }
+    }
+
+    /**
+     * A notice's report, built as core's retrieve web service builds it.
+     *
+     * The report manager caches an instance per report row and user, not per parameters, so the
+     * cache is reset before each build.
+     *
+     * @param string $class The system report class.
+     * @param awareness $notice The notice.
+     * @return \core_reportbuilder\system_report
+     */
+    private function report(string $class, awareness $notice): \core_reportbuilder\system_report {
+        \core_reportbuilder\manager::reset_caches();
+
+        return system_report_factory::create(
+            $class,
+            \context_system::instance(),
+            'local_awareness',
+            '',
+            0,
+            ['noticeid' => $notice->get('id')]
+        );
     }
 
     /**

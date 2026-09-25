@@ -27,11 +27,9 @@ use local_awareness\local\notice_payload;
 /**
  * One saved notice, rendered as the reader would get it, for the manage list's preview.
  *
- * The list used to carry each notice's rendered content in a data attribute for a plain dialogue
- * to show. That dialogue knew nothing of layouts, positions, images or slides, so the one place
- * an administrator browses live notices previewed every one of them as the classic dialogue. The
- * payload is the same the reader's queue receives; only the gate differs, because the audience is
- * not the question here - the viewer's standing over the notice is.
+ * The payload is the one the reader's queue receives ({@see notice_payload}), so the preview shows
+ * the notice's layout, position, image and slides. Only the gate differs: the question here is the
+ * viewer's standing over the notice, not whether they are in its audience.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -56,10 +54,15 @@ class render_notice extends external_api {
      * viewer reads the notice they report on. The context is the notice's own scope, resolved
      * server-side from the id.
      *
+     * Every refusal is the same "no such notice", as {@see helper::resolve_notice_as_author()}
+     * answers the pages: an id naming nothing, a notice outside the viewer's authority, and one
+     * aimed only at groups the viewer may not reach, which the manage list does not show them. The
+     * gate is asked before validate_context(), whose login check for another course's context
+     * would otherwise refuse differently and say that the id names a notice in some course.
+     *
      * @param int $noticeid The notice id.
      * @return array As notice_payload::structure() declares.
-     * @throws \moodle_exception When the id names nothing; resolve_notice() fails closed itself.
-     * @throws \required_capability_exception When the viewer holds neither verb over the notice.
+     * @throws \moodle_exception notification:noticedoesnotexist, for every refusal.
      */
     public static function execute(int $noticeid): array {
         $params = self::validate_parameters(self::execute_parameters(), ['noticeid' => $noticeid]);
@@ -70,10 +73,13 @@ class render_notice extends external_api {
         }
 
         $scope = author_scope::of($notice);
-        self::validate_context($scope->context());
-        if (!helper::require_author($scope, 'manage', false) && !helper::require_author($scope, 'viewreports', false)) {
-            throw new \required_capability_exception($scope->context(), 'local/awareness:viewreports', 'nopermissions', '');
+        $authorised = helper::require_author($scope, 'manage', false) || helper::require_author($scope, 'viewreports', false);
+        if (!$authorised || !helper::may_reach_groups($notice)) {
+            throw new \moodle_exception('notification:noticedoesnotexist', 'local_awareness');
         }
+        // A notice whose course is gone has no course context; require_author() admitted the site
+        // capability for it at the system context, so that is the context validated.
+        self::validate_context($scope->exists() ? $scope->context() : \context_system::instance());
 
         return notice_payload::build($notice);
     }

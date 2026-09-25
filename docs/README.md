@@ -117,12 +117,14 @@ proposal; the decisions that shape the markup are summarised below.
   of backgrounds. The mockups pair each background token with its own ink token,
   which is also what keeps them legible when the palette flips to dark.
 
-- **Row action menus use `.dropdown`, never `.btn-group`.** Boost forces
+- **Row action menus use `.dropdown`, never `.btn-group`.** Boost 5.x forces
   `.table-responsive .dropdown { position: static }` precisely so the menu's
   containing block lands outside the scroll container and escapes its overflow
   clip. `.btn-group` is `position: relative` and puts the clip straight back —
   the last row's menu is cut off. The shipped page uses core's `\action_menu`,
-  which emits the structure that rule expects.
+  which emits the structure that rule expects. Boost 4.5 has no such rule and
+  wraps a responsive table in `.no-overflow`, so `styles.css` supplies the same
+  rule for that wrapper behind the Bootstrap 4 gate.
 
 - **The sticky footer carries buttons only.** Core's raw pattern: icon above a
   centred label, no colour variant, the row centred, no status text. It is

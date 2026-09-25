@@ -19,28 +19,16 @@ namespace local_awareness\local;
 /**
  * Guards the notice dialogue's accessibility contract and the claims its strings make.
  *
- * Nothing else in the pipeline reads any of this. phpcs reads PHP, the mustache lint reads
- * structure, stylelint reads CSS, and none of them resolves a string id, compares a CSS selector
- * against the element a JS file puts the class on, or notices that a help string describes a
- * different setting. Every defect pinned here shipped on all supported branches with CI green.
+ * phpcs, the mustache lint and stylelint never resolve a string id, compare a CSS selector with
+ * the element a JS file puts the class on, or read what a help string promises. Pinned here:
+ *  - every string id a template asks for exists;
+ *  - aria-modal and the accessible name sit on the element with role="dialog";
+ *  - Tab is left to core's FocusLock, with no second trap in the plugin;
+ *  - the close button is actuated through a selector scoped to the dialogue, and pressed once;
+ *  - the refused-click animation class is on the element the stylesheet animates;
+ *  - neither language pack claims that acknowledgement logs the reader out.
  *
- * What shipped, and why prose was not enough to stop it:
- *  - The close button announced itself to screen readers as the literal "[[close]]", because
- *    get_string('close', 'core') does not exist; core's own modal uses closebuttontitle.
- *  - The dialogue carried no aria-modal and put its accessible name on the inner element rather
- *    than the one with role="dialog", so the name was never announced with the dialogue.
- *  - The only feedback telling a user that a refused backdrop click was deliberate was a CSS rule
- *    that could not match: the class went on the root, the selector asked for a .modal-dialog
- *    inside .awareness, and .awareness IS the .modal-dialog.
- *  - The plugin carried a second, weaker Tab trap on top of core's FocusLock.
- *  - The close button was actuated through a document-wide [data-action="close"] selector, which
- *    core also uses in tool_lp and mod_assign templates.
- *  - The acknowledgement help string promised a logout that the setting does not perform, and the
- *    checkbox label made the same claim before JavaScript corrected it.
- *
- * Every scan here asserts it found something before it asserts anything about what it found. A
- * pattern that silently stops matching is the failure mode these tests exist to prevent, and it
- * has already happened once in this repository's history to a sweep written with confidence.
+ * Every scan asserts it found something before it asserts anything about what it found.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -74,8 +62,7 @@ final class modal_contract_test extends \basic_testcase {
     /**
      * Every Mustache template the plugin ships.
      *
-     * Swept rather than listed: a template added to a new subdirectory is then covered by default,
-     * which is the failure an inclusion list produces silently.
+     * Swept rather than listed, so a template added to a new subdirectory is covered by default.
      *
      * @return array Relative path => contents.
      */
@@ -96,10 +83,9 @@ final class modal_contract_test extends \basic_testcase {
     /**
      * Every string id a template asks core or this plugin to resolve actually exists.
      *
-     * A missing id does not throw and does not warn. get_string() returns the literal
-     * "[[identifier]]", so it renders into the page — and when the sink is an aria-label, the only
-     * person who ever hears it is the one least able to report it. That is exactly how
-     * aria-label="[[close]]" survived on 4.5, 5.1 and 5.2 at once.
+     * A missing id does not throw: get_string() returns the literal "[[identifier]]", warning only
+     * at developer debug level, so it renders into the page. In an aria-label only a screen reader
+     * user ever hears it. Core has no 'close' string, for example; its modal uses closebuttontitle.
      *
      * @return void
      */
@@ -129,10 +115,9 @@ final class modal_contract_test extends \basic_testcase {
     /**
      * The dialogue's accessible name and aria-modal sit on the element that carries role="dialog".
      *
-     * Assistive technology announces the name of the element holding the dialogue role. Core puts
-     * both attributes there (lib/templates/modal.mustache); this template used to put the name one
-     * level in, on the role="document" element, where it is never announced as the dialogue's name.
-     * That matters most for a notice that deliberately cannot be escaped by clicking away.
+     * Assistive technology announces the name of the element holding the dialogue role, as core's
+     * lib/templates/modal.mustache does; a name on the inner role="document" element is never
+     * announced as the dialogue's.
      *
      * @return void
      */
@@ -155,10 +140,8 @@ final class modal_contract_test extends \basic_testcase {
      * The plugin does not reimplement the Tab focus trap that core already installs.
      *
      * core/modal calls FocusLock.trapFocus() from attachToDOM(), and focuslock binds keydown in the
-     * CAPTURE phase — so a jQuery handler here always runs second, on a key core has already acted
-     * on. The copy this plugin carried also matched a narrower set of elements than core's: it
-     * could not reach a select, a textarea, or anything with tabindex inside a notice body, all of
-     * which an author can put there through the content editor.
+     * capture phase, so a jQuery handler here always runs second, on a key core has already acted
+     * on.
      *
      * @return void
      */
@@ -183,10 +166,10 @@ final class modal_contract_test extends \basic_testcase {
     /**
      * The close button is never actuated through an unscoped, document-wide selector.
      *
-     * [data-action="close"] is not private to this plugin. Core matches it in
+     * [data-action="close"] is not private to this plugin: core uses it in
      * admin/tool/lp/templates/scale_configuration_page.mustache and in mod_assign's grading filter
-     * dropdown, on every supported branch — so an unscoped trigger fired while a notice sits over
-     * one of those pages also actuates the other control.
+     * dropdown, so an unscoped trigger fired while a notice sits over one of those pages also
+     * actuates the other control.
      *
      * @return void
      */
@@ -201,19 +184,65 @@ final class modal_contract_test extends \basic_testcase {
 
         // Control: the button must still be actuated somewhere, or the assertion above is free.
         $this->assertStringContainsString(
-            'SELECTORS.CLOSE_BUTTON).trigger(',
+            'getModal().find(SELECTORS.CLOSE_BUTTON).first().trigger(',
             $js,
             'The refused-exit paths must still route through the close button so the dismissal is recorded.'
         );
     }
 
     /**
+     * A backdrop click or Escape presses one close button, not every one the selector matches.
+     *
+     * jQuery's trigger() clicks every element in the collection, and the selector matches the header
+     * cross, the footer Close and Not now, so an unnarrowed trigger runs the close handler once per
+     * button. The reader's queue survives that only because of its in-flight guard; the previews,
+     * only because the first destroy() strips the handlers from the rest.
+     *
+     * @return void
+     */
+    public function test_each_exit_path_presses_one_close_button(): void {
+        $js = $this->read('amd/src/modal_notice.js');
+        $template = $this->read('templates/modal_notice.mustache');
+
+        // The force: the template really carries several buttons the selector matches.
+        $this->assertGreaterThanOrEqual(
+            2,
+            substr_count($template, 'data-action="close"'),
+            'The template no longer carries several close buttons, so this test guards nothing.'
+        );
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/SELECTORS\.CLOSE_BUTTON\)\s*\.trigger\(/',
+            $js,
+            'A trigger() on every close button runs the close handler once per button.'
+        );
+
+        // Both exit paths go through the one helper that narrows the collection.
+        $start = strpos($js, 'ModalNotice.prototype.registerEventListeners = function()');
+        $this->assertNotFalse($start, 'registerEventListeners() is gone, so the scan below would pass blind.');
+        $end = strpos($js, "\n        };", $start);
+        $this->assertNotFalse($end, 'registerEventListeners() has no end at its indent.');
+        $this->assertSame(
+            2,
+            substr_count(substr($js, $start, $end - $start), 'pressClose('),
+            'The backdrop and the Escape handler must each press the close button through pressClose().'
+        );
+
+        // Moodle serves amd/build, so the fix only counts once the bundle carries it.
+        $this->assertStringContainsString(
+            '.first().trigger("click")',
+            $this->read('amd/build/modal_notice.min.js'),
+            'amd/build/modal_notice.min.js predates the single press: rebuild it.'
+        );
+    }
+
+    /**
      * The class the JS toggles for the refused-click animation is the class the stylesheet animates.
      *
-     * The JS puts jelly-anim on the element that must move. A selector that asks for a descendant
-     * after it therefore cannot match, which is what shipped: the class went on getRoot() and the
-     * rule read `.awareness.jelly-anim .modal-dialog`, while `awareness` is itself the
-     * .modal-dialog. The user got no signal that their click had been refused on purpose.
+     * The JS puts jelly-anim on the element that must move, so a rule styling a descendant of it
+     * cannot match: `.awareness.jelly-anim .modal-dialog` finds nothing, because .awareness is
+     * itself the .modal-dialog. Without the animation the reader gets no sign that the backdrop
+     * click was refused on purpose.
      *
      * @return void
      */
@@ -223,8 +252,8 @@ final class modal_contract_test extends \basic_testcase {
 
         $this->assertStringContainsString("addClass('jelly-anim')", $js, 'The refused-click feedback is gone from the JS.');
 
-        // Comments are stripped first: this file documents the defect in prose beside the rule that
-        // fixes it, and a scan that reads the prose as a selector reports the explanation as the bug.
+        // Comments are stripped first: the stylesheet's prose beside the rule mentions jelly-anim,
+        // and the scan must not read that prose as a selector.
         $rules = (string) preg_replace('#/\*.*?\*/#s', '', $css);
         preg_match_all('/^([^{}\n][^{}]*jelly-anim[^{}]*)\{/m', $rules, $matches);
         $selectors = array_map('trim', $matches[1]);
@@ -244,14 +273,12 @@ final class modal_contract_test extends \basic_testcase {
     /**
      * Neither language pack claims that acknowledgement logs the reader out.
      *
-     * Requiring acknowledgement and ending the session are independent settings, and only the
-     * second ends a session. Both packs described the first as doing the second, so an author who
-     * read the help believed they had already asked for a logout. The checkbox label made the same
-     * claim to the reader before JavaScript replaced it — and if that request lost, the claim stood.
+     * Acknowledgement records the reader's consent and nothing else: the plugin never ends a
+     * session, so a help text or checkbox label promising a logout misleads authors and readers.
      *
-     * Each row also carries a SAMPLE: a sentence of the kind a drifting pack would plausibly
-     * contain, written out literally rather than assembled from the phrase list. That
-     * independence is the whole point of it — see the control at the end of the test.
+     * Each row also carries a sample: a sentence of the kind a drifting pack would plausibly
+     * contain, written out literally rather than assembled from the phrase list, so the control at
+     * the end of the test can fail.
      *
      * @return array Language directory => list of forbidden substrings, plus an offending sample.
      */
@@ -301,15 +328,9 @@ final class modal_contract_test extends \basic_testcase {
         }
 
         /*
-         * Control: the phrase list must be able to catch a pack that drifts.
-         *
-         * It is run against $sample, which the provider writes out as a literal sentence — NOT
-         * assembled from the phrase list. An earlier version of this control built its probe by
-         * interpolating each phrase into "Prefix {phrase} suffix" and then searched it with the
-         * same list, so it was true by construction: emptying the list, or misspelling every
-         * phrase in it, left the guarded assertions above making no assertions at all and the
-         * control still green. That is precisely the failure this control exists to prevent, and
-         * it is why the probe has to come from somewhere the list cannot reach.
+         * Control: the phrase list must be able to catch a pack that drifts. $sample is a literal
+         * sentence, not built from the list, so emptying or misspelling the list fails here
+         * instead of leaving the assertions above unable to fail.
          */
         $lowered = \core_text::strtolower($sample);
         $hits = 0;

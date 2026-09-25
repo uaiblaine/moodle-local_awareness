@@ -27,34 +27,26 @@ namespace local_awareness\local;
 /**
  * Builds the SQL that narrows a {role_assignments} lookup to the contexts a role rule names.
  *
- * Two places ask which role assignments a notice's rule covers, and they ask it differently.
- * helper::user_matches_role_filter() asks about one user and reads the roles back;
- * audience\estimator asks how many users there are and tests membership inside an EXISTS. The
- * predicate is the same question either way, and it used to be written out in both — thirty lines
- * apiece, differing only in what the local variables were called. They are one definition now, so
- * the display path, the write path and the audience estimate cannot answer differently.
+ * helper::user_matches_role_filter() asks it about one user and reads the roles back;
+ * audience\estimator tests membership inside an EXISTS to count users. One definition keeps the
+ * display path, the write path and the audience estimate from answering differently.
  *
- * The fragments are built to sit in a query whose {role_assignments} row is aliased `ra`, which is
- * the shape both callers already had.
+ * The fragments attach to the {role_assignments} row whose alias the caller passes ('ra' by
+ * default).
  */
 class role_scope {
     /**
-     * Join and where fragments restricting `ra` to the contexts the rule covers.
+     * Join and where fragments restricting the $ra row to the contexts the rule covers.
      *
-     * filter_category and filter_course are read here in their SECOND meaning — as the scope of the
+     * filter_category and filter_course are read here in their second meaning: as the scope of the
      * role question, not as page-context filters in their own right. A category context consults
-     * only the category list; a course context takes the UNION of the two lists, so holding the
+     * only the category list; a course context takes the union of the two lists, so holding the
      * role in any course of a listed category counts even when that course is not one named.
      *
-     * The estimator now asks this question several times in ONE statement — once for the combined
-     * count and once per rule for the breakdown chips — so both the aliases and the parameter names
-     * have to be unique per instance. $suffix is what makes them so. Moodle counts placeholder
-     * OCCURRENCES against the parameter array and rejects any name that appears twice, so reusing a
-     * fragment verbatim is not an option; it has to be rebuilt under a fresh suffix. The default is
-     * empty, which is exactly the single-fragment SQL this produced before. The two names written
-     * by hand here, rsysctx and rctxlvl, carry it for the same reason the get_in_or_equal prefixes
-     * below do; the context-level branches are mutually exclusive, so rctxlvl is never emitted
-     * twice by one call.
+     * $suffix makes every alias and parameter name unique, because the estimator embeds this
+     * fragment several times in one statement (the combined count and each rule's breakdown chip)
+     * and fix_sql_params() rejects a named placeholder that appears more than once. The
+     * context-level branches are mutually exclusive, so one call never emits rctxlvl twice.
      *
      * @param array $filters Decoded filtervalues, or normalised estimator criteria.
      * @param int $rolectx Context level from filter_role_context; 0 means any context.

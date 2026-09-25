@@ -133,12 +133,12 @@ function xmldb_local_awareness_upgrade($oldversion) {
 
     if ($oldversion < 2026081103) {
         /*
-         * local_awareness_hlinks_his grows one row per link click and is queried only by hlinkid
-         * (the join in linkhistory::count_clicked_links) and by userid (its WHERE, and the privacy
-         * erasure path), yet it had no index on either. Moodle never emits a real FOREIGN KEY
-         * constraint — sql_generator::$foreign_keys is false on every driver — so these declare
-         * the relationships and create the two indexes, without failing on rows whose hlinkid no
-         * longer resolves.
+         * local_awareness_hlinks_his grows one row per link click and is queried by hlinkid (the
+         * joins to the notice's links) and by userid (privacy export and erasure), with no index on
+         * either. Moodle emits no real FOREIGN KEY constraint
+         * (sql_generator::$foreign_keys is false on every driver), so these keys declare the
+         * relationships and build the two indexes without failing on rows whose hlinkid no longer
+         * resolves.
          */
         $table = new xmldb_table('local_awareness_hlinks_his');
 
@@ -243,11 +243,7 @@ function xmldb_local_awareness_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026081503) {
-        /*
-         * Accent-insensitive notice search. On PostgreSQL it needs the unaccent extension, which
-         * is DDL and therefore belongs to upgrade rather than to the search request. An account
-         * without the privilege keeps accent-sensitive search; see helper::ensure_unaccent().
-         */
+        // Accent-insensitive notice search on PostgreSQL; see helper::ensure_unaccent().
         \local_awareness\helper::ensure_unaccent();
 
         upgrade_plugin_savepoint(true, 2026081503, 'local', 'awareness');
@@ -255,20 +251,13 @@ function xmldb_local_awareness_upgrade($oldversion) {
 
     if ($oldversion < 2026082303) {
         /*
-         * ack_action indexed a column with exactly two values. Around half the table qualifies for
-         * either one, so no planner will choose it — the index was paid for on every insert and
-         * read by nothing.
-         *
-         * Every predicate in the plugin that names action names noticeid beside it:
-         * helper::has_acknowledgement_record() on the dismissal write path, both system reports,
-         * and the two correlated subqueries behind the notice datasource's ack_count and
-         * dismiss_count columns, which run once per notice row. The composite is what those want.
-         *
-         * The two datasources that filter on action ALONE are the honest cost of this trade, and
-         * whether they were ever served by ack_action depended on a site's accept/dismiss ratio.
-         * The composite's leading column also duplicates the noticeid foreign key's own index on a
-         * fresh install; that is stated rather than hidden, and the key stays because it declares
-         * the relationship.
+         * Replace ack_action, an index on a two-valued column that no planner will choose, with
+         * (noticeid, action). The plugin's own queries on action all name noticeid beside it:
+         * helper::has_acknowledgement_record(), both system reports, and the notice datasource's
+         * ack_count and dismiss_count subqueries. Report builder filters on action alone lose the
+         * old index, which a two-valued column made of little use to them anyway. The composite's
+         * leading column duplicates the noticeid foreign key's index on a fresh install; the key
+         * stays because it declares the relationship.
          */
         $ack = new xmldb_table('local_awareness_ack');
 
@@ -283,15 +272,13 @@ function xmldb_local_awareness_upgrade($oldversion) {
         }
 
         /*
-         * local_awareness_lastview is the plugin's largest table — one row per (user, notice) — and
-         * had no way into it by noticeid. Deleting a notice removes its view rows with
-         * delete_records(TABLE, ['noticeid' => ...]), which had to scan the whole table. That path
-         * is gated behind two settings that both default to off, so this is not a hot path; the key
-         * is declared because the relationship is real and the table is the big one.
+         * local_awareness_lastview is the plugin's largest table, one row per (user, notice), and
+         * deleting a notice removes its rows by noticeid alone (only with cleanup_deleted_notice
+         * on), which without an index scans the whole table.
          *
-         * Only noticeid. A userid key would be documentation with a cost: add_key() matches an
-         * existing index by exact column SET, so it would not recognise user_notice_uq and would
-         * build a second index on a column that index already leads with.
+         * Only noticeid. add_key() looks for an existing index by its exact column list, so a
+         * userid key would not recognise user_notice_uq and would build a second index on the
+         * column that index already leads with.
          */
         $lastview = new xmldb_table('local_awareness_lastview');
         $key = new xmldb_key('noticeid', XMLDB_KEY_FOREIGN, ['noticeid'], 'local_awareness', ['id']);
@@ -302,21 +289,19 @@ function xmldb_local_awareness_upgrade($oldversion) {
 
     if ($oldversion < 2026082304) {
         /*
-         * local_awareness_lastview.action held the same 0/1 enum that local_awareness_ack.action
-         * stores as int(1), in a char(1333). Nothing has ever written anything else: the only
-         * writer is noticeview::add_notice_view(), typed int since the repository's first commit,
-         * and its callers pass the two acknowledgement constants.
+         * local_awareness_lastview.action held the 0/1 enum of local_awareness_ack.action in a
+         * char(1333). Its only writer, noticeview::add_notice_view(), takes an int and is passed the
+         * two acknowledgement constants, so on a site written by this plugin the UPDATE matches
+         * nothing.
          *
-         * The rows are normalised BEFORE the type change rather than trusted to it.
-         * change_field_type() casts on its own — PostgreSQL is handed
-         * USING CAST(CAST(action AS NUMERIC) AS INTEGER) — but that cast is a hard error on a
-         * non-numeric row, and MySQL's ALTER IGNORE escape hatch is gated on a text column, not a
-         * char one. An upgrade dying half way through DDL is worse than one unreadable marker, so
-         * anything outside the enum becomes 0 — which is how must_reshow() has always read a value
-         * it does not recognise. On a site written by this plugin the UPDATE matches nothing.
+         * The rows are normalised before the type change rather than trusted to it:
+         * change_field_type() hands PostgreSQL USING CAST(CAST(action AS NUMERIC) AS INTEGER),
+         * which is a hard error on a non-numeric row, and MySQL's ALTER IGNORE fallback applies
+         * only to a text column, not a char one. Anything outside the enum becomes 0 (dismissed)
+         * rather than stopping the upgrade half way through DDL.
          *
-         * No DEFAULT on the new column, deliberately: an insert that omits the action should still
-         * fail loudly rather than silently record a dismissal.
+         * No DEFAULT on the new column: an insert that omits the action should fail rather than
+         * silently record a dismissal.
          */
         $DB->execute("UPDATE {local_awareness_lastview} SET action = '0' WHERE action NOT IN ('0', '1')");
 
@@ -329,25 +314,14 @@ function xmldb_local_awareness_upgrade($oldversion) {
 
     if ($oldversion < 2026082402) {
         /*
-         * Force logout is retired, and the notices that used it must not quietly become the least
-         * insistent thing on the site.
+         * Force logout is retired. A notice that used it without requiring an acknowledgement is
+         * raised to Blocking (outsideclick = 0), so the author's intent that it matters survives;
+         * the level is derived in awareness::get_insistence(). A notice with reqack = 1 is already
+         * at the top level and is left alone, which the WHERE clause states explicitly.
          *
-         * How insistent a notice is now reads as one ordered level derived from the two columns
-         * that always stored it — see awareness::get_insistence(). Force logout was a third,
-         * orthogonal switch, and it was the only one an author could reach for to say "this one
-         * really matters". It never delivered that: the reader was ejected AFTER the fact, could
-         * log straight back in, and on 4.5 and 5.1 the guest login button is on by default, so
-         * even a guest bounced straight back to the same notice. What it did reliably communicate
-         * was intent, and that intent is what this step preserves.
-         *
-         * Only rows that would otherwise LOSE insistence are touched: forcelogout = 1 with
-         * reqack = 0 becomes Blocking, which is outsideclick = 0. A notice that already required
-         * an acknowledgement is at the top level already and is left exactly as it is — the
-         * WHERE clause says so rather than relying on the assignment being a no-op.
-         *
-         * The column itself is kept. Dropping it would take the historical fact with it and break
-         * every saved report carrying the Force logout column; the column is marked deprecated in
-         * the report builder instead, and nothing reads it at runtime any more.
+         * The forcelogout column is kept: dropping it would lose the history and break saved
+         * reports using its report builder column, which is marked deprecated instead. Nothing
+         * reads it at runtime.
          */
         $DB->execute(
             "UPDATE {local_awareness} SET outsideclick = 0 WHERE forcelogout = 1 AND reqack = 0 AND outsideclick <> 0"
@@ -358,11 +332,10 @@ function xmldb_local_awareness_upgrade($oldversion) {
 
     if ($oldversion < 2026090400) {
         /*
-         * A notice may now belong to a course. 0 is the site, which is what every existing row has
-         * always meant, so there is no backfill: the default says it. The foreign key is the index
-         * Moodle builds for it and nothing more — core enforces no referential integrity — and the
-         * before_course_deleted hook (hook_callbacks::before_course_deleted) is what keeps the
-         * column true when a course goes.
+         * A notice may belong to a course. 0 is the site, which is what every existing row means,
+         * so the default is the backfill. The foreign key only builds an index (Moodle enforces no
+         * referential integrity); hook_callbacks::before_course_deleted() keeps the column true
+         * when a course is deleted.
          */
         $table = new xmldb_table('local_awareness');
         $field = new xmldb_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'id');
@@ -416,6 +389,53 @@ function xmldb_local_awareness_upgrade($oldversion) {
         }
 
         upgrade_plugin_savepoint(true, 2026090402, 'local', 'awareness');
+    }
+
+    if ($oldversion < 2026092401) {
+        /*
+         * A course notice's audience criteria no longer carry its pathmatch, which the course scope
+         * forces and the editor's estimate leaves out, so a saved course notice now hashes as the
+         * editor's form does. A count stored before that is still right, because page reach never
+         * enters a count, but its hash would read as "filters changed" until recalculated. This
+         * re-stamps each course notice whose stored hash is exactly the one its criteria made with
+         * the pathmatch in.
+         *
+         * The criteria are assembled as notice_audience::criteria_for() assembles them, while the
+         * normalising and hashing are the estimator's own, since a copy of those could not be shown
+         * to agree with it. Should either change shape later, no stored hash matches and the rows
+         * are left as they are, which a recalculation fixes. Written through $DB, because the
+         * persistent's update() stamps timemodified and would expire every recorded acceptance.
+         */
+        $rs = $DB->get_recordset_select(
+            'local_awareness',
+            'courseid > :siteid',
+            ['siteid' => SITEID],
+            'id',
+            'id, cohorts, reqcourse, pathmatch, filtervalues, audiencehash'
+        );
+        foreach ($rs as $record) {
+            if ((string) $record->audiencehash === '') {
+                continue;
+            }
+            $raw = [];
+            if (!empty($record->cohorts)) {
+                $raw['cohorts'] = explode(',', $record->cohorts);
+            }
+            $raw['reqcourse'] = (int) $record->reqcourse;
+            $filters = json_decode((string) $record->filtervalues, true);
+            $filters = is_array($filters) ? $filters : [];
+
+            $saved = \local_awareness\audience\estimator::hash(
+                \local_awareness\audience\estimator::normalise($raw + ['pathmatch' => (string) $record->pathmatch] + $filters)
+            );
+            $current = \local_awareness\audience\estimator::hash(\local_awareness\audience\estimator::normalise($raw + $filters));
+            if ($record->audiencehash === $saved && $saved !== $current) {
+                $DB->set_field('local_awareness', 'audiencehash', $current, ['id' => $record->id]);
+            }
+        }
+        $rs->close();
+
+        upgrade_plugin_savepoint(true, 2026092401, 'local', 'awareness');
     }
 
     return true;

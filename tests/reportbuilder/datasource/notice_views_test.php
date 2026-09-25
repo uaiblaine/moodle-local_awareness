@@ -43,7 +43,6 @@ final class notice_views_test extends datasource_testcase {
      * @return int The inserted notice ID.
      */
     private function create_notice(string $title = 'View notice'): int {
-        global $DB;
         return (int) $this->getDataGenerator()->get_plugin_generator('local_awareness')
             ->create_notice(['title' => $title])->get('id');
     }
@@ -157,9 +156,8 @@ final class notice_views_test extends datasource_testcase {
     /**
      * Exercise every column and aggregation the datasource offers.
      *
-     * Not gated behind PHPUNIT_LONGTEST: moodle-plugin-ci never defines it, so gating this
-     * test removed the only coverage of the column/aggregation matrix from every CI run —
-     * which is where two aggregation defects lived while the suite reported green.
+     * Not gated behind PHPUNIT_LONGTEST, which moodle-plugin-ci leaves false: gated, the column
+     * and aggregation matrix would never run in CI.
      */
     public function test_stress_datasource(): void {
         $this->resetAfterTest();

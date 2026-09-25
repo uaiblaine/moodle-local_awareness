@@ -17,10 +17,8 @@
 /**
  * Data generator for local_awareness.
  *
- * Five test files each hand-built notice rows with the same fourteen literal fields, which meant
- * every column added to the table had to be added to fourteen call sites, and a row that omitted
- * one simply relied on the database default. Routing through the persistent gives every test the
- * same defaults the plugin itself writes, and makes a schema change a one-line edit here.
+ * Notices are created through the persistent, so every test gets the defaults the plugin itself
+ * writes and a schema change is one edit here rather than one per test.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine

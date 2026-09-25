@@ -23,8 +23,8 @@ use core_table\local\filter\string_filter;
 /**
  * Filters accepted by the notice list.
  *
- * All three are optional: the unfiltered list is the page's normal state, and the web service
- * rejects an absent required filter outright.
+ * Every filter is optional: the unfiltered list is the page's normal state, and an absent courseid
+ * means the site list.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -65,8 +65,8 @@ class all_notices_filterset extends filterset {
      * Filters the table understands.
      *
      * status and validity are string filters over a fixed vocabulary rather than integers: the
-     * values are not stored columns but questions asked of several of them at once, and a word
-     * survives being read in a URL or a test far better than a magic number does.
+     * values are questions asked of several columns at once, not stored values, and a word reads
+     * better than a number in a URL.
      *
      * @return array Filter name => filter class.
      */
@@ -76,10 +76,9 @@ class all_notices_filterset extends filterset {
             'status' => string_filter::class,
             'validity' => string_filter::class,
             /*
-             * The course the list is for, or absent for the site. It travels in the filterset and
-             * not as a page parameter because the dynamic-table web service rebuilds the table from
-             * the filterset alone: the scope has to be wherever the context and the capability are
-             * decided from, or a refresh over AJAX would decide them for a different list.
+             * The course the list is for, or absent for the site. It travels in the filterset, not
+             * as a page parameter, because the dynamic-table web service rebuilds the table from the
+             * filterset alone, and the context and capability check are decided from the scope.
              */
             'courseid' => integer_filter::class,
         ];

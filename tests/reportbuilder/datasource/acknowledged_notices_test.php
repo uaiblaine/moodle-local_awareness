@@ -23,8 +23,12 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/datasource_testcase.php');
 
 use core_reportbuilder_generator;
+use core_reportbuilder\local\aggregation\avg;
+use core_reportbuilder\local\aggregation\max;
+use core_reportbuilder\local\aggregation\sum;
 use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
 use local_awareness\reportbuilder\datasource\acknowledged_notices;
+use local_awareness\reportbuilder\local\entities\acknowledgement;
 
 /**
  * Unit tests for the acknowledged_notices datasource.
@@ -34,6 +38,7 @@ use local_awareness\reportbuilder\datasource\acknowledged_notices;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
  * @covers \local_awareness\reportbuilder\datasource\acknowledged_notices
+ * @covers \local_awareness\reportbuilder\local\entities\acknowledgement
  */
 final class acknowledged_notices_test extends datasource_testcase {
     /**
@@ -43,7 +48,6 @@ final class acknowledged_notices_test extends datasource_testcase {
      * @return int The inserted notice ID.
      */
     private function create_notice(string $title = 'Test notice'): int {
-        global $DB;
         return (int) $this->getDataGenerator()->get_plugin_generator('local_awareness')
             ->create_notice(['title' => $title, 'reqack' => 1])->get('id');
     }
@@ -165,11 +169,82 @@ final class acknowledged_notices_test extends datasource_testcase {
     }
 
     /**
+     * Under Sum and Average the action column shows the aggregate as a number, not an action's name.
+     *
+     * Every row here is an acknowledgement, so Sum counts them and Average is 1. A notice acknowledged
+     * once sums to 1, the acknowledged action's own value. Max is the control: it keeps the action's
+     * values, so it still shows the name.
+     */
+    public function test_sum_and_average_of_the_action_are_numbers(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $user1 = $this->getDataGenerator()->create_user();
+        $user2 = $this->getDataGenerator()->create_user();
+        $noticea = $this->create_notice('Notice A');
+        $noticeb = $this->create_notice('Notice B');
+        $this->create_ack($noticea, $user1->id, acknowledgement_persistent::ACTION_ACKNOWLEDGED);
+        $this->create_ack($noticeb, $user1->id, acknowledgement_persistent::ACTION_ACKNOWLEDGED);
+        $this->create_ack($noticeb, $user2->id, acknowledgement_persistent::ACTION_ACKNOWLEDGED);
+
+        $acknowledged = get_string('report_ack:action_acknowledged', 'local_awareness');
+        $expected = [
+            sum::get_class_name() => [['Notice A', '1'], ['Notice B', '2']],
+            avg::get_class_name() => [['Notice A', format_float(1, 2)], ['Notice B', format_float(1, 2)]],
+            max::get_class_name() => [['Notice A', $acknowledged], ['Notice B', $acknowledged]],
+        ];
+
+        /** @var core_reportbuilder_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_reportbuilder');
+        foreach ($expected as $aggregation => $rows) {
+            $report = $generator->create_report([
+                'name' => "Action {$aggregation}",
+                'source' => acknowledged_notices::class,
+                'default' => 0,
+            ]);
+            $generator->create_column([
+                'reportid' => $report->get('id'),
+                'uniqueidentifier' => 'notice:title',
+                'sortenabled' => 1,
+                'sortdirection' => SORT_ASC,
+            ]);
+            $generator->create_column([
+                'reportid' => $report->get('id'),
+                'uniqueidentifier' => 'acknowledgement:action',
+                'aggregation' => $aggregation,
+            ]);
+
+            $content = $this->get_custom_report_content($report->get('id'));
+            $this->assertSame($rows, array_map('array_values', $content), $aggregation);
+        }
+    }
+
+    /**
+     * A fractional Average is shown as the fraction on 4.5 as well, where the column casts it first.
+     *
+     * Neither datasource can average to a fraction, since each holds one action, so the formatter
+     * is called as 4.5 calls it for an Average of 0.5: $value is the aggregate cast to the column's
+     * integer type, and the row holds the value the query returned. Without an aggregation the same
+     * zero is the dismissed action, which is the control.
+     */
+    public function test_a_fractional_average_is_not_read_as_an_action(): void {
+        $this->resetAfterTest();
+
+        $this->assertSame(
+            format_float(0.5, 2),
+            acknowledgement::format_action(0, (object) ['action' => '0.5000000000'], null, avg::get_class_name())
+        );
+        $this->assertSame(
+            get_string('report_ack:action_dismissed', 'local_awareness'),
+            acknowledgement::format_action(0, (object) ['action' => '0'], null, null)
+        );
+    }
+
+    /**
      * Exercise every column and aggregation the datasource offers.
      *
-     * Not gated behind PHPUNIT_LONGTEST: moodle-plugin-ci never defines it, so gating this
-     * test removed the only coverage of the column/aggregation matrix from every CI run —
-     * which is where two aggregation defects lived while the suite reported green.
+     * Not gated behind PHPUNIT_LONGTEST, which moodle-plugin-ci leaves false: gated, the column
+     * and aggregation matrix would never run in CI.
      */
     public function test_stress_datasource(): void {
         $this->resetAfterTest();

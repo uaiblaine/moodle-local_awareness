@@ -63,14 +63,8 @@ class search_roles extends external_api {
             'courseid' => $courseid,
         ]);
 
-        // Only reached from the notice editor. Without the gate any authenticated user could
-        // enumerate every role defined on the site.
-        /*
-         * The scope the caller is writing under, from the courseid the editor sends: the site when
-         * absent. Validated as a context — which also requires login to the course — and then gated
-         * the way every author-side entry point is, so a course author's editor works and a caller
-         * naming a course they do not hold is refused before anything is read.
-         */
+        // Only reached from the notice editor; without the gate any authenticated user could list
+        // every role on the site. The scope gate is explained in estimate_audience::execute().
         $scope = author_scope::for_request(null, (int) $params['courseid']);
         self::validate_context($scope->context());
         helper::require_author($scope, 'manage');
@@ -99,22 +93,16 @@ class search_roles extends external_api {
         $allroles = role_get_names(null, ROLENAME_ORIGINAL);
 
         /*
-         * The query is matched here rather than in SQL, because the label the picker shows is not
-         * in the database. A standard role ships with an EMPTY role.name and takes its label from
-         * the language pack through role_get_name(), so a LIKE over name and shortname finds
-         * nothing for "Non-editing teacher" or "Course creator" — and under a translated pack it
-         * finds nothing at all, for any standard role. The autocomplete does no client-side
-         * filtering either: it calls this function with the typed string and renders the answer
-         * verbatim, so what this misses the admin cannot select.
+         * Matched here rather than in SQL, because the label the picker shows is not in the
+         * database: a standard role has an empty role.name and takes its label from the language
+         * pack through role_get_name(), so a LIKE over name and shortname would miss "Non-editing
+         * teacher" and, under a translated pack, every standard role. The autocomplete does no
+         * filtering of its own, so what this misses cannot be selected.
          *
-         * The stored name stays in the comparison beside the label. role_get_name() runs it
-         * through format_string(), which entity-escapes an ampersand, so a custom role called
-         * "R&D coordinator" is findable by the text its author actually typed rather than only by
-         * "R&amp;D". Three separate comparisons rather than one concatenated haystack, so a query
-         * cannot match across a field boundary.
-         *
-         * Filter first, cap after: capping in SQL would have limited the rows CONSIDERED rather
-         * than the rows returned, hiding matches behind fifty non-matches.
+         * The stored name is compared too, because role_get_name() runs it through format_string(),
+         * which escapes an ampersand: "R&D coordinator" must be findable as typed. Three separate
+         * comparisons, so a query cannot match across a field boundary. The cap of 50 applies after
+         * matching, so non-matching rows cannot crowd matches out.
          */
         $needle = \core_text::strtolower($query);
         $roles = [];

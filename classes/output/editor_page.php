@@ -22,7 +22,6 @@ use local_awareness\persistent\awareness;
 use renderable;
 use templatable;
 use renderer_base;
-use moodle_url;
 
 /**
  * Renderable for the redesigned notice editor page.
@@ -38,17 +37,6 @@ class editor_page implements renderable, templatable {
     /** @var string */
     protected $formhtml;
 
-    /**
-     * Constructor.
-     *
-     * Takes neither a form id nor a cancel URL any more. Both were residue of the removed action
-     * bar, which posted the page's own form through a form="" attribute; the form declares its own
-     * buttons now. The id was extracted from the rendered HTML with a regular expression and then
-     * never exported to anything.
-     *
-     * @param awareness|null $awareness The notice being edited, or null when creating.
-     * @param string $formhtml Rendered moodleform HTML to embed.
-     */
     /** @var author_scope The scope the editor writes under. */
     protected $scope;
 
@@ -76,21 +64,15 @@ class editor_page implements renderable, templatable {
         $enabled = $isedit && (int) $this->awareness->get('enabled') === 1;
 
         /*
-         * Three states, not two. The badge used to read "Live · being shown" from the enabled flag
-         * alone, which is a true statement about the flag and can be a false one about the world:
-         * a notice whose display window has closed, or cannot be satisfied, is published and
-         * unreachable at the same time. The banner below the head says so in a sentence; a reader
-         * who takes in only the chip would still have been told the opposite.
+         * Three states, not two: a published notice whose display window has closed, or can never
+         * be satisfied, is enabled and reachable by nobody, so the chip must not call it live.
          */
         $blocked = $enabled && !empty(self::window_problems_of($this->awareness));
         $statusislive = $enabled && !$blocked;
 
         /*
-         * The form is rendered as it comes. This used to rewrite its <form> tag into a <div> so the
-         * shell could re-emit the tag around a hidden copy and JavaScript could move the fields into
-         * cards; the form now declares its own sections, so the surgery, the hidden copy and the
-         * whole relocation step are gone — along with the class of bug where a field the map forgot
-         * stayed reachable by keyboard while being painted nowhere.
+         * The form is embedded exactly as rendered. It declares its own header sections; moving its
+         * rows into cards with JavaScript left fields focusable while painted nowhere.
          */
         $formhtml = $this->formhtml;
 
@@ -112,7 +94,7 @@ class editor_page implements renderable, templatable {
             'unsavedlabel' => get_string('editor:unsaved', 'local_awareness'),
             'requirements' => self::window_warning($this->awareness),
             'formhtml' => $formhtml,
-            // Read by every module that calls a web service: the scope travels with each request.
+            // Read by local_awareness/editor_scope for every module that calls a web service.
             'courseid' => $this->scope->get_courseid(),
             'helptitle' => get_string('editor:nav:howitworks', 'local_awareness'),
             'helpbody' => get_string('editor:nav:howitworks:body', 'local_awareness'),
@@ -161,14 +143,8 @@ class editor_page implements renderable, templatable {
     /**
      * The sentence to put above the form when a published notice can never actually appear.
      *
-     * The page head paints "Live · being shown" from the enabled flag alone, which is a true
-     * statement about the flag and can be a false one about the world: a notice whose expiry has
-     * passed, or whose dates cannot both be satisfied, is enabled and unreachable at once. The
-     * banner existed in the template, the CSS and two language packs and could never render,
-     * because this method returned an empty string.
-     *
-     * Only ever one sentence: editor_state returns at most one problem, and a wall of warnings is
-     * how a warning stops being read.
+     * Covers a notice whose expiry has passed and one whose dates cannot both be satisfied. Only
+     * ever one sentence: {@see editor_state::window_problems()} returns at most one problem.
      *
      * @param awareness|null $awareness The notice being edited, or null when creating.
      * @return string The warning, or an empty string when there is nothing wrong.
@@ -182,10 +158,7 @@ class editor_page implements renderable, templatable {
 
         $when = userdate((int) $awareness->get('timeend'), get_string('strftimedatetimeshort'));
 
-        /*
-         * A literal per branch rather than a key built from the constant. The fleet rule against
-         * dynamic string ids is what keeps `grep editor:warning:` able to find every one of them.
-         */
+        // A literal string id per branch, never one built from the constant, so a search finds every use.
         switch ($problems[0]) {
             case editor_state::WINDOW_EXPIRED:
                 return get_string('editor:warning:window_expired', 'local_awareness', $when);

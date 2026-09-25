@@ -22,11 +22,10 @@ use local_awareness\persistent\audience_job;
 /**
  * The five editor web services under a course scope: gated by the course they name, and answering inside it.
  *
- * Every call goes by NAME through call_external_function(), with courseid appended to the arguments
- * the editor already sends, so a reordering of any signature reddens here even where the old
- * positional calls still compile. The author holds a fresh role carrying managecourse alone, in one
- * course, and is enrolled in both courses as a student: enrolment is what validate_context() needs,
- * and the refusal for the other course has to be the capability's.
+ * Every call goes by name through call_external_function(), with courseid added to the arguments the
+ * editor sends, so the declared parameters and returns are what is tested. The author holds a role
+ * carrying only managecourse, in one course, and is enrolled in both courses as a student: enrolment
+ * satisfies validate_context(), so the refusal for the other course has to come from the capability.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -37,6 +36,7 @@ use local_awareness\persistent\audience_job;
  * @covers \local_awareness\external\search_courses
  * @covers \local_awareness\external\search_roles
  * @covers \local_awareness\external\check_collision
+ * @covers \local_awareness\external\render_notice
  */
 final class course_scope_external_test extends \advanced_testcase {
     /** @var \stdClass The author's course. */
@@ -121,11 +121,10 @@ final class course_scope_external_test extends \advanced_testcase {
     /**
      * An estimate under a course scope is confined to the course and comes back without the per-rule chips.
      *
-     * The count is the course's: two enrolled users and one outsider, so the outsider is what an
-     * unconfined estimate would have counted. The chips are withheld because each answers over
-     * the whole site — and withheld at the read, so a job a site manager made for the very same
-     * criteria, chips and all, still hands a course author none. The site manager reading the same
-     * job gets them: the control that the withholding is the scope's, not the job's.
+     * The course has two students and the site one outsider, whom an unconfined estimate would
+     * count. The per-rule chips each answer over the whole site, so they are withheld at the read:
+     * a job a site manager made for the same criteria, chips included, still gives a course author
+     * none. The site manager reading that job gets them, the control that the scope withholds them.
      */
     public function test_an_estimate_under_a_course_scope_is_the_course_s_and_carries_no_chips(): void {
         global $DB;
@@ -224,7 +223,7 @@ final class course_scope_external_test extends \advanced_testcase {
             ['query' => '', 'contextlevel' => CONTEXT_SYSTEM, 'courseid' => (int) $this->mine->id]
         );
         $roles = json_decode($rolesresponse['data']['roles'], true);
-        // Keyed by the role_context_levels row id, not the role id: the VALUES are the roles.
+        // Keyed by the role_context_levels row id, not the role id: the values are the roles.
         $courselevel = array_map('intval', array_values(get_roles_for_contextlevels(CONTEXT_COURSE)));
         $managerid = (int) $DB->get_field('role', 'id', ['shortname' => 'manager']);
         $listed = array_map(static fn(array $r): int => (int) $r['id'], $roles);
@@ -242,16 +241,53 @@ final class course_scope_external_test extends \advanced_testcase {
     }
 
     /**
+     * The list's preview answers a course author the same way for every notice outside their authority.
+     *
+     * The author is enrolled in the other course, so validate_context() admits them there and only
+     * the gate can refuse; a course they are not enrolled in is the case where validate_context()
+     * would refuse first, and differently, if it ran before the gate. An id naming nothing is the
+     * answer every refusal must match, and their own course's notice the control that the preview
+     * works for them at all.
+     */
+    public function test_the_list_preview_refuses_every_notice_outside_the_scope_alike(): void {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $own = $generator->create_notice(['courseid' => $this->mine->id]);
+        $theirs = $generator->create_notice(['courseid' => $this->other->id]);
+        $elsewhere = $generator->create_notice(['courseid' => $this->getDataGenerator()->create_course()->id]);
+        $site = $generator->create_notice();
+
+        $this->setUser($this->author);
+        $response = $this->call('render_notice', ['noticeid' => (int) $own->get('id')]);
+        $this->assertFalse($response['error'], 'the author previews their own course\'s notice');
+        $this->assertSame((int) $own->get('id'), $response['data']['id']);
+
+        $answers = [];
+        $ids = [
+            'theirs' => $theirs->get('id'),
+            'elsewhere' => $elsewhere->get('id'),
+            'site' => $site->get('id'),
+            'missing' => 987654,
+        ];
+        foreach ($ids as $key => $id) {
+            $response = $this->call('render_notice', ['noticeid' => (int) $id]);
+            $this->assertTrue($response['error'], "{$key} must be refused");
+            $answers[$key] = $response['exception']->errorcode . ': ' . $response['exception']->message;
+        }
+        $expected = 'notification:noticedoesnotexist: ' . get_string('notification:noticedoesnotexist', 'local_awareness');
+        $this->assertSame(array_fill_keys(array_keys($ids), $expected), $answers);
+    }
+
+    /**
      * A competing notice is named only inside the scope; outside it is described, not named.
      */
     public function test_a_rival_outside_the_scope_is_described_and_not_named(): void {
         $this->setAdminUser();
         $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
         /*
-         * The rivals reach everywhere, which overlaps whatever reach the caller is judged with.
-         * This test is about WHOSE NAME a course author may read, not about page reach, and pinning
-         * it to one pattern made it fail the day a course scope started writing its own: the
-         * author's side is now compared against the course's main page, which '/my/%' misses.
+         * The rivals have no page restriction, so they overlap whatever reach the caller is judged
+         * by; under a course scope that is author_scope::COURSE_PATHMATCH, not the '/my/%' sent
+         * below. The test is about whose title a course author may read, not about page reach.
          */
         $generator->create_notice(['title' => 'Dashboard rival', 'resetinterval' => WEEKSECS]);
         $generator->create_notice([

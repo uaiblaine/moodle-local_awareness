@@ -22,7 +22,7 @@ use local_awareness\persistent\slide;
 /**
  * What the dialogue is told about a notice's layout, and what each layout ships with.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
+ * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHPUnit attributes.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -61,7 +61,7 @@ final class layout_payload_test extends \advanced_testcase {
     }
 
     /**
-     * A notice saved before layouts existed is told it is the classic, centred, still dialogue.
+     * A notice with no layout settings ships the defaults: classic, centred, no animation, no media.
      */
     public function test_a_plain_notice_ships_the_defaults_and_no_media(): void {
         $this->ready();

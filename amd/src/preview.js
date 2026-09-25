@@ -71,8 +71,7 @@ const openPreview = async(link) => {
             dialog.find(modal.getAcceptButtonID()).attr('disabled', !ticked);
         });
         modal.setInsistence(payload.insistence);
-        // Shown before it is dressed: show() attaches the dialogue to the document, and the
-        // video.js loader finds a player by id in the document - a detached band names nothing.
+        // Shown before it is dressed; see ModalNotice.setAppearance().
         await modal.show();
         await modal.setAppearance(payload);
         modal.setAnimation(payload.animation);

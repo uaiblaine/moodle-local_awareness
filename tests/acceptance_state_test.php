@@ -22,12 +22,11 @@ use local_awareness\persistent\awareness;
 /**
  * "Has this user accepted this notice" is a question with an expiry date.
  *
- * Before helper::acceptance_is_current() the only available answer was "a row exists in
- * {local_awareness_ack}", and that answer can only ever become MORE true: nothing deletes the row,
- * and the acknowledge path deliberately writes a fresh one after the notice is edited or its reset
- * interval elapses. An author who sets a reset interval is saying the opposite — that acceptance
- * expires and must be given again — so the row-exists answer contradicts the setting it was most
- * likely to be asked about.
+ * Pins helper::acceptance_is_current(): an acceptance counts only while it is newer than the
+ * notice's last edit and inside its reset interval, the newest row decides, and a dismissal never
+ * counts. "A row exists in {local_awareness_ack}" is not the answer: nothing deletes those rows,
+ * and the acknowledge path adds a fresh one whenever acceptance is given again, so that answer can
+ * only ever become more true.
  *
  * Every test here fixes its timestamps at explicit offsets rather than letting them fall where
  * time() happens to land. interaction_is_stale() compares with a strict less-than, so a fixture
@@ -76,8 +75,7 @@ final class acceptance_state_test extends \advanced_testcase {
         $row = new acknowledgement(0, (object) [
             'userid' => $userid,
             'username' => 'u' . $userid,
-            // NULL_ALLOWED without a default still means required: core\persistent demands the
-            // key be present, and only then permits it to be null.
+            // The persistent requires these three copies, so each needs a value.
             'firstname' => 'First' . $userid,
             'lastname' => 'Last' . $userid,
             'idnumber' => '',

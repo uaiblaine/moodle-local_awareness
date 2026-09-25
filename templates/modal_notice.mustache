@@ -17,7 +17,9 @@
 {{!
     @template local_awareness/modal_notice
 
-    Template for modal pop up.
+    The notice dialogue: core's modal markup with the media region, the acknowledgement checkbox
+    and the exit buttons added. modal_notice.js puts the layout, position and entrance classes on
+    the .modal-dialog, the element carrying the awareness class.
 
     Context variables required for this template:
       * classes
@@ -59,10 +61,10 @@
                 {{/header}}
             </div>
             {{!
-                The media band the hero, video and carousel layouts draw: the background image as a
-                band, the player the multimedia filter built, or the slides. Hidden until a layout
-                fills it, by modal_notice.js; the header stays where it is in every layout because it
-                holds the dialogue's name and its close button.
+                The media region the layouts draw into: the image band (hero, split, image), the
+                player the multimedia filter built (video), or the slides (carousel). Hidden until a
+                layout fills it, by modal_notice.js; the header stays where it is in every layout
+                because it holds the dialogue's name and its close button.
             }}
             <div class="la-media" data-region="media" hidden>
                 <div class="la-media-band" data-region="band"></div>
@@ -85,10 +87,8 @@
                     {{!
                         Two exit buttons rather than one whose label is swapped at runtime. Both
                         carry data-action close and both record a dismissal; only one is ever
-                        visible. Swapping a label meant fetching a string asynchronously and
-                        writing it in after render, which is how the acknowledgement checkbox came
-                        to claim a logout that no longer happened - if that request lost, the wrong
-                        wording simply stood. A hidden sibling cannot lose a race.
+                        visible. A label fetched asynchronously and written in after render can
+                        lose the race and leave the wrong wording standing; a hidden sibling cannot.
                     }}
                     <div class="ms-auto">
                         <button id="awareness-closebtn-footer" type="button" class="btn btn-primary px-4" data-action="close">

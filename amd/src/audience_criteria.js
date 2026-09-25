@@ -14,8 +14,8 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Reads the moodleform's current state and produces a normalised criteria
- * object shared by audience_estimator and live_preview.
+ * Reads the moodleform's current state and produces the criteria object
+ * audience_estimator sends to the server.
  *
  * Field IDs follow Moodle's `id_<fieldname>` convention. Multi-select
  * autocompletes render their selected values into hidden inputs that share
@@ -168,12 +168,9 @@ define([], function() {
         if (roles.length) {
             criteria.filter_role = roles;
             /*
-             * Sent only alongside the roles it scopes, which is the same condition estimator's
-             * normalise() applies before keeping it. Omitting it made the server read 0 — "any
-             * context" — so a rule scoped to one course was estimated across the whole site, and
-             * where the role was the site's default the estimator took its `1 = 1` shortcut and
-             * reported the entire user base. The runtime honoured the stored context all along, so
-             * the panel and the notice disagreed by orders of magnitude. Audit finding M3.
+             * Sent only alongside the roles it scopes, the same condition estimator::normalise()
+             * applies. Without it the server reads 0 ("any context") and estimates a role rule
+             * scoped to one course across the whole site, while delivery honours the stored context.
              */
             criteria.filter_role_context = parseInt(readSingleValue('filter_role_context'), 10) || 0;
         }
@@ -242,7 +239,7 @@ define([], function() {
     }
 
     /**
-     * Count audience-shaping rules in the criteria (cohorts, role, reqcourse).
+     * Count the audience-shaping rules (AUDIENCE_KEYS) present in the criteria.
      *
      * @param {Object} criteria
      * @returns {number}

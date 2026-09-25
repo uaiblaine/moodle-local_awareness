@@ -19,32 +19,26 @@ namespace local_awareness\audience;
 use local_awareness\local\role_scope;
 
 /**
- * Pure module that estimates the audience size for a notice given a normalised
- * criteria array, in bulk SQL instead of per-user.
+ * Estimates how many users a notice can reach, from a normalised criteria array, in bulk SQL.
  *
- * A rule counts towards the audience when it can be answered about a USER. That is every rule the
- * notice has except two: pathmatch and filter_theme, which are properties of the page being
- * rendered and of nobody in particular. Those two are surfaced as context restrictions instead.
+ * A rule counts towards the audience when it can be answered about a user. Every rule does except
+ * pathmatch and filter_theme, which are properties of the page being rendered; those two are
+ * reported as context restrictions instead.
  *
- * The category, course, format and competency rules look like page rules and were treated as such
- * until an author pointed out that the number they were left out of is the number the editor calls
- * "reach". They are page rules AND user rules at once: check_filters() only admits them on a course
- * page the user can actually access, so "how many people could ever see this" is bounded by who is
- * enrolled in a course the rule names. See course_scope_sql() for the predicate and what it
- * deliberately does not model.
+ * The category, course, format and competency rules are page rules and user rules at once:
+ * check_filters() only admits them on a course page the user can access, so their reach is bounded
+ * by who is enrolled in a course the rule names. See course_scope_sql() for the predicate and what
+ * it deliberately does not model.
  *
- * With no rules at all the count is the whole site — every real, active user — rather than zero.
- * Zero was read as "this notice reaches nobody" when it meant "nothing has been narrowed yet".
+ * With no rules at all the count is the whole site (every real, active user) rather than zero,
+ * which would read as "this notice reaches nobody".
  *
- * The role half shares its context scoping with the per-user rule: both call
- * {@see \local_awareness\local\role_scope::sql()}, so which contexts count is
- * one definition rather than two that have to be kept in step. What remains
- * separate is how the answer is consumed — here membership is tested inside an
- * EXISTS over every user, there the roles are read back for one — and one
- * deliberate divergence: a default role standing in for "every user" collapses
- * to 1 = 1 here, because counting cannot enumerate an implicit assignment that
- * has no rows in {role_assignments}. That the two agree in practice is pinned
- * by test_the_bulk_count_agrees_with_the_per_user_rule().
+ * The role rule shares its context scoping with the per-user check in
+ * helper::user_matches_role_filter(): both call {@see \local_awareness\local\role_scope::sql()}.
+ * Here membership is tested inside an EXISTS over every user; there the roles are read back for
+ * one user. One deliberate divergence: a filter naming a default role collapses to 1 = 1 here,
+ * because an implicit assignment has no rows in {role_assignments} to count.
+ * test_the_bulk_count_agrees_with_the_per_user_rule() pins that the two agree.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -72,9 +66,12 @@ class estimator {
     /**
      * Normalise raw criteria from the form/web service into a deterministic shape.
      *
-     * Sorts arrays so that two semantically-equal inputs produce the same hash.
+     * Empty rules are dropped and lists are de-duplicated and sorted, so two semantically-equal
+     * inputs produce the same hash. filter_role_context is kept only beside filter_role, and
+     * filter_competency_requireall only beside filter_competency_rules. Shape only: whether the
+     * ids exist is checked by {@see \local_awareness\local\author_scope}, not here.
      *
-     * @param array $raw
+     * @param array $raw Raw criteria keyed by the notice form's field names, e.g. 'filter_role'.
      * @return array
      */
     public static function normalise(array $raw): array {
@@ -150,8 +147,9 @@ class estimator {
      *
      * Returns:
      *  - count: estimated audience size (int)
-     *  - breakdown: list of [{key, label_key, count}] for each audience-shaping rule alone
-     *  - context_only_filters: list of [{key, label_key, values}]
+     *  - breakdown: list of [{key, count}], one per audience-shaping rule counted alone; empty
+     *    unless $withbreakdown
+     *  - context_only_filters: list of [{key, values}], as context_rules_in() returns them
      *  - has_audience_rules: bool — false means the count is the whole site, nothing was narrowed
      *
      * @param array $criteria normalised criteria
@@ -167,15 +165,11 @@ class estimator {
         [$base, $params] = self::base_predicate();
 
         /*
-         * One pass, not one per rule. Every count here reads the same rows — the whole {user} table
-         * — and asks a different question of each; as separate statements that was N+1 sequential
-         * scans of a table with hundreds of thousands of rows, for answers that differ only in the
-         * predicate. Conditional aggregation asks all of them while the rows are already in hand.
+         * One statement with a conditional column per count, not one query per rule: every count
+         * reads the same {user} rows, so separate statements would scan the table N+1 times.
          *
-         * Each fragment is rebuilt under its own suffix rather than reused. Moodle counts
-         * placeholder OCCURRENCES against the parameter array (fix_sql_params) and throws
-         * duplicateparaminsql when a name appears twice, so the same predicate appearing in two
-         * columns must carry two sets of names.
+         * Each fragment is rebuilt under its own suffix rather than reused, because
+         * fix_sql_params() throws duplicateparaminsql when a named placeholder appears twice.
          */
         [$totalsql, $totalparams] = self::predicate($criteria, null, 't');
         $columns = ["SUM(CASE WHEN {$totalsql} THEN 1 ELSE 0 END) AS total"];
@@ -185,12 +179,10 @@ class estimator {
         if ($withbreakdown) {
             foreach (array_values($audiencerules) as $i => $rule) {
                 /*
-                 * Two arguments, because "the rule alone" is two separate questions. isolate_rule()
-                 * decides what the rule is allowed to READ — filter_role has to keep the category
-                 * and course lists or it stops being scoped. The second decides which rules are
-                 * APPLIED, and naming only this one is what stops those same lists from also
-                 * counting as their own rule inside the role's chip, which would make every chip
-                 * approximate the total instead of its own share.
+                 * isolate_rule() decides what the rule may read: filter_role keeps the category and
+                 * course lists that scope it. The second argument decides which rules are applied;
+                 * naming only this one stops those lists from also counting as rules of their own
+                 * inside the role's chip.
                  */
                 [$rulesql, $ruleparams] = self::predicate(self::isolate_rule($criteria, $rule), [$rule], "b{$i}");
                 $columns[] = "SUM(CASE WHEN {$rulesql} THEN 1 ELSE 0 END) AS rule{$i}";
@@ -224,17 +216,15 @@ class estimator {
     /**
      * Reduce the criteria to a single audience rule, keeping the keys that modify that rule.
      *
-     * "The rule alone" means without the OTHER rules, not without its own settings. filter_role is
-     * the only one with any: filter_role_context decides which context level is searched, and
-     * filter_category / filter_course narrow it further inside that level. Dropping them made the
-     * breakdown answer a different question from the one the notice asks — a rule scoped to one
-     * course was counted across the whole site, so the editor offered "Teachers: every teacher
-     * here" beside a total of the handful who would actually see it.
+     * "The rule alone" means without the other rules, not without its own settings.
+     * filter_role_context decides which context level a role is searched at, and filter_category /
+     * filter_course narrow it inside that level ({@see \local_awareness\local\role_scope::sql()});
+     * dropping them would count a role scoped to one course across the whole site.
+     * filter_competency_requireall likewise decides how the competency rules combine.
      *
-     * filter_category and filter_course now count on their own as well, so carrying them into the
-     * role chip does widen it — from "teachers of this course" to "teachers of this course, or
-     * anyone enrolled in it". That is the reading the chip is meant to have: the scope belongs to
-     * the rule. Their own chips are computed separately, from criteria that carry no role.
+     * The carried category and course lists are read only as the role's scope: estimate() applies
+     * the isolated rule alone, so they do not also count as rules inside the role's chip. Their own
+     * chips are computed from criteria that carry no role.
      *
      * @param array $criteria Normalised criteria.
      * @param string $rule The audience-shaping rule to isolate.
@@ -294,16 +284,13 @@ class estimator {
     /**
      * The population every count here is taken from: real, active users.
      *
-     * Mirrors what Moodle considers a "real" user at login. It is the WHERE of the single statement
-     * rather than part of any rule's predicate, so the rows are filtered once and every conditional
-     * column is evaluated over the same set.
+     * It is the WHERE of the single statement rather than part of any rule's predicate, so the rows
+     * are filtered once and every conditional column is evaluated over the same set.
      *
-     * SUM(CASE …), not COUNT(DISTINCT u.id): the FROM clause is {user} alone and every rule is an
-     * EXISTS or a comparison on u, so a user is one row and cannot be counted twice.
-     *
-     * THIS DEPENDS ON THE FROM CLAUSE STAYING JOIN-FREE. Anything that joins a one-to-many table in
-     * here multiplies the rows and silently overcounts; keep new predicates inside an EXISTS as
-     * every existing one is.
+     * The counts are SUM(CASE …), not COUNT(DISTINCT u.id): the FROM clause is {user} alone and
+     * every rule is an EXISTS or a comparison on u, so a user is one row and cannot be counted
+     * twice. That depends on the FROM clause staying join-free; a join to a one-to-many table would
+     * multiply the rows and overcount, so keep new predicates inside an EXISTS.
      *
      * @return array [$whereparts, $params]
      */
@@ -316,16 +303,13 @@ class estimator {
                 'u.suspended = 0',
                 'u.confirmed = 1',
                 'u.id <> :guestid',
-                // Guest is excluded by username too, to be robust on sites imported from elsewhere
-                // where it does not hold the id $CFG->siteguest names.
                 'u.username <> :guestname',
             ],
             /*
-             * Bound from $CFG->siteguest, not from a literal 1. The guest account only holds id 1
-             * on a site Moodle installed itself; after a migration it is whatever it is, and the
-             * literal put the real guest back into every audience count while excluding whichever
-             * innocent user inherited the id. The username predicate beside it is a second net,
-             * not a substitute — a site can rename the account.
+             * Bound from $CFG->siteguest, not a literal 1: the guest holds id 1 only on a site
+             * Moodle installed itself, and after a migration a literal would count the real guest
+             * and exclude whoever inherited id 1. The username test is a second net, not a
+             * substitute, because the account can be renamed.
              */
             ['guestid' => (int) ($CFG->siteguest ?? 1), 'guestname' => 'guest'],
         ];
@@ -370,10 +354,9 @@ class estimator {
 
         if ($applies('filter_groups')) {
             /*
-             * Membership, whatever the group's visibility: a member of a hidden group is still a
-             * member, and helper::user_in_notice_groups() delivers on the same terms. The groups
-             * name their own course, so this stands on its own; under a course scope the forced
-             * filter_course adds the enrolment test through course_scope_sql() below.
+             * Membership, whatever the group's visibility, as helper::user_in_notice_groups()
+             * delivers. The groups name their own course, so this stands on its own; under a course
+             * scope the forced filter_course adds the enrolment test through course_scope_sql().
              */
             [$insql, $inparams] = $DB->get_in_or_equal(
                 array_map('intval', $criteria['filter_groups']),
@@ -402,20 +385,21 @@ class estimator {
                                     WHERE {$ra}.userid = u.id AND {$ra}.roleid {$insql} {$ctxwhere})";
             $params += $inparams;
 
-            // Implicit default-user role: applies to every confirmed, non-guest user.
-            if ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM) {
-                $defaults = [];
-                if (!empty($CFG->defaultuserroleid)) {
-                    $defaults[] = (int) $CFG->defaultuserroleid;
-                }
-                if (!empty($CFG->defaultfrontpageroleid)) {
-                    $defaults[] = (int) $CFG->defaultfrontpageroleid;
-                }
-                $defaults = array_unique($defaults);
-                if (array_intersect($defaults, $roleids)) {
-                    // Filter matches a default role → every user qualifies on the role test.
-                    $clauses[] = "1 = 1";
-                }
+            /*
+             * The default user and front page roles have no {role_assignments} rows and are held by
+             * every user in the population, which already leaves out the guest. A rule naming one
+             * admits everybody where helper::user_matches_role_filter() counts it: the default role
+             * for any context or the system, the front page role for any context only.
+             */
+            $defaults = [];
+            if (!empty($CFG->defaultuserroleid) && ($rolectx == 0 || $rolectx == CONTEXT_SYSTEM)) {
+                $defaults[] = (int) $CFG->defaultuserroleid;
+            }
+            if (!empty($CFG->defaultfrontpageroleid) && $rolectx == 0) {
+                $defaults[] = (int) $CFG->defaultfrontpageroleid;
+            }
+            if (array_intersect($defaults, $roleids)) {
+                $clauses[] = "1 = 1";
             }
 
             $where[] = '(' . implode(' OR ', $clauses) . ')';
@@ -427,13 +411,12 @@ class estimator {
             $cc = 'cc' . $suffix;
             $rc = 'rc' . $suffix;
             /*
-             * Notice fires for users who have NOT completed the required course. Mirrors the
-             * course-completion block in helper::collect_user_notices() — being present in
-             * {course_completions} only counts when timecompleted is set — and, like it, counts
-             * nobody once the course is gone. Deleting a course purges its completion rows, so
-             * the NOT EXISTS on its own went vacuously true and the estimate grew to the whole
-             * site the moment the gate stopped meaning anything. The same id is bound under two
-             * names because a named placeholder may appear only once per statement.
+             * Counts users who have NOT completed the required course, as the completion block in
+             * helper::collect_user_notices() does; keep the two in step. A {course_completions} row
+             * counts only when timecompleted is set, and a course that no longer exists reaches
+             * nobody: deletion purges its completion rows, so the NOT EXISTS alone would count the
+             * whole site. The id is bound under two names because a named placeholder may appear
+             * only once per statement.
              */
             $where[] = "EXISTS (SELECT 1 FROM {course} {$rc} WHERE {$rc}.id = :reqcourseexists{$suffix})";
             $where[] = "NOT EXISTS (SELECT 1 FROM {course_completions} {$cc}
@@ -457,26 +440,26 @@ class estimator {
      *
      * helper::check_filters() admits the category, course, format and competency rules only on a
      * course page, and only after can_access_course($course, null, '', true) has accepted the user
-     * for that course. So the population those rules can ever reach is the people who hold such a
+     * for that course. So the population those rules can reach is the people who hold such a
      * course, and this reproduces that as one EXISTS over the user's enrolments.
      *
      * The enrolment half is core's get_enrolled_join() with $onlyactive = true, inlined because
-     * that helper takes ONE course context and this asks about a set of courses in a single
-     * statement. It must agree with it: active user_enrolment, enabled enrol instance, inside the
-     * enrolment's own time window. Two of core's special cases and how they land here:
+     * that helper takes one course context and this asks about a set of courses in a single
+     * statement. Keep it in step: active user_enrolment, enabled enrol instance, inside the
+     * enrolment's own time window. Two of core's special cases land differently here:
      *
-     *  - get_enrolled_join() skips the enrolment join entirely for SITEID, where everyone counts as
-     *    enrolled. That exemption must NOT be carried over: check_filters() resolves the course only
-     *    when the id is greater than 1, so the front page never satisfies these rules in the first
-     *    place, and importing the exemption would report the whole site for a rule that reaches
-     *    nobody. The site course is excluded explicitly.
-     *  - can_access_course() also admits a user with no enrolment at all who holds
-     *    moodle/course:view, and refuses a hidden course to anyone without
+     *  - get_enrolled_join() skips the enrolment join for SITEID, where everyone counts as
+     *    enrolled. That exemption is not carried over: check_filters() resolves the course only
+     *    when the id is greater than 1, so the front page never satisfies these rules, and the
+     *    exemption would report the whole site for a rule that reaches nobody. The site course is
+     *    excluded explicitly.
+     *  - can_access_course() also admits a user with no enrolment who holds moodle/course:view or
+     *    has temporary guest access, and refuses a hidden course to anyone without
      *    moodle/course:viewhiddencourses. Capabilities are not resolvable in bulk here, so the
-     *    estimate keeps the enrolment branch and the visibility rule and skips the viewer branch.
-     *    It therefore reads slightly LOW for a notice aimed at people who only ever view courses
-     *    they are not enrolled in. Chosen over reading high, because an editor acts on the number
-     *    by narrowing.
+     *    estimate keeps the enrolment branch and the visibility rule and skips the others. It
+     *    therefore reads slightly low for a notice aimed at people who view courses they are not
+     *    enrolled in; reading low was chosen over reading high because an editor acts on the
+     *    number by narrowing.
      *
      * @param array $criteria Normalised criteria.
      * @param callable $applies Predicate deciding whether a rule key is present and applied.

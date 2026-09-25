@@ -23,10 +23,8 @@ use local_awareness\persistent\awareness;
  * The rendered picker has the shape the stylesheet reads.
  *
  * Core renders a grouped radio as <label><input> ...</label>, the input inside its label, on 4.5
- * and 5.2 alike, and every state rule of the picker is written against that: the option is the
- * input's next sibling. The first version read "input + label", which matches nothing in that
- * markup, and with the radio hidden the chosen layout showed no mark at all. Nothing in the
- * pipeline checks a selector against the markup it was written for, so this test renders the form
+ * and 5.2 alike, so every state rule of the picker reads the option as the input's next sibling;
+ * a selector written as "input + label" matches nothing in that markup. This test renders the form
  * and asserts the shape; motion_contract_test asserts the stylesheet reads exactly that shape.
  *
  * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
@@ -104,9 +102,9 @@ final class picker_render_test extends \advanced_testcase {
     /**
      * Every layout card carries the sentence that says what the layout is for.
      *
-     * The sentences live in the help text too, where they are read by whoever opens a help icon
-     * while comparing six thumbnails — which is nobody. A card with an empty description would
-     * render as a silent gap, so the text itself is asserted, not just the element.
+     * The help text carries the same sentences, but the card is where the author compares layouts.
+     * notice_form::layout_description() returns '' for a layout it has no case for, so the text
+     * itself is asserted, not just the element.
      */
     public function test_every_layout_card_carries_its_description(): void {
         $this->resetAfterTest();
@@ -124,9 +122,8 @@ final class picker_render_test extends \advanced_testcase {
     /**
      * A position radio is drawn as a cell of the screen, and keeps its name where a reader can hear it.
      *
-     * The visible text is gone — seven phrases describe a place where a picture of one shows it —
-     * so the accessible name is the whole of what a screen reader has. The offscreen class is the
-     * plugin's own: visually-hidden is a Bootstrap 5 name and dead on 4.5 in this surface.
+     * The cell shows no visible text, so the offscreen name is all a screen reader has. The
+     * offscreen class is the plugin's own, defined on both branches without the Bootstrap 4 polyfill.
      */
     public function test_every_position_radio_is_a_drawn_cell_that_keeps_its_name(): void {
         $this->resetAfterTest();
@@ -159,11 +156,9 @@ final class picker_render_test extends \advanced_testcase {
     /**
      * Every control of a slide keeps its own row, and therefore its own label.
      *
-     * The card is drawn ACROSS a slide's rows rather than around one. Wrapping them in a group was
-     * tried first and measured: hideIf and setType do reach a group's children, and the delete
-     * button's client hints can be restored by hand — but core renders a group's children WITHOUT
-     * THEIR LABELS, and two controls arrived on screen with no label at all. This is what would
-     * notice a return to that shape.
+     * The slide card is drawn across the slide's rows rather than around a group, because core
+     * renders a group's children without their own labels. This test fails if the controls are
+     * wrapped in a group again.
      */
     public function test_every_control_of_a_slide_keeps_its_own_row_and_label(): void {
         $this->resetAfterTest();

@@ -10,9 +10,8 @@ Feature: The editor tells the truth about a notice that reaches nobody
     And I log in as "admin"
 
   Scenario: A published notice whose window has closed says so
-    # The badge read "Live · being shown" from the enabled flag alone, which is a true statement
-    # about the flag and a false one about the world: is_within_active_window() has been refusing
-    # this notice since the expiry passed. Nothing on the page said it.
+    # The badge judges the display window, not the enabled flag alone: an enabled notice past its
+    # expiry reaches nobody.
     Given the following site notices exist
       | title              | content            | enabled | timestart  | timeend    |
       | Expired notice     | <p>Body</p>        | 1       | 1600000000 | 1600086400 |
@@ -23,9 +22,7 @@ Feature: The editor tells the truth about a notice that reaches nobody
     And I should not see "Live · being shown"
 
   Scenario: A start date with no expiry runs from that date onwards
-    # This used to read to an author as "from this date onwards" and behave as "never", because the
-    # window check asked now < timeend with timeend zero. A zero bound is now unbounded on that
-    # side, so the notice means what it says and the warning that papered over it is gone.
+    # A zero bound is unbounded on that side, so a zero timeend must not be read as "ended".
     Given the following site notices exist
       | title              | content            | enabled | timestart  | timeend |
       | Open ended notice  | <p>Body</p>        | 1       | 1600000000 | 0       |
@@ -57,10 +54,9 @@ Feature: The editor tells the truth about a notice that reaches nobody
     Then I should see "Unsaved changes"
 
   Scenario: Saving a notice that was deleted in the meantime creates nothing
-    # The create-or-update branch used to key on whether the record was found, which is false both
-    # for "new notice" and for "deleted while this form was open" — so the save ran the create
-    # branch and produced a duplicate with every acknowledgement gone. The renamed title is what a
-    # duplicate would carry, so its absence from the list is the proof.
+    # "Not found" must not be read as "new notice", or the save would create a duplicate without
+    # the original's acknowledgements. The renamed title is what a duplicate would carry, so its
+    # absence from the list is the proof.
     Given the following site notices exist
       | title      | content     |
       | Stale copy | <p>Body</p> |

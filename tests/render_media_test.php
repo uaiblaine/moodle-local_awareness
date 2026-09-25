@@ -38,7 +38,7 @@ final class render_media_test extends \advanced_testcase {
         require_once($CFG->libdir . '/filterlib.php');
 
         filter_set_global_state('mediaplugin', TEXTFILTER_ON);
-        // The players a fresh install enables, in the order it enables them.
+        // A fresh install enables videojs and youtube; vimeo is added for the carousel's Vimeo slide.
         set_config('media_plugins_sortorder', 'videojs,youtube,vimeo');
         \core_media_manager::reset_caches();
         // The active filters are memoised per request; a state changed after the first render is

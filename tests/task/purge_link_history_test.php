@@ -16,18 +16,14 @@
 
 namespace local_awareness\task;
 
-use local_awareness\persistent\linkhistory;
-
 /**
  * The retention task for link-click history, and the meaning of a click it must not change.
  *
- * The table gained a row per click and nothing time-based ever removed one, so a site kept every
- * click for its whole life. That is the half of audit finding M7 worth fixing.
+ * The table gains a row per click, and the task discards rows past the configured lifetime.
  *
- * The other half — a reader looping the web service to inflate their own count — stays open on
- * purpose, and the test at the end of this file is why the obvious fix is refused: repeat clicks
- * are the REPORTED quantity. Any throttle collapses a genuine second click into the first, which
- * is a worse outcome than the one it prevents.
+ * A reader can inflate their own count by calling the web service repeatedly, and that is
+ * accepted: repeat clicks are the reported quantity, and a throttle would collapse a genuine
+ * second click into the first. The last test pins that.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -57,8 +53,7 @@ final class purge_link_history_test extends \advanced_testcase {
     /**
      * A configured lifetime discards what is past it and keeps what is not.
      *
-     * The survivor is the control. Without it a task that emptied the table outright would pass,
-     * and emptying the table is the failure this feature could most plausibly ship with.
+     * The survivor is the control: without it a task that emptied the table outright would pass.
      *
      * @return void
      */
@@ -112,9 +107,9 @@ final class purge_link_history_test extends \advanced_testcase {
     /**
      * db/tasks.php declares the task, and its name resolves to a real language string.
      *
-     * Reads the FILE through load_default_scheduled_tasks_for_component(), deliberately — the
-     * other loader reads {task_scheduled}, which holds whatever was installed when the test site
-     * was last built and so keeps passing after the declaration is deleted.
+     * Reads db/tasks.php through load_default_scheduled_tasks_for_component(): the other loader
+     * reads the {task_scheduled} rows installed when the test site was built, and so keeps passing
+     * after the declaration is deleted.
      *
      * @return void
      */
@@ -130,16 +125,14 @@ final class purge_link_history_test extends \advanced_testcase {
     }
 
     /**
-     * TWO CLICKS ON ONE LINK ARE TWO CLICKS.
+     * Two clicks on one link are two clicks.
      *
-     * This is the test that refuses the throttle. count_clicked_links() reports COUNT(hlinkid), so
-     * a rate limit — however short its window — would silently turn a reader who clicked twice into
-     * a reader who clicked once, and the number the report exists to give would stop being a click
-     * count at all.
+     * Each click is one row of the link history report source, so a rate limit of any window would
+     * turn a reader who clicked twice into one who clicked once.
      *
-     * It goes through helper::track_link(), not the persistent, on purpose: the assertions in
+     * It goes through helper::track_link(), not the persistent, because the tests in
      * tests/persistent/linkhistory_test.php seed rows directly and would stay green through a guard
-     * added to the write path, so they cannot serve as this guarantee.
+     * added to the write path.
      *
      * @return void
      */
@@ -175,9 +168,5 @@ final class purge_link_history_test extends \advanced_testcase {
             $DB->count_records('local_awareness_hlinks_his', ['hlinkid' => $linkid, 'userid' => $user->id]),
             'a second click on the same link was collapsed into the first'
         );
-
-        $counts = linkhistory::count_clicked_links((int) $user->id, (int) $notice->get('id'));
-        $row = reset($counts);
-        $this->assertSame(2, (int) $row->clickcount, 'the reported click count is no longer a count of clicks');
     }
 }

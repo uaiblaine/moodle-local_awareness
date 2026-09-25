@@ -54,7 +54,7 @@ class track_link extends external_api {
 
         self::validate_context(\context_system::instance());
 
-        // See dismiss_notice(): the switch is enforced at the boundary, not in the helper.
+        // Nothing is recorded while delivery is off; dismiss_notice explains why the check sits here.
         if (!helper::is_delivery_enabled()) {
             return ['status' => false];
         }
@@ -68,9 +68,8 @@ class track_link extends external_api {
      * @return external_single_structure
      */
     public static function execute_returns(): external_single_structure {
-        // No redirecturl. It was declared here and never returned by helper::track_link(), which
-        // told a reader of the contract that this function might navigate the browser — the one
-        // thing a click-tracking call must not appear to do.
+        // Status only, no redirect URL: the browser follows the link itself, and a click-tracking
+        // call must not appear to navigate.
         return new external_single_structure(
             [
                 'status' => new external_value(PARAM_BOOL, 'status: true if success', VALUE_DEFAULT, "0"),

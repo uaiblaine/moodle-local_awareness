@@ -67,7 +67,7 @@ final class group_scope_test extends \advanced_testcase {
     }
 
     /**
-     * Switch the course's group mode and read it back through the scope.
+     * Switch the course's group mode and reload the course record.
      *
      * @param int $groupmode NOGROUPS, SEPARATEGROUPS or VISIBLEGROUPS.
      * @return void
@@ -94,9 +94,9 @@ final class group_scope_test extends \advanced_testcase {
         $this->assertSame([], $scope->options());
         /*
          * It confines nobody: separation is a course's mode, and the site has no course. What stops
-         * a site notice naming groups is author_scope's rule table, on the way in; this class is
-         * asked who may REACH one that somehow exists, and hiding it from everyone would leave the
-         * row nobody could fix. narrow() is the other question, and it still offers nothing.
+         * a site notice naming groups is author_scope's rule table, on the way in; admits() answers
+         * who may reach one that somehow exists, and hiding it from everyone would leave a row
+         * nobody could fix. narrow() answers what may be saved, and still offers nothing.
          */
         $this->assertTrue($scope->admits([]), 'no group named is everyone\'s to reach');
         $this->assertTrue($scope->admits([(int) $this->red->id]));
@@ -149,9 +149,9 @@ final class group_scope_test extends \advanced_testcase {
         $this->assertEqualsCanonicalizing($every, $scope->allowed_ids());
         $this->assertTrue($scope->admits($every));
         /*
-         * The staff group cannot be picked — it does not participate — but a notice that somehow
-         * names it is still theirs to open and fix. Whoever confines nobody is kept from nothing:
-         * the restricted teacher above is the control, refused the same group.
+         * The staff group cannot be picked, as it does not participate, but a notice that somehow
+         * names it is still theirs to open and fix: an unrestricted author is kept from nothing.
+         * The restricted teacher in the previous test is the control, refused the same group.
          */
         $this->assertNotContains((int) $this->staff->id, $scope->allowed_ids());
         $this->assertTrue($scope->admits([(int) $this->staff->id]));
@@ -169,12 +169,10 @@ final class group_scope_test extends \advanced_testcase {
     /**
      * The group mode switched off still offers every group, and confines nobody.
      *
-     * The mode governs how ACTIVITIES separate participants; it does not decide whether a course
-     * has groups or whether a notice may address one. This is the shape of a real site: on the dev
-     * server the three courses with the most groups — 300, 30 and 9 — all sit at NOGROUPS, and an
-     * earlier version of offered() read the mode and hid the picker on every one of them. The
-     * teacher here is the one the mode WOULD confine if it were separate, which is what makes the
-     * first assertion mean something.
+     * The mode governs how activities separate participants; it does not decide whether a course
+     * has groups or whether a notice may address one, and a course can hold many groups at
+     * NOGROUPS, core's default. The teacher here is the one separate groups would confine, which is
+     * what makes the assertions mean something.
      */
     public function test_the_group_mode_switched_off_still_offers_every_group(): void {
         $this->set_groupmode(NOGROUPS);

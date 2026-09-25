@@ -35,11 +35,10 @@ use local_awareness\table\all_notices;
 use local_awareness\table\all_notices_filterset;
 
 /*
- * Two modes, one page. With no course the list is Site administration's, as it has always been.
- * With a course it is that course's: reached from the course navigation, laid out inside the
- * course, gated in the course context, and listing that course's notices only. The scope is the
- * page's whole difference; the table reads it from its filterset, so the AJAX refresh sees the
- * same list. author_scope::for_request() is what turns the raw parameter into a scope.
+ * Two modes, one page. With no course the list is Site administration's. With a course it is that
+ * course's: reached from the course navigation, laid out inside the course, gated in the course
+ * context, and listing that course's notices only. The table reads the scope from its filterset,
+ * so the AJAX refresh sees the same list.
  */
 $courseid = optional_param('courseid', 0, PARAM_INT);
 $scope = author_scope::for_request(null, $courseid);

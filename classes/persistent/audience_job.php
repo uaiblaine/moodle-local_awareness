@@ -127,14 +127,11 @@ class audience_job extends persistent {
     /**
      * Find a job for the same criteria that is already queued and still worth waiting for.
      *
-     * The editor re-estimates on every form change, and only completed jobs were deduplicated, so
-     * a burst of edits queued a burst of identical adhoc tasks — each a full estimate the site then
-     * ran and threw away, because by the time they completed the client was polling a later one.
-     * Joining the job already in flight costs the caller nothing: it is the same criteria, so it
-     * will produce the same answer.
+     * The editor re-estimates as the form changes; joining the job already queued for the same
+     * criteria keeps a burst of edits from queueing a burst of identical adhoc tasks.
      *
-     * Deliberately not merged into find_reusable(): a ready job answers immediately and a pending
-     * one is a promise, and the caller decides differently about the two.
+     * Kept apart from find_reusable(): a ready job answers immediately and a pending one is a
+     * promise, and the caller decides differently about the two.
      *
      * @param string $criteriahash
      * @return self|false
@@ -197,15 +194,10 @@ class audience_job extends persistent {
     /**
      * Fire the audience-estimate event for a job row that has just been created.
      *
-     * Lives here rather than at either call site because rows are created in TWO places — the
-     * estimate web service, and audience\notice_audience::refresh(), which is the path a notice
-     * save and the editor's Recalculate button both take. Instrumenting only the web service would
-     * have logged the editor's debounced previews, which mostly reuse an existing job and create
-     * nothing, while missing every deliberate recalculation and every save.
-     *
-     * The reuse and join paths deliberately do not call this: no row is created there, and the
-     * event's whole meaning is that a distinct criteria set was asked about for the first time
-     * inside the dedup window.
+     * Called from both places that create rows: the estimate_audience web service and
+     * {@see \local_awareness\audience\notice_audience::refresh()}, the path a notice save and the
+     * manage list's Recalculate action take. Reusing or joining an existing job creates no row and
+     * fires nothing.
      *
      * @param self $job The job row that was just created.
      * @return void

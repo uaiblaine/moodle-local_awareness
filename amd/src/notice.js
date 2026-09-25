@@ -33,20 +33,19 @@ define(
         var notices = {};
         var modal;
         var viewednotices = [];
-        // True while a dismiss or acknowledge request is in flight. The modal used to be hidden
-        // synchronously on click, which made a second click impossible; now that it stays up until
-        // the server answers, this is what stops one notice being dismissed twice.
+        // True while a dismiss or acknowledge request is in flight. The dialogue stays up until the
+        // server answers, so this is what stops a second click from recording one notice twice.
         var inflight = false;
 
         var Awareness = {};
 
         /**
-         * Retrieved notice which has not been viewwed.
-         * @returns {boolean|*}
+         * Take the next notice not yet shown, and mark it shown.
+         * @returns {boolean|*} The notice, or false when none is left.
          */
         var getNotice = function() {
             for (var i in notices) {
-                // Check the notice has been viewed.
+                // Skip the notices already shown.
                 if (!viewednotices.includes(i)) {
                     viewednotices.push(i);
                     return notices[i];
@@ -62,9 +61,7 @@ define(
             var nextnotice = getNotice();
             if (nextnotice == false) {
                 if (typeof modal !== 'undefined') {
-                    // Nothing left to show. This is the ONLY place the modal is hidden, so a
-                    // dismissal that never reached the server leaves the notice on screen instead
-                    // of closing it and silently losing the record.
+                    // Nothing left to show: the only place the dialogue is hidden (see the module docblock).
                     modal.hide();
                 }
                 return;
@@ -90,10 +87,14 @@ define(
                         modal.getModal().on('click', modal.getAcceptButtonID(), function() {
                             acknowledgeNotice();
                         });
-                        // Event listener for link tracking.
-                        modal.getModal().on('click', 'a', function() {
-                            var linkid = $(this).attr("data-linkid");
-                            trackLink(linkid);
+                        /*
+                         * Link tracking, for the anchors the server registered when the notice was
+                         * saved. Anchors that appear at render time - text filter output, a video
+                         * link no player took - carry no data-linkid, and the tracking service
+                         * refuses a click without one.
+                         */
+                        modal.getModal().on('click', 'a[data-linkid]', function() {
+                            trackLink($(this).attr('data-linkid'));
                         });
                         // Event listener for ack checkbox.
                         modal.getModal().on('click', modal.getAckCheckboxID(), function() {
@@ -101,12 +102,7 @@ define(
                             $(modal.getAcceptButtonID()).attr('disabled', !ischecked);
                         });
 
-                        /*
-                         * Shown BEFORE it is dressed. show() is what attaches the dialogue to the
-                         * document, and the video.js loader finds the player it is told about by
-                         * id, in the document: a band filled while the dialogue was still detached
-                         * gave it an id that named nothing, and no player.
-                         */
+                        // Shown before it is dressed; see ModalNotice.setAppearance().
                         modal.show();
                         return modal.setAppearance(nextnotice);
                     })
@@ -118,12 +114,11 @@ define(
                     .catch(Notification.exception);
             } else {
                 /*
-                 * The dialogue is dressed in place, whatever its next shape: core's hide() and
-                 * show() run in the same frame here, so nothing between them would ever be painted,
-                 * and the entrance the caller replays after show() is what carries a change of
-                 * shape - it starts from nothing and arrives as the new notice. An author who chose
-                 * no entrance chose no motion at all, including here. Hiding stays in exactly one
-                 * place, when the queue is empty, which async_contract_test pins.
+                 * The dialogue is dressed in place, whatever its next shape: a hide and show in the
+                 * same frame would paint nothing between them, so the entrance replayed after
+                 * show() is what carries a change of shape. An author who chose no entrance gets no
+                 * motion here either. The dialogue is hidden only when the queue is empty, which
+                 * tests/local/async_contract_test.php pins.
                  */
                 // Update with new details.
                 modal.setTitle(nextnotice.title);
@@ -138,7 +133,7 @@ define(
         };
 
         /**
-         * Dismiss Notice.
+         * Record the dismissal of the notice on screen, and show the next one once the server has answered.
          */
         var dismissNotice = function() {
             if (inflight) {
@@ -159,7 +154,7 @@ define(
         };
 
         /**
-         * Acknowledge notice.
+         * Record the acceptance of the notice on screen, and show the next one once the server has answered.
          */
         var acknowledgeNotice = function() {
             if (inflight) {
@@ -180,8 +175,8 @@ define(
         };
 
         /**
-         * Link tracking.
-         * @param {Integer} linkid
+         * Record a click on a tracked link.
+         * @param {String} linkid The anchor's data-linkid, a local_awareness_hlinks id.
          */
         var trackLink = function(linkid) {
             var promises = ajax.call([
@@ -192,7 +187,7 @@ define(
         };
 
         /**
-         * Initial Modal with user notices.
+         * Fetch the reader's notices for this page and show the first.
          */
         Awareness.init = function() {
             var currenturl = window.location.pathname + window.location.search;
@@ -202,9 +197,8 @@ define(
             ]);
 
             promises[0].done(function(response) {
-                // No JSON.parse: the web service declares a real structure now, so core hands over
-                // an array that has already been through clean_returnvalue(). The parse used to sit
-                // inside done(), where fail() could not see it throw.
+                // No JSON.parse: the web service declares a real structure, so the notices arrive
+                // as an array that has already been through clean_returnvalue().
                 notices = response.notices || [];
                 $(document).ready(function() {
                     nextNotice();

@@ -19,7 +19,9 @@ namespace local_awareness\persistent;
 use core\persistent;
 
 /**
- * Acknowledgement class.
+ * One user's dismissal or acknowledgement of a notice.
+ *
+ * The user's name, username and idnumber and the notice title are copies taken when the row is written.
  *
  * @package    local_awareness
  * @copyright  Catalyst IT
@@ -54,17 +56,22 @@ class acknowledgement extends persistent {
                 'type' => PARAM_RAW_TRIMMED,
                 'null' => NULL_NOT_ALLOWED,
             ],
+            /*
+             * Required, although their columns are nullable: with no default, core\persistent
+             * refuses a null here whatever 'null' says, and the copies come from {user}, where
+             * none of the three can be null.
+             */
             'firstname' => [
                 'type' => PARAM_RAW_TRIMMED,
-                'null' => NULL_ALLOWED,
+                'null' => NULL_NOT_ALLOWED,
             ],
             'lastname' => [
                 'type' => PARAM_RAW_TRIMMED,
-                'null' => NULL_ALLOWED,
+                'null' => NULL_NOT_ALLOWED,
             ],
             'idnumber' => [
                 'type' => PARAM_RAW_TRIMMED,
-                'null' => NULL_ALLOWED,
+                'null' => NULL_NOT_ALLOWED,
             ],
             'noticetitle' => [
                 'type' => PARAM_RAW_TRIMMED,

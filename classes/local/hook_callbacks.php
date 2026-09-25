@@ -23,11 +23,11 @@ use local_awareness\helper;
 /**
  * Hook callbacks for local_awareness.
  *
- * The notice module used to ride on the navigation callback, which fires mid-header wherever the
- * theme touches navigation — a point where $PAGE->url may not be set yet, and which also runs on
- * the navigation-expansion AJAX endpoint where the queued module can never execute. This hook
- * fires at the top of footer rendering: strictly later, with the URL as settled as it will ever
- * be, and only on renders that can actually deliver the module.
+ * The notice module is queued from before_footer_html_generation rather than a navigation
+ * callback. Navigation callbacks fire mid-header, where $PAGE->url may not be set yet, and also
+ * run on the navigation-expansion AJAX endpoint, where a queued module never executes; this hook
+ * fires at the top of footer rendering, with the URL settled, and only on renders that can
+ * deliver the module.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -37,25 +37,21 @@ class hook_callbacks {
     /**
      * @var string[] Page layouts the notice module never loads on.
      *
-     * The first three follow tool_usertours: no notices in maintenance mode, when printing, or on
-     * a redirect interstitial. Embedded and popup preserve today's coverage — the navigation
-     * callback never fired there, so nothing changes. Secure is a deliberate product decision, not
-     * preservation: with a sticky Navigation block the old callback could deliver a notice inside
-     * a securewindow quiz attempt, and a modal (with a possible forced logout) inside a locked
-     * exam window is accidental behaviour we choose to end. This is a denylist on purpose — an
-     * unknown layout loads the module, it never suppresses it.
+     * Maintenance, print and redirect follow {@see \tool_usertours\helper::bootstrap()}: no
+     * notices in maintenance mode, when printing, or on a redirect interstitial. Embedded and popup
+     * keep the module out of frames and pop-up windows, and secure keeps a modal out of a
+     * locked-down quiz attempt window. A denylist on purpose: an unknown layout loads the module.
      */
     public const EXCLUDED_LAYOUTS = ['maintenance', 'print', 'redirect', 'embedded', 'popup', 'secure'];
 
     /**
      * Purge a course's notices before the course goes.
      *
-     * This hook and not the course_deleted event: by the time that event fires the course row and
-     * its context are already gone, and an observer resolving either throws inside a catch the
-     * event manager keeps to itself — the purge would fail silently on exactly the courses that
-     * have notices. The hook runs first, with everything still in place. Hook dispatch has no catch
-     * of its own, so this one has: a fault here must not make a course undeletable, and whatever
-     * it leaves behind is refused by author_scope::exists() rather than read as the site.
+     * The hook and not the course_deleted event: that event fires after the course row and its
+     * context are gone, so a purge resolving either would fail, and the event manager swallows
+     * observer exceptions. Hook dispatch does not catch, so this callback does: a failed purge must
+     * not make a course undeletable, and any notice it leaves behind is refused through
+     * {@see author_scope::exists()} rather than read as a site notice.
      *
      * @param before_course_deleted $hook The hook being dispatched.
      */
@@ -92,7 +88,7 @@ class hook_callbacks {
             return false;
         }
 
-        if (!isloggedin() || !get_config('local_awareness', 'enabled')) {
+        if (!isloggedin() || !helper::is_delivery_enabled()) {
             return false;
         }
 
@@ -100,15 +96,11 @@ class hook_callbacks {
             return helper::has_candidate_notices(page_probe::from_page($page));
         } catch (\Throwable $exception) {
             /*
-             * Throwable, not Exception. This runs on essentially every page of the site, so an
-             * Error escaping here — a typed setter handed null, a bad argument reaching
-             * completion_info — is not a missing notice, it is a fatal on every page for every
-             * logged-in user, recoverable only by disabling the plugin from the database. There is
-             * no failure of this pipeline worth taking the site down for. page_probe already uses
-             * Throwable at each of its four boundaries; this one had been left behind.
-             *
-             * Same treatment the navigation callback gave a pipeline failure: report, load nothing.
-             * Page-rule uncertainty never lands here — page_probe degrades to "admit" internally.
+             * Throwable, not Exception: this runs on almost every page, so an Error escaping here
+             * (a typed setter handed null, a bad argument reaching completion_info) would be a fatal
+             * on every page for every logged-in user, recoverable only by disabling the plugin in
+             * the database. Report and load nothing. Page-rule uncertainty never reaches this catch:
+             * page_probe admits on its own failures.
              */
             debugging($exception->getMessage());
             return false;

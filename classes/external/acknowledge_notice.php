@@ -63,26 +63,15 @@ class acknowledge_notice extends external_api {
             'status' => 0,
         ];
 
-        /*
-         * The site switch is checked at each entry point, the way should_load_on() checks it for
-         * the footer hook, rather than inside the delivery helpers. Those helpers answer "what
-         * would this user be shown", which is a question worth being able to ask with the switch
-         * off; this is the boundary where the answer becomes an action. A silent no-op rather than
-         * an exception: a disabled plugin should look like a plugin with nothing to say.
-         */
+        // Nothing is recorded while delivery is off; dismiss_notice explains why the check sits here.
         if (!helper::is_delivery_enabled()) {
             return $result;
         }
 
         $notice = awareness::get_record(['id' => $params['noticeid']]);
 
-        /*
-         * The notice id comes from the client, so both halves have to be re-established here:
-         * the audience test, and the fact that this session was actually served the notice.
-         * Without the second one a user in the notice's cohort who is not in the course it targets
-         * could post a row that lands in the compliance report as consent given after display —
-         * and the report is the reason this plugin exists.
-         */
+        // The id comes from the client, so the audience and the delivery to this session are both
+        // re-checked before a row can reach the acknowledgement report; see helper::may_act_on_notice().
         if ($notice && helper::may_act_on_notice($notice)) {
             $result = helper::acknowledge_notice($notice);
         }

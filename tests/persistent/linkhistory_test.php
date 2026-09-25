@@ -30,9 +30,9 @@ final class linkhistory_test extends \advanced_testcase {
      * Seed a notice with one hyperlink and a number of recorded clicks by one user.
      *
      * @param int $clicks How many click rows to record.
-     * @return array{0: int, 1: int, 2: int} Notice id, link id, user id.
+     * @return int The link id.
      */
-    private function seed_clicks(int $clicks): array {
+    private function seed_clicks(int $clicks): int {
         $user = $this->getDataGenerator()->create_user();
 
         $notice = new awareness(0, (object) [
@@ -54,66 +54,41 @@ final class linkhistory_test extends \advanced_testcase {
             ]))->create();
         }
 
-        return [(int) $notice->get('id'), (int) $link->get('id'), (int) $user->id];
+        return (int) $link->get('id');
     }
 
     /**
-     * The aggregate must be exposed under an explicit alias.
+     * Deleting the history of some links takes every click on them and none on any other link.
      *
-     * An unaliased COUNT() is named 'count' by PostgreSQL and 'COUNT(h.hlinkid)' by
-     * MySQL/MariaDB, so the property the report reads existed on one driver only and the
-     * link-click column rendered empty on the other. Asserting the alias — and the value —
-     * fails on every driver if the alias is dropped again.
-     *
-     * @covers \local_awareness\persistent\linkhistory::count_clicked_links
+     * The untouched link is the control: a delete that ignored its list and emptied the table
+     * would pass the first assertion alone.
      */
-    public function test_count_clicked_links_exposes_an_aliased_count(): void {
+    public function test_deleting_link_history_takes_only_the_named_links(): void {
+        global $DB;
+
         $this->resetAfterTest();
 
-        [$noticeid, $linkid, $userid] = $this->seed_clicks(3);
+        $doomed = $this->seed_clicks(3);
+        $kept = $this->seed_clicks(2);
 
-        $counts = linkhistory::count_clicked_links($userid, $noticeid);
+        linkhistory::delete_link_history([$doomed]);
 
-        $this->assertCount(1, $counts);
-        $row = reset($counts);
-        // Uses property_exists() rather than assertObjectHasProperty(): the latter only exists
-        // from PHPUnit 10.1, and Moodle 4.5 — inside the supported range — ships PHPUnit 9.6.
-        $this->assertTrue(property_exists($row, 'clickcount'));
-        $this->assertEquals(3, $row->clickcount);
-        $this->assertEquals($linkid, $row->hlinkid);
-        $this->assertSame('the policy', $row->text);
+        $this->assertSame(0, $DB->count_records(linkhistory::TABLE, ['hlinkid' => $doomed]));
+        $this->assertSame(2, $DB->count_records(linkhistory::TABLE, ['hlinkid' => $kept]));
     }
 
     /**
-     * The same alias must be present when the query is narrowed to a single link.
-     *
-     * @covers \local_awareness\persistent\linkhistory::count_clicked_links
+     * An empty list deletes nothing, rather than reaching get_in_or_equal() with no values.
      */
-    public function test_count_clicked_links_exposes_an_aliased_count_for_one_link(): void {
+    public function test_deleting_the_history_of_no_links_deletes_nothing(): void {
+        global $DB;
+
         $this->resetAfterTest();
 
-        [$noticeid, $linkid, $userid] = $this->seed_clicks(2);
+        $this->seed_clicks(2);
 
-        $counts = linkhistory::count_clicked_links($userid, $noticeid, $linkid);
+        linkhistory::delete_link_history([]);
 
-        $this->assertArrayHasKey($linkid, $counts);
-        $this->assertTrue(property_exists($counts[$linkid], 'clickcount'));
-        $this->assertEquals(2, $counts[$linkid]->clickcount);
-    }
-
-    /**
-     * A user who never clicked gets no rows — the control that proves the counts above
-     * come from the seeded clicks rather than from the join returning everything.
-     *
-     * @covers \local_awareness\persistent\linkhistory::count_clicked_links
-     */
-    public function test_count_clicked_links_is_scoped_to_the_user(): void {
-        $this->resetAfterTest();
-
-        [$noticeid, , $userid] = $this->seed_clicks(2);
-        $other = $this->getDataGenerator()->create_user();
-
-        $this->assertNotEmpty(linkhistory::count_clicked_links($userid, $noticeid));
-        $this->assertEmpty(linkhistory::count_clicked_links((int) $other->id, $noticeid));
+        $this->assertSame(2, $DB->count_records(linkhistory::TABLE));
     }
 }

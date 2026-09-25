@@ -10,10 +10,8 @@ Feature: Previewing a notice from the editor
     And I click on "Create new notice" "link"
 
   Scenario: The preview shows the content the form currently holds
-    # It used to draw a mock of the notice modal INSIDE a core modal, showing truncated plain text
-    # with the formatting stripped — a picture of a dialogue, inside a dialogue, that had to be kept
-    # in step with the real thing by hand. The content itself is the preview now, in the same
-    # core/modal_cancel the manage list opens for a saved notice.
+    # The preview is the content itself, rendered by the server and opened in the real notice
+    # dialogue (local_awareness/modal_notice), the same one the manage list opens for a saved notice.
     When I set the field "Title" to "Scheduled maintenance"
     And I set the field "Content" to "The library closes at six."
     And I click on "Preview" "button"
@@ -24,9 +22,9 @@ Feature: Previewing a notice from the editor
     Then I should see "This notice has no content yet."
 
   Scenario: The dialogue closes on Escape
-    # Escape, the focus trap and the return of focus to the button that opened it all come from
-    # core/modal_cancel. Asserted so that replacing it with a hand-made dialogue cannot be a silent
-    # change: a hand-made one passes every other gate in the pipeline.
+    # local_awareness/modal_notice routes Escape to the close button, and core/modal underneath it
+    # traps focus. Asserted so that replacing the dialogue with a hand-made one cannot be a silent
+    # change: nothing else here would notice.
     When I set the field "Title" to "Scheduled maintenance"
     And I set the field "Content" to "The library closes at six."
     And I click on "Preview" "button"

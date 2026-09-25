@@ -22,9 +22,9 @@ use local_awareness\output\audience_panel;
 /**
  * Tests for the interactive-estimate decision and what the editor does with it.
  *
- * Coverage is declared in this docblock rather than with #[CoversClass]; moodle-cs on the 4.05 leg
- * cannot see attributes and reports every method as missing coverage information, which fails
- * phpcs under --max-warnings 0 while this plugin still supports 4.5.
+ * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
+ * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage. Move to the
+ * attribute when 4.5 support is dropped.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -43,8 +43,7 @@ final class audience_live_mode_test extends \advanced_testcase {
      * An unstored setting means the default, not zero.
      *
      * Reading a missing setting as 0 would switch interactive estimation off on every site whose
-     * upgrade had not yet applied the default — the failure would look like the feature simply
-     * being slow, which is the behaviour it was built to remove.
+     * upgrade had not yet applied the default.
      */
     public function test_an_unstored_limit_reads_as_the_default(): void {
         unset_config('audience_sync_limit', 'local_awareness');
@@ -124,13 +123,10 @@ final class audience_live_mode_test extends \advanced_testcase {
     public function test_the_editor_switches_the_automatic_estimate_off_on_a_large_site(): void {
         global $PAGE;
 
-        /*
-         * Asked of the panel rather than the page: the estimate is rendered into the audience
-         * section by the form now, and its context moved to its own renderable when it turned out
-         * editor_page builds its context AFTER the form has been rendered and handed to it.
-         */
+        // Asked of the panel rather than the editor page: the form renders the estimate into its
+        // audience section.
         $panel = new audience_panel(null);
-        // The page renderer, not the DI container, which does not exist on 4.5.
+        // The page renderer, because core\output\renderer_helper does not exist on 4.5.
         $renderer = $PAGE->get_renderer('core');
 
         set_config('audience_sync_limit', 100000, 'local_awareness');

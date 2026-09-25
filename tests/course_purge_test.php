@@ -26,7 +26,7 @@ use local_awareness\persistent\awareness;
  * off, because that setting says whether a human may press Delete, not whether a course may stop
  * existing. A purge that reused the gated delete verb passes neither condition. Every deletion is
  * asserted beside a survivor of the same kind — another course's notice, a site notice, their
- * files, their dependent rows — so a purge that deleted nothing or everything reddens.
+ * files, their dependent rows — so a purge that deleted nothing or everything fails.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine

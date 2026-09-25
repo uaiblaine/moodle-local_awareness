@@ -21,10 +21,8 @@ use local_awareness\persistent\awareness;
 /**
  * Retiring Force logout must not quietly make the most insistent notices the least insistent.
  *
- * This runs the REAL upgrade function rather than a copy of its statement. A test that reproduces
- * the SQL beside the code proves the two agree with each other and nothing else — this repository
- * has already shipped a test whose pure-logic twin passed against the exact mutation it existed to
- * catch, and only the real query caught it.
+ * This runs the real upgrade function rather than a copy of its statement: a copy of the SQL
+ * beside the code proves only that the two agree with each other.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -77,10 +75,9 @@ final class upgrade_insistence_test extends \advanced_testcase {
     /**
      * Every stored combination lands on the level its author would recognise.
      *
-     * The four rows are the whole space that mattered, and three of them are controls for the
-     * fourth: only the Force logout row may move. A migration that set outsideclick unconditionally
-     * would satisfy an assertion about that row alone while silently promoting every ordinary
-     * notice on the site to Blocking, which is the failure this shape exists to catch.
+     * Three of the four rows are controls for the fourth: only the Force logout row may move. A
+     * migration that set outsideclick unconditionally would satisfy an assertion about that row
+     * alone while promoting every ordinary notice on the site to Blocking.
      *
      * @return void
      */
@@ -135,7 +132,7 @@ final class upgrade_insistence_test extends \advanced_testcase {
             'a notice that already required acknowledgement is at the top level and must not be demoted'
         );
         /*
-         * ...and its STORED columns are untouched, which the level alone cannot show:
+         * ...and its stored columns are untouched, which the level alone cannot show:
          * get_insistence() short-circuits on reqack, so this row reports ACKNOWLEDGE whatever
          * outsideclick holds. Without this line, deleting `AND reqack = 0` from the migration
          * flips the column from 1 to 0 and every assertion in this test still passes.

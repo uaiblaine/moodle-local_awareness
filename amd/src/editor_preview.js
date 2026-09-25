@@ -22,15 +22,13 @@
  * exits close the dialogue and record nothing: the dialogue's own listeners route Escape and a
  * backdrop click into the close button, and the handlers bound here are what the button does.
  *
- * This replaced a plain core/modal_cancel showing the editor's raw HTML, which had been "the
- * thing that ships" only while a notice was text and images.
- *
  * @module     local_awareness/editor_preview
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 import Ajax from 'core/ajax';
+import {courseId} from 'local_awareness/editor_scope';
 import ModalNotice from 'local_awareness/modal_notice';
 import Notification from 'core/notification';
 import Pending from 'core/pending';
@@ -130,7 +128,7 @@ const readSlides = () => {
  * @returns {Object} The service arguments.
  */
 const readForm = () => ({
-    courseid: parseInt(new URLSearchParams(window.location.search).get('courseid'), 10) || 0,
+    courseid: courseId(),
     title: value(SELECTORS.title).trim(),
     content: getContent(),
     template: value(SELECTORS.template) || 'classic',
@@ -203,8 +201,7 @@ const openPreview = async(trigger) => {
         });
         bindPreviewExits(modal, trigger);
         modal.setInsistence(payload.insistence);
-        // Shown before it is dressed: show() attaches the dialogue to the document, and the
-        // video.js loader finds a player by id in the document - a detached band names nothing.
+        // Shown before it is dressed; see ModalNotice.setAppearance().
         await modal.show();
         await modal.setAppearance(payload);
         modal.setAnimation(payload.animation);

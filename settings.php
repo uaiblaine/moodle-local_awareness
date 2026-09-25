@@ -107,11 +107,13 @@ if ($hassiteconfig) {
     $settings = null;
 }
 
+// Either capability opens the list (check_access() admits any one of them); editnotice.php, which
+// shares this page for its navigation, still demands manage through helper::require_author().
 $managenotice = new admin_externalpage(
     'local_awareness_managenotice',
     get_string('setting:managenotice', 'local_awareness', null, true),
     new moodle_url('/local/awareness/managenotice.php'),
-    'local/awareness:manage'
+    ['local/awareness:manage', 'local/awareness:viewreports']
 );
 
 $ADMIN->add('awareness', $managenotice);

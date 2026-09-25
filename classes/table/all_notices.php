@@ -72,27 +72,23 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     public function __construct(string $uniqueid, ?\moodle_url $url = null, int $page = 0, int $perpage = self::PER_PAGE) {
         parent::__construct($uniqueid);
 
-        $this->set_attribute('class', 'local-awareness awarenesss');
+        $this->set_attribute('class', 'local-awareness');
 
         /*
-         * A name for the table itself. Screen readers list a page's tables and announce each by its
-         * accessible name; without one this is "table", which on an admin page that has several is
-         * no help at all. Hidden visually because the heading above it already says this in print —
-         * set_caption() and render_caption() are on flexible_table on both 4.5 and 5.2.
+         * The table's accessible name, which screen readers announce when listing a page's tables.
+         * Visually hidden because the page heading already says it.
          */
         $this->set_caption(
             get_string('manage:table:caption', 'local_awareness'),
             ['class' => 'visually-hidden']
         );
 
-        // Set protected properties. setup() refines currpage from the request on a full page load.
+        // When $page is 0, setup() reads the page number from the request itself.
         $this->pagesize = $perpage;
         $this->currpage = $page;
 
-        // Define columns in the table.
         $this->define_table_columns();
 
-        // Define configs.
         $this->define_table_configs($url ?? new moodle_url('/local/awareness/managenotice.php'));
     }
 
@@ -108,10 +104,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * The context the dynamic-table web service validates against.
      *
-     * Derived from the scope, never accepted as a parameter: a context id arriving from the client
-     * is a context the client chose. The scope comes from the filterset, which is the one thing the
-     * AJAX refresh rebuilds the table from — so this, has_capability() and the query cannot decide
-     * for different lists.
+     * Derived from the scope, never from a context id the client sends. The scope is read from the
+     * filterset, which is all the AJAX refresh rebuilds the table from, so this, has_capability()
+     * and the query always describe the same list.
      *
      * @return \context
      */
@@ -142,8 +137,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * The scope this list is for: the course in the filterset, or the site.
      *
-     * An absent filterset is the site — the shape the dynamic-table contract test constructs and
-     * the shape every site-mode caller has always used. The site course and below read as the site.
+     * An absent filterset, or a courseid filter at or below SITEID, is the site.
      *
      * @return author_scope
      */
@@ -179,9 +173,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * How many rows match the current filters, across every page.
      *
-     * Reads flexible_table's own public $totalrows, which pagesize() sets from the filtered count
-     * in query_db(). Shadowing it with a property of the same name is a fatal error, since the
-     * base declares it public.
+     * Reads flexible_table's public $totalrows, which pagesize() sets from the filtered count in
+     * query_db(). Do not redeclare that property here: a narrower visibility or a type on the
+     * redeclaration is a fatal error.
      *
      * @return int
      */
@@ -194,14 +188,10 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      */
     protected function define_table_columns() {
         /*
-         * Six columns, down from twelve. Four of the removed ones were yes/no columns that are now
-         * chips in "behaviour", drawn only when the setting is ON: an on/off pair told apart by
-         * colour is invisible to a reader with a colour vision deficiency, and absence carries
-         * "off" perfectly well. "Time modified" is gone outright — it guided no decision on this
-         * page, and the value still lives on the notice.
-         *
-         * Status is a column of its own rather than a badge glued to the title, so it can be
-         * filtered and sorted like the data it is.
+         * Boolean settings are chips in the behaviour column, drawn only when on, rather than
+         * yes/no columns: an on/off pair told apart by colour is invisible to a reader with a
+         * colour vision deficiency. Status is a column of its own, not a badge on the title,
+         * because the list filters on it.
          */
         $cols = [
             'title' => get_string('notice:title', 'local_awareness'),
@@ -223,17 +213,15 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @param \moodle_url $url
      */
     protected function define_table_configs(\moodle_url $url) {
-        // Set table url.
         $this->define_baseurl($url);
 
-        // Set table configs.
         $this->collapsible(false);
         $this->sortable(false);
         $this->pageable(true);
     }
 
     /**
-     * Get data.
+     * Fetch one page of the filtered notices, and resolve once per page what the columns look up.
      *
      * @param int $pagesize number of records to fetch
      * @param bool $useinitialsbar initial bar
@@ -271,18 +259,13 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         }
 
         /*
-         * Resolved once for the whole page of rows rather than per row, which would re-read every
-         * repeating notice for each line of the table.
-         *
-         * rawdata is null, not [], until the loop above puts something in it, so a site with no
-         * notices at all reaches this with nothing. The manage page is exactly where a site with no
-         * notices starts.
+         * Resolved once per page rather than per row, which would re-read every repeating notice
+         * for each row. rawdata stays null, not [], when the query returns nothing.
          */
         $this->clashtitles = collision::clash_titles_for($this->rawdata ?? [], $this->scope());
         // Same shape as the line above: one query for the page, not one per row in col_audience().
         $this->inflight = audience_job::in_flight_hashes();
 
-        // Set initial bars.
         if ($useinitialsbar) {
             $this->initialbars($total > $pagesize);
         }
@@ -291,11 +274,10 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * How many notices matched, printed just above the rows.
      *
-     * Inside the table on purpose. start_html() calls this within the dynamic-table wrapper, so
-     * the AJAX refresh replaces it along with the rows and the number can never describe a
-     * different list than the one on screen. Rendering it in the page around the table would have
-     * meant JavaScript reading data-table-total-rows back out and re-fetching a language string
-     * on every keystroke — more moving parts, and a window where the two disagree.
+     * start_html() calls this inside the dynamic-table wrapper, so the AJAX refresh replaces the
+     * count along with the rows and it always describes the list on screen. Printed by the page
+     * around the table, it would need JavaScript to re-read and re-format the total on every
+     * refresh.
      *
      * @return void
      */
@@ -310,13 +292,10 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * What an empty result looks like.
      *
-     * Overridden rather than rendered by the page around the table, because the AJAX refresh
-     * replaces the table's own HTML and nothing else: an empty state living outside it would still
-     * be showing the previous answer after a filter narrowed the list to nothing.
-     *
-     * The two cases read differently on purpose. A site with no notices at all needs an invitation
-     * to create one; a filter that matched nothing needs a way back out, and offering "create a
-     * notice" there would answer a question nobody asked.
+     * Rendered by the table, not the page, because the AJAX refresh replaces only the table's own
+     * HTML. With filters active it offers to clear them; with none, it offers an author the create
+     * button, gated like the page's own ({@see \local_awareness\output\manage_page::export_for_template()}),
+     * and a reports-only viewer nothing.
      *
      * @return void
      */
@@ -334,13 +313,13 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 'clearlabel' => get_string('manage:filter:clear', 'local_awareness'),
             ]);
         } else {
+            $cancreate = helper::require_author($this->scope(), 'manage', false);
             echo $OUTPUT->render_from_template('local_awareness/manage/empty', [
                 'message' => get_string('manage:empty:none', 'local_awareness'),
-                'showcreate' => true,
-                'createurl' => $this->page_url(
-                    '/local/awareness/editnotice.php',
-                    ['noticeid' => 0, 'sesskey' => sesskey()]
-                )->out(false),
+                'showcreate' => $cancreate,
+                'createurl' => $cancreate
+                    ? $this->page_url('/local/awareness/editnotice.php', ['noticeid' => 0, 'sesskey' => sesskey()])->out(false)
+                    : '',
                 'createlabel' => get_string('notice:create', 'local_awareness'),
             ]);
         }
@@ -376,10 +355,13 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * A predicate excluding the notices whose groups the current user may not reach, or nothing.
      *
      * The candidates are the rows naming a group at all, found by a LIKE on the JSON column for
-     * the one key group_scope spells; a row without it cannot be excluded. Each candidate is then
-     * decided by group_scope for its own course, memoised per course, so a page of notices in one
-     * course asks the group question once. A site notice cannot name a group and is never excluded,
-     * so a site administrator keeps hold of a row that was written by hand.
+     * group_scope::FIELD; a row without that key cannot be excluded. Only a course in separate
+     * groups mode confines anyone ({@see group_scope::is_restricted()}), so the same query keeps
+     * only such courses. That also leaves out a site notice, even one whose stored JSON names a
+     * group, and a notice whose course is gone: neither confines anybody, and an administrator must
+     * still reach both to fix them. What is left is decided by group_scope::admits() for its own
+     * course, memoised per course, and only for a viewer without moodle/site:accessallgroups there:
+     * a viewer who may access all groups costs this one query, whatever the number of courses.
      *
      * @param author_scope $scope The list's scope.
      * @return array [sql, params], the sql empty when nothing is excluded.
@@ -387,24 +369,43 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     protected function unreachable_notices_sql(author_scope $scope): array {
         global $DB;
 
-        $where = $DB->sql_like('filtervalues', ':grpkey');
-        $params = ['grpkey' => '%' . $DB->sql_like_escape('"' . group_scope::FIELD . '"') . '%'];
+        $where = $DB->sql_like('a.filtervalues', ':grpkey');
+        $params = [
+            'grpkey' => '%' . $DB->sql_like_escape('"' . group_scope::FIELD . '"') . '%',
+            'grpmode' => SEPARATEGROUPS,
+            'grpctxlevel' => CONTEXT_COURSE,
+        ];
         if (!$scope->is_site()) {
-            $where .= ' AND courseid = :grpcourseid';
+            $where .= ' AND a.courseid = :grpcourseid';
             $params['grpcourseid'] = $scope->get_courseid();
         }
-        $candidates = $DB->get_records_select(awareness::TABLE, $where, $params, '', 'id, courseid, filtervalues');
+        /*
+         * The course contexts are preloaded, so the capability check below reads no context row. A
+         * LEFT join, so a course missing its context row is still decided rather than skipped.
+         */
+        $ctxfields = \context_helper::get_preload_record_columns_sql('ctx');
+        $sql = "SELECT a.id, a.courseid, a.filtervalues, {$ctxfields}
+                  FROM {" . awareness::TABLE . "} a
+                  JOIN {course} c ON c.id = a.courseid AND c.groupmode = :grpmode
+             LEFT JOIN {context} ctx ON ctx.instanceid = a.courseid AND ctx.contextlevel = :grpctxlevel
+                 WHERE {$where}";
+        $candidates = $DB->get_records_sql($sql, $params);
 
         $excluded = [];
         $reach = [];
         foreach ($candidates as $record) {
+            \context_helper::preload_from_record($record);
             $courseid = (int) $record->courseid;
             $targets = group_scope::decode($record->filtervalues);
             if ($targets === [] || $courseid <= SITEID) {
                 continue;
             }
-            $reach[$courseid] ??= group_scope::for_author(author_scope::course($courseid));
-            if (!$reach[$courseid]->admits($targets)) {
+            if (!array_key_exists($courseid, $reach)) {
+                // The second half of group_scope::is_restricted(); the query above holds the first.
+                $confined = !has_capability('moodle/site:accessallgroups', \context_course::instance($courseid));
+                $reach[$courseid] = $confined ? group_scope::for_author(author_scope::course($courseid)) : null;
+            }
+            if ($reach[$courseid] !== null && !$reach[$courseid]->admits($targets)) {
                 $excluded[] = (int) $record->id;
             }
         }
@@ -419,9 +420,8 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * Turn the filterset into a WHERE clause and its parameters.
      *
-     * Every filter is a SQL predicate, never a post-query array_filter. Narrowing the rows after
-     * the query would make paging lie: it would fetch a page of 25 and display however many
-     * survived, while the pager kept counting the unfiltered total.
+     * Every filter is a SQL predicate, never a post-query array_filter: narrowing the rows after
+     * the query would show short pages while the pager counted the unfiltered total.
      *
      * @return array [where clause, parameters]
      * @throws \coding_exception
@@ -432,13 +432,12 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
         $wheres = ['1 = 1'];
         $params = [];
-        $filterset = $this->get_filterset();
 
-        if ($filterset === null) {
-            return [implode(' AND ', $wheres), $params];
-        }
-
-        // The list's scope: a course page lists that course's notices and nothing else.
+        /*
+         * The list's scope: a course page lists that course's notices and nothing else. The scope
+         * and the group reach below apply with or without a filterset; scope() reads an absent one
+         * as the site.
+         */
         $scope = $this->scope();
         if (!$scope->is_site()) {
             $wheres[] = 'courseid = :courseid';
@@ -446,11 +445,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         }
 
         /*
-         * Notices whose groups this viewer may not reach are not listed: in separate groups mode
-         * without moodle/site:accessallgroups, a notice aimed only at other groups is not theirs to
-         * know about, which is what the mode means. Decided in SQL like every other narrowing here,
-         * so the pager stays honest: the ids are found first, from the few rows naming a group at
-         * all, and excluded by id.
+         * A notice naming a group this viewer may not reach (separate groups mode without
+         * moodle/site:accessallgroups) is not listed; see group_scope::admits(). Excluded by id in
+         * SQL, like every other filter here, so the pager's count stays right.
          */
         [$unreachablesql, $unreachableparams] = $this->unreachable_notices_sql($scope);
         if ($unreachablesql !== '') {
@@ -458,15 +455,18 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             $params += $unreachableparams;
         }
 
+        $filterset = $this->get_filterset();
+        if ($filterset === null) {
+            return [implode(' AND ', $wheres), $params];
+        }
+
         if ($filterset->has_filter('name')) {
             $values = $filterset->get_filter('name')->get_filter_values();
             $needle = trim((string) reset($values));
             if ($needle !== '') {
                 /*
-                 * Accent- and case-insensitive: "manutencao" has to find "Manutenção". On
-                 * PostgreSQL that is unaccent() on both operands when the extension is present,
-                 * and on MySQL/MariaDB the collation already does it. ILIKE is PostgreSQL-only,
-                 * which is why this goes through the helper rather than being written inline.
+                 * Accent- and case-insensitive where the database supports it, so that "manutencao"
+                 * finds "Manutenção". See helper::sql_like_ai().
                  */
                 $wheres[] = helper::sql_like_ai('title', ':name');
                 $params['name'] = '%' . $DB->sql_like_escape($needle) . '%';
@@ -502,10 +502,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             $now = time();
 
             /*
-             * Each occurrence gets its own placeholder name. fix_sql_params() counts placeholder
-             * OCCURRENCES against the parameter array and throws duplicateparaminsql when a name
-             * appears twice, so one :now compared against both ends of the window is two names
-             * bound to the same value, not one name reused.
+             * One placeholder name per occurrence: fix_sql_params() throws duplicateparaminsql when
+             * a name appears twice in a statement, so "now" compared against both ends of the
+             * window is bound under two names.
              */
             if ($validity === all_notices_filterset::VALIDITY_PERMANENT) {
                 $wheres[] = 'timestart = 0 AND timeend = 0';
@@ -546,21 +545,22 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         };
 
         /*
-         * A core action_menu, not a hand-rolled dropdown. It carries both Bootstrap data-API
-         * attribute spellings, the keyboard handling and the ARIA wiring, and — the reason it
-         * matters most here — it emits a .dropdown, which is what Boost's
-         * `.table-responsive .dropdown { position: static }` rule keys off. That rule is what lets
-         * the menu escape the scroll container's overflow clip; a .btn-group wrapper is
-         * position:relative and traps it, so the last row's menu is cut off.
+         * A core action_menu, not a hand-rolled dropdown: it carries both Bootstrap data-API
+         * spellings, keyboard handling and ARIA, and it emits a .dropdown. Boost on 5.x has a
+         * `.table-responsive .dropdown { position: static }` rule that lets that menu escape the
+         * scroll container's overflow clip; a .btn-group wrapper is position: relative and would
+         * clip the last row's menu. Moodle 4.5's Boost has no such rule and wraps the table in
+         * .no-overflow instead; styles.css supplies the rule for that wrapper behind the Bootstrap 4
+         * gate.
          */
         $menu = new \core\output\action_menu();
         $menu->set_kebab_trigger(get_string('actions'));
 
         /*
-         * A reports-only viewer gets the two reports and the preview, and none of the verbs: the
-         * page opened for the reports capability, and a link to an action the seam would refuse
-         * is a link to an error. Decided per row rather than once, because a course list can be
-         * read by a viewer who may author the site's notices and not the course's.
+         * A viewer who may not manage this notice gets the preview and, where they may read them,
+         * the reports; none of the verbs: a link to an action require_author() would refuse is a
+         * link to an error. Decided per row because each row is judged in its own scope, and on
+         * the site list a capability overridden in one course differs from row to row.
          */
         if (!helper::require_author(author_scope::of($awareness), 'manage', false)) {
             return $this->report_only_actions($awareness, $menu);
@@ -584,9 +584,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         /*
          * Preview writes nothing: preview.js reads the notice id off .notice-preview, asks the
          * render_notice service for the notice as the reader gets it, and opens it in the real
-         * dialogue. The row used to carry the rendered content in a data attribute for a plain
-         * dialogue that knew nothing of layouts; it used to be a "View" link in a column of its
-         * own before that, which cost a whole column for one link.
+         * dialogue.
          */
         $previewlabel = get_string('notice:preview', 'local_awareness');
         $menu->add_primary_action(new \core\output\action_menu\link_primary(
@@ -605,21 +603,6 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             ['recalculate', get_string('notice:audience:recalculate', 'local_awareness'), 'i/calc'],
             ['unconfirmedreset', get_string('notice:reset', 'local_awareness'), 't/reset'],
         ];
-        /*
-         * Gated on the level, not on reqack. A Blocking notice records acceptances and refusals
-         * just as an Acknowledge one does — it simply does not demand a tick first — so gating on
-         * reqack hid the reports for exactly the notices whose rows nobody could otherwise reach.
-         * Informational notices record no acceptance at all, so they still offer no report.
-         */
-        if ($awareness->get_insistence() >= awareness::INSISTENCE_BLOCKING) {
-            $secondary[] = ['acknowledged_report', get_string('report:button:ack', 'local_awareness'), 'i/report'];
-            $secondary[] = ['dismissed_report', get_string('report:button:dis', 'local_awareness'), 'i/report'];
-        }
-        // Delete stays last because it is destructive.
-        if (get_config('local_awareness', 'allow_delete')) {
-            $secondary[] = ['unconfirmeddelete', get_string('notice:delete', 'local_awareness'), 't/delete'];
-        }
-
         foreach ($secondary as [$name, $label, $icon]) {
             $menu->add_secondary_action(new \core\output\action_menu\link_secondary(
                 $action($name),
@@ -627,12 +610,59 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 $label
             ));
         }
+        foreach ($this->report_links($awareness) as $link) {
+            $menu->add_secondary_action($link);
+        }
+        // Delete stays last because it is destructive.
+        if (get_config('local_awareness', 'allow_delete')) {
+            $menu->add_secondary_action(new \core\output\action_menu\link_secondary(
+                $action('unconfirmeddelete'),
+                new \pix_icon('t/delete', ''),
+                get_string('notice:delete', 'local_awareness')
+            ));
+        }
 
         return $OUTPUT->render($menu);
     }
 
     /**
-     * The actions a reports-only viewer gets: the preview, and the two reports where rows can exist.
+     * The two compliance report links of a notice, or none.
+     *
+     * Offered from Blocking up, not on reqack: from that level a notice records acceptances and
+     * refusals (see helper::dismiss_notice()) even without demanding a tick, and an Informational
+     * notice records neither. Offered only to a viewer who may read this notice's reports, whatever
+     * they may do to the notice itself. The links go straight to the report pages, which gate on
+     * the viewreports verb themselves; editnotice.php would demand the manage verb first.
+     *
+     * @param awareness $awareness The notice.
+     * @return \core\output\action_menu\link_secondary[]
+     */
+    private function report_links(awareness $awareness): array {
+        $offered = $awareness->get_insistence() >= awareness::INSISTENCE_BLOCKING
+            && helper::require_author(author_scope::of($awareness), 'viewreports', false);
+        if (!$offered) {
+            return [];
+        }
+
+        $params = ['noticeid' => (int) $awareness->get('id')];
+        $reports = [
+            ['/local/awareness/report/acknowledged_systemreport.php', get_string('report:button:ack', 'local_awareness')],
+            ['/local/awareness/report/dismissed_systemreport.php', get_string('report:button:dis', 'local_awareness')],
+        ];
+        $links = [];
+        foreach ($reports as [$path, $label]) {
+            $links[] = new \core\output\action_menu\link_secondary(
+                new moodle_url($path, $params),
+                new \pix_icon('i/report', ''),
+                $label
+            );
+        }
+
+        return $links;
+    }
+
+    /**
+     * The actions a viewer who may not manage the notice gets: the preview, and the reports they may read.
      *
      * @param awareness $awareness The notice.
      * @param \core\output\action_menu $menu The menu, with its trigger already set.
@@ -641,7 +671,6 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     private function report_only_actions(awareness $awareness, \core\output\action_menu $menu): string {
         global $OUTPUT;
 
-        $id = (int) $awareness->get('id');
         $previewlabel = get_string('notice:preview', 'local_awareness');
         $menu->add_primary_action(new \core\output\action_menu\link_primary(
             new moodle_url('#'),
@@ -655,22 +684,8 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             ]
         ));
 
-        // The same gate col_actions() applies: informational notices record nothing to report on.
-        if ($awareness->get_insistence() >= awareness::INSISTENCE_BLOCKING) {
-            $reports = [
-                ['acknowledged_report', get_string('report:button:ack', 'local_awareness')],
-                ['dismissed_report', get_string('report:button:dis', 'local_awareness')],
-            ];
-            foreach ($reports as [$name, $label]) {
-                $menu->add_secondary_action(new \core\output\action_menu\link_secondary(
-                    $this->page_url(
-                        '/local/awareness/editnotice.php',
-                        ['noticeid' => $id, 'action' => $name, 'sesskey' => sesskey()]
-                    ),
-                    new \pix_icon('i/report', ''),
-                    $label
-                ));
-            }
+        foreach ($this->report_links($awareness) as $link) {
+            $menu->add_secondary_action($link);
         }
 
         return $OUTPUT->render($menu);
@@ -685,7 +700,15 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     protected function col_status(awareness $awareness): string {
         global $OUTPUT;
 
-        $clashes = $this->clashtitles[(int) $awareness->get('id')] ?? [];
+        /*
+         * collision::clash_titles_for() returns the rivals' titles raw. They are formatted as the
+         * title column formats its own, but unescaped: the explanation reaches double stashes.
+         */
+        $options = ['context' => \context_system::instance(), 'escape' => false];
+        $clashes = array_map(
+            static fn(string $title): string => format_string($title, true, $options),
+            $this->clashtitles[(int) $awareness->get('id')] ?? []
+        );
         $explanation = empty($clashes)
             ? ''
             : get_string('collision:badgetooltip', 'local_awareness', implode(', ', $clashes));
@@ -709,19 +732,11 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
         $interval = (int) $awareness->get('resetinterval');
         if ($interval > 0) {
-            /*
-             * format_time() gives "1 day"; the old column ran the raw interval through a DateInterval
-             * format string and printed "1 day(s), 0 hour(s), 0 minute(s) and 0 second(s)" — three
-             * wrapped lines per cell for a value that is almost always round.
-             */
             $chips[] = get_string('notice:behaviour:repeat', 'local_awareness', format_time($interval));
         }
         /*
-         * The level, and only when it is worth saying. Informational is the default and the least
-         * insistent, so chipping it would put a badge on almost every row and leave the "nothing
-         * to say here" state unreachable. This replaced two chips that reported two of the three
-         * booleans the level is derived from, which meant a notice could be hard to escape and
-         * say nothing about it.
+         * The insistence level, chipped only from Blocking up: Informational is the default, and
+         * chipping it would badge almost every row.
          */
         $insistence = $awareness->get_insistence();
         if ($insistence >= awareness::INSISTENCE_BLOCKING) {
@@ -784,12 +799,9 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * Custom target-audience column.
      *
-     * Reads the count denormalised onto the notice rather than resolving the latest job per row,
-     * which on a page of twenty notices would be twenty extra queries for a column.
-     *
-     * The number is always shown with what it is a statement about. A count computed before the
-     * filters changed is not merely old — it describes a different notice — so it is labelled
-     * "filters changed since" rather than being silently presented as current.
+     * Reads the count stored on the notice rather than the latest job, which would cost a query per
+     * row. A count computed before the notice's filters changed describes a different audience, so
+     * it is labelled as such (notice:audience:stale) rather than shown as current.
      *
      * @param awareness $awareness a notice record.
      * @return string
@@ -835,9 +847,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     /**
      * The cohort restriction, as a muted line under the audience count.
      *
-     * The cohort names used to own a column. They are a property OF the audience, not a sibling
-     * of it, so they read better underneath the number — and a notice targeting everyone, which is
-     * the common case, now says nothing instead of spending a column to say "All users".
+     * Nothing is shown for a notice that targets everyone.
      *
      * @param awareness $awareness a notice record.
      * @return array The sentence and the plain list, both empty when the notice targets everyone.
@@ -849,27 +859,24 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         }
 
         /*
-         * Resolved once for the whole page. get_cohort_name() reaches built_cohorts_options(),
-         * which is a COUNT plus an unbounded scan of {cohort} joined to {context} plus a
-         * capability walk — and it was paid once per cohort id per row, so the page cost scaled
-         * with the size of the site rather than with what is on screen. Worse since the list became
-         * a dynamic table: the filter bar re-pays it on every keystroke.
-         *
-         * The memo lives on the table object, which exists for exactly one render, so it cannot go
-         * stale across requests, users or test methods. A static inside built_cohorts_options() —
-         * which is what the audit recommends — would survive resetAfterTest(), because
-         * phpunit_util::reset_all_data() resets a hardcoded list of core caches and has no hook for
-         * plugin ones; it would also break the two existing tests that create or delete a cohort
-         * between calls.
-         *
-         * Filled lazily rather than in query_db(): the early return above means a site that never
-         * targets cohorts pays nothing at all.
+         * Resolved once per render, not per cohort per row: built_cohorts_options() reads every
+         * cohort the user can see, and the AJAX refresh re-renders on every filter change.
+         * Memoised on the table object, which lives for one render; a static would outlive a
+         * PHPUnit test's reset. Filled lazily, so a page with no cohort-targeted notice pays
+         * nothing.
          */
         $this->cohortnames ??= helper::built_cohorts_options();
         $options = $this->cohortnames;
 
-        $names = array_map(static function ($cohortid) use ($options) {
-            return helper::get_cohort_name((int) $cohortid, $options);
+        /*
+         * The option list holds raw names. The line and the list reach double stashes, so each name
+         * is formatted, unescaped, in the system context: the list carries no cohort's own.
+         */
+        $context = \context_system::instance();
+        $names = array_map(static function ($cohortid) use ($options, $context) {
+            $name = helper::get_cohort_name((int) $cohortid, $options);
+
+            return format_string($name, true, ['context' => $context, 'escape' => false]);
         }, $cohorts);
         $list = implode(', ', $names);
 
@@ -904,7 +911,8 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
             $this->groupnames = [];
             foreach ($DB->get_records_list('groups', 'id', array_keys($ids), '', 'id, name, courseid') as $group) {
                 $context = \context_course::instance((int) $group->courseid, IGNORE_MISSING) ?: \context_system::instance();
-                $this->groupnames[(int) $group->id] = format_string($group->name, true, ['context' => $context]);
+                // Unescaped: the line and the list reach double stashes, which escape them.
+                $this->groupnames[(int) $group->id] = format_string($group->name, true, ['context' => $context, 'escape' => false]);
             }
         }
 
@@ -919,7 +927,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
     }
 
     /**
-     * Custom reset title column.
+     * Title column: the title, the pages it shows on and, on the site list, its course.
      *
      * @param awareness $awareness a notice record.
      * @return string
@@ -928,22 +936,19 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         global $OUTPUT;
 
         /*
-         * format_string(), not the raw value: `title` is PARAM_RAW_TRIMMED all the way from the
-         * form to the persistent, so the stored string would otherwise reach this page as markup.
-         * It is also the same treatment the modal gives the title, which is the point: a multilang
-         * title that resolves in the modal and shows its markup here is worse than either
-         * behaviour alone.
+         * format_string(), not the raw value: the persistent stores the title as
+         * PARAM_RAW_TRIMMED, and the modal formats it the same way, so a multilang title reads
+         * alike in both (see notice_payload::build()). Escaped for the template's triple stash,
+         * unescaped for its tooltip attribute, which is a double stash.
          */
-        $title = format_string(
-            $awareness->get('title'),
-            true,
-            ['context' => \context_system::instance()]
-        );
+        $context = \context_system::instance();
+        $title = format_string($awareness->get('title'), true, ['context' => $context]);
+        $titleplain = format_string($awareness->get('title'), true, ['context' => $context, 'escape' => false]);
 
         /*
-         * The path is PARAM_RAW as well, and it is a URL pattern rather than prose — so it is
-         * passed RAW and escaped by the template. Pre-escaping it here would double-escape it,
-         * because Mustache escapes {{ }} on its own.
+         * The path is PARAM_RAW too, but a URL pattern rather than prose: it is passed raw and
+         * escaped once by the template's double stash. Escaping it here as well would
+         * double-escape it.
          */
         $path = trim((string) $awareness->get('pathmatch'));
 
@@ -952,10 +957,14 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
         $courseid = (int) $awareness->get('courseid');
         if ($courseid > 0 && $this->scope()->is_site()) {
             if (isset($this->coursenames[$courseid])) {
+                // Unescaped: the sentence reaches a double stash.
                 $name = format_string(
                     $this->coursenames[$courseid]->fullname,
                     true,
-                    ['context' => \context_course::instance($courseid, IGNORE_MISSING) ?: \context_system::instance()]
+                    [
+                        'context' => \context_course::instance($courseid, IGNORE_MISSING) ?: \context_system::instance(),
+                        'escape' => false,
+                    ]
                 );
                 $course = [
                     'name' => get_string('manage:scope:course', 'local_awareness', $name),
@@ -968,7 +977,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
 
         return $OUTPUT->render_from_template('local_awareness/manage/cell_title', [
             'title' => $title,
-            'titleplain' => $title,
+            'titleplain' => $titleplain,
             'where' => $path !== '' ? $path : get_string('notice:pathmatch:anywhere', 'local_awareness'),
             'course' => $course,
         ]);

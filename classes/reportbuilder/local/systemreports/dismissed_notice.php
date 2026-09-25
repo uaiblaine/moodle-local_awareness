@@ -76,11 +76,8 @@ class dismissed_notice extends system_report {
         ));
 
         /*
-         * The notice entity is deliberately NOT registered here. It was, with a LEFT JOIN on
-         * {local_awareness}, and neither report ever used a column or a filter from it — the column
-         * and filter lists below name only user: and acknowledgement: identifiers. This report is
-         * already scoped to one notice by a base condition, so the notice's own fields would be the
-         * same value on every row; the title needed for the download name is read directly below.
+         * No notice entity: a base condition already scopes the report to one notice, so its fields
+         * would repeat on every row. The title needed for the download name is read directly below.
          */
 
         $this->add_columns_from_entities([
@@ -98,18 +95,7 @@ class dismissed_notice extends system_report {
         ]);
 
         $this->set_initial_sort_column('acknowledgement:timecreated', SORT_DESC);
-        /*
-         * The download name has to identify the notice. Named after the datasource alone, every
-         * notice's export arrives as the same file, which is useless as a compliance record. The id
-         * is what carries the distinction, because two notices may legitimately share a title; the
-         * title is what makes the file readable.
-         *
-         * The title is PARAM_RAW and up to 1333 characters, so it is formatted and truncated before
-         * it goes anywhere near a file name. escape => false is deliberate: the sink is a plain-text
-         * Content-Disposition header, not HTML, and the escaped spelling would leave a literal
-         * "amp;" in the name once clean_filename() strips the ampersand. The non-escape branch of
-         * format_string() still strips tags and still resolves multilang.
-         */
+        // The download name identifies the notice by id and title; see acknowledged_notice::initialise().
         $noticetitle = format_string(
             (string) $DB->get_field('local_awareness', 'title', ['id' => $noticeid]),
             true,
@@ -137,18 +123,12 @@ class dismissed_notice extends system_report {
      * @return bool
      */
     protected function can_view(): bool {
-        /*
-         * Decided from the report's own noticeid parameter and never from the context it was created
-         * in: the retrieve web service takes both from the client, and a course-level reports holder
-         * could otherwise read any notice's report by pairing their course's context with someone
-         * else's notice id. The rows are already per notice, so this is the only scope that can be
-         * right — and the report keeps the system context in every mode for the same reason.
-         */
+        // From the report's own noticeid, never its context, and within the group reach; see acknowledged_notice::can_view().
         $notice = awareness::get_record(['id' => $this->get_parameter('noticeid', 0, PARAM_INT)]);
         if (!$notice) {
             return false;
         }
 
-        return helper::require_author(author_scope::of($notice), 'viewreports', false);
+        return helper::require_author(author_scope::of($notice), 'viewreports', false) && helper::may_reach_groups($notice);
     }
 }

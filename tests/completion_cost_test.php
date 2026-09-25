@@ -22,9 +22,8 @@ use local_awareness\persistent\awareness;
  * What the course-completion rule costs on the page-generation path.
  *
  * This rule runs inside has_candidate_notices(), which every page load calls before any HTML is
- * sent, so a statement per notice here lands in the TTFB of every page and delays the paint. It is
- * the only rule in the plugin that does that; the rest of the per-notice work happens in the
- * asynchronous call, after the page is already on screen.
+ * sent, so a statement per notice here delays every page; see the completion block of
+ * helper::collect_user_notices().
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
@@ -78,8 +77,7 @@ final class completion_cost_test extends \advanced_testcase {
     /**
      * Several notices requiring the same course cost no more than one does.
      *
-     * Every notice pointed at the same course used to fetch that course again, so the page paid a
-     * statement per notice for an answer that could not differ between them.
+     * The answer cannot differ between them, so the course is resolved once, not once per notice.
      */
     public function test_notices_sharing_a_required_course_do_not_each_cost_a_statement(): void {
         $course = $this->getDataGenerator()->create_course(['enablecompletion' => 1]);

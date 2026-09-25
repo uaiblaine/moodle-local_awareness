@@ -17,6 +17,7 @@
 namespace local_awareness\task;
 
 use local_awareness\audience\estimator;
+use local_awareness\local\author_scope;
 use local_awareness\persistent\audience_job;
 
 /**
@@ -29,6 +30,16 @@ use local_awareness\persistent\audience_job;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class estimate_audience extends \core\task\adhoc_task {
+    /**
+     * Name shown in the task logs and the adhoc task list; core derives one from the class otherwise.
+     *
+     * @return string
+     * @throws \coding_exception
+     */
+    public function get_name(): string {
+        return get_string('task_estimate_audience', 'local_awareness');
+    }
+
     /**
      * Run the task.
      */
@@ -55,9 +66,8 @@ class estimate_audience extends \core\task\adhoc_task {
         self::resolve($job);
 
         /*
-         * Notified from here and not from resolve(), because this method IS the asynchronous path.
-         * A small site resolves the same job inline during the request that asked for it, and
-         * messaging someone about work they watched finish in milliseconds is noise.
+         * Notified here rather than in resolve(), because this is the asynchronous path: a small
+         * site resolves the same job inline during the request, where a message would be noise.
          */
         if ($job->get('status') === audience_job::STATUS_READY && (int) $job->get('noticeid') > 0) {
             self::notify($job);
@@ -67,11 +77,8 @@ class estimate_audience extends \core\task\adhoc_task {
     /**
      * Tell the person who asked that their estimate is ready.
      *
-     * Modelled on asynchronous course backup: the work outlives the request that started it, so the
-     * result has to find its way back to a user who has long since navigated away.
-     *
-     * A failure to message must not fail the task. An adhoc task that throws is retried forever,
-     * and the estimate itself — the thing worth keeping — has already been stored by this point.
+     * A messaging failure is logged, not thrown: the estimate is already stored, and a throwing
+     * task would only be marked failed and retried.
      *
      * @param audience_job $job A completed job carrying a notice id.
      * @return void
@@ -101,8 +108,11 @@ class estimate_audience extends \core\task\adhoc_task {
         $message->fullmessagehtml = '';
         $message->smallmessage = $message->subject;
         $message->notification = 1;
-        $message->contexturl = (new \moodle_url('/local/awareness/managenotice.php'))->out(false);
-        $message->contexturlname = get_string('setting:managenotice', 'local_awareness');
+        // The list the notice is in: a course author cannot open the site's.
+        $scope = author_scope::of($notice);
+        $listparams = $scope->is_site() ? [] : ['courseid' => $scope->get_courseid()];
+        $message->contexturl = (new \moodle_url('/local/awareness/managenotice.php', $listparams))->out(false);
+        $message->contexturlname = get_string($scope->is_site() ? 'setting:managenotice' : 'coursenotices', 'local_awareness');
 
         try {
             message_send($message);
@@ -115,10 +125,10 @@ class estimate_audience extends \core\task\adhoc_task {
     /**
      * Run a pending job's estimate and record the outcome on it.
      *
-     * Public and static because the web service resolves small sites inline rather than waiting for
-     * cron. Both callers must produce the same stored job, so there is one body rather than two;
-     * this one owns the try/catch, so an inline caller cannot turn a failed estimate into a failed
-     * request.
+     * Public and static because small sites resolve inline, from the estimate_audience web service
+     * and from notice_audience::refresh(), rather than waiting for cron. Every caller must produce
+     * the same stored job, so there is one body; it owns the try/catch, so an inline caller cannot
+     * turn a failed estimate into a failed request.
      *
      * @param audience_job $job A job in pending status.
      * @return void
@@ -130,16 +140,14 @@ class estimate_audience extends \core\task\adhoc_task {
                 $criteria = [];
             }
             /*
-             * The per-rule breakdown is drawn only by the editor's panel, which raises jobs with no
-             * notice attached. A job refreshing a saved notice's stored total feeds a list column
-             * showing one number, so it asks for the total alone.
-             *
-             * No longer a saving of one table scan per rule — the counts share a single pass now —
-             * but each chip is still a conditional column with its own EXISTS evaluated per row, so
-             * dropping seven of them roughly halves the work.
+             * The per-rule breakdown is drawn only by the editor's panel, whose jobs carry no
+             * notice. A job refreshing a saved notice's count asks for the total alone, which skips
+             * one conditional SUM column per rule in the estimate query.
              */
             $withbreakdown = (int) $job->get('noticeid') <= 0;
-            $result = (new estimator())->estimate($criteria, $withbreakdown);
+            // From core's container rather than new, so a test can substitute an estimator that fails.
+            // The container hands out one shared instance, which is safe while the estimator keeps no state.
+            $result = \core\di::get(estimator::class)->estimate($criteria, $withbreakdown);
             $job->set('resultcount', (int) $result['count']);
             $job->set('breakdown', json_encode($result['breakdown']));
             $job->set('status', audience_job::STATUS_READY);

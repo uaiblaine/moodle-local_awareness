@@ -42,13 +42,6 @@ class manage_page implements renderable, templatable {
     /** @var array Current filter values, keyed by filter name. */
     protected $filtervalues;
 
-    /**
-     * Constructor.
-     *
-     * @param string $tablehtml Rendered notices table HTML.
-     * @param string $createurl URL of the create-notice page.
-     * @param array $filtervalues Current filter values, keyed by filter name.
-     */
     /** @var author_scope The scope the list is for. */
     protected $scope;
 
@@ -57,7 +50,7 @@ class manage_page implements renderable, templatable {
      *
      * @param string $tablehtml The rendered table.
      * @param string $createurl Where the create button goes.
-     * @param array $filtervalues The current filter values.
+     * @param array $filtervalues The current filter values, keyed by filter name.
      * @param author_scope|null $scope The scope the list is for; the site when not given.
      */
     public function __construct(string $tablehtml, string $createurl, array $filtervalues = [], ?author_scope $scope = null) {
@@ -68,12 +61,12 @@ class manage_page implements renderable, templatable {
     }
 
     /**
-     * Site-wide counts for the strip above the table.
+     * Counts for the strip above the table, over every notice of the scope.
      *
-     * One statement with conditional aggregates rather than a query per tile. These describe the
-     * SITE and not the filtered list: the dynamic-table web service returns table HTML and nothing
-     * else, so filtered totals would need a web service of the plugin's own, and the result count
-     * under the filter bar already answers "how many matched".
+     * One statement with conditional aggregates rather than a query per tile. The counts ignore
+     * the filters: the dynamic-table web service returns table HTML and nothing else, so filtered
+     * totals would need a web service of the plugin's own, and the result count under the filter
+     * bar already answers "how many matched".
      *
      * @return array List of {label, value, accent} rows.
      * @throws \coding_exception
@@ -85,8 +78,7 @@ class manage_page implements renderable, templatable {
         // The population the numbers describe is the list's: a course page counts that course only.
         $where = $this->scope->is_site() ? '' : ' WHERE courseid = :courseid';
         $params = $this->scope->is_site() ? [] : ['courseid' => $this->scope->get_courseid()];
-        $sql = 'SELECT COUNT(1) AS total,
-                       SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) AS live,
+        $sql = 'SELECT SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) AS live,
                        SUM(CASE WHEN enabled = 0 THEN 1 ELSE 0 END) AS draft,
                        SUM(COALESCE(audiencecount, 0)) AS reach
                   FROM {' . awareness::TABLE . '}' . $where;

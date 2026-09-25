@@ -47,6 +47,7 @@ $string['audience:rules_too_many'] = 'Há muitos filtros para estimar automatica
 $string['audience:state:auto_pending'] = 'Calculando — atualizando conforme você ajusta os filtros…';
 $string['audience:state:cached'] = 'Resultado calculado em {$a}.';
 $string['audience:state:error'] = 'Falha ao estimar: {$a}';
+$string['audience:state:error_noanswer'] = 'o servidor não retornou uma resposta.';
 $string['audience:state:idle'] = 'O alcance ainda não foi calculado.';
 $string['audience:state:manual_ready'] = 'Clique em "Calcular alcance" quando estiver pronto.';
 $string['audience:state:queued'] = 'Calculando em segundo plano…';
@@ -161,6 +162,17 @@ $string['filter_role_context'] = 'Contexto do papel';
 $string['filter_role_context:category'] = 'Categoria de curso';
 $string['filter_role_context:course'] = 'Curso';
 $string['filter_role_context:system'] = 'Sistema';
+$string['filter_role_context_help'] = 'Onde o leitor precisa ter um dos papéis selecionados para que a regra de papel o inclua. Não muda nada enquanto nenhum papel estiver selecionado.
+
+Todos: vale um papel atribuído em qualquer lugar, em qualquer contexto. Todo usuário logado também conta como tendo o Papel padrão para todos usuários e o Papel padrão da página principal (normalmente Usuário autenticado e Usuário autenticado na página inicial), então selecionar qualquer um deles alcança todos os usuários logados.
+
+Sistema: apenas papéis atribuídos no nível do sistema, mais o Papel padrão para todos usuários.
+
+Categoria de curso: apenas papéis atribuídos em uma categoria de curso; quando há categorias escolhidas em Filtros de exibição, apenas nelas.
+
+Curso: apenas papéis atribuídos no próprio curso, não em suas atividades; quando há cursos ou categorias escolhidos em Filtros de exibição, apenas nesses cursos e nos cursos dessas categorias.
+
+O usuário visitante não conta como tendo nenhum dos dois papéis padrão.';
 $string['filter_theme'] = 'Tema';
 $string['filters'] = 'Filtros';
 $string['manage:empty:filtered'] = 'Nenhum aviso corresponde a estes filtros.';
@@ -199,6 +211,7 @@ Quem pediu movimento reduzido ao dispositivo vê um esmaecer simples, seja qual 
 $string['notice:audience'] = 'Público-alvo';
 $string['notice:audience:cohorts'] = 'Coortes: {$a}';
 $string['notice:audience:computed'] = 'Calculado em {$a}';
+$string['notice:audience:failed'] = 'Não foi possível calcular a estimativa de público de "{$a}". O valor anterior, se houver, foi mantido; tente novamente mais tarde.';
 $string['notice:audience:groups'] = 'Grupos: {$a}';
 $string['notice:audience:never'] = 'Não calculado';
 $string['notice:audience:pending'] = 'Calculando…';
@@ -350,10 +363,14 @@ $string['notice:videourl_help'] = 'Um link para o vídeo: uma página do YouTube
 $string['notification:nodeleteallowed'] = 'Exclusão de alerta não permitida';
 $string['notification:noticedoesnotexist'] = 'O alerta não existe';
 $string['notification:noupdateallowed'] = 'Atualização de alerta não permitida';
+$string['notification:orphannotice'] = 'Este alerta pertencia a um curso que não existe mais. Nenhuma página pode exibi-lo, por isso ele não pode ser editado; ainda pode ser pré-visualizado, desabilitado ou excluído.';
 $string['pathmatch'] = 'Aplicar à correspondência de URL';
-$string['pathmatch_help'] = 'Alertas serão exibidos em qualquer página cuja URL corresponda a este valor.
+$string['pathmatch_help'] = 'Alertas serão exibidos em qualquer página cuja URL corresponda a este valor. O valor é comparado com o endereço da página depois do endereço do site, incluindo os parâmetros após o ?, a partir do primeiro caractere.
 
-Você pode usar o caractere % como curinga para significar qualquer coisa.
+Sem %, o valor precisa corresponder ao endereço inteiro: /course/view.php não corresponde a /course/view.php?id=2.
+
+Com um % em qualquer posição do valor, cada % representa qualquer texto, e o valor só precisa corresponder ao início do endereço: /mod/%/view.php corresponde a /mod/forum/view.php?id=5 e também a /mod/forum/view.php/extra.
+
 Alguns exemplos de valores incluem:
 
 * /my/% - para corresponder ao Painel
@@ -378,6 +395,8 @@ $string['privacy:metadata:local_awareness_ack'] = 'Reconhecimento de alerta';
 $string['privacy:metadata:local_awareness_audience_jobs'] = 'Trabalhos de estimativa de público';
 $string['privacy:metadata:local_awareness_hlinks_his'] = 'Rastreamento de links';
 $string['privacy:metadata:local_awareness_lastview'] = 'Última visualização do alerta';
+$string['privacy:metadata:local_awareness_slides'] = 'Slides de carrossel dos avisos do site, registrando o usuário que criou ou editou cada um por último';
+$string['privacy:metadata:local_awareness_slides:usermodified'] = 'ID do usuário que criou ou editou o slide por último';
 $string['privacy:metadata:noticeid'] = 'ID do aviso a que o registro se refere';
 $string['privacy:metadata:noticetitle'] = 'Título do aviso no momento do reconhecimento';
 $string['privacy:metadata:resultcount'] = 'Número de usuários alcançados pela estimativa';
@@ -452,4 +471,3 @@ $string['setting:settings'] = 'Configurações';
 $string['task_estimate_audience'] = 'Estimar o público de um alerta';
 $string['task_purge_audience_jobs'] = 'Expurgar trabalhos de estimativa de público já consumidos';
 $string['task_purge_link_history'] = 'Limpar histórico antigo de cliques em links';
-$string['timeformat:resetinterval'] = '%a dia(s), %h hora(s), %i minuto(s) e %s segundo(s)';

@@ -37,7 +37,7 @@ use local_awareness\persistent\awareness;
  *   this request may resolve a different theme than the web service request will, so the rule is
  *   not judged at all.
  *
- * Everything else — role, competency, course access — costs queries or can disagree with the
+ * Everything else — role, competency, group, course access — costs queries or can disagree with the
  * service, so it always counts as a match. Every unknown (no URL, a thrown exception, a missing
  * course property) also counts as a match: uncertainty loads the JS, it never silences the plugin.
  *
@@ -127,8 +127,9 @@ final class page_probe {
 
         /*
          * With course or category themes enabled this render may resolve a different theme than the
-         * web service request will (the service resolves without a course), and judging the rule
-         * against the wrong theme would suppress a notice the service would show. Leave it unjudged.
+         * web service, which knows only the course id (see helper::current_theme_name()), and
+         * judging the rule against the wrong theme would suppress a notice the service would show.
+         * Leave it unjudged.
          */
         $theme = null;
         try {

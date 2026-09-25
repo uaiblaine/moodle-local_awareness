@@ -34,37 +34,27 @@ use core_reportbuilder\tests\core_reportbuilder_testcase;
 /**
  * Base class for this plugin's datasource tests: every content fetch is made independent of the clock.
  *
- * Core's datasource_stress_test_columns_aggregation() asserts that ONE fetch emits exactly one
- * debugging() call per deprecated column, and this plugin carries one (notice:forcelogout). The
- * call is emitted whenever core_reportbuilder\datasource::get_active_columns() rebuilds its memo,
- * and the memo is reused only while its build time is later than the moment the report's elements
- * were last modified — two microtime(true) readings, the second taken milliseconds after the first.
- * A fetch reaches that method four times (the table constructor, twice inside get_sql_sort(), and
- * format_row()), so whenever the second reading is not strictly later than the first — the clock
- * stepping backwards, or an equal read under contention — the memo misses on every call and the
- * assertion sees four. That is what failed once on a local matrix run inside the
- * Docker Desktop VM: the leg's log shows the four identical messages, one per site. The VM's wall
- * clock, watched against its monotonic clock while CI legs ran, stepped up to 4.4 ms backwards
- * seventeen times in twenty-five minutes; on the dev stack the first rebuild follows the update by
- * under a millisecond and the last one by a few, so a step of that size covers the window. It was
- * reproduced by forcing the memo to miss, and it cannot be fixed from inside a test any other way,
- * because the readings are core's and the clock is the environment's. Core's column stress helper,
- * which asserts exactly one debugging() for a deprecated column, is covered by the same override.
+ * Core's datasource_stress_test_columns_aggregation() asserts that one fetch emits exactly one
+ * debugging() call per deprecated column (datasource_stress_test_columns() likewise), and this
+ * plugin has one (notice:forcelogout). core_reportbuilder\datasource::get_active_columns() emits
+ * that call each time it rebuilds its memo, and reuses the memo only while its build time is later
+ * than the report's "elements modified" stamp; both are microtime(true) readings taken moments apart.
+ * A fetch calls get_active_columns() several times (the table constructor, get_sql_sort() and
+ * format_row()), so when the clock steps backwards or two readings are equal the memo misses on
+ * every call and the assertion counts one message per miss. The readings are core's, so a test
+ * cannot fix them; it removes the dependency on them instead.
  *
- * So the fetch is bracketed: the report instance the table builds is fresh, and the "last modified"
- * stamp is set to a time no clock can precede, so the memo built during the fetch is valid for the
- * rest of it whatever microtime(true) returns. Core's own assertion stays exactly as it is. The
- * stamp would also validate a STALE memo, which is why the instance cache is reset first and why
- * the fetch is followed by a control: the columns and conditions the fetch used must match the
- * database rows, so a rebuild that failed to happen fails the test instead of silently running the
- * previous iteration's report.
+ * So each fetch is bracketed: the report instance cache is reset, so the table builds a fresh
+ * datasource, and the stamp is set to -1, below any build time, so the memo built during the fetch
+ * stays valid for the rest of it. Core's own assertion is unchanged. The stamp would also validate
+ * a stale memo, which is why the fetch is followed by a check that the columns and conditions it
+ * used match the stored rows.
  *
- * The stamp is left at -1 afterwards, on purpose: every write to the report's elements overwrites it
- * with the current time and a fresh instance has no memo, so the leftover can never validate a stale
- * memo — while putting the previous stamp back would reopen the clock window for the memo reads the
- * helpers make between two fetches. This file is not autoloadable (its namespace maps to classes/,
- * where it does not live), so each test loads it with a require_once of its own; that line is
- * load-bearing.
+ * The stamp is left at -1 afterwards: every write to the report's elements overwrites it with the
+ * current time and a fresh instance has no memo, so the leftover cannot validate a stale memo, while
+ * restoring the previous stamp would reopen the clock window for the memo reads the helpers make
+ * between two fetches. This file is not autoloadable (its namespace maps to classes/, where it does
+ * not live), so each test loads it with a require_once of its own.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
