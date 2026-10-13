@@ -113,6 +113,13 @@ The links are offered to whoever may read that notice's reports, and open the re
 An informational notice records neither acceptances nor refusals, so it offers no report. Reports
 include filtering and downloadable exports.
 
+A course also lists **Notice acknowledgements and dismissals** on its Reports page: one row per
+acknowledgement or dismissal across all of the course's notices, with the notice as a column. It is
+offered to whoever may read the course's reports (`local/awareness:viewreportscourse`, or
+`local/awareness:viewreports` inherited from the site), and it keeps to the same group separation
+as the list. Core shows the Reports page only to holders of `moodle/site:viewreports` in the
+course; anyone else reads each notice's reports from the course's notice list.
+
 ### Report Builder
 
 Awareness also provides Report Builder entities and data sources for:

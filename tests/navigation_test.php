@@ -97,6 +97,35 @@ final class navigation_test extends \advanced_testcase {
     }
 
     /**
+     * The course report goes under the course's Reports node, for the reports capability only.
+     *
+     * Core adds that node only for holders of moodle/site:viewreports; a course navigation without
+     * it gets the list's entry and nothing else, and nothing throws. The manage holder is refused
+     * against a navigation that has the node, so the node's presence is not what refuses them.
+     */
+    public function test_the_course_report_is_listed_under_the_course_s_reports(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $report = function () use ($course) {
+            $navigation = new \navigation_node('Course');
+            $reports = $navigation->add('Reports', null, \navigation_node::TYPE_CONTAINER, null, 'coursereports');
+            local_awareness_extend_navigation_course($navigation, $course, \context_course::instance($course->id));
+
+            return $reports->get('localawarenessreport');
+        };
+
+        $this->user_with('local/awareness:viewreportscourse', $course);
+        $node = $report();
+        $this->assertNotFalse($node, 'the reports holder gets the course report');
+        $this->assertSame(get_string('report:course', 'local_awareness'), $node->text);
+        $this->assertSame((int) $course->id, (int) $node->action->get_param('courseid'));
+        $this->assertStringContainsString('/local/awareness/report/course.php', $node->action->out(false));
+        $this->assertNotFalse($this->node_for($course), 'without a Reports node the list entry is still added');
+
+        $this->user_with('local/awareness:managecourse', $course);
+        $this->assertFalse($report(), 'the manage capability alone gets no report');
+    }
+
+    /**
      * The site course is handed to this callback by core, and it must return before building a scope.
      *
      * settings_navigation's CONTEXT_MODULE branch reaches the course callbacks with course id 1 for

@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Course report of acknowledgements and dismissals (version 2026101301)
+
+A course's Reports page now lists "Notice acknowledgements and dismissals": every acknowledgement
+and dismissal recorded on the course's own notices, one row each, with the notice title, the action
+and the date, filterable and downloadable. It is offered to whoever may read the course's reports
+and keeps to the course's group separation, as the notice list does; the per-notice reports are
+unchanged.
+
 ### One close cross on Moodle 5.x (version 2026101300)
 
 The notice dialogue showed two overlapping crosses on its close button on Moodle 5.x, in the

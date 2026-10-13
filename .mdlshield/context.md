@@ -40,7 +40,10 @@ own: `local_awareness`, `_slides`, `_ack`, `_hlinks`, `_hlinks_his`, `_lastview`
   group reach.
 - Pages: `editnotice.php` (manage; `require_sesskey()` on every POST and state-changing
   action), `managenotice.php` (either verb), `report/acknowledged_systemreport.php` and
-  `report/dismissed_systemreport.php` (viewreports, through the notice's own scope).
+  `report/dismissed_systemreport.php` (viewreports, through the notice's own scope),
+  `report/course.php` (viewreports in the course its `courseid` names; its system report
+  `course_notices` decides `can_view()` from that parameter and lists only the course's
+  notices within the viewer's group reach).
 - File serving: `local_awareness_pluginfile()` serves `content`, `bgimage` and `slidemedia`
   at system context with `send_stored_file()`, behind `helper::may_serve_files_of()`.
 - Hooks: `before_footer_html_generation` loads the AMD module (it catches `\Throwable` on
