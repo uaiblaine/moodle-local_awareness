@@ -6,6 +6,23 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The editor's and the list's reads no longer hold the session lock (version 2026101303)
+
+Six read web services now declare `'readonlysession' => true`, as core does for its own reads:
+`check_collision`, `search_roles`, `search_courses`, `get_estimate` (polled every ten seconds while
+an estimate runs), `preview_notice` and `render_notice`. They no longer wait for the editor's other
+requests of the same session, or delay them. This takes effect only on a site that sets
+`$CFG->enable_read_only_sessions`, with its session-mode caches mapped outside the session store.
+None of them writes `$SESSION` or a `$USER` field; the plugin's caches are application-mode.
+
+`local_awareness_getnotices`, the reader's one call on every page, keeps the lock on purpose.
+`helper::select_for_display()` records each notice it hands over in `$USER->awarenessshown`, the
+dismiss and acknowledge services refuse a notice that record does not hold, and a read-only request
+would drop the record without an error. `tests/external/readonly_session_test.php` pins both: the
+six carry the flag and leave `$SESSION` as they found it, each call from an empty session, and
+`getnotices` and every write do not carry it. Measured on Moodle 5.2 with the site flag on, four
+simultaneous calls took 2.0 to 7.5 times one call before the change and 1.1 to 2.3 times after it.
+
 ### The image layout's close cross turns white on hover again (version 2026101302)
 
 On Moodle 5.x the image layout's floating close button kept a black cross when the pointer or the
