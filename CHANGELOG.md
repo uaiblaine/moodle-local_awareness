@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### One close cross on Moodle 5.x (version 2026101300)
+
+The notice dialogue showed two overlapping crosses on its close button on Moodle 5.x, in the
+reader's dialogue and in both previews. The template carries the text cross that Moodle 4.5's
+Bootstrap 4 button needs; Bootstrap 5 draws its own as an image, so the dialogue now drops the
+text cross wherever the theme draws one. Moodle 4.5 is unchanged.
+
 ### Loose ends after the code audit (version 2026092500)
 
 The "audience estimate ready" message shows the notice title the way the notice list does: filters
