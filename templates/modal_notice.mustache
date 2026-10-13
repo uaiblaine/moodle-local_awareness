@@ -55,8 +55,12 @@
             <div class="modal-header {{$headerclasses}}{{headerclasses}}{{/headerclasses}}" data-region="header">
                 {{$header}}
                     <h5 id="{{uniqid}}-modal-title" class="modal-title" data-region="title">{{$title}}{{title}}{{/title}}</h5>
+                    {{!
+                        The glyph is 4.5's cross; Bootstrap 5 paints its own, and ModalNotice.show()
+                        removes this one wherever the theme does.
+                    }}
                     <button id="awareness-closebtn" type="button" class="btn-close" data-action="close" aria-label="{{#cleanstr}}closebuttontitle{{/cleanstr}}">
-                        <span aria-hidden="true">&times;</span>
+                        <span aria-hidden="true" data-region="close-glyph">&times;</span>
                     </button>
                 {{/header}}
             </div>

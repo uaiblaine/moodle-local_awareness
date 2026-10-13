@@ -108,10 +108,8 @@ function local_awareness_extend_navigation_course(navigation_node $navigation, s
     // The manage page opens for either verb: the reports capability alone gets a read-only list, from
     // which each notice's two reports are reached. A link is shown only where its page will open.
     $scope = \local_awareness\local\author_scope::course((int) $course->id);
-    if (
-        !\local_awareness\helper::require_author($scope, 'manage', false)
-        && !\local_awareness\helper::require_author($scope, 'viewreports', false)
-    ) {
+    $mayreport = \local_awareness\helper::require_author($scope, 'viewreports', false);
+    if (!$mayreport && !\local_awareness\helper::require_author($scope, 'manage', false)) {
         return;
     }
 
@@ -123,4 +121,21 @@ function local_awareness_extend_navigation_course(navigation_node $navigation, s
         'localawareness',
         new pix_icon('i/settings', '')
     );
+
+    /*
+     * The course's Reports page (report/view.php) lists the children of this node. Core builds it
+     * only for holders of moodle/site:viewreports in the course; anyone else still reads each
+     * notice's own reports from the list above.
+     */
+    $reports = $navigation->get('coursereports');
+    if ($mayreport && $reports) {
+        $reports->add(
+            get_string('report:course', 'local_awareness'),
+            new moodle_url('/local/awareness/report/course.php', ['courseid' => $course->id]),
+            navigation_node::TYPE_SETTING,
+            null,
+            'localawarenessreport',
+            new pix_icon('i/report', '')
+        );
+    }
 }

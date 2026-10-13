@@ -6,6 +6,21 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Course report of acknowledgements and dismissals (version 2026101301)
+
+A course's Reports page now lists "Notice acknowledgements and dismissals": every acknowledgement
+and dismissal recorded on the course's own notices, one row each, with the notice title, the action
+and the date, filterable and downloadable. It is offered to whoever may read the course's reports
+and keeps to the course's group separation, as the notice list does; the per-notice reports are
+unchanged.
+
+### One close cross on Moodle 5.x (version 2026101300)
+
+The notice dialogue showed two overlapping crosses on its close button on Moodle 5.x, in the
+reader's dialogue and in both previews. The template carries the text cross that Moodle 4.5's
+Bootstrap 4 button needs; Bootstrap 5 draws its own as an image, so the dialogue now drops the
+text cross wherever the theme draws one. Moodle 4.5 is unchanged.
+
 ### Loose ends after the code audit (version 2026092500)
 
 The "audience estimate ready" message shows the notice title the way the notice list does: filters
