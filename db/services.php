@@ -74,6 +74,7 @@ $functions = [
         'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
+        'readonlysession' => true,
     ],
 
     'local_awareness_search_roles' => [
@@ -84,6 +85,7 @@ $functions = [
         'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
+        'readonlysession' => true,
     ],
 
     'local_awareness_search_courses' => [
@@ -94,6 +96,7 @@ $functions = [
         'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
+        'readonlysession' => true,
     ],
 
     'local_awareness_estimate_audience' => [
@@ -114,6 +117,7 @@ $functions = [
         'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
+        'readonlysession' => true,
     ],
 
     'local_awareness_preview_notice' => [
@@ -124,6 +128,7 @@ $functions = [
         'capabilities' => 'local/awareness:manage, local/awareness:managecourse',
         'loginrequired' => true,
         'ajax' => true,
+        'readonlysession' => true,
     ],
 
     'local_awareness_render_notice' => [
@@ -135,5 +140,6 @@ $functions = [
             . 'local/awareness:viewreports, local/awareness:viewreportscourse',
         'loginrequired' => true,
         'ajax' => true,
+        'readonlysession' => true,
     ],
 ];
