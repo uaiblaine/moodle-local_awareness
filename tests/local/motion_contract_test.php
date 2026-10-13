@@ -492,6 +492,68 @@ final class motion_contract_test extends \basic_testcase {
     }
 
     /**
+     * The header close button draws one cross on both branches, and the image layout's is the glyph.
+     *
+     * The template carries 4.5's text glyph; Bootstrap 5 paints its own cross as an image, so
+     * modal_notice.js records which the theme draws as data-cross and the stylesheet hides the glyph
+     * under an image. The image layout reverses that, because its hover turns the cross white on the
+     * brand disc and only the glyph takes a colour. Each rule must outrank the one it overrides.
+     */
+    public function test_the_close_button_draws_one_cross(): void {
+        $glyph = '<span aria-hidden="true" data-region="close-glyph">&times;</span>';
+        $this->assertMatchesRegularExpression(
+            '~<button id="awareness-closebtn"[^>]*>\s*' . preg_quote($glyph, '~') . '\s*</button>~',
+            $this->read('templates/modal_notice.mustache'),
+            'the header close button lost its glyph'
+        );
+        foreach (['amd/src/modal_notice.js', 'amd/build/modal_notice.min.js'] as $module) {
+            $source = $this->read($module);
+            $this->assertStringContainsString('data-cross', $source, "{$module} no longer records the cross");
+            $this->assertMatchesRegularExpression(
+                '/["\']image["\']\s*:\s*["\']glyph["\']/',
+                $source,
+                "{$module} names neither answer"
+            );
+        }
+
+        $found = [];
+        foreach ($this->rules($this->css()) as [$group, $declarations]) {
+            foreach (array_map('trim', explode(',', $group)) as $selector) {
+                $image = str_contains($selector, '.la-tpl-image');
+                $marked = str_contains($selector, '[data-cross="image"]');
+                $onglyph = str_ends_with($selector, '.btn-close > [data-region="close-glyph"]');
+                if ($marked && $onglyph && !$image && preg_match('/display\s*:\s*none/', $declarations)) {
+                    $found['hide'] = $selector;
+                }
+                if ($marked && $onglyph && $image && preg_match('/display\s*:\s*inline\b/', $declarations)) {
+                    $found['show'] = $selector;
+                }
+                $button = str_ends_with($selector, '.btn-close');
+                if ($marked && $image && $button && preg_match('/background-image\s*:\s*none/', $declarations)) {
+                    $found['noimage'] = $selector;
+                }
+                if ($image && str_ends_with($selector, '.btn-close:hover') && preg_match('/(^|;)\s*color\s*:/', $declarations)) {
+                    $found['hover'] = $selector;
+                }
+            }
+        }
+
+        foreach (['hide', 'show', 'noimage', 'hover'] as $rule) {
+            $this->assertArrayHasKey($rule, $found, "the {$rule} rule of the close cross is gone");
+        }
+        $this->assertSame(
+            1,
+            $this->specificity($found['show']) <=> $this->specificity($found['hide']),
+            'the image layout cannot show the glyph'
+        );
+        $this->assertSame(
+            1,
+            $this->specificity($found['noimage']) <=> $this->specificity('.btn-close'),
+            'core\'s .btn-close image outranks the image layout'
+        );
+    }
+
+    /**
      * No rule sets display on one of Bootstrap's display utilities.
      *
      * .d-flex is display: flex !important on both branches, and Moodle's stylelint config forbids

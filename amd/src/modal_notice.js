@@ -33,7 +33,6 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
             ACK_CHECKBOX: '#awareness-modal-ackcheckbox',
             ACK_CONTAINER: '#awareness-ack-container',
             HEADER_CLOSE: '#awareness-closebtn',
-            CLOSE_GLYPH: '[data-region="close-glyph"]',
             FOOTER_CLOSE: '#awareness-closebtn-footer',
             NOT_NOW: '#awareness-notnowbtn',
             MEDIA: '[data-region="media"]',
@@ -166,7 +165,8 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         };
 
         var ATTRIBUTE = {
-            NOTICE_ID: 'data-noticeid'
+            NOTICE_ID: 'data-noticeid',
+            CROSS: 'data-cross'
         };
 
         /**
@@ -546,22 +546,27 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         };
 
         /**
-         * Show the dialogue, with one cross on its header close button.
+         * Show the dialogue, recording once how the theme draws its close cross.
          *
          * The template carries the text glyph that 4.5's Bootstrap 4 .btn-close needs, as core's own
-         * 4.5 modal does; Bootstrap 5 draws the cross as a background image instead, and 5.x's core
-         * modal ships the button empty. This dialogue appears on pages without the plugin's body
-         * marker, so the computed style decides: once the theme paints an image, the glyph goes.
-         * Read after core's show(), which attaches the root synchronously; before that nothing is
-         * computed.
+         * 4.5 modal does; Bootstrap 5 draws the cross as a background image instead. This dialogue
+         * appears on pages without the plugin's body marker, so the computed style decides, and
+         * styles.css reads the answer from data-cross: it hides the glyph under an image, and
+         * the image layout trades the image for the glyph, which its hover can recolour.
+         *
+         * Read after core's show(), which attaches the root synchronously, and only on the first
+         * call: the queue dresses a reused dialogue before showing it, and the image layout's own
+         * rule would then read as Bootstrap 4.
          *
          * @returns {Promise} Core's show() promise.
          */
         ModalNotice.prototype.show = function() {
             var shown = Modal.prototype.show.call(this);
-            var button = this.getModal().find(SELECTORS.HEADER_CLOSE)[0];
-            if (button && window.getComputedStyle(button).backgroundImage !== 'none') {
-                $(button).find(SELECTORS.CLOSE_GLYPH).remove();
+            var dialog = this.getModal();
+            if (!dialog.attr(ATTRIBUTE.CROSS)) {
+                var button = dialog.find(SELECTORS.HEADER_CLOSE)[0];
+                var drawn = button && window.getComputedStyle(button).backgroundImage !== 'none';
+                dialog.attr(ATTRIBUTE.CROSS, drawn ? 'image' : 'glyph');
             }
             return shown;
         };
