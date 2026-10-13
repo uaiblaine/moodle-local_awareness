@@ -53,6 +53,15 @@
     outline-offset: 2px;
 }
 
+/*
+ * One cross on the header close button. The template carries 4.5's text glyph; where the theme
+ * paints the cross as an image (Bootstrap 5), modal_notice.js marks the dialogue data-cross="image"
+ * and the glyph is hidden here. The image layout reverses the trade below.
+ */
+.awareness[data-cross="image"] .btn-close > [data-region="close-glyph"] {
+    display: none;
+}
+
 /* Background Image Modal Styles */
 .awareness .modal-content.has-bg-image {
     position: relative;
@@ -1967,12 +1976,26 @@
     background-color: #fff;
     box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.35);
     opacity: 1;
+    /* Bootstrap 4's .close type, so the glyph reads the same on both branches. */
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
 }
 
 .awareness.la-tpl-image .btn-close:hover,
 .awareness.la-tpl-image .btn-close:focus-visible {
     color: #fff;
     background-color: var(--la-brand);
+}
+
+/* The glyph rather than Bootstrap 5's image, which is drawn in a fixed black the hover above could
+   not turn white on the brand disc. */
+.awareness.la-tpl-image[data-cross="image"] .btn-close {
+    background-image: none;
+}
+
+.awareness.la-tpl-image[data-cross="image"] .btn-close > [data-region="close-glyph"] {
+    display: inline;
 }
 
 /* Not display: none - the footer carries d-flex, which Bootstrap declares with

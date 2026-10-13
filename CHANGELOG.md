@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### The image layout's close cross turns white on hover again (version 2026101302)
+
+On Moodle 5.x the image layout's floating close button kept a black cross when the pointer or the
+keyboard focus turned its disc to the brand colour: Bootstrap 5 draws that cross as an image, which
+takes no colour. The image layout now shows the text cross on both branches, so the hover turns it
+white as designed; every other layout keeps the theme's own cross. The dialogue records once, when it
+is first shown, which cross the theme draws, and the stylesheet shows one of the two.
+
 ### Course report of acknowledgements and dismissals (version 2026101301)
 
 A course's Reports page now lists "Notice acknowledgements and dismissals": every acknowledgement
