@@ -47,11 +47,17 @@ This repository is currently maintained and evolved under the Awareness directio
 
 ## Compatibility
 
-This repository is maintained for modern Moodle branches through CI matrix testing. Check the CI badge and workflow matrix for currently validated combinations.
+This branch supports **Moodle 4.5** (PHP 8.1 or later). Each Moodle version has its own branch:
 
-Current declared support in plugin metadata:
+| Moodle | Branch | Releases |
+|---|---|---|
+| 5.3 | `main` (`MOODLE_503_STABLE`) | `v5.3-r<N>` |
+| 5.2 | `MOODLE_502_STABLE` | `v5.2-r<N>` |
+| 5.1 | `MOODLE_501_STABLE` | `v5.1-r<N>` |
+| 4.5 | `MOODLE_405_STABLE` | `v4.5-r<N>` |
 
-- Moodle 4.5 to 5.2
+Each release is a GitHub release with its zip attached. A site that ran a version numbered by date
+(up to 2026101303) switches as `CHANGELOG.md` describes.
 
 ## Administration paths
 
@@ -135,16 +141,16 @@ This enables custom report composition with filters, columns, export, and reuse 
 ## Development notes
 
 - PHPUnit and Behat tests live under `tests/`, and ship in the release zip as Moodle expects.
-- CI is the moodle-an-hochschulen reusable workflow, one job per supported Moodle branch.
-  Run it locally before pushing, at both ends of the supported range:
+- CI is the moodle-an-hochschulen reusable workflow, one job naming this branch's Moodle version.
+  Run every leg locally before pushing:
 
   ```sh
-  mdl ci moodle-local_awareness --branch MOODLE_405_STABLE
-  mdl ci moodle-local_awareness --branch MOODLE_502_STABLE
+  mdl ci moodle-local_awareness-405 --matrix --behat
   ```
 
-- Targeted runs: `mdl phpunit m501 local_awareness`, `mdl behat m501 @local_awareness`.
-- For release automation, tags matching `v*` trigger the Moodle Plugin Release workflow.
+- Targeted runs: `mdl phpunit m405 local_awareness`, `mdl behat m405 @local_awareness`.
+- Releases are tags `v<moodle>-r<N>`; the zip attached to each GitHub release is the `git archive`
+  of the tag.
 
 ## Course notices
 
