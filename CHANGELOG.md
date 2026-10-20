@@ -6,7 +6,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
-### One branch per Moodle version
+### One branch per Moodle version (version 2025100600)
 
 The plugin now has one branch per Moodle version, each supporting that version only, and each
 numbering its versions inside that version's range:
