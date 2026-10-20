@@ -4,8 +4,9 @@
 modal, optionally asks for an acknowledgement, and records who dismissed, acknowledged or
 clicked each notice. Notices are aimed by rules (cohort, role, course, category, theme, page
 path, groups, competency) and written by site managers or, per course, by course authors. It
-is a local plugin supporting Moodle 4.5 through 5.2 on one branch, with seven tables of its
-own: `local_awareness`, `_slides`, `_ack`, `_hlinks`, `_hlinks_his`, `_lastview`, `_audience_jobs`.
+is a local plugin with one branch per Moodle version (`main` is 5.3; 5.2, 5.1 and 4.5 have
+`MOODLE_*_STABLE` branches carrying the same code), with seven tables of its own:
+`local_awareness`, `_slides`, `_ack`, `_hlinks`, `_hlinks_his`, `_lastview`, `_audience_jobs`.
 
 ## Who is trusted
 
@@ -88,5 +89,5 @@ own: `local_awareness`, `_slides`, `_ack`, `_hlinks`, `_hlinks_his`, `_lastview`
 - `lang/**`, `docs/**` (design notes and mockups) and `tests/**` carry no production behaviour.
 - `styles.css` and the Mustache templates, unless they show data the viewer should not see.
   The Bootstrap 4 polyfill gated by a body class is a compatibility measure.
-- Code that branches on `$CFG->branch` or probes for a helper first is deliberate: one branch
-  serves Moodle 4.5 to 5.2.
+- Code that branches on `$CFG->branch` or probes for a helper first is deliberate: the branches
+  share one code base, and 4.5 is among them.
