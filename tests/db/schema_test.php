@@ -23,9 +23,8 @@ use local_awareness\persistent\noticeview;
 /**
  * The schema install.xml declares, read back from the test database.
  *
- * The schema is written twice, in install.xml for new sites and in db/upgrade.php for existing ones,
- * and nothing compares the two. PHPUnit installs from install.xml, so these tests pin the
- * fresh-install side; each expectation is also what an upgrade step must produce.
+ * PHPUnit installs from install.xml, so these tests pin the fresh-install side. An upgrade step
+ * that changes the schema must produce the same result, and nothing compares the two.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine

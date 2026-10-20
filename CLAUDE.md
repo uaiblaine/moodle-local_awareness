@@ -18,12 +18,28 @@ every `userid`/`usermodified` column against `get_metadata()`, because core's
 compliance test finds user columns only through foreign keys to `{user}`. It
 integrates with core Report Builder (five datasources, two
 system reports), the Cohort, Competency and Role subsystems, and injects itself
-into every page through the `before_footer_html_generation` hook. Supports
-Moodle **4.5 through 5.2** (`$plugin->requires = 2024100700`,
-`$plugin->supported = [405, 502]`). CI is the moodle-an-hochschulen reusable
-workflow, one job per supported branch in `.github/workflows/ci.yml` — **update
-those jobs when `supported` changes**. Development happens on m501; the repo is
-mounted at `local/awareness`.
+into every page through the `before_footer_html_generation` hook.
+
+**One branch per Moodle version.** `main` is the Moodle 5.3 branch, the same
+commit as `MOODLE_503_STABLE`; `MOODLE_502_STABLE`, `MOODLE_501_STABLE` and
+`MOODLE_405_STABLE` are 5.2, 5.1 and 4.5. Each branch declares
+`$plugin->supported = [N, N]` and its core's `$plugin->requires`, numbers its
+versions inside that core's range (5.3 `20261005XX`, 5.2 `20260420XX`, 5.1
+`20251006XX`, 4.5 `20241007XX`; the first release is the `requires` value), and
+has one job in `.github/workflows/ci.yml` naming its core (the moodle-an-hochschulen
+reusable workflow). `version.php`, `ci.yml` and the README's requirements line
+diverge on purpose: keep each branch's values when merging or cherry-picking,
+then bump that branch's counter, and check all five `$plugin->` lines afterwards.
+New work lands on `main` and is backported. Releases are tags `v<moodle>-r<N>`,
+the same name in `$plugin->release`, with the `git archive` zip attached to the
+GitHub release; there is no moodle.org release workflow. Version 2026101303 was
+the last date-numbered one: its upgrade steps were removed, `db/upgrade.php`
+starts with a schema check refusing a site that never ran them, and
+`CHANGELOG.md` says how a site switches. A new step goes below that check.
+
+Checkouts, each mounted at `local/awareness`: `~/dev/moodle-local_awareness`
+(`main`, on m503 and m503b), `-502` (m502, m502b), `-501` (m501) and `-405`
+(m405). `<stack>` below means the stack of the checkout you are in.
 
 ## Agent orchestration budget (fleet rule, repeated here on purpose)
 
@@ -55,23 +71,23 @@ definition, and none runs on the session model.
 ## Commands
 
 ```sh
-mdl ci moodle-local_awareness --branch MOODLE_405_STABLE   # lowest supported
-mdl ci moodle-local_awareness --branch MOODLE_502_STABLE   # highest supported
-mdl phpunit m501 local_awareness
-mdl behat m501 @local_awareness
-mdl grunt m501 local/awareness
+mdl ci moodle-local_awareness --matrix --behat       # main (5.3); -502, -501, -405 for the others
+mdl phpunit <stack> local_awareness
+mdl behat <stack> @local_awareness
+mdl grunt <stack> local/awareness
 ```
 
-**Run both ends of the range before pushing.** This is not a formality here: on
-three consecutive releases the 4.05 phpcs leg failed on something the local
-suite and the 5.02 leg both accepted (lowercase inline comments twice, a
-multi-line `foreach` once). moodle-cs also cannot see PHP attributes on 4.05,
-which is why test metadata stays in docblocks — see below.
+**A backport is tested on its own branch's legs.** On three consecutive
+releases the 4.05 phpcs leg failed on something the local suite and the 5.02
+leg both accepted (lowercase inline comments twice, a multi-line `foreach`
+once), so a change merged into `MOODLE_405_STABLE` runs the matrix of that
+checkout. moodle-cs also cannot see PHP attributes on 4.05, which is why test
+metadata stays in docblocks there — see below.
 
 **Never run Behat and `mdl ci` at the same time.** Measured: the suite went from
 9 to 110 minutes and produced two WebDriver session failures that were not
-defects. After any `version.php` bump, run `mdl upgrade m501 && mdl behat-init
-m501 && mdl phpunit-init m501`, and confirm the init *finishes* — a half-upgraded
+defects. After any `version.php` bump, run `mdl upgrade <stack> && mdl behat-init
+<stack> && mdl phpunit-init <stack>`, and confirm the init *finishes* — a half-upgraded
 Behat site fails every scenario on the same core locator and looks like your bug.
 
 ## Where the real documentation is
@@ -388,8 +404,8 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `external\estimate_audience` unsets `pathmatch` under a course scope, and
   `notice_audience::criteria_for()` leaves it out of a course notice's criteria, so the two hash
   alike and a save joins the editor's job in flight rather than queueing a second estimate
-  (`audience_notice_audience_test` pins both scopes; upgrade step 2026092401 re-stamped the counts
-  stored before). `get_estimate` returns the context rules in every scope; under a course scope
+  (`audience_notice_audience_test` pins both scopes; the date-numbered upgrade step 2026092401,
+  since removed, re-stamped the counts stored before). `get_estimate` returns the context rules in every scope; under a course scope
   they come out empty because neither criteria set carries `pathmatch` and the scope forbids
   `filter_theme`. The per-rule breakdown is what it withholds there. The successor once intended
   for the forced pattern is a page-type choice shaped like a block's ("any course page", "the
@@ -526,12 +542,14 @@ Behat site fails every scenario on the same core locator and looks like your bug
 
 ## Testing notes
 
-- **Test metadata stays in docblocks (`@covers`, `@dataProvider`) while 405 is
-  supported.** moodle-cs on the 4.05 leg cannot see PHP attributes and reports
-  `moodle.PHPUnit.TestCaseCovers.Missing` for every method in a class carrying
-  only `#[CoversClass]` — 22 warnings from one converted file, on exactly one of
-  the four legs. Move to attributes in the same commit that drops 405. The
-  resulting PHPUnit deprecations (~75) are expected and do not fail the build.
+- **Test metadata stays in docblocks (`@covers`, `@dataProvider`) on
+  `MOODLE_405_STABLE`.** moodle-cs on the 4.05 leg cannot see PHP attributes and
+  reports `moodle.PHPUnit.TestCaseCovers.Missing` for every method in a class
+  carrying only `#[CoversClass]` — 22 warnings from one converted file, on
+  exactly one of the four legs. The other branches still carry docblocks too,
+  so a fix merges unchanged into all four; moving `main` to attributes is a
+  change of its own. The resulting PHPUnit deprecations (~75) are expected and
+  do not fail the build.
 - **Every "it did not happen" assertion needs a control** that proves the force
   which would have caused it was switched on. This repo has shipped vacuous
   tests: one created a deleted user who could never join the cohort, so the
@@ -628,7 +646,8 @@ reviews).
   key it names; an invalid file stops reviews for the repository until it is fixed, and an
   unknown key only raises a warning on the summary comment.
 - **One Moodle version per repository.** There is no per-branch mapping, so the file pins
-  `moodle.versions: ["5.2"]`. The plugin also runs on older cores, so read a finding about a core API with that in mind.
+  `moodle.versions: ["5.3"]`, the core of `main`. The other branches run on older cores, so read a
+  finding about a core API with that in mind.
 - `fail_on.severity` is `high`: the check fails on an open finding at or above it. Code
   quality findings never block, only security findings do.
 - The context file is project knowledge that **influences** the reviewer and is not a

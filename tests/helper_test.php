@@ -826,6 +826,8 @@ final class helper_test extends \advanced_testcase {
      *
      * Inside the get_notices web service $PAGE has no course set, so its theme ignores course and
      * category themes; the rule resolves the course's own ({@see helper::current_theme_name()}).
+     * Moodle 5.3 ships Boost alone, so the course's theme is a fixture found through
+     * $CFG->themedir.
      *
      * @covers \local_awareness\helper::check_filters
      */
@@ -835,8 +837,9 @@ final class helper_test extends \advanced_testcase {
         $this->resetAfterTest();
         $CFG->theme = 'boost';
         $CFG->allowcoursethemes = 1;
+        $CFG->themedir = __DIR__ . '/fixtures/themes';
 
-        $course = $this->getDataGenerator()->create_course(['theme' => 'classic']);
+        $course = $this->getDataGenerator()->create_course(['theme' => 'awarenessalt']);
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $this->setUser($user);
         $courseid = (int) $course->id;
@@ -847,14 +850,14 @@ final class helper_test extends \advanced_testcase {
          */
         $this->assertFalse(helper::check_filters(json_encode(['filter_theme' => ['nosuchtheme']]), $courseid));
 
-        // Preconditions: this course renders classic while the service's own $PAGE says boost.
+        // Preconditions: this course renders the fixture while the service's own $PAGE says boost.
         $coursepage = new \moodle_page();
         $coursepage->set_course($course);
-        $this->assertSame('classic', $coursepage->theme->name);
+        $this->assertSame('awarenessalt', $coursepage->theme->name);
         $this->assertSame('boost', $PAGE->theme->name);
 
-        // A pair, deliberately: both can only pass if the resolved theme is exactly classic.
-        $this->assertTrue(helper::check_filters(json_encode(['filter_theme' => ['classic']]), $courseid));
+        // A pair, deliberately: both can only pass if the resolved theme is exactly the fixture.
+        $this->assertTrue(helper::check_filters(json_encode(['filter_theme' => ['awarenessalt']]), $courseid));
         $this->assertFalse(helper::check_filters(json_encode(['filter_theme' => ['boost']]), $courseid));
     }
 

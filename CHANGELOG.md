@@ -6,6 +6,38 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### One branch per Moodle version (version 2026100500)
+
+The plugin now has one branch per Moodle version, each supporting that version only, and each
+numbering its versions inside that version's range:
+
+| Branch | Moodle | `$plugin->version` | Release |
+|---|---|---|---|
+| `main` = `MOODLE_503_STABLE` | 5.3 | `20261005XX` | `v5.3-r<N>` |
+| `MOODLE_502_STABLE` | 5.2 | `20260420XX` | `v5.2-r<N>` |
+| `MOODLE_501_STABLE` | 5.1 | `20251006XX` | `v5.1-r<N>` |
+| `MOODLE_405_STABLE` | 4.5 | `20241007XX` | `v4.5-r<N>` |
+
+Moodle 5.0 is no longer tested. New work lands on `main` and is backported. Releases are tags
+`v<moodle>-r<N>` with the `git archive` zip attached on GitHub; the moodle.org release workflow is
+removed.
+
+The upgrade steps up to version 2026101303 were numbered by date, above the 4.5, 5.1 and 5.2
+ranges, so a site that lowered its version to switch branches would have run them again. They are
+removed. `db/upgrade.php` now refuses a site whose schema never reached them. A site running
+Awareness switches like this:
+
+1. Upgrade to version 2026101303, the last date-numbered version, which runs every earlier step.
+2. Replace the plugin's files with the branch for the site's Moodle version.
+3. Set the version just below that branch's first number:
+   `php admin/cli/cfg.php --component=local_awareness --name=version --set=<number>`, where the
+   number is `2026100499` for 5.3, `2026041999` for 5.2, `2025100599` for 5.1 and `2024100699`
+   for 4.5.
+4. Run `php admin/cli/upgrade.php`.
+
+Step 3 must come after step 2: with the old files still in place, a lowered version runs every
+old step again.
+
 ### The editor's and the list's reads no longer hold the session lock (version 2026101303)
 
 Six read web services now declare `'readonlysession' => true`, as core does for its own reads:
