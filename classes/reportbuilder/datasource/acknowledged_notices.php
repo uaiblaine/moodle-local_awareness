@@ -41,6 +41,7 @@ class acknowledged_notices extends datasource {
      *
      * @return string
      */
+    #[\Override]
     public static function get_name(): string {
         return get_string('datasource:acknowledgednotices', 'local_awareness');
     }
@@ -48,6 +49,7 @@ class acknowledged_notices extends datasource {
     /**
      * Initialise report.
      */
+    #[\Override]
     protected function initialise(): void {
         $ackentity = new acknowledgement();
         $ackalias  = $ackentity->get_table_alias('local_awareness_ack');
@@ -84,6 +86,7 @@ class acknowledged_notices extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_columns(): array {
         return [
             'user:fullname',
@@ -98,6 +101,7 @@ class acknowledged_notices extends datasource {
      *
      * @return int[]
      */
+    #[\Override]
     public function get_default_column_sorting(): array {
         return ['acknowledgement:timecreated' => SORT_DESC];
     }
@@ -107,6 +111,7 @@ class acknowledged_notices extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_filters(): array {
         return [
             'notice:title',
@@ -120,6 +125,7 @@ class acknowledged_notices extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_conditions(): array {
         return [];
     }

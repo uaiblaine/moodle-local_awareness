@@ -29,6 +29,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 #[CoversClass(\local_awareness\audience\estimator::class)]
 final class audience_estimator_test extends \advanced_testcase {
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

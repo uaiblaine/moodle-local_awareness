@@ -45,6 +45,7 @@ class purge_audience_jobs extends \core\task\scheduled_task {
      * @return string
      * @throws \coding_exception
      */
+    #[\Override]
     public function get_name(): string {
         return get_string('task_purge_audience_jobs', 'local_awareness');
     }
@@ -55,6 +56,7 @@ class purge_audience_jobs extends \core\task\scheduled_task {
      * @return void
      * @throws \dml_exception
      */
+    #[\Override]
     public function execute() {
         global $DB;
 

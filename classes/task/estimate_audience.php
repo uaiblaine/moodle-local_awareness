@@ -36,6 +36,7 @@ class estimate_audience extends \core\task\adhoc_task {
      * @return string
      * @throws \coding_exception
      */
+    #[\Override]
     public function get_name(): string {
         return get_string('task_estimate_audience', 'local_awareness');
     }
@@ -43,6 +44,7 @@ class estimate_audience extends \core\task\adhoc_task {
     /**
      * Run the task.
      */
+    #[\Override]
     public function execute() {
         $data = $this->get_custom_data();
         $jobid = isset($data->jobid) ? (string) $data->jobid : '';

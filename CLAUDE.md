@@ -533,6 +533,13 @@ Behat site fails every scenario on the same core locator and looks like your bug
   on every badge, no BS5-only utility in the dialogue. A change backported to 4.5 that adds a BS5
   utility to a plugin page needs a polyfill rule there.
 
+- **`main` uses `#[\Override]` on every method whose parent class or interface declares it**
+  (events, tasks, persistents, the form, renderables, report builder, the table and its filterset,
+  the privacy provider, test `setUp()`/`tearDown()`), never on the `execute*` methods of
+  `classes/external/`: `core_external\external_api` declares none, and the attribute would be fatal
+  at class load. A wrong one fails only when the class loads, which no lint step sees; the PHPUnit
+  run does. Per property, never `readonly class`: moodle-cs reads its docblock as an inline comment.
+
 - **A dev site that upgraded mid-change never registers a web service added afterwards.**
   `external_functions` is refreshed only when `$plugin->version` rises; a stack already at the bumped
   version when `db/services.php` gained a function keeps its old list, and the AJAX call dies with

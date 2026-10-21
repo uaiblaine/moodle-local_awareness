@@ -45,6 +45,7 @@ final class course_page_reach_test extends \advanced_testcase {
     /**
      * A course, a reader in it, and an enabled course notice saved through the real path.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();

@@ -48,6 +48,7 @@ final class notice_external_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

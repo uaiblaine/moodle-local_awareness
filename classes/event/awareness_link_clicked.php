@@ -32,6 +32,7 @@ class awareness_link_clicked extends \core\event\base {
     /**
      * Init.
      */
+    #[\Override]
     protected function init() {
         $this->data['objecttable'] = 'local_awareness_hlinks';
         $this->data['crud'] = 'r';
@@ -42,6 +43,7 @@ class awareness_link_clicked extends \core\event\base {
      * Description.
      * @return string
      */
+    #[\Override]
     public function get_description() {
         $noticeid = $this->other['noticeid'] ?? 0;
         return "The user with id '$this->userid' clicked the link with id '$this->objectid' " .
@@ -52,6 +54,7 @@ class awareness_link_clicked extends \core\event\base {
      * Gets name.
      * @return \lang_string|string
      */
+    #[\Override]
     public static function get_name() {
         return get_string('event:clicklink', 'local_awareness');
     }
@@ -61,6 +64,7 @@ class awareness_link_clicked extends \core\event\base {
      *
      * @return \moodle_url
      */
+    #[\Override]
     public function get_url() {
         $params = $this->contextlevel == CONTEXT_COURSE ? ['courseid' => $this->courseid] : [];
         return new \moodle_url('/local/awareness/managenotice.php', $params);

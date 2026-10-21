@@ -67,6 +67,7 @@ class notice_form extends \core\form\persistent {
     /**
      * Form definition.
      */
+    #[\Override]
     public function definition() {
         global $CFG, $DB, $OUTPUT;
         $mform =& $this->_form;
@@ -715,6 +716,7 @@ class notice_form extends \core\form\persistent {
      * @param array $errors Errors found so far.
      * @return array Additional errors, keyed by element name.
      */
+    #[\Override]
     protected function extra_validation($data, $files, array &$errors) {
         $result = $this->scope()->apply((array) $data);
 
@@ -740,6 +742,7 @@ class notice_form extends \core\form\persistent {
      *
      * @return void
      */
+    #[\Override]
     public function definition_after_data() {
         parent::definition_after_data();
 
@@ -1493,6 +1496,7 @@ class notice_form extends \core\form\persistent {
      *
      * @return \stdClass
      */
+    #[\Override]
     protected function get_default_data() {
         $data = parent::get_default_data();
         $data->perpetual = $data->timestart == 0 && $data->timeend == 0;

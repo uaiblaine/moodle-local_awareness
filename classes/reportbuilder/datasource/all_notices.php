@@ -38,6 +38,7 @@ class all_notices extends datasource {
      *
      * @return string
      */
+    #[\Override]
     public static function get_name(): string {
         return get_string('datasource:allnotices', 'local_awareness');
     }
@@ -45,6 +46,7 @@ class all_notices extends datasource {
     /**
      * Initialise report.
      */
+    #[\Override]
     protected function initialise(): void {
         $noticeentity = new notice();
         $noticealias  = $noticeentity->get_table_alias('local_awareness');
@@ -67,6 +69,7 @@ class all_notices extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_columns(): array {
         return [
             'notice:title',
@@ -85,6 +88,7 @@ class all_notices extends datasource {
      *
      * @return int[]
      */
+    #[\Override]
     public function get_default_column_sorting(): array {
         return ['notice:timecreated' => SORT_DESC];
     }
@@ -94,6 +98,7 @@ class all_notices extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_filters(): array {
         return [
             'notice:title',
@@ -107,6 +112,7 @@ class all_notices extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_conditions(): array {
         return [];
     }

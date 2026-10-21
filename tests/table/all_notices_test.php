@@ -37,6 +37,7 @@ final class all_notices_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

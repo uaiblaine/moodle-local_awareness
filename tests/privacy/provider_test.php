@@ -50,6 +50,7 @@ final class provider_test extends \advanced_testcase {
      *
      * @return void
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         writer::reset();

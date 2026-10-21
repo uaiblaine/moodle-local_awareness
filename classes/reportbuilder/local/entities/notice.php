@@ -42,6 +42,7 @@ class notice extends base {
      *
      * @return string[]
      */
+    #[\Override]
     protected function get_default_tables(): array {
         return ['local_awareness'];
     }
@@ -51,6 +52,7 @@ class notice extends base {
      *
      * @return lang_string
      */
+    #[\Override]
     protected function get_default_entity_title(): lang_string {
         return new lang_string('entity_notice', 'local_awareness');
     }
@@ -60,6 +62,7 @@ class notice extends base {
      *
      * @return base
      */
+    #[\Override]
     public function initialise(): base {
         foreach ($this->get_all_columns() as $column) {
             $this->add_column($column);

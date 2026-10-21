@@ -29,6 +29,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
  */
 #[CoversClass(\local_awareness\audience\live_mode::class)]
 final class audience_live_mode_test extends \advanced_testcase {
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

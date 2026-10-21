@@ -50,6 +50,7 @@ class slide extends persistent {
      *
      * @return array[]
      */
+    #[\Override]
     protected static function define_properties() {
         return [
             'noticeid' => [

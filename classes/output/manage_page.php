@@ -145,6 +145,7 @@ class manage_page implements renderable, templatable {
      * @throws \coding_exception
      * @throws \dml_exception
      */
+    #[\Override]
     public function export_for_template(renderer_base $output) {
         return [
             'lede' => get_string($this->scope->is_site() ? 'manage:lede' : 'manage:lede:course', 'local_awareness'),

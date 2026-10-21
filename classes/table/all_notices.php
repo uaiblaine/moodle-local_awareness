@@ -97,6 +97,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return string Fully qualified class name.
      */
+    #[\Override]
     public static function get_filterset_class(): string {
         return all_notices_filterset::class;
     }
@@ -110,6 +111,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return \context
      */
+    #[\Override]
     public function get_context(): \context {
         return $this->scope()->context();
     }
@@ -119,6 +121,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return bool
      */
+    #[\Override]
     public function has_capability(): bool {
         $scope = $this->scope();
 
@@ -130,6 +133,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return void
      */
+    #[\Override]
     public function guess_base_url(): void {
         $this->baseurl = $this->page_url('/local/awareness/managenotice.php');
     }
@@ -226,6 +230,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @param int $pagesize number of records to fetch
      * @param bool $useinitialsbar initial bar
      */
+    #[\Override]
     public function query_db($pagesize, $useinitialsbar = true): void {
         global $DB;
 
@@ -281,6 +286,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return void
      */
+    #[\Override]
     public function wrap_html_start() {
         global $OUTPUT;
 
@@ -299,6 +305,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return void
      */
+    #[\Override]
     public function print_nothing_to_display(): void {
         global $OUTPUT;
 

@@ -49,6 +49,7 @@ final class group_scope_test extends \advanced_testcase {
     /**
      * A course in separate groups mode, three groups, two teachers.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();

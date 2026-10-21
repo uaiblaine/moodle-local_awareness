@@ -36,6 +36,7 @@ final class audience_notice_audience_test extends \advanced_testcase {
     /**
      * Each test runs as the administrator, with the cached site user count forgotten.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

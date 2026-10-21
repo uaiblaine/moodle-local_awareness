@@ -87,6 +87,7 @@ final class group_audience_test extends \advanced_testcase {
     /**
      * A separate-groups course, two groups, three students, two teachers, three notices.
      */
+    #[\Override]
     protected function setUp(): void {
         global $DB;
 

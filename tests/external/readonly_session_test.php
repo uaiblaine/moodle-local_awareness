@@ -61,6 +61,7 @@ final class readonly_session_test extends \advanced_testcase {
      *
      * @return void
      */
+    #[\Override]
     protected function tearDown(): void {
         unset($_POST['sesskey']);
         parent::tearDown();

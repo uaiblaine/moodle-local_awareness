@@ -59,6 +59,7 @@ class editor_page implements renderable, templatable {
      * @param renderer_base $output The renderer.
      * @return array Template context.
      */
+    #[\Override]
     public function export_for_template(renderer_base $output) {
         $isedit = (bool) $this->awareness;
         $enabled = $isedit && (int) $this->awareness->get('enabled') === 1;

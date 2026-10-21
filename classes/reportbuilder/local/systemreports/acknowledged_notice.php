@@ -47,6 +47,7 @@ class acknowledged_notice extends system_report {
     /**
      * Initialise report.
      */
+    #[\Override]
     protected function initialise(): void {
         global $DB;
 
@@ -131,6 +132,7 @@ class acknowledged_notice extends system_report {
      *
      * @return bool
      */
+    #[\Override]
     protected function can_view(): bool {
         /*
          * Decided from the report's own noticeid parameter, never from the context it was created
