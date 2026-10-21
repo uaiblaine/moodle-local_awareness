@@ -16,6 +16,8 @@
 
 namespace local_awareness\local;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * Source contracts for the competency picker's message rendering and its label plumbing.
  *
@@ -31,9 +33,8 @@ namespace local_awareness\local;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\form\notice_form
  */
+#[CoversClass(\local_awareness\form\notice_form::class)]
 final class picker_contract_test extends \basic_testcase {
     /**
      * Plugin root.

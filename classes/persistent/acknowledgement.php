@@ -42,6 +42,7 @@ class acknowledgement extends persistent {
      * Returns a list of properties.
      * @return array[]
      */
+    #[\Override]
     protected static function define_properties() {
         return [
             'userid' => [

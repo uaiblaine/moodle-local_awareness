@@ -28,6 +28,7 @@ use core_reportbuilder\local\aggregation\max;
 use core_reportbuilder\local\aggregation\sum;
 use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
 use local_awareness\reportbuilder\datasource\dismissed_notices;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for the dismissed_notices datasource.
@@ -35,10 +36,9 @@ use local_awareness\reportbuilder\datasource\dismissed_notices;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\reportbuilder\datasource\dismissed_notices
- * @covers \local_awareness\reportbuilder\local\entities\acknowledgement
  */
+#[CoversClass(\local_awareness\reportbuilder\datasource\dismissed_notices::class)]
+#[CoversClass(\local_awareness\reportbuilder\local\entities\acknowledgement::class)]
 final class dismissed_notices_test extends datasource_testcase {
     /**
      * Insert a notice and return its ID.

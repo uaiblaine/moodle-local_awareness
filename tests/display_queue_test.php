@@ -17,6 +17,7 @@
 namespace local_awareness;
 
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * The display queue: one notice at a time, and what earns a place at the front of it.
@@ -24,13 +25,13 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::select_for_display
  */
+#[CoversMethod(\local_awareness\helper::class, 'select_for_display')]
 final class display_queue_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

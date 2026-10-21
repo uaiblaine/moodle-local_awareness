@@ -19,6 +19,8 @@ namespace local_awareness;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
 use local_awareness\persistent\noticeview;
+use PHPUnit\Framework\Attributes\CoversMethod;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Tests for creating, resetting, enabling and delivering notices, and for acting on them.
@@ -28,10 +30,19 @@ use local_awareness\persistent\noticeview;
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+#[CoversMethod(\local_awareness\helper::class, 'create_new_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'reset_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'enable_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'disable_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'dismiss_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'acknowledge_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'track_link')]
+#[CoversMethod(\local_awareness\helper::class, 'retrieve_user_notices')]
 final class awareness_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -40,14 +51,13 @@ final class awareness_test extends \advanced_testcase {
     /**
      * Test notice creation.
      *
-     * @covers \local_awareness\helper::create_new_notice
      *
-     * @dataProvider create_notices_provider
      * @param array $formdata Array of form data to create notices
      * @param bool $allowdeletion Whether or not to allow deletion of notices
      * @param bool $cleanup Whether or not to clean up extra link data after notice deletion
      * @param array $expected Array of expected testcase results
      */
+    #[DataProvider('create_notices_provider')]
     public function test_create_notices(array $formdata, bool $allowdeletion, bool $cleanup, array $expected): void {
         $this->setAdminUser();
         set_config('allow_delete', $allowdeletion, 'local_awareness');
@@ -87,8 +97,6 @@ final class awareness_test extends \advanced_testcase {
      * only inside its `!empty($this->_options)` branch — with no cohorts on the site the option
      * list is empty and the marker survives. Stored as a cohort it would match nobody, hiding the
      * notice from every user.
-     *
-     * @covers \local_awareness\helper::create_new_notice
      */
     public function test_the_multiselect_marker_is_never_stored_as_a_cohort(): void {
         global $USER;
@@ -117,8 +125,6 @@ final class awareness_test extends \advanced_testcase {
      *
      * Without this, the assertion that the notice reaches a cohort-less user would also pass if
      * cohort filtering had been removed altogether.
-     *
-     * @covers \local_awareness\helper::create_new_notice
      */
     public function test_a_real_cohort_selection_still_restricts_the_audience(): void {
         global $USER;
@@ -147,11 +153,10 @@ final class awareness_test extends \advanced_testcase {
     /**
      * Test set reset notice.
      *
-     * @covers \local_awareness\helper::reset_notice
      *
-     * @dataProvider generic_provider
      * @param array $formdata Array of form data to create notices
      */
+    #[DataProvider('generic_provider')]
     public function test_reset_notices(array $formdata): void {
         global $DB;
 
@@ -188,12 +193,10 @@ final class awareness_test extends \advanced_testcase {
     /**
      * Test enable/disable notice.
      *
-     * @covers \local_awareness\helper::enable_notice
-     * @covers \local_awareness\helper::disable_notice
      *
-     * @dataProvider generic_provider
      * @param array $formdata Array of form data to create notices
      */
+    #[DataProvider('generic_provider')]
     public function test_enable_notices(array $formdata): void {
         $this->setAdminUser();
 
@@ -227,13 +230,10 @@ final class awareness_test extends \advanced_testcase {
     /**
      * Test user notice interaction.
      *
-     * @covers \local_awareness\helper::dismiss_notice
-     * @covers \local_awareness\helper::acknowledge_notice
-     * @covers \local_awareness\helper::reset_notice
      *
-     * @dataProvider generic_provider
      * @param array $formdata Data to test on.
      */
+    #[DataProvider('generic_provider')]
     public function test_user_notice($formdata): void {
         global $DB, $USER;
 
@@ -313,11 +313,10 @@ final class awareness_test extends \advanced_testcase {
     /**
      * Test user link interaction
      *
-     * @covers \local_awareness\helper::track_link
      *
-     * @dataProvider generic_provider
      * @param array $formdata Data to test on.
      */
+    #[DataProvider('generic_provider')]
     public function test_user_hlink_interact($formdata): void {
         global $DB;
 
@@ -368,8 +367,6 @@ final class awareness_test extends \advanced_testcase {
 
     /**
      * Test course completion option.
-     *
-     * @covers \local_awareness\helper::retrieve_user_notices
      */
     public function test_user_required_completion(): void {
         global $DB;
@@ -433,8 +430,6 @@ final class awareness_test extends \advanced_testcase {
 
     /**
      * Test user see required notice after dismissing it.
-     *
-     * @covers \local_awareness\helper::retrieve_user_notices
      */
     public function test_retrieve_user_notices_when_dismissed_one_that_requires_acknowledgement(): void {
         $this->resetAfterTest();
@@ -462,8 +457,6 @@ final class awareness_test extends \advanced_testcase {
 
     /**
      * Test user see required notice after dismissing, and then acknowledged it.
-     *
-     * @covers \local_awareness\helper::retrieve_user_notices
      */
     public function test_retrieve_user_notices_when_dismiss_and_then_acknowledged(): void {
         $this->resetAfterTest();
@@ -505,8 +498,6 @@ final class awareness_test extends \advanced_testcase {
      * Refusing leaves the session alone, for an ordinary user as well as the admin. The site
      * administrator is not exempt from being asked again, just as a notice requiring
      * acknowledgement comes back for admins too.
-     *
-     * @covers \local_awareness\helper::retrieve_user_notices
      */
     public function test_a_blocking_notice_returns_after_it_is_refused(): void {
         global $USER;

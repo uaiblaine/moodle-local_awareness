@@ -18,6 +18,7 @@ namespace local_awareness\external;
 
 use core_external\external_api;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * A service declared 'readonlysession' runs without the session lock, so nothing it writes to
@@ -33,20 +34,17 @@ use local_awareness\persistent\awareness;
  * dismiss and acknowledge services refuse a notice that record does not hold, and a read-only
  * request would drop the record without a word.
  *
- * The metadata stays in docblocks rather than attributes because the plugin still supports
- * Moodle 4.5, whose moodle-cs cannot see attributes.
- *
  * @package    local_awareness
  * @category   test
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\external\check_collision
- * @covers     \local_awareness\external\search_roles
- * @covers     \local_awareness\external\search_courses
- * @covers     \local_awareness\external\get_estimate
- * @covers     \local_awareness\external\preview_notice
- * @covers     \local_awareness\external\render_notice
  */
+#[CoversClass(\local_awareness\external\check_collision::class)]
+#[CoversClass(\local_awareness\external\search_roles::class)]
+#[CoversClass(\local_awareness\external\search_courses::class)]
+#[CoversClass(\local_awareness\external\get_estimate::class)]
+#[CoversClass(\local_awareness\external\preview_notice::class)]
+#[CoversClass(\local_awareness\external\render_notice::class)]
 final class readonly_session_test extends \advanced_testcase {
     /** @var string The read that must keep the session lock, and why is in the class docblock. */
     private const LOCKED_READ = 'local_awareness_getnotices';
@@ -63,6 +61,7 @@ final class readonly_session_test extends \advanced_testcase {
      *
      * @return void
      */
+    #[\Override]
     protected function tearDown(): void {
         unset($_POST['sesskey']);
         parent::tearDown();

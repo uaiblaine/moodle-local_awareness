@@ -19,6 +19,7 @@ namespace local_awareness\db;
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticeview;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The schema install.xml declares, read back from the test database.
@@ -29,9 +30,8 @@ use local_awareness\persistent\noticeview;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\persistent\noticeview
  */
+#[CoversClass(\local_awareness\persistent\noticeview::class)]
 final class schema_test extends \advanced_testcase {
     /**
      * The acknowledgement index leads with noticeid, because every predicate names it.

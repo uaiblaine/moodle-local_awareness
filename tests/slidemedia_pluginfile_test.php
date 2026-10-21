@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
+use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -32,13 +33,11 @@ require_once($CFG->dirroot . '/local/awareness/lib.php');
  * returns null only when it resolved the slide to its notice, passed that notice's gate and found
  * the entry under the slide id; every refusal and every miss returns false.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers ::local_awareness_pluginfile
  */
+#[CoversFunction('local_awareness_pluginfile')]
 final class slidemedia_pluginfile_test extends \advanced_testcase {
     /**
      * An enabled or disabled carousel notice with one image slide.

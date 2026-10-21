@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * Which authoring actions expire a recorded acceptance, and which do not.
@@ -33,9 +34,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::acceptance_is_current
  */
+#[CoversMethod(\local_awareness\helper::class, 'acceptance_is_current')]
 final class consent_expiry_test extends \advanced_testcase {
     /**
      * A notice whose last edit is safely in the past, with one acceptance on record.

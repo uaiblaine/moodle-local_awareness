@@ -42,6 +42,7 @@ class link_history extends datasource {
      *
      * @return string
      */
+    #[\Override]
     public static function get_name(): string {
         return get_string('datasource:linkhistory', 'local_awareness');
     }
@@ -49,6 +50,7 @@ class link_history extends datasource {
     /**
      * Initialise report.
      */
+    #[\Override]
     protected function initialise(): void {
         $lhentity = new linkhistory();
         $lhhalias = $lhentity->get_table_alias('local_awareness_hlinks_his');
@@ -82,6 +84,7 @@ class link_history extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_columns(): array {
         return [
             'user:fullname',
@@ -97,6 +100,7 @@ class link_history extends datasource {
      *
      * @return int[]
      */
+    #[\Override]
     public function get_default_column_sorting(): array {
         return ['linkhistory:timecreated' => SORT_DESC];
     }
@@ -106,6 +110,7 @@ class link_history extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_filters(): array {
         return [
             'notice:title',
@@ -119,6 +124,7 @@ class link_history extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_conditions(): array {
         return [];
     }

@@ -16,6 +16,8 @@
 
 namespace local_awareness\local;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * Guards two asynchronous contracts in the plugin's JavaScript.
  *
@@ -33,12 +35,11 @@ namespace local_awareness\local;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\external\estimate_audience
- * @covers \local_awareness\external\get_estimate
- * @covers \local_awareness\external\dismiss_notice
- * @covers \local_awareness\external\acknowledge_notice
  */
+#[CoversClass(\local_awareness\external\estimate_audience::class)]
+#[CoversClass(\local_awareness\external\get_estimate::class)]
+#[CoversClass(\local_awareness\external\dismiss_notice::class)]
+#[CoversClass(\local_awareness\external\acknowledge_notice::class)]
 final class async_contract_test extends \basic_testcase {
     /**
      * Absolute path to the plugin root.

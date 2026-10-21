@@ -22,24 +22,21 @@ use local_awareness\audience\notice_audience;
 use local_awareness\persistent\audience_job;
 use local_awareness\persistent\awareness;
 use local_awareness\task\estimate_audience as estimate_audience_task;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the audience size stored against a saved notice.
  *
- * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
- * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage. Move to the
- * attribute when 4.5 support is dropped.
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\audience\notice_audience
  */
+#[CoversClass(\local_awareness\audience\notice_audience::class)]
 final class audience_notice_audience_test extends \advanced_testcase {
     /**
      * Each test runs as the administrator, with the cached site user count forgotten.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -423,8 +420,6 @@ final class audience_notice_audience_test extends \advanced_testcase {
      *
      * The timestamps are forced into the past because must_reshow() compares with a strict `<`: a
      * stamp landing in the same second as the last view would go unnoticed.
-     *
-     * @covers \local_awareness\audience\notice_audience::record
      */
     public function test_recording_a_count_does_not_re_show_the_notice(): void {
         global $DB, $USER;
@@ -470,8 +465,6 @@ final class audience_notice_audience_test extends \advanced_testcase {
      * refresh() finds an in-flight job by criteria hash, and two notices with the same filters hash
      * identically. Re-owning the job would leave the notice that raised it waiting for a result
      * never written to it ({@see \local_awareness\audience\notice_audience::refresh()}).
-     *
-     * @covers \local_awareness\audience\notice_audience::refresh
      */
     public function test_a_second_notice_does_not_steal_an_in_flight_job(): void {
         // Over the limit, so the work is queued rather than resolved during the request.

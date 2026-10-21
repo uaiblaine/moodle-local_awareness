@@ -16,6 +16,8 @@
 
 namespace local_awareness;
 
+use PHPUnit\Framework\Attributes\CoversFunction;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -27,13 +29,13 @@ require_once($CFG->dirroot . '/local/awareness/lib.php');
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers ::local_awareness_extend_navigation_course
  */
+#[CoversFunction('local_awareness_extend_navigation_course')]
 final class navigation_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

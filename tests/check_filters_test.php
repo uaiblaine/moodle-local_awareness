@@ -16,6 +16,9 @@
 
 namespace local_awareness;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
+use PHPUnit\Framework\Attributes\DataProvider;
+
 /**
  * Direct tests for the two page-targeting predicates.
  *
@@ -30,10 +33,9 @@ namespace local_awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::check_path_match
- * @covers \local_awareness\helper::check_filters
  */
+#[CoversMethod(\local_awareness\helper::class, 'check_path_match')]
+#[CoversMethod(\local_awareness\helper::class, 'check_filters')]
 final class check_filters_test extends \advanced_testcase {
     /**
      * Path patterns, the URL they are tested against, and whether they should match.
@@ -64,11 +66,11 @@ final class check_filters_test extends \advanced_testcase {
     /**
      * The path predicate, called directly rather than through either caller.
      *
-     * @dataProvider path_match_provider
      * @param string $pathmatch The stored pattern.
      * @param string $pageurl The local URL being tested.
      * @param bool $expected Whether the notice should show.
      */
+    #[DataProvider('path_match_provider')]
     public function test_check_path_match(string $pathmatch, string $pageurl, bool $expected): void {
         $this->resetAfterTest();
 

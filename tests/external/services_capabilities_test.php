@@ -16,6 +16,8 @@
 
 namespace local_awareness\external;
 
+use PHPUnit\Framework\Attributes\CoversNothing;
+
 /**
  * The capabilities each web service declares are the ones its gate accepts.
  *
@@ -27,9 +29,8 @@ namespace local_awareness\external;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @coversNothing
  */
+#[CoversNothing]
 final class services_capabilities_test extends \basic_testcase {
     /**
      * Each service's declared capabilities, as core splits them.

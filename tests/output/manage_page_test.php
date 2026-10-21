@@ -17,6 +17,7 @@
 namespace local_awareness\output;
 
 use local_awareness\local\author_scope;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The manage page's numbers and buttons follow the scope of the list they sit above.
@@ -28,13 +29,13 @@ use local_awareness\local\author_scope;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\output\manage_page
  */
+#[CoversClass(\local_awareness\output\manage_page::class)]
 final class manage_page_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

@@ -19,6 +19,7 @@ namespace local_awareness;
 use local_awareness\form\notice_form;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Where a course notice fires: its course's main page, and the author is not asked.
@@ -27,16 +28,13 @@ use local_awareness\persistent\awareness;
  * scope writes the page itself, which is why these tests read the stored value rather than a
  * submitted one.
  *
- * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
- * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage.
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\local\author_scope
- * @covers     \local_awareness\helper
- * @covers     \local_awareness\form\notice_form
  */
+#[CoversClass(\local_awareness\local\author_scope::class)]
+#[CoversClass(\local_awareness\helper::class)]
+#[CoversClass(\local_awareness\form\notice_form::class)]
 final class course_page_reach_test extends \advanced_testcase {
     /** @var \stdClass The course. */
     private \stdClass $course;
@@ -47,6 +45,7 @@ final class course_page_reach_test extends \advanced_testcase {
     /**
      * A course, a reader in it, and an enabled course notice saved through the real path.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();

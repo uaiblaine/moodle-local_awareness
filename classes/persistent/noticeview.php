@@ -34,6 +34,7 @@ class noticeview extends persistent {
      *
      * @return array[]
      */
+    #[\Override]
     protected static function define_properties() {
         return [
             'userid' => [
@@ -87,6 +88,7 @@ class noticeview extends persistent {
      *
      * @param bool $result Result of update.
      */
+    #[\Override]
     protected function after_update($result) {
         if ($result) {
             self::purge_cache($this->get('userid'));
@@ -96,6 +98,7 @@ class noticeview extends persistent {
     /**
      * Run after created.
      */
+    #[\Override]
     protected function after_create() {
         self::purge_cache($this->get('userid'));
     }
@@ -105,6 +108,7 @@ class noticeview extends persistent {
      *
      * @param bool $result Result of delete.
      */
+    #[\Override]
     protected function after_delete($result) {
         if ($result) {
             self::purge_cache($this->get('userid'));

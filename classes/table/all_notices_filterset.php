@@ -57,6 +57,7 @@ class all_notices_filterset extends filterset {
      *
      * @return array Always empty: every filter on this table is optional.
      */
+    #[\Override]
     public function get_required_filters(): array {
         return [];
     }
@@ -70,6 +71,7 @@ class all_notices_filterset extends filterset {
      *
      * @return array Filter name => filter class.
      */
+    #[\Override]
     public function get_optional_filters(): array {
         return [
             'name' => string_filter::class,

@@ -17,6 +17,7 @@
 namespace local_awareness\task;
 
 use local_awareness\persistent\audience_job;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the audience-job retention task.
@@ -24,9 +25,8 @@ use local_awareness\persistent\audience_job;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\task\purge_audience_jobs
  */
+#[CoversClass(\local_awareness\task\purge_audience_jobs::class)]
 final class purge_audience_jobs_test extends \advanced_testcase {
     /**
      * Create a job and backdate it.

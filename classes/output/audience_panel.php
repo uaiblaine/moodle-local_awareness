@@ -59,6 +59,7 @@ class audience_panel implements renderable, templatable {
      * @param renderer_base $output The renderer.
      * @return array Template context, under the 'audience' key the template reads.
      */
+    #[\Override]
     public function export_for_template(renderer_base $output) {
         /*
          * On a site above the interactive limit the editor must not estimate on its own: each

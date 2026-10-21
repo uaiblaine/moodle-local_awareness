@@ -39,6 +39,7 @@ class notice_views extends datasource {
      *
      * @return string
      */
+    #[\Override]
     public static function get_name(): string {
         return get_string('datasource:noticeviews', 'local_awareness');
     }
@@ -46,6 +47,7 @@ class notice_views extends datasource {
     /**
      * Initialise report.
      */
+    #[\Override]
     protected function initialise(): void {
         $viewentity = new noticeview();
         $viewalias  = $viewentity->get_table_alias('local_awareness_lastview');
@@ -75,6 +77,7 @@ class notice_views extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_columns(): array {
         return [
             'user:fullname',
@@ -89,6 +92,7 @@ class notice_views extends datasource {
      *
      * @return int[]
      */
+    #[\Override]
     public function get_default_column_sorting(): array {
         return ['noticeview:timemodified' => SORT_DESC];
     }
@@ -98,6 +102,7 @@ class notice_views extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_filters(): array {
         return [
             'notice:title',
@@ -111,6 +116,7 @@ class notice_views extends datasource {
      *
      * @return string[]
      */
+    #[\Override]
     public function get_default_conditions(): array {
         return [];
     }

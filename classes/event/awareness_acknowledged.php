@@ -28,6 +28,7 @@ class awareness_acknowledged extends \core\event\base {
     /**
      * Init.
      */
+    #[\Override]
     protected function init() {
         $this->data['objecttable'] = 'local_awareness';
         $this->data['crud'] = 'c';
@@ -38,6 +39,7 @@ class awareness_acknowledged extends \core\event\base {
      * Gets description.
      * @return string
      */
+    #[\Override]
     public function get_description() {
         return "The user with id '$this->relateduserid' acknowledged the notice with id '$this->objectid'";
     }
@@ -46,6 +48,7 @@ class awareness_acknowledged extends \core\event\base {
      * Gets name.
      * @return \lang_string|string
      */
+    #[\Override]
     public static function get_name() {
         return get_string('event:acknowledge', 'local_awareness');
     }
@@ -55,6 +58,7 @@ class awareness_acknowledged extends \core\event\base {
      *
      * @return \moodle_url
      */
+    #[\Override]
     public function get_url() {
         $params = $this->contextlevel == CONTEXT_COURSE ? ['courseid' => $this->courseid] : [];
         return new \moodle_url('/local/awareness/managenotice.php', $params);

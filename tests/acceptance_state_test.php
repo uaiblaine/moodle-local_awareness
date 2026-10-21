@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * "Has this user accepted this notice" is a question with an expiry date.
@@ -35,9 +36,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper
  */
+#[CoversClass(\local_awareness\helper::class)]
 final class acceptance_state_test extends \advanced_testcase {
     /**
      * Create a notice whose last edit is far enough in the past to be out of the way.

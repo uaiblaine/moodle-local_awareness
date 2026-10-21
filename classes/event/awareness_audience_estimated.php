@@ -33,6 +33,7 @@ class awareness_audience_estimated extends \core\event\base {
     /**
      * Init.
      */
+    #[\Override]
     protected function init() {
         $this->data['objecttable'] = 'local_awareness_audience_jobs';
         $this->data['crud'] = 'c';
@@ -43,6 +44,7 @@ class awareness_audience_estimated extends \core\event\base {
      * Description.
      * @return string
      */
+    #[\Override]
     public function get_description() {
         $jobid = $this->other['jobid'] ?? '';
         return "The user with id '$this->userid' requested an audience estimate, stored as the " .
@@ -53,6 +55,7 @@ class awareness_audience_estimated extends \core\event\base {
      * Gets name.
      * @return \lang_string|string
      */
+    #[\Override]
     public static function get_name() {
         return get_string('event:estimateaudience', 'local_awareness');
     }
@@ -61,6 +64,7 @@ class awareness_audience_estimated extends \core\event\base {
      * Gets URL.
      * @return \moodle_url
      */
+    #[\Override]
     public function get_url() {
         return new \moodle_url('/local/awareness/managenotice.php');
     }

@@ -16,15 +16,16 @@
 
 namespace local_awareness\persistent;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * Tests for the hyperlink click history persistent.
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\persistent\linkhistory
  */
+#[CoversClass(\local_awareness\persistent\linkhistory::class)]
 final class linkhistory_test extends \advanced_testcase {
     /**
      * Seed a notice with one hyperlink and a number of recorded clicks by one user.

@@ -16,6 +16,8 @@
 
 namespace local_awareness\local;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * Guards the audience-criteria contract between the editor's JavaScript and the estimator.
  *
@@ -27,9 +29,8 @@ namespace local_awareness\local;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\audience\estimator
  */
+#[CoversClass(\local_awareness\audience\estimator::class)]
 final class criteria_contract_test extends \basic_testcase {
     /**
      * Absolute path to the plugin root.

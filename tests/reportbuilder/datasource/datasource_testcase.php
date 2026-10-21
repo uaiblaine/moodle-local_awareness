@@ -69,6 +69,7 @@ abstract class datasource_testcase extends core_reportbuilder_testcase {
      * @param array $filtervalues
      * @return array
      */
+    #[\Override]
     protected function get_custom_report_content(int $reportid, int $pagesize = 30, array $filtervalues = []): array {
         self::detach_memo_from_clock($reportid);
 

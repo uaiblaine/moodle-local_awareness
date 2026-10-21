@@ -16,6 +16,8 @@
 
 namespace local_awareness;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
+
 /**
  * Characterisation tests for the role rule inside filtervalues: they pin behaviour that follows
  * from the implementation rather than from a stated rule, so a refactor has to reproduce it.
@@ -36,13 +38,13 @@ namespace local_awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::check_filters
  */
+#[CoversMethod(\local_awareness\helper::class, 'check_filters')]
 final class role_filter_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

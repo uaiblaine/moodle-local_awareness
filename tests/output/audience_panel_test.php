@@ -16,6 +16,8 @@
 
 namespace local_awareness\output;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * The audience panel template documents, and renders, the context the panel exports.
  *
@@ -26,9 +28,8 @@ namespace local_awareness\output;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\output\audience_panel
  */
+#[CoversClass(\local_awareness\output\audience_panel::class)]
 final class audience_panel_test extends \advanced_testcase {
     /**
      * The template's example context, decoded.

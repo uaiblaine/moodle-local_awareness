@@ -16,16 +16,16 @@
 
 namespace local_awareness\persistent;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * Carousel slides: ordering, what each one shows, and the cleanup that takes their files with them.
- *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\persistent\slide
  */
+#[CoversClass(\local_awareness\persistent\slide::class)]
 final class slide_test extends \advanced_testcase {
     /**
      * A saved notice to hang slides on.

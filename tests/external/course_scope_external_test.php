@@ -18,6 +18,7 @@ namespace local_awareness\external;
 
 use core_external\external_api;
 use local_awareness\persistent\audience_job;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The five editor web services under a course scope: gated by the course they name, and answering inside it.
@@ -30,14 +31,13 @@ use local_awareness\persistent\audience_job;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\external\estimate_audience
- * @covers \local_awareness\external\get_estimate
- * @covers \local_awareness\external\search_courses
- * @covers \local_awareness\external\search_roles
- * @covers \local_awareness\external\check_collision
- * @covers \local_awareness\external\render_notice
  */
+#[CoversClass(\local_awareness\external\estimate_audience::class)]
+#[CoversClass(\local_awareness\external\get_estimate::class)]
+#[CoversClass(\local_awareness\external\search_courses::class)]
+#[CoversClass(\local_awareness\external\search_roles::class)]
+#[CoversClass(\local_awareness\external\check_collision::class)]
+#[CoversClass(\local_awareness\external\render_notice::class)]
 final class course_scope_external_test extends \advanced_testcase {
     /** @var \stdClass The author's course. */
     private \stdClass $mine;
@@ -51,6 +51,7 @@ final class course_scope_external_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

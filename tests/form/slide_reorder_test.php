@@ -20,6 +20,7 @@ use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Moving a slide: the press exchanges two rows and saves nothing, and the save after it stores the order shown.
@@ -31,14 +32,12 @@ use local_awareness\persistent\slide;
  * mock_submit(), and read the rendered rows back; the last one saves the rearranged rows through
  * the same path the page uses and checks what was stored.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\form\notice_form
- * @covers     \local_awareness\helper
  */
+#[CoversClass(\local_awareness\form\notice_form::class)]
+#[CoversClass(\local_awareness\helper::class)]
 final class slide_reorder_test extends \advanced_testcase {
     /**
      * A stored carousel with three slides: an image slide, a video slide and a caption-only slide.

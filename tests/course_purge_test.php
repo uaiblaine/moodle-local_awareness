@@ -17,6 +17,7 @@
 namespace local_awareness;
 
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * Deleting a course purges its notices, and nothing else, whoever is deleting and whatever the settings.
@@ -31,15 +32,15 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\local\hook_callbacks::before_course_deleted
- * @covers \local_awareness\helper::purge_course_notices
- * @covers \local_awareness\helper::purge_notice
  */
+#[CoversMethod(\local_awareness\local\hook_callbacks::class, 'before_course_deleted')]
+#[CoversMethod(\local_awareness\helper::class, 'purge_course_notices')]
+#[CoversMethod(\local_awareness\helper::class, 'purge_notice')]
 final class course_purge_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

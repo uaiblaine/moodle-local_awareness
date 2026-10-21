@@ -17,6 +17,7 @@
 namespace local_awareness;
 
 use local_awareness\local\author_scope;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * Tests for the one gate every author-side request passes through.
@@ -28,13 +29,13 @@ use local_awareness\local\author_scope;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::require_author
  */
+#[CoversMethod(\local_awareness\helper::class, 'require_author')]
 final class require_author_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

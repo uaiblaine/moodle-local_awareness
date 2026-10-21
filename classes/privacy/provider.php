@@ -43,6 +43,7 @@ class provider implements
      * @param int $userid user ID.
      * @return \core_privacy\local\request\contextlist
      */
+    #[\Override]
     public static function get_contexts_for_userid(int $userid): contextlist {
         $contextlist = new contextlist();
 
@@ -83,6 +84,7 @@ class provider implements
      *
      * @param \core_privacy\local\request\approved_contextlist $contextlist Context list.
      */
+    #[\Override]
     public static function export_user_data(approved_contextlist $contextlist) {
         global $DB;
 
@@ -239,6 +241,7 @@ class provider implements
      *
      * @param \context $context Context.
      */
+    #[\Override]
     public static function delete_data_for_all_users_in_context(\context $context) {
         if ($context->contextlevel !== CONTEXT_USER) {
             return;
@@ -253,6 +256,7 @@ class provider implements
      *
      * @param \core_privacy\local\request\approved_contextlist $contextlist Context list.
      */
+    #[\Override]
     public static function delete_data_for_user(approved_contextlist $contextlist) {
         $userid = (int) $contextlist->get_user()->id;
 
@@ -273,6 +277,7 @@ class provider implements
      *
      * @param \core_privacy\local\request\userlist $userlist user list.
      */
+    #[\Override]
     public static function get_users_in_context(userlist $userlist) {
         $context = $userlist->get_context();
 
@@ -309,6 +314,7 @@ class provider implements
      *
      * @param \core_privacy\local\request\approved_userlist $userlist User list.
      */
+    #[\Override]
     public static function delete_data_for_users(approved_userlist $userlist) {
         $context = $userlist->get_context();
 
@@ -355,6 +361,7 @@ class provider implements
      * @param \core_privacy\local\metadata\collection $collection Collection.
      * @return \core_privacy\local\metadata\collection
      */
+    #[\Override]
     public static function get_metadata(collection $collection): collection {
         /*
          * Every column export_user_data() ships. It exports whole rows, so a column added to one of

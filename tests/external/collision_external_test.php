@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\external\check_collision;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The web service behind the editor's live collision warning.
@@ -25,13 +26,13 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\external\check_collision
  */
+#[CoversClass(\local_awareness\external\check_collision::class)]
 final class collision_external_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

@@ -228,6 +228,7 @@ class awareness extends persistent {
      *
      * @return array[]
      */
+    #[\Override]
     protected static function define_properties() {
         return [
             'courseid' => [
@@ -411,6 +412,7 @@ class awareness extends persistent {
      *
      * @param bool $result Result of update.
      */
+    #[\Override]
     protected function after_update($result) {
         if ($result) {
             self::purge_caches();
@@ -420,6 +422,7 @@ class awareness extends persistent {
     /**
      * Run after created.
      */
+    #[\Override]
     protected function after_create() {
         self::purge_caches();
     }
@@ -429,6 +432,7 @@ class awareness extends persistent {
      *
      * @param bool $result Result of delete.
      */
+    #[\Override]
     protected function after_delete($result) {
         if ($result) {
             self::purge_caches();

@@ -47,8 +47,6 @@ $PAGE->set_pagelayout('report');
 $PAGE->set_title(get_string('report:course', 'local_awareness'));
 $PAGE->set_heading(format_string($course->fullname, true, ['context' => $context]));
 $PAGE->set_secondary_active_tab('coursereports');
-// The Bootstrap 4 polyfill in styles.css is gated on the body class this adds.
-\local_awareness\local\bootstrap::mark_page();
 
 echo $OUTPUT->header();
 

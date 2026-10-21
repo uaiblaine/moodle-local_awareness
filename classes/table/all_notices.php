@@ -97,6 +97,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return string Fully qualified class name.
      */
+    #[\Override]
     public static function get_filterset_class(): string {
         return all_notices_filterset::class;
     }
@@ -110,6 +111,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return \context
      */
+    #[\Override]
     public function get_context(): \context {
         return $this->scope()->context();
     }
@@ -119,6 +121,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return bool
      */
+    #[\Override]
     public function has_capability(): bool {
         $scope = $this->scope();
 
@@ -130,6 +133,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return void
      */
+    #[\Override]
     public function guess_base_url(): void {
         $this->baseurl = $this->page_url('/local/awareness/managenotice.php');
     }
@@ -226,6 +230,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      * @param int $pagesize number of records to fetch
      * @param bool $useinitialsbar initial bar
      */
+    #[\Override]
     public function query_db($pagesize, $useinitialsbar = true): void {
         global $DB;
 
@@ -281,6 +286,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return void
      */
+    #[\Override]
     public function wrap_html_start() {
         global $OUTPUT;
 
@@ -299,6 +305,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
      *
      * @return void
      */
+    #[\Override]
     public function print_nothing_to_display(): void {
         global $OUTPUT;
 
@@ -549,9 +556,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
          * spellings, keyboard handling and ARIA, and it emits a .dropdown. Boost on 5.x has a
          * `.table-responsive .dropdown { position: static }` rule that lets that menu escape the
          * scroll container's overflow clip; a .btn-group wrapper is position: relative and would
-         * clip the last row's menu. Moodle 4.5's Boost has no such rule and wraps the table in
-         * .no-overflow instead; styles.css supplies the rule for that wrapper behind the Bootstrap 4
-         * gate.
+         * clip the last row's menu.
          */
         $menu = new \core\output\action_menu();
         $menu->set_kebab_trigger(get_string('actions'));

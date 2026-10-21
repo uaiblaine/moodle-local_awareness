@@ -18,17 +18,16 @@ namespace local_awareness;
 
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The video and the slides are rendered by the site's own machinery, not built by hand.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\helper
  */
+#[CoversClass(\local_awareness\helper::class)]
 final class render_media_test extends \advanced_testcase {
     /**
      * The multimedia filter on, at the system level, as a fresh site has it.

@@ -16,6 +16,9 @@
 
 namespace local_awareness\local;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+
 /**
  * The reasons a published notice can never actually be displayed.
  *
@@ -25,9 +28,8 @@ namespace local_awareness\local;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\local\editor_state
  */
+#[CoversClass(\local_awareness\local\editor_state::class)]
 final class editor_state_test extends \basic_testcase {
     /** A fixed instant to judge against; nothing here depends on the wall clock. */
     private const NOW = 1000000;
@@ -56,13 +58,13 @@ final class editor_state_test extends \basic_testcase {
     /**
      * The predicate must agree with window::is_open(), the display test, about every shape.
      *
-     * @dataProvider window_provider
      * @param int $enabled Whether the notice is published.
      * @param int $timestart Start of the window.
      * @param int $timeend End of the window.
      * @param array $expected The problems that shape carries.
      * @return void
      */
+    #[DataProvider('window_provider')]
     public function test_window_problems(int $enabled, int $timestart, int $timeend, array $expected): void {
         $this->assertSame(
             $expected,

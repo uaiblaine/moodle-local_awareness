@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticeview;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * The caches are consulted, including when what they hold is nothing.
@@ -31,14 +32,14 @@ use local_awareness\persistent\noticeview;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\persistent\awareness::get_enabled_notices
- * @covers \local_awareness\persistent\noticeview::get_user_viewed_notice_records
  */
+#[CoversMethod(\local_awareness\persistent\awareness::class, 'get_enabled_notices')]
+#[CoversMethod(\local_awareness\persistent\noticeview::class, 'get_user_viewed_notice_records')]
 final class cache_reuse_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

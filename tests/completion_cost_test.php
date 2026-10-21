@@ -17,6 +17,7 @@
 namespace local_awareness;
 
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * What the course-completion rule costs on the page-generation path.
@@ -28,13 +29,13 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::has_candidate_notices
  */
+#[CoversMethod(\local_awareness\helper::class, 'has_candidate_notices')]
 final class completion_cost_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);

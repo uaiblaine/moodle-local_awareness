@@ -22,6 +22,8 @@ use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use local_awareness\persistent\noticeview;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Tests for the privacy provider's request and userlist implementations.
@@ -36,9 +38,8 @@ use local_awareness\persistent\noticeview;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\privacy\provider
  */
+#[CoversClass(\local_awareness\privacy\provider::class)]
 final class provider_test extends \advanced_testcase {
     /**
      * Start every test with an empty writer.
@@ -49,6 +50,7 @@ final class provider_test extends \advanced_testcase {
      *
      * @return void
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         writer::reset();
@@ -155,9 +157,9 @@ final class provider_test extends \advanced_testcase {
     /**
      * A row in any single user-linked table is enough to put the user's context in the list.
      *
-     * @dataProvider table_provider
      * @param string $table The table seeded on its own.
      */
+    #[DataProvider('table_provider')]
     public function test_get_contexts_for_userid_sees_every_table(string $table): void {
         $this->resetAfterTest();
 
@@ -184,9 +186,9 @@ final class provider_test extends \advanced_testcase {
     /**
      * The userlist path reaches every table too — it is what makes delete_data_for_users run.
      *
-     * @dataProvider table_provider
      * @param string $table The table seeded on its own.
      */
+    #[DataProvider('table_provider')]
     public function test_get_users_in_context_sees_every_table(string $table): void {
         $this->resetAfterTest();
 

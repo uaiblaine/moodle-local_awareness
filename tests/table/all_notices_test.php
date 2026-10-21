@@ -22,6 +22,7 @@ use core_table\local\filter\string_filter;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Filtering and paging the notice list.
@@ -29,14 +30,14 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\table\all_notices
- * @covers \local_awareness\table\all_notices_filterset
  */
+#[CoversClass(\local_awareness\table\all_notices::class)]
+#[CoversClass(\local_awareness\table\all_notices_filterset::class)]
 final class all_notices_test extends \advanced_testcase {
     /**
      * Initial set up.
      */
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -360,8 +361,6 @@ final class all_notices_test extends \advanced_testcase {
      * Same shape as the cohort line below: the names every row on the page needs are read in one
      * statement. A group deleted since the notice was saved keeps its place as an id, so the row
      * still says something is named; the "Named" notice, whose group is real, is the control.
-     *
-     * @covers \local_awareness\table\all_notices::group_line
      */
     public function test_the_group_line_names_the_groups_and_reads_them_once(): void {
         global $DB;
@@ -420,8 +419,6 @@ final class all_notices_test extends \advanced_testcase {
      * {cohort} joined to {context} and a capability walk, so resolving it per cohort id per row
      * would scale the page with the size of the site. The list is a dynamic table, so every filter
      * change renders it again.
-     *
-     * @covers \local_awareness\table\all_notices::cohort_line
      */
     public function test_cohort_names_are_resolved_once_per_page_of_rows(): void {
         global $DB;
@@ -475,8 +472,6 @@ final class all_notices_test extends \advanced_testcase {
      * notice_audience::state_of() runs audience_job::find_in_flight() for every notice whose stored
      * hash is missing or stale, unless it is handed the in-flight hashes query_db() reads once for
      * the page.
-     *
-     * @covers \local_awareness\table\all_notices::col_audience
      */
     public function test_the_audience_column_resolves_in_flight_jobs_once_per_page(): void {
         global $DB;

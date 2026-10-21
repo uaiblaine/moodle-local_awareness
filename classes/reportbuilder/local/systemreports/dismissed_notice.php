@@ -47,6 +47,7 @@ class dismissed_notice extends system_report {
     /**
      * Initialise report.
      */
+    #[\Override]
     protected function initialise(): void {
         global $DB;
 
@@ -122,6 +123,7 @@ class dismissed_notice extends system_report {
      *
      * @return bool
      */
+    #[\Override]
     protected function can_view(): bool {
         // From the report's own noticeid, never its context, and within the group reach; see acknowledged_notice::can_view().
         $notice = awareness::get_record(['id' => $this->get_parameter('noticeid', 0, PARAM_INT)]);

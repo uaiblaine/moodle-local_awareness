@@ -24,6 +24,7 @@ require_once(__DIR__ . '/datasource_testcase.php');
 
 use core_reportbuilder_generator;
 use local_awareness\reportbuilder\datasource\link_history;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for the link_history datasource.
@@ -31,9 +32,8 @@ use local_awareness\reportbuilder\datasource\link_history;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\reportbuilder\datasource\link_history
  */
+#[CoversClass(\local_awareness\reportbuilder\datasource\link_history::class)]
 final class link_history_test extends datasource_testcase {
     /**
      * Insert a notice, a hyperlink for it, and a click event.

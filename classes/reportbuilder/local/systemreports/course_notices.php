@@ -48,6 +48,7 @@ class course_notices extends system_report {
     /**
      * Initialise report.
      */
+    #[\Override]
     protected function initialise(): void {
         global $DB;
 
@@ -156,6 +157,7 @@ class course_notices extends system_report {
      *
      * @return bool
      */
+    #[\Override]
     protected function can_view(): bool {
         $courseid = $this->get_parameter('courseid', 0, PARAM_INT);
         if ($courseid <= SITEID) {

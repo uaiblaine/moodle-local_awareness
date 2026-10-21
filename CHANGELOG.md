@@ -6,6 +6,24 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Moodle 5.3 clean-up on `main` (version 2026100501)
+
+`main` runs on Moodle 5.3 only, so the code that existed for Moodle 4.5 is gone from it; the
+`MOODLE_405_STABLE` branch keeps it.
+
+- The Bootstrap 4 utility polyfill at the tail of `styles.css` (including the row-menu
+  `.no-overflow .dropdown` backport), the `local\bootstrap` class and the `mark_page()` call on
+  the five plugin pages are removed. `bootstrap_compat_test` keeps the arms that still guard
+  something: deprecated Bootstrap 4 class names, badge text colours, data-API pairing (new work is
+  backported to 4.5) and no `--mds-*` declarations.
+- Test metadata moved from docblocks to PHPUnit attributes (`#[CoversClass]`, `#[CoversMethod]`,
+  `#[CoversFunction]`, `#[CoversNothing]`, `#[DataProvider]`), which clears PHPUnit 11's
+  deprecations for docblock metadata.
+- `#[\Override]` on every method that overrides or implements a parent or interface method, so a
+  signature change in core fails at class load instead of leaving a silent new method. The
+  `execute*` methods of the web service classes carry none: `core_external\external_api`
+  declares none of them.
+
 ### One branch per Moodle version (version 2026100500)
 
 The plugin now has one branch per Moodle version, each supporting that version only, and each

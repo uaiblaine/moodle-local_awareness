@@ -17,21 +17,19 @@
 namespace local_awareness;
 
 use local_awareness\audience\estimator;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Tests for the audience estimator.
  *
- * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
- * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage. Move to the
- * attribute when 4.5 support is dropped.
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\audience\estimator
  */
+#[CoversClass(\local_awareness\audience\estimator::class)]
 final class audience_estimator_test extends \advanced_testcase {
+    #[\Override]
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest(true);
@@ -363,10 +361,10 @@ final class audience_estimator_test extends \advanced_testcase {
      * deleted would already have left the cohort (delete_user() removes every membership), so the
      * membership clause alone would satisfy the assertion and the state predicate would go untested.
      *
-     * @dataProvider excluded_user_state_provider
      * @param string $field The user field to flag.
      * @param int $value The value that should exclude them.
      */
+    #[DataProvider('excluded_user_state_provider')]
     public function test_estimate_excludes_users_by_state(string $field, int $value): void {
         global $DB;
 

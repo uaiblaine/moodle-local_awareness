@@ -19,6 +19,7 @@ namespace local_awareness\local;
 use local_awareness\external\check_collision;
 use local_awareness\form\notice_form;
 use local_awareness\output\editor_page;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The notice editor's modules agree with the page about its scope, and speak the author's language.
@@ -30,9 +31,8 @@ use local_awareness\output\editor_page;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\output\editor_page
  */
+#[CoversClass(\local_awareness\output\editor_page::class)]
 final class editor_js_contract_test extends \advanced_testcase {
     /** @var array The editor modules that send the scope with a web-service call. */
     private const SCOPED_MODULES = [
