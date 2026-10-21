@@ -16,6 +16,9 @@
 
 namespace local_awareness\local;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+
 /**
  * Tests the scheduling-window truth table and, above all, the relation between its projections.
  *
@@ -28,9 +31,8 @@ namespace local_awareness\local;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\local\window
  */
+#[CoversClass(\local_awareness\local\window::class)]
 final class window_test extends \basic_testcase {
     /** An arbitrary fixed instant, so nothing here depends on the wall clock. */
     private const NOW = 1800000000;
@@ -61,12 +63,12 @@ final class window_test extends \basic_testcase {
     /**
      * is_open() answers the truth table, half-open at the upper bound.
      *
-     * @dataProvider shape_provider
      * @param int $timestart Start of the window.
      * @param int $timeend End of the window.
      * @param bool $expected Whether the window is open at NOW.
      * @return void
      */
+    #[DataProvider('shape_provider')]
     public function test_is_open(int $timestart, int $timeend, bool $expected): void {
         $this->assertSame($expected, window::is_open($timestart, $timeend, self::NOW));
     }

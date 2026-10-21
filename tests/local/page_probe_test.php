@@ -17,6 +17,7 @@
 namespace local_awareness\local;
 
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the page probe's admission rules.
@@ -28,9 +29,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\local\page_probe
  */
+#[CoversClass(\local_awareness\local\page_probe::class)]
 final class page_probe_test extends \advanced_testcase {
     /**
      * Build a notice carrying only the fields the probe reads.

@@ -18,6 +18,7 @@ namespace local_awareness\form;
 
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The rendered picker has the shape the stylesheet reads.
@@ -27,13 +28,11 @@ use local_awareness\persistent\awareness;
  * a selector written as "input + label" matches nothing in that markup. This test renders the form
  * and asserts the shape; motion_contract_test asserts the stylesheet reads exactly that shape.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\form\notice_form
  */
+#[CoversClass(\local_awareness\form\notice_form::class)]
 final class picker_render_test extends \advanced_testcase {
     /**
      * The form for a new site notice, rendered as the administrator, as a queryable document.

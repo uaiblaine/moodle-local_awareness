@@ -17,17 +17,16 @@
 namespace local_awareness\local;
 
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Which groups an author may target, decided as core decides it.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\local\group_scope
  */
+#[CoversClass(\local_awareness\local\group_scope::class)]
 final class group_scope_test extends \advanced_testcase {
     /** @var \stdClass The course. */
     private \stdClass $course;

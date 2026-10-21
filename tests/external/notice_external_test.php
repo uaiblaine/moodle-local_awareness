@@ -25,6 +25,8 @@ use local_awareness\helper;
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * Tests for the notice-interaction external functions.
@@ -35,14 +37,13 @@ use local_awareness\persistent\noticelink;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\external\dismiss_notice
- * @covers \local_awareness\external\acknowledge_notice
- * @covers \local_awareness\external\track_link
- * @covers \local_awareness\external\get_notices
- * @covers \local_awareness\external\search_roles
- * @covers \local_awareness\helper::is_notice_available_to_user
  */
+#[CoversClass(\local_awareness\external\dismiss_notice::class)]
+#[CoversClass(\local_awareness\external\acknowledge_notice::class)]
+#[CoversClass(\local_awareness\external\track_link::class)]
+#[CoversClass(\local_awareness\external\get_notices::class)]
+#[CoversClass(\local_awareness\external\search_roles::class)]
+#[CoversMethod(\local_awareness\helper::class, 'is_notice_available_to_user')]
 final class notice_external_test extends \advanced_testcase {
     /**
      * Initial set up.

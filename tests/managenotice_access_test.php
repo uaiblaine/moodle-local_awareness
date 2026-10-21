@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use admin_externalpage;
 use local_awareness\local\author_scope;
+use PHPUnit\Framework\Attributes\CoversNothing;
 
 /**
  * Who Site administration lets into the notice list.
@@ -29,9 +30,8 @@ use local_awareness\local\author_scope;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @coversNothing
  */
+#[CoversNothing]
 final class managenotice_access_test extends \advanced_testcase {
     /**
      * A user holding one capability at the site, through a role of their own.

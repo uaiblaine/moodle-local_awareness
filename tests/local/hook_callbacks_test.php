@@ -17,6 +17,7 @@
 namespace local_awareness\local;
 
 use local_awareness\helper;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the footer-hook loading decision.
@@ -28,9 +29,8 @@ use local_awareness\helper;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\local\hook_callbacks
  */
+#[CoversClass(\local_awareness\local\hook_callbacks::class)]
 final class hook_callbacks_test extends \advanced_testcase {
     /**
      * Log a user in, enable the plugin, and seed one enabled notice reaching every page.

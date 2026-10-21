@@ -17,6 +17,7 @@
 namespace local_awareness\table;
 
 use core_table\local\filter\filter;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * How the notice list spells the admin-set names it shows.
@@ -29,9 +30,8 @@ use core_table\local\filter\filter;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\table\all_notices
  */
+#[CoversClass(\local_awareness\table\all_notices::class)]
 final class all_notices_rendering_test extends \advanced_testcase {
     /**
      * Initial set up.

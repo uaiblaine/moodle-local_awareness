@@ -20,18 +20,18 @@ use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The layout, position, animation, video link and slides: what the form offers, refuses and saves.
  *
- * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHPUnit attributes.
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\form\notice_form
- * @covers     \local_awareness\helper
  */
+#[CoversClass(\local_awareness\form\notice_form::class)]
+#[CoversClass(\local_awareness\helper::class)]
 final class layout_form_test extends \advanced_testcase {
     /**
      * A form for the given notice, or for a new one.
@@ -119,10 +119,10 @@ final class layout_form_test extends \advanced_testcase {
     /**
      * The combinations the picker cannot express are refused on the field the author can act on.
      *
-     * @dataProvider refused_combination_provider
      * @param array $data The submitted appearance fields.
      * @param string $element The element the message lands on.
      */
+    #[DataProvider('refused_combination_provider')]
     public function test_a_combination_the_layout_cannot_carry_is_refused(array $data, string $element): void {
         $this->resetAfterTest();
         $this->setAdminUser();

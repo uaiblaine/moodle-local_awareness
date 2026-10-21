@@ -25,6 +25,7 @@ use local_awareness\local\author_scope;
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
 use local_awareness\reportbuilder\local\systemreports\course_notices;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The course report: who may open it, and which rows it holds.
@@ -36,9 +37,8 @@ use local_awareness\reportbuilder\local\systemreports\course_notices;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\reportbuilder\local\systemreports\course_notices
  */
+#[CoversClass(\local_awareness\reportbuilder\local\systemreports\course_notices::class)]
 final class course_notices_test extends \advanced_testcase {
     /**
      * Build the report for a course id, as core's report web services build it.

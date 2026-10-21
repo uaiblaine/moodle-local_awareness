@@ -16,6 +16,8 @@
 
 namespace local_awareness\local;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * Every language string this plugin defines is either used or required by convention.
  *
@@ -31,9 +33,8 @@ namespace local_awareness\local;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper
  */
+#[CoversClass(\local_awareness\helper::class)]
 final class lang_usage_test extends \basic_testcase {
     /**
      * Plugin root.

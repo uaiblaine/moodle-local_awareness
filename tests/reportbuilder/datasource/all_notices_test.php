@@ -24,6 +24,7 @@ require_once(__DIR__ . '/datasource_testcase.php');
 
 use core_reportbuilder_generator;
 use local_awareness\reportbuilder\datasource\all_notices;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for the all_notices datasource.
@@ -31,9 +32,8 @@ use local_awareness\reportbuilder\datasource\all_notices;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\reportbuilder\datasource\all_notices
  */
+#[CoversClass(\local_awareness\reportbuilder\datasource\all_notices::class)]
 final class all_notices_test extends datasource_testcase {
     /**
      * Test default datasource.

@@ -17,6 +17,7 @@
 namespace local_awareness\persistent;
 
 use local_awareness\external\estimate_audience;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * The dedup predicates on audience_job::find_reusable(), one negative control each.
@@ -33,9 +34,8 @@ use local_awareness\external\estimate_audience;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\persistent\audience_job::find_reusable
  */
+#[CoversMethod(\local_awareness\persistent\audience_job::class, 'find_reusable')]
 final class audience_job_dedup_test extends \advanced_testcase {
     /**
      * Store one job row.

@@ -16,6 +16,8 @@
 
 namespace local_awareness\local;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * The stylesheet's own hygiene: every rule can match markup the plugin emits, stays on its pages,
  * and is not silently replaced by another rule.
@@ -23,13 +25,11 @@ namespace local_awareness\local;
  * stylelint checks syntax only, and a plugin's styles.css is compiled into every page of the site,
  * so a stray selector costs every page and a dead one costs every reader of the file.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\output\editor_page
  */
+#[CoversClass(\local_awareness\output\editor_page::class)]
 final class stylesheet_contract_test extends \basic_testcase {
     /** @var array The class-name prefixes the plugin owns; a class under one is the plugin's to emit. */
     private const NAMESPACES = ['la-', 'local-awareness-', 'competency-picker-'];

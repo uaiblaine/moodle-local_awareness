@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * A notice belongs to the scope it was written under, and every verb answers to that scope.
@@ -30,14 +31,13 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::create_new_notice
- * @covers \local_awareness\helper::update_notice
- * @covers \local_awareness\helper::delete_notice
- * @covers \local_awareness\helper::enable_notice
- * @covers \local_awareness\helper::disable_notice
- * @covers \local_awareness\helper::reset_notice
  */
+#[CoversMethod(\local_awareness\helper::class, 'create_new_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'update_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'delete_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'enable_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'disable_notice')]
+#[CoversMethod(\local_awareness\helper::class, 'reset_notice')]
 final class course_ownership_test extends \advanced_testcase {
     /** @var \stdClass The course the author writes for. */
     private \stdClass $mine;

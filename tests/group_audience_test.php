@@ -28,6 +28,7 @@ use local_awareness\reportbuilder\local\systemreports\acknowledged_notice;
 use local_awareness\reportbuilder\local\systemreports\dismissed_notice;
 use local_awareness\table\all_notices;
 use local_awareness\table\all_notices_filterset;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * A course notice aimed at groups: who receives it, and who may reach it.
@@ -39,18 +40,16 @@ use local_awareness\table\all_notices_filterset;
  * reports' can_view() — are each pinned here against the same notices, with an editing teacher as
  * the control that the capability opens all of them.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\helper
- * @covers     \local_awareness\table\all_notices
- * @covers     \local_awareness\audience\rule_describer
- * @covers     \local_awareness\external\render_notice
- * @covers     \local_awareness\reportbuilder\local\systemreports\acknowledged_notice
- * @covers     \local_awareness\reportbuilder\local\systemreports\dismissed_notice
  */
+#[CoversClass(\local_awareness\helper::class)]
+#[CoversClass(\local_awareness\table\all_notices::class)]
+#[CoversClass(\local_awareness\audience\rule_describer::class)]
+#[CoversClass(\local_awareness\external\render_notice::class)]
+#[CoversClass(\local_awareness\reportbuilder\local\systemreports\acknowledged_notice::class)]
+#[CoversClass(\local_awareness\reportbuilder\local\systemreports\dismissed_notice::class)]
 final class group_audience_test extends \advanced_testcase {
     /** @var \stdClass The course, in separate groups mode. */
     private \stdClass $course;

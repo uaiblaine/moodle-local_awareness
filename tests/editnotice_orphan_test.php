@@ -19,6 +19,7 @@ namespace local_awareness;
 use local_awareness\form\notice_form;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversNothing;
 
 /**
  * What editnotice.php does with a course notice whose course is gone.
@@ -28,14 +29,11 @@ use local_awareness\persistent\awareness;
  * read as that exception, and a confirmation box as the captured output. The course and its context
  * are deleted directly, bypassing the before_course_deleted purge, which is how an orphan arises.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @coversNothing
  */
+#[CoversNothing]
 final class editnotice_orphan_test extends \advanced_testcase {
     /**
      * A course notice, created as the administrator in its course's scope.

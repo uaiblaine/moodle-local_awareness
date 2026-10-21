@@ -541,14 +541,15 @@ Behat site fails every scenario on the same core locator and looks like your bug
 
 ## Testing notes
 
-- **Test metadata stays in docblocks (`@covers`, `@dataProvider`) on
-  `MOODLE_405_STABLE`.** moodle-cs on the 4.05 leg cannot see PHP attributes and
-  reports `moodle.PHPUnit.TestCaseCovers.Missing` for every method in a class
-  carrying only `#[CoversClass]` — 22 warnings from one converted file, on
-  exactly one of the four legs. The other branches still carry docblocks too,
-  so a fix merges unchanged into all four; moving `main` to attributes is a
-  change of its own. The resulting PHPUnit deprecations (~75) are expected and
-  do not fail the build.
+- **Test metadata is in attributes on `main` and in docblocks on the other
+  branches.** `main` uses `#[CoversClass]`, `#[CoversMethod]`, `#[CoversFunction]`,
+  `#[CoversNothing]` and `#[DataProvider]` (PHPUnit 11 has no method-level covers
+  attribute, so a method's target goes on the class), and runs with no PHPUnit
+  deprecations. moodle-cs on the 4.05 leg cannot see attributes and reports
+  `moodle.PHPUnit.TestCaseCovers.Missing` for every method of a class carrying
+  only `#[CoversClass]`, so `MOODLE_405_STABLE` keeps `@covers` and `@dataProvider`,
+  and 501 and 502 keep them too; a test backported from `main` is converted back,
+  and its `#[\Override]` lines dropped.
 - **Every "it did not happen" assertion needs a control** that proves the force
   which would have caused it was switched on. This repo has shipped vacuous
   tests: one created a deleted user who could never join the cohort, so the

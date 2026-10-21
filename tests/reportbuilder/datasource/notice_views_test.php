@@ -25,6 +25,7 @@ require_once(__DIR__ . '/datasource_testcase.php');
 use core_reportbuilder_generator;
 use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
 use local_awareness\reportbuilder\datasource\notice_views;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Unit tests for the notice_views datasource.
@@ -32,9 +33,8 @@ use local_awareness\reportbuilder\datasource\notice_views;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\reportbuilder\datasource\notice_views
  */
+#[CoversClass(\local_awareness\reportbuilder\datasource\notice_views::class)]
 final class notice_views_test extends datasource_testcase {
     /**
      * Insert a notice and return its ID.

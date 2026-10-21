@@ -18,19 +18,18 @@ namespace local_awareness\external;
 
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The two previews: the editor's, from the form's fields, and the manage list's, from a saved notice.
  *
- * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHPUnit attributes.
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\external\preview_notice
- * @covers     \local_awareness\external\render_notice
- * @covers     \local_awareness\local\notice_payload
  */
+#[CoversClass(\local_awareness\external\preview_notice::class)]
+#[CoversClass(\local_awareness\external\render_notice::class)]
+#[CoversClass(\local_awareness\local\notice_payload::class)]
 final class preview_external_test extends \advanced_testcase {
     /**
      * The multimedia filter on, as a fresh site has it.

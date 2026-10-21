@@ -16,6 +16,8 @@
 
 namespace local_awareness\external;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * Every registered web service resolves to a class that can actually serve it.
  *
@@ -30,17 +32,16 @@ namespace local_awareness\external;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\external\dismiss_notice
- * @covers \local_awareness\external\acknowledge_notice
- * @covers \local_awareness\external\track_link
- * @covers \local_awareness\external\get_notices
- * @covers \local_awareness\external\check_collision
- * @covers \local_awareness\external\search_roles
- * @covers \local_awareness\external\search_courses
- * @covers \local_awareness\external\estimate_audience
- * @covers \local_awareness\external\get_estimate
  */
+#[CoversClass(\local_awareness\external\dismiss_notice::class)]
+#[CoversClass(\local_awareness\external\acknowledge_notice::class)]
+#[CoversClass(\local_awareness\external\track_link::class)]
+#[CoversClass(\local_awareness\external\get_notices::class)]
+#[CoversClass(\local_awareness\external\check_collision::class)]
+#[CoversClass(\local_awareness\external\search_roles::class)]
+#[CoversClass(\local_awareness\external\search_courses::class)]
+#[CoversClass(\local_awareness\external\estimate_audience::class)]
+#[CoversClass(\local_awareness\external\get_estimate::class)]
 final class services_contract_test extends \basic_testcase {
     /**
      * The service definitions, read from db/services.php as core reads them.

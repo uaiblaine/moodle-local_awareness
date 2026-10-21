@@ -18,20 +18,16 @@ namespace local_awareness;
 
 use local_awareness\audience\live_mode;
 use local_awareness\output\audience_panel;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the interactive-estimate decision and what the editor does with it.
  *
- * Coverage stays in this docblock rather than in #[CoversClass]: the moodle-cs release used with
- * Moodle 4.5 cannot see PHPUnit attributes and reports every test as missing coverage. Move to the
- * attribute when 4.5 support is dropped.
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\audience\live_mode
  */
+#[CoversClass(\local_awareness\audience\live_mode::class)]
 final class audience_live_mode_test extends \advanced_testcase {
     protected function setUp(): void {
         parent::setUp();

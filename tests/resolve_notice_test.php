@@ -16,6 +16,8 @@
 
 namespace local_awareness;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
+
 /**
  * Tests for turning the id a request names into the notice it means.
  *
@@ -27,9 +29,8 @@ namespace local_awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::resolve_notice
  */
+#[CoversMethod(\local_awareness\helper::class, 'resolve_notice')]
 final class resolve_notice_test extends \advanced_testcase {
     /**
      * Initial set up.

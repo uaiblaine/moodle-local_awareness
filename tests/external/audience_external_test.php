@@ -21,6 +21,7 @@ use local_awareness\external\estimate_audience;
 use local_awareness\external\get_estimate;
 use local_awareness\persistent\audience_job;
 use local_awareness\task\estimate_audience as estimate_audience_task;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the audience-estimate external functions.
@@ -28,10 +29,9 @@ use local_awareness\task\estimate_audience as estimate_audience_task;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\external\estimate_audience
- * @covers \local_awareness\external\get_estimate
  */
+#[CoversClass(\local_awareness\external\estimate_audience::class)]
+#[CoversClass(\local_awareness\external\get_estimate::class)]
 final class audience_external_test extends \advanced_testcase {
     /**
      * Initial set up.

@@ -16,6 +16,8 @@
 
 namespace local_awareness\task;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * The retention task for link-click history, and the meaning of a click it must not change.
  *
@@ -28,9 +30,8 @@ namespace local_awareness\task;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\task\purge_link_history
  */
+#[CoversClass(\local_awareness\task\purge_link_history::class)]
 final class purge_link_history_test extends \advanced_testcase {
     /**
      * Store one click, stamped a given age.

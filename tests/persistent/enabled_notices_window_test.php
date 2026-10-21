@@ -17,6 +17,7 @@
 namespace local_awareness\persistent;
 
 use local_awareness\local\window;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * The cached prefilter query, measured against the display decision on a real database.
@@ -31,9 +32,8 @@ use local_awareness\local\window;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\persistent\awareness::get_enabled_notices
  */
+#[CoversMethod(\local_awareness\persistent\awareness::class, 'get_enabled_notices')]
 final class enabled_notices_window_test extends \advanced_testcase {
     /**
      * Every window shape, seeded and then read back through the real query.

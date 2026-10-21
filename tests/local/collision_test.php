@@ -17,6 +17,7 @@
 namespace local_awareness\local;
 
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Detecting repeating notices that compete for the same pages.
@@ -24,9 +25,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\local\collision
  */
+#[CoversClass(\local_awareness\local\collision::class)]
 final class collision_test extends \advanced_testcase {
     /**
      * Initial set up.

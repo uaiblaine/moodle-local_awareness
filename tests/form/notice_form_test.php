@@ -18,6 +18,7 @@ namespace local_awareness\form;
 
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the notice editing form.
@@ -25,9 +26,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\form\notice_form
  */
+#[CoversClass(\local_awareness\form\notice_form::class)]
 final class notice_form_test extends \advanced_testcase {
     /**
      * Create a notice carrying one file in its content file area.

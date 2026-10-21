@@ -16,6 +16,9 @@
 
 namespace local_awareness\local;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+
 /**
  * Guards the notice dialogue's accessibility contract and the claims its strings make.
  *
@@ -33,9 +36,8 @@ namespace local_awareness\local;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper
  */
+#[CoversClass(\local_awareness\helper::class)]
 final class modal_contract_test extends \basic_testcase {
     /**
      * Plugin root.
@@ -300,12 +302,12 @@ final class modal_contract_test extends \basic_testcase {
     /**
      * The acknowledgement strings describe acknowledgement, not session termination.
      *
-     * @dataProvider logout_claim_provider
      * @param string $lang The language directory under lang/.
      * @param array $forbidden Lowercased substrings that would claim a logout.
      * @param string $sample A sentence that does claim one, written independently of that list.
      * @return void
      */
+    #[DataProvider('logout_claim_provider')]
     public function test_acknowledgement_strings_do_not_promise_a_logout(
         string $lang,
         array $forbidden,

@@ -16,20 +16,19 @@
 
 namespace local_awareness\persistent;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * An acknowledgement row always carries the copies of the reader's name and idnumber.
  *
  * The compliance reports print these copies rather than joining {user}, so a row written without
  * them would list an acceptance nobody can be named for.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\persistent\acknowledgement
  */
+#[CoversClass(\local_awareness\persistent\acknowledgement::class)]
 final class acknowledgement_test extends \advanced_testcase {
     /**
      * A complete row, as helper::create_new_acknowledge_record() builds it.

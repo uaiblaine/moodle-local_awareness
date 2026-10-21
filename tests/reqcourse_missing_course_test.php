@@ -18,6 +18,7 @@ namespace local_awareness;
 
 use local_awareness\audience\estimator;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * A required course that no longer exists withholds its notice, on every path that reads the rule.
@@ -34,11 +35,10 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::retrieve_user_notices
- * @covers \local_awareness\helper::is_notice_available_to_user
- * @covers \local_awareness\audience\estimator::estimate
  */
+#[CoversMethod(\local_awareness\helper::class, 'retrieve_user_notices')]
+#[CoversMethod(\local_awareness\helper::class, 'is_notice_available_to_user')]
+#[CoversMethod(\local_awareness\audience\estimator::class, 'estimate')]
 final class reqcourse_missing_course_test extends \advanced_testcase {
     /** @var \stdClass The course that will be deleted. */
     private \stdClass $doomed;

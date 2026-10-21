@@ -18,6 +18,7 @@ namespace local_awareness\local;
 
 use local_awareness\helper;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The reader's dialogue tracks only the links the server registered.
@@ -31,9 +32,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper
  */
+#[CoversClass(\local_awareness\helper::class)]
 final class link_tracking_test extends \advanced_testcase {
     /**
      * Read one file from the plugin root.

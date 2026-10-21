@@ -17,6 +17,7 @@
 namespace local_awareness\local;
 
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The dialogue's motion and layout rules, pinned in the stylesheet and the JavaScript.
@@ -25,13 +26,11 @@ use local_awareness\persistent\awareness;
  * contract is scanned here. Every scan asserts it found something before it asserts anything
  * about what it found.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\persistent\awareness
  */
+#[CoversClass(awareness::class)]
 final class motion_contract_test extends \basic_testcase {
     /**
      * The plugin's stylesheet, comments stripped.

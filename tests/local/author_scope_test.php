@@ -18,6 +18,7 @@ namespace local_awareness\local;
 
 use local_awareness\audience\estimator;
 use local_awareness\helper;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the author scope: what a site-level and a course-level author may target.
@@ -29,10 +30,9 @@ use local_awareness\helper;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\local\author_scope
- * @covers \local_awareness\local\scope_result
  */
+#[CoversClass(\local_awareness\local\author_scope::class)]
+#[CoversClass(\local_awareness\local\scope_result::class)]
 final class author_scope_test extends \advanced_testcase {
     /**
      * Initial set up.

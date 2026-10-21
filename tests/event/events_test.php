@@ -21,6 +21,7 @@ use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests that each write path fires the event it claims to fire.
@@ -32,18 +33,17 @@ use local_awareness\persistent\noticelink;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\event\awareness_created
- * @covers \local_awareness\event\awareness_updated
- * @covers \local_awareness\event\awareness_enabled
- * @covers \local_awareness\event\awareness_disabled
- * @covers \local_awareness\event\awareness_reset
- * @covers \local_awareness\event\awareness_deleted
- * @covers \local_awareness\event\awareness_dismissed
- * @covers \local_awareness\event\awareness_link_clicked
- * @covers \local_awareness\event\awareness_audience_estimated
- * @covers \local_awareness\event\awareness_acknowledged
  */
+#[CoversClass(\local_awareness\event\awareness_created::class)]
+#[CoversClass(\local_awareness\event\awareness_updated::class)]
+#[CoversClass(\local_awareness\event\awareness_enabled::class)]
+#[CoversClass(\local_awareness\event\awareness_disabled::class)]
+#[CoversClass(\local_awareness\event\awareness_reset::class)]
+#[CoversClass(\local_awareness\event\awareness_deleted::class)]
+#[CoversClass(\local_awareness\event\awareness_dismissed::class)]
+#[CoversClass(\local_awareness\event\awareness_link_clicked::class)]
+#[CoversClass(\local_awareness\event\awareness_audience_estimated::class)]
+#[CoversClass(\local_awareness\event\awareness_acknowledged::class)]
 final class events_test extends \advanced_testcase {
     /**
      * Create one notice through the helper, discarding the events that creation itself fires.

@@ -22,6 +22,8 @@ use local_awareness\external\get_estimate;
 use local_awareness\external\search_courses;
 use local_awareness\external\search_roles;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversMethod;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Tests that every author entry point refuses a user without local/awareness:manage.
@@ -38,9 +40,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::require_author
  */
+#[CoversMethod(\local_awareness\helper::class, 'require_author')]
 final class helper_capability_test extends \advanced_testcase {
     /**
      * Seed one notice, as admin, outside the code path under test.
@@ -136,9 +137,9 @@ final class helper_capability_test extends \advanced_testcase {
     /**
      * A user without the capability is refused by every write entry point.
      *
-     * @dataProvider write_entry_point_provider
      * @param callable $write The write to attempt.
      */
+    #[DataProvider('write_entry_point_provider')]
     public function test_write_entry_points_reject_a_user_without_the_capability(callable $write): void {
         $this->resetAfterTest();
 
@@ -159,9 +160,9 @@ final class helper_capability_test extends \advanced_testcase {
      * capability is what the gate reads — a site admin passes every has_capability() check there
      * is and would prove nothing about which one is enforced.
      *
-     * @dataProvider write_entry_point_provider
      * @param callable $write The write to attempt.
      */
+    #[DataProvider('write_entry_point_provider')]
     public function test_write_entry_points_accept_a_capability_holder(callable $write): void {
         $this->resetAfterTest();
 

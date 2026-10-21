@@ -19,6 +19,7 @@ namespace local_awareness\table;
 use local_awareness\local\author_scope;
 use local_awareness\local\group_scope;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * The manage list's group-reach exclusion: where it applies, and what it costs.
@@ -31,9 +32,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\table\all_notices
  */
+#[CoversClass(\local_awareness\table\all_notices::class)]
 final class all_notices_group_reach_test extends \advanced_testcase {
     /**
      * Initial set up.

@@ -16,19 +16,17 @@
 
 namespace local_awareness\db;
 
+use PHPUnit\Framework\Attributes\CoversFunction;
+
 /**
  * The switch from date-numbered versions to per-Moodle-version numbering, and the rule that keeps
  * savepoints at or below version.php.
  *
- * Coverage stays in the docblock while a branch of this plugin supports Moodle 4.5: moodle-cs on
- * the 4.5 leg cannot see attributes and warns on every method.
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers ::xmldb_local_awareness_upgrade
  */
+#[CoversFunction('xmldb_local_awareness_upgrade')]
 final class upgrade_test extends \advanced_testcase {
     /**
      * A site that ran the date-numbered steps and set its version just below this branch's

@@ -16,6 +16,8 @@
 
 namespace local_awareness;
 
+use PHPUnit\Framework\Attributes\CoversMethod;
+
 /**
  * A page names a notice; the resolver answers only for the notices the caller may act on.
  *
@@ -27,9 +29,8 @@ namespace local_awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper::resolve_notice_as_author
  */
+#[CoversMethod(\local_awareness\helper::class, 'resolve_notice_as_author')]
 final class resolve_notice_as_author_test extends \advanced_testcase {
     /**
      * Initial set up.

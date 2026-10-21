@@ -22,6 +22,8 @@ use local_awareness\helper;
 use local_awareness\persistent\awareness;
 use local_awareness\reportbuilder\local\systemreports\acknowledged_notice;
 use local_awareness\reportbuilder\local\systemreports\dismissed_notice;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Tests the capability gate on both system reports.
@@ -33,10 +35,9 @@ use local_awareness\reportbuilder\local\systemreports\dismissed_notice;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\reportbuilder\local\systemreports\acknowledged_notice
- * @covers \local_awareness\reportbuilder\local\systemreports\dismissed_notice
  */
+#[CoversClass(\local_awareness\reportbuilder\local\systemreports\acknowledged_notice::class)]
+#[CoversClass(\local_awareness\reportbuilder\local\systemreports\dismissed_notice::class)]
 final class systemreports_test extends \advanced_testcase {
     /**
      * The two system reports, by class name.
@@ -95,9 +96,9 @@ final class systemreports_test extends \advanced_testcase {
      * Holding manage is the realistic case, the person who publishes notices: a can_view() that
      * checked manage instead of viewreports would still refuse a plain user.
      *
-     * @dataProvider report_provider
      * @param string $class The system report class.
      */
+    #[DataProvider('report_provider')]
     public function test_manage_alone_does_not_grant_the_report(string $class): void {
         $this->resetAfterTest();
 
@@ -125,9 +126,9 @@ final class systemreports_test extends \advanced_testcase {
     /**
      * A user with no capabilities at all cannot view either report.
      *
-     * @dataProvider report_provider
      * @param string $class The system report class.
      */
+    #[DataProvider('report_provider')]
     public function test_a_plain_user_cannot_view_the_report(string $class): void {
         $this->resetAfterTest();
 
@@ -143,9 +144,9 @@ final class systemreports_test extends \advanced_testcase {
      *
      * The control for both refusals: same user, same report, one capability added.
      *
-     * @dataProvider report_provider
      * @param string $class The system report class.
      */
+    #[DataProvider('report_provider')]
     public function test_viewreports_alone_grants_the_report(string $class): void {
         $this->resetAfterTest();
 
@@ -174,9 +175,9 @@ final class systemreports_test extends \advanced_testcase {
      * parameters, and both notices resolve to the same report persistent. Without the
      * reset_caches() between the two builds the second create() returns the first instance.
      *
-     * @dataProvider report_provider
      * @param string $class The system report class.
      */
+    #[DataProvider('report_provider')]
     public function test_the_download_name_identifies_the_notice(string $class): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -209,9 +210,9 @@ final class systemreports_test extends \advanced_testcase {
      * becomes "A &amp; B" and clean_filename() then strips the ampersand, leaving the literal word
      * "amp;" in the name of a compliance export.
      *
-     * @dataProvider report_provider
      * @param string $class The system report class.
      */
+    #[DataProvider('report_provider')]
     public function test_an_ampersand_in_the_title_does_not_become_amp_in_the_filename(string $class): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -238,9 +239,9 @@ final class systemreports_test extends \advanced_testcase {
      * the site's, including a site notice requested through their own course's context
      * ({@see acknowledged_notice::can_view()} gives the reason).
      *
-     * @dataProvider report_provider
      * @param string $class The system report class.
      */
+    #[DataProvider('report_provider')]
     public function test_the_report_is_decided_in_the_notice_s_own_scope(string $class): void {
         $this->resetAfterTest();
 

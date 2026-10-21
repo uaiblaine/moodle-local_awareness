@@ -18,17 +18,16 @@ namespace local_awareness\external;
 
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * What the dialogue is told about a notice's layout, and what each layout ships with.
  *
- * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHPUnit attributes.
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\external\get_notices
  */
+#[CoversClass(\local_awareness\external\get_notices::class)]
 final class layout_payload_test extends \advanced_testcase {
     /**
      * The plugin switched on, and a reader logged in.

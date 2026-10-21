@@ -17,6 +17,7 @@
 namespace local_awareness;
 
 use local_awareness\external\search_courses;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the course-picker web service.
@@ -31,9 +32,8 @@ use local_awareness\external\search_courses;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\external\search_courses
  */
+#[CoversClass(\local_awareness\external\search_courses::class)]
 final class search_courses_external_test extends \advanced_testcase {
     /**
      * Log in an ordinary user holding local/awareness:manage.

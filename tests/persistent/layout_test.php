@@ -16,17 +16,17 @@
 
 namespace local_awareness\persistent;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+
 /**
  * The layout, position and animation a notice stores stay inside their vocabularies.
- *
- * Test metadata stays in docblocks while Moodle 4.5 is supported: its moodle-cs cannot see PHP
- * attributes and reports every method of a class carrying only #[CoversClass].
  *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_awareness\persistent\awareness
  */
+#[CoversClass(\local_awareness\persistent\awareness::class)]
 final class layout_test extends \advanced_testcase {
     /**
      * A persistent carrying the given appearance fields, otherwise valid.
@@ -84,10 +84,10 @@ final class layout_test extends \advanced_testcase {
      * Changes that must make it fail: removing any one property's `choices`, which fails exactly
      * one data set.
      *
-     * @dataProvider out_of_vocabulary_provider
      * @param string $property The property under test.
      * @param string $value A well-formed value the vocabulary does not contain.
      */
+    #[DataProvider('out_of_vocabulary_provider')]
     public function test_a_value_outside_the_vocabulary_is_refused(string $property, string $value): void {
         $notice = $this->notice([$property => $value]);
 

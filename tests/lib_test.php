@@ -17,6 +17,8 @@
 namespace local_awareness;
 
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversFunction;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -36,10 +38,9 @@ require_once($CFG->dirroot . '/local/awareness/lib.php');
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers ::local_awareness_pluginfile
- * @covers \local_awareness\helper::may_serve_files_of
  */
+#[CoversFunction('local_awareness_pluginfile')]
+#[CoversMethod(\local_awareness\helper::class, 'may_serve_files_of')]
 final class lib_test extends \advanced_testcase {
     /**
      * Create a notice and store one file in its content area.

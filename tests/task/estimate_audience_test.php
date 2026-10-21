@@ -22,6 +22,7 @@ use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\persistent\audience_job;
 use local_awareness\persistent\awareness;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * Tests for the estimate_audience ad-hoc task.
@@ -29,9 +30,8 @@ use local_awareness\persistent\awareness;
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\task\estimate_audience
  */
+#[CoversClass(\local_awareness\task\estimate_audience::class)]
 final class estimate_audience_test extends \advanced_testcase {
     /**
      * Initial set up.

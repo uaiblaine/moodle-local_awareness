@@ -20,6 +20,8 @@ use local_awareness\local\page_probe;
 use local_awareness\persistent\acknowledgement;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\noticelink;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversMethod;
 
 /**
  * Test cases
@@ -28,9 +30,9 @@ use local_awareness\persistent\noticelink;
  * @copyright  Catalyst IT
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @covers \local_awareness\helper
  */
+#[CoversClass(\local_awareness\helper::class)]
+#[CoversMethod(\local_awareness\persistent\noticelink::class, 'create_new_link')]
 final class helper_test extends \advanced_testcase {
     /**
      * Serve a notice to the current session through the real read path.
@@ -81,8 +83,6 @@ final class helper_test extends \advanced_testcase {
      * cohort_get_all_cohorts() returns only the cohorts visible to the caller, and a cohort can
      * simply be deleted, so the id stored on the notice may be absent from the options. An
      * unguarded array lookup would raise a TypeError and take the whole notice list down with it.
-     *
-     * @covers \local_awareness\helper::get_cohort_name
      */
     public function test_get_cohort_name_survives_a_missing_cohort(): void {
         $this->resetAfterTest();
@@ -104,8 +104,6 @@ final class helper_test extends \advanced_testcase {
      * update_hyperlinks() parses the content with DOMDocument to stamp each anchor with its link
      * id. Without LIBXML_HTML_NOIMPLIED|NODEFDTD, saveHTML() returns a complete document, so the
      * stored row would carry a doctype and <html>/<body> that then render nested inside the page.
-     *
-     * @covers \local_awareness\helper::create_new_notice
      */
     public function test_saved_content_is_a_fragment_not_a_document(): void {
         $this->resetAfterTest();
@@ -132,8 +130,6 @@ final class helper_test extends \advanced_testcase {
      *
      * Baking them into storage would freeze a multilang notice into the author's language for every
      * reader, and write absolute /pluginfile.php URLs that break when wwwroot changes.
-     *
-     * @covers \local_awareness\helper::render_content
      */
     public function test_file_urls_are_resolved_at_render_time_not_at_save_time(): void {
         $this->resetAfterTest();
@@ -326,8 +322,6 @@ final class helper_test extends \advanced_testcase {
      * helper::update_notice() refuses the write itself, whatever page calls it; editnotice.php's own
      * check only turns the refusal into a message. The control: an identical update with the setting
      * on has to land, or the refusal would prove nothing about the setting.
-     *
-     * @covers \local_awareness\helper::update_notice
      */
     public function test_update_notice_obeys_the_allow_update_setting(): void {
         $this->resetAfterTest();
@@ -366,8 +360,6 @@ final class helper_test extends \advanced_testcase {
      * without being offered still yields a population size — a membership oracle for any cohort on
      * the site. The visible cohort in the same call is the control: without it, a change that
      * dropped every cohort would pass this test.
-     *
-     * @covers \local_awareness\helper::allowed_cohorts
      */
     public function test_a_cohort_the_user_cannot_see_is_dropped_on_save(): void {
         $this->resetAfterTest();
@@ -410,9 +402,6 @@ final class helper_test extends \advanced_testcase {
      * path is where the id is checked. The real course saved first is the control — it proves the
      * refusal is about the id and not about course filters as such — and the row count proves the
      * refused save wrote nothing.
-     *
-     * @covers \local_awareness\helper::create_new_notice
-     * @covers \local_awareness\helper::update_notice
      */
     public function test_a_course_that_does_not_exist_is_refused_on_save(): void {
         global $DB;
@@ -469,8 +458,6 @@ final class helper_test extends \advanced_testcase {
      * The scope's existence lookups bind one placeholder per id, so the write path is bounded like
      * the estimate. The one-course save in the test above is the control that a list within the
      * bound is stored whole.
-     *
-     * @covers \local_awareness\helper::create_new_notice
      */
     public function test_an_oversized_list_is_bounded_on_save(): void {
         $this->resetAfterTest();
@@ -506,8 +493,6 @@ final class helper_test extends \advanced_testcase {
      *
      * The stored columns are asserted as well as the level, because get_insistence() short-circuits
      * on reqack: a level assertion alone cannot see outsideclick going astray at level 2.
-     *
-     * @covers \local_awareness\helper::create_new_notice
      */
     public function test_every_level_the_author_can_choose_survives_into_storage(): void {
         $this->resetAfterTest();
@@ -556,8 +541,6 @@ final class helper_test extends \advanced_testcase {
      * The fixture is Blocking because that is the level where a refusal writes a compliance row of
      * its own, asserted below: the two rows are what tell a refusal and an acceptance apart in the
      * report.
-     *
-     * @covers \local_awareness\helper::acknowledge_notice
      */
     public function test_a_refused_blocking_notice_can_still_be_acknowledged(): void {
         global $DB;
@@ -618,8 +601,6 @@ final class helper_test extends \advanced_testcase {
      *
      * The control for the test above. Without it, making must_reshow() return true unconditionally
      * would satisfy that test while re-showing every dismissed notice on the site for ever.
-     *
-     * @covers \local_awareness\helper::acknowledge_notice
      */
     public function test_a_plainly_dismissed_notice_is_not_acknowledged_again(): void {
         global $DB;
@@ -655,8 +636,6 @@ final class helper_test extends \advanced_testcase {
      *
      * The outsider is the control: without them, a change that stopped filtering by cohort at all
      * would satisfy the first assertion.
-     *
-     * @covers \local_awareness\helper::user_cohort_ids
      */
     public function test_a_notice_targeting_a_hidden_cohort_reaches_its_members(): void {
         $this->resetAfterTest();
@@ -698,8 +677,6 @@ final class helper_test extends \advanced_testcase {
      *
      * If link identity included the anchor text, a renamed label would mint a new id and retire the
      * old one, taking its click history with it.
-     *
-     * @covers \local_awareness\persistent\noticelink::create_new_link
      */
     public function test_renaming_a_link_keeps_its_identity_and_its_history(): void {
         global $DB;
@@ -740,8 +717,6 @@ final class helper_test extends \advanced_testcase {
      * The control for the test above: it proves the identity change did not simply stop retiring
      * links. Orphan history rows are invisible to every report, because each one inner-joins the
      * links table back.
-     *
-     * @covers \local_awareness\helper::update_notice
      */
     public function test_a_removed_link_leaves_no_orphan_history(): void {
         global $DB;
@@ -780,8 +755,6 @@ final class helper_test extends \advanced_testcase {
      * local_awareness_getnotices service, declared 'type' => 'read', so evaluating it through that
      * API would create competency state for users nobody had assessed, which core's reports then
      * list.
-     *
-     * @covers \local_awareness\helper::retrieve_user_notices
      */
     public function test_reading_a_competency_rule_creates_no_competency_state(): void {
         global $DB;
@@ -828,8 +801,6 @@ final class helper_test extends \advanced_testcase {
      * category themes; the rule resolves the course's own ({@see helper::current_theme_name()}).
      * Moodle 5.3 ships Boost alone, so the course's theme is a fixture found through
      * $CFG->themedir.
-     *
-     * @covers \local_awareness\helper::check_filters
      */
     public function test_the_theme_rule_matches_the_theme_the_page_actually_renders(): void {
         global $CFG, $PAGE;
@@ -867,8 +838,6 @@ final class helper_test extends \advanced_testcase {
      * Nothing in core removes a plugin's file areas when its row goes, and files left behind could
      * never be reached or cleared through the plugin, because the pluginfile gate resolves the
      * notice first and refuses one that is gone.
-     *
-     * @covers \local_awareness\helper::delete_notice
      */
     public function test_deleting_a_notice_deletes_its_files(): void {
         $this->resetAfterTest();

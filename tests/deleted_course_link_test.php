@@ -16,6 +16,8 @@
 
 namespace local_awareness;
 
+use PHPUnit\Framework\Attributes\CoversNothing;
+
 /**
  * What managenotice.php and editnotice.php do with a link naming a course that has been deleted.
  *
@@ -23,14 +25,11 @@ namespace local_awareness;
  * redirecterrordetected in a CLI process, so a redirect is read as that exception. A page that
  * still called get_course() on the missing id would end in a missing-record error instead.
  *
- * Test metadata stays in docblocks while 405 is supported (moodle-cs cannot see attributes there).
- *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- *
- * @coversNothing
  */
+#[CoversNothing]
 final class deleted_course_link_test extends \advanced_testcase {
     /**
      * Run one of the two pages as one request.
