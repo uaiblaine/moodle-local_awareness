@@ -277,10 +277,9 @@ Behat site fails every scenario on the same core locator and looks like your bug
   needs enrolment or `moodle/course:view` beside `managecourse`.
 
 - **The dialogue's layout, position and entrance are `la-*` classes with hand-written CSS, and
-  nothing in it may be a Bootstrap 5 utility.** `bootstrap::mark_page()` gates the BS4 polyfill on
-  a body class four plugin pages add; the dialogue is injected on every page by the hook, so the
-  gate can never reach it — `modal-fullscreen`, `rounded-3`, `sticky-bottom`, `visually-hidden`
-  are dead on 4.5 there with no repair path (`fw-bold` was the first casualty). Specificity is
+  nothing in it may be a Bootstrap 5 utility.** The dialogue is injected on every page by the hook,
+  and a backport of its markup lands on the 4.5 branch, where `modal-fullscreen`, `rounded-3`,
+  `sticky-bottom`, `visually-hidden` and `fw-bold` resolve to nothing on any page. Specificity is
   rarely the problem: `.awareness.la-x` (0,2,0) beats core's layout rules on `.modal-dialog`, and
   Bootstrap's `.modal.fade .modal-dialog` and `.modal.show .modal-dialog` (0,3,0) set only the
   transform and transition, which the plugin does not fight. What cannot be beaten is a utility,
@@ -526,13 +525,13 @@ Behat site fails every scenario on the same core locator and looks like your bug
   the first of the three `data-action="close"` buttons; a `trigger()` on the collection ran the
   close handler once per button.
 
-- **The Bootstrap 4 polyfill holds one behaviour backport as well as utilities.**
-  `body.local-awareness-bs4 .local-awareness-manage .no-overflow .dropdown { position: static }`
-  lets the list's row menu escape the scroll wrapper on 4.5, where `flexible_table` wraps a
-  responsive table in `.no-overflow`; 5.x uses `.table-responsive`, where Boost has the rule. It is
-  listed in `bootstrap_compat_test::backports()`, which exempts it from the utility-token checks,
-  and `test_the_row_menu_escapes_its_scroll_wrapper` reads core's wrapper class on the running
-  branch; a future backport goes in that list too.
+- **The Moodle 4.5 compatibility code exists only on `MOODLE_405_STABLE`** (and, dead, on 501 and
+  502): the Bootstrap 4 utility polyfill at the tail of `styles.css`, gated on
+  `body.local-awareness-bs4`, with its row-menu `.no-overflow .dropdown` backport; `local\bootstrap`
+  and its `mark_page()` call on the five plugin pages; and the `bootstrap_compat_test` arms that
+  hold them. `main` keeps what a backport still needs: both `data-toggle` spellings, a text colour
+  on every badge, no BS5-only utility in the dialogue. A change backported to 4.5 that adds a BS5
+  utility to a plugin page needs a polyfill rule there.
 
 - **A dev site that upgraded mid-change never registers a web service added afterwards.**
   `external_functions` is refreshed only when `$plugin->version` rises; a stack already at the bumped
@@ -610,8 +609,7 @@ Behat site fails every scenario on the same core locator and looks like your bug
   comments, so a key named only in a test or a comment is dead, and it exempts only `_help`,
   `cachedef_` and `messageprovider:` keys (every task fetches its `task_` string in `get_name()`).
   `bootstrap_compat_test::code_lines()` follows multi-line `{{! }}` and `/* */` comments, so
-  template docblock prose is never scanned as markup; the recipe for re-deriving its BS5-only list
-  is in the fleet file. `stylesheet_contract_test` fails on a `la-*`, `local-awareness-*` or
+  template docblock prose is never scanned as markup. `stylesheet_contract_test` fails on a `la-*`, `local-awareness-*` or
   `competency-picker-*` class the stylesheet styles and no shipped code emits, on a property set
   twice in one media context, on a form id selector not scoped to `.local-awareness-editor`, and
   on a `.la-pagehead` heading level the shell does not render: removing markup that emits a class

@@ -548,11 +548,11 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         /**
          * Show the dialogue, recording once how the theme draws its close cross.
          *
-         * The template carries the text glyph that 4.5's Bootstrap 4 .btn-close needs, as core's own
-         * 4.5 modal does; Bootstrap 5 draws the cross as a background image instead. This dialogue
-         * appears on pages without the plugin's body marker, so the computed style decides, and
-         * styles.css reads the answer from data-cross: it hides the glyph under an image, and
-         * the image layout trades the image for the glyph, which its hover can recolour.
+         * The template carries a text glyph for a theme whose .btn-close paints no image; Boost's
+         * Bootstrap 5 draws the cross as a background image instead. The dialogue appears under
+         * whatever theme the page uses, so the computed style decides, and styles.css reads the
+         * answer from data-cross: it hides the glyph under an image, and the image layout trades
+         * the image for the glyph, which its hover can recolour.
          *
          * Read after core's show(), which attaches the root synchronously, and only on the first
          * call: the queue dresses a reused dialogue before showing it, and the image layout's own

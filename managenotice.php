@@ -98,7 +98,6 @@ if (!in_array($filtervalues['validity'], all_notices_filterset::validity_values(
 $thispage = '/local/awareness/managenotice.php';
 $editnotice = '/local/awareness/editnotice.php';
 
-\local_awareness\local\bootstrap::mark_page();
 $PAGE->set_url(new moodle_url($thispage, $scopeparams));
 $PAGE->requires->js_call_amd('local_awareness/preview', 'init');
 // Core owns the paging links and the refresh of the table region; the plugin only feeds it filters.

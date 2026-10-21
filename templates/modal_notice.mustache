@@ -56,8 +56,10 @@
                 {{$header}}
                     <h5 id="{{uniqid}}-modal-title" class="modal-title" data-region="title">{{$title}}{{title}}{{/title}}</h5>
                     {{!
-                        The glyph is 4.5's cross; Bootstrap 5 paints its own. ModalNotice.show()
-                        records which the theme draws, and styles.css shows one of the two.
+                        The glyph is the cross of a theme whose .btn-close paints no image, and of
+                        the image layout, whose hover recolours it; Boost paints its own as an
+                        image. ModalNotice.show() records which the theme draws, and styles.css
+                        shows one of the two.
                     }}
                     <button id="awareness-closebtn" type="button" class="btn-close" data-action="close" aria-label="{{#cleanstr}}closebuttontitle{{/cleanstr}}">
                         <span aria-hidden="true" data-region="close-glyph">&times;</span>

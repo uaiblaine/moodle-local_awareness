@@ -67,7 +67,6 @@ if ($requested->is_site()) {
     $PAGE->set_title(get_string('notice:notice', 'local_awareness'));
     $PAGE->set_heading(format_string($course->fullname, true, ['context' => $requested->context()]));
 }
-\local_awareness\local\bootstrap::mark_page();
 $PAGE->navbar->add(get_string('notice:notice', 'local_awareness'));
 
 // Enforce sesskey on any state-changing action to prevent CSRF.

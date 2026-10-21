@@ -549,9 +549,7 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
          * spellings, keyboard handling and ARIA, and it emits a .dropdown. Boost on 5.x has a
          * `.table-responsive .dropdown { position: static }` rule that lets that menu escape the
          * scroll container's overflow clip; a .btn-group wrapper is position: relative and would
-         * clip the last row's menu. Moodle 4.5's Boost has no such rule and wraps the table in
-         * .no-overflow instead; styles.css supplies the rule for that wrapper behind the Bootstrap 4
-         * gate.
+         * clip the last row's menu.
          */
         $menu = new \core\output\action_menu();
         $menu->set_kebab_trigger(get_string('actions'));
