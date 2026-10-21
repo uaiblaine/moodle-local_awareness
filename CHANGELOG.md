@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project follows Semantic Versioning principles where possible.
 
-## [Unreleased]
+## [v5.3-r1] - 2026-10-21
 
 ### Moodle 5.3 clean-up on `main` (version 2026100501)
 
