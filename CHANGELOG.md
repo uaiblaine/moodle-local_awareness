@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project follows Semantic Versioning principles where possible.
 
-## [Unreleased]
+## [v5.1-r1] - 2026-10-21
 
 ### One branch per Moodle version (version 2025100600)
 
