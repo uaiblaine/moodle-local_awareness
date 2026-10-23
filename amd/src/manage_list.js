@@ -29,7 +29,7 @@ import {setFilters} from 'core_table/dynamic';
 import Pending from 'core/pending';
 
 const SELECTORS = {
-    root: '[data-region="la-manage"]',
+    root: '[data-region="local-awareness-manage"]',
     table: '[data-region="core_table/dynamic"]',
     filter: '[data-filter]',
     clear: '[data-action="clear-filters"]',

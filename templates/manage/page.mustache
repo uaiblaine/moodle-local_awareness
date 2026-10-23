@@ -57,7 +57,7 @@
         "tablehtml": "<table><tbody><tr><td>Example</td></tr></tbody></table>"
     }
 }}
-<div class="local-awareness-manage" data-region="la-manage">
+<div class="local-awareness-manage" data-region="local-awareness-manage">
 
     <div class="local-awareness-toolbar">
         <p class="local-awareness-lede">{{lede}}</p>
@@ -76,23 +76,23 @@
     <div class="card">
         <div class="card-body local-awareness-filterbar">
             <div class="local-awareness-filter local-awareness-filter--grow">
-                <label for="la-filter-name">{{filters.namelabel}}</label>
-                <input type="search" id="la-filter-name" class="form-control"
+                <label for="local-awareness-filter-name">{{filters.namelabel}}</label>
+                <input type="search" id="local-awareness-filter-name" class="form-control"
                        value="{{filters.namevalue}}"
                        placeholder="{{filters.nameplaceholder}}" autocomplete="off"
                        data-filter="name">
             </div>
             <div class="local-awareness-filter">
-                <label for="la-filter-status">{{filters.statuslabel}}</label>
-                <select id="la-filter-status" class="form-select" data-filter="status">
+                <label for="local-awareness-filter-status">{{filters.statuslabel}}</label>
+                <select id="local-awareness-filter-status" class="form-select" data-filter="status">
                     {{#filters.statusoptions}}
                         <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
                     {{/filters.statusoptions}}
                 </select>
             </div>
             <div class="local-awareness-filter">
-                <label for="la-filter-validity">{{filters.validitylabel}}</label>
-                <select id="la-filter-validity" class="form-select" data-filter="validity">
+                <label for="local-awareness-filter-validity">{{filters.validitylabel}}</label>
+                <select id="local-awareness-filter-validity" class="form-select" data-filter="validity">
                     {{#filters.validityoptions}}
                         <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
                     {{/filters.validityoptions}}

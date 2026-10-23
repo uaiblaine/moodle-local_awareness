@@ -574,8 +574,8 @@ class notice_form extends \core\form\persistent {
             '',
             \html_writer::span(
                 get_string('notice:position:covered', 'local_awareness'),
-                'la-zone-note',
-                ['data-region' => 'la-position-note', 'hidden' => 'hidden']
+                'local-awareness-zone-note',
+                ['data-region' => 'local-awareness-position-note', 'hidden' => 'hidden']
             )
         );
         $mform->addGroup($positions, 'positiongroup', get_string('notice:position', 'local_awareness'), '', false);

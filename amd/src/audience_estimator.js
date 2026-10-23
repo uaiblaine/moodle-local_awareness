@@ -239,7 +239,7 @@ define([
 
         var html = '';
         contextRules.forEach(function(rule) {
-            html += '<li class="la-chip" data-key="' + rule.key + '">'
+            html += '<li class="local-awareness-rulechip" data-key="' + rule.key + '">'
                 + escapeHtml(ruleLabel(rule.key, rule.display)) + '</li>';
         });
         state.slots.contextChips.innerHTML = html;
@@ -390,7 +390,7 @@ define([
                     var html = '';
                     arr.forEach(function(it) {
                         var label = ruleLabel(it.key, it.display);
-                        html += '<span class="la-chip la-chip--brand">'
+                        html += '<span class="local-awareness-rulechip local-awareness-rulechip--brand">'
                             + escapeHtml(label) + ' · ' + formatCount(parseInt(it.count, 10) || 0)
                             + '</span>';
                     });
@@ -613,7 +613,7 @@ define([
     return {
         init: function(config) {
             config = config || {};
-            var root = document.querySelector('[data-region="la-audience"]');
+            var root = document.querySelector('[data-region="local-awareness-audience"]');
             if (!root) {
                 return;
             }

@@ -200,7 +200,9 @@ final class slide_reorder_test extends \advanced_testcase {
      * @return string
      */
     private function heading(\DOMXPath $xpath, int $i): string {
-        $headings = $xpath->query('//*[@id="fitem_id_slide_no_' . $i . '"]//*[contains(@class, "la-slide-head-number")]');
+        $headings = $xpath->query(
+            '//*[@id="fitem_id_slide_no_' . $i . '"]//*[contains(@class, "local-awareness-slide-head-number")]'
+        );
         $this->assertSame(1, $headings->length, "row {$i} has no heading");
 
         return trim($headings->item(0)->textContent);

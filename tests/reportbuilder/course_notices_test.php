@@ -84,9 +84,10 @@ final class course_notices_test extends \advanced_testcase {
         $result = external_api::clean_returnvalue(retrieve::execute_returns(), $result);
         $this->assertSame(count($result['data']['rows']), (int) $result['data']['totalrowcount'], 'the pager counts other rows');
 
-        // Columns: full name, username, ID number, notice title, action, date.
+        // Columns: full name, the identity fields the viewer may see, notice title, action, date.
         $rows = array_map(
-            static fn(array $row): string => strip_tags($row['columns'][3]) . ': ' . $row['columns'][4],
+            static fn(array $row): string => strip_tags($row['columns'][count($row['columns']) - 3]) . ': '
+                . $row['columns'][count($row['columns']) - 2],
             $result['data']['rows']
         );
         sort($rows);

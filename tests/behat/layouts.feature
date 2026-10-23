@@ -23,9 +23,9 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     When I log in as "bilbo"
     And I am on site homepage
     Then I should see "get the app for reminders"
-    And ".awareness.la-tpl-card.la-pos-top-end" "css_element" should exist
+    And ".local-awareness-notice.local-awareness-tpl-card.local-awareness-pos-top-end" "css_element" should exist
     # A card is a compact layout, so the modal-lg class the template bakes in is taken off.
-    And ".awareness.modal-lg" "css_element" should not exist
+    And ".local-awareness-notice.modal-lg" "css_element" should not exist
     And I click on "awareness-closebtn-footer" "button"
     And I should see "You are logged in as Bilbo Baggins"
 
@@ -39,8 +39,8 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     Then I should see "watch the library"
     # The markup is the filter's; the vjs-paused class is stamped by video.js when it initialises,
     # which proves the loader already on the page picked up a player the page did not render.
-    And ".awareness.la-tpl-video .mediaplugin_videojs" "css_element" should exist
-    And ".awareness.la-tpl-video .video-js.vjs-paused" "css_element" should exist
+    And ".local-awareness-notice.local-awareness-tpl-video .mediaplugin_videojs" "css_element" should exist
+    And ".local-awareness-notice.local-awareness-tpl-video .video-js.vjs-paused" "css_element" should exist
 
   @javascript
   Scenario: An image notice is the picture alone, and its close is what records the visit
@@ -50,13 +50,13 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     When I log in as "bilbo"
     And I am on site homepage
     # The picture, named by the title; no footer, so the header's close is the only exit.
-    Then "//img[contains(@class, 'la-image')][@alt='Poster']" "xpath_element" should exist
-    And ".awareness.la-tpl-image" "css_element" should exist
+    Then "//img[contains(@class, 'local-awareness-image')][@alt='Poster']" "xpath_element" should exist
+    And ".local-awareness-notice.local-awareness-tpl-image" "css_element" should exist
     And "awareness-closebtn-footer" "button" should not be visible
     When I click on "awareness-closebtn" "button"
     Then I should see "You are logged in as Bilbo Baggins"
     And I reload the page
-    And ".awareness.la-tpl-image" "css_element" should not exist
+    And ".local-awareness-notice.local-awareness-tpl-image" "css_element" should not exist
 
   @javascript
   Scenario: A banner is a strip against the edge it was given
@@ -66,8 +66,8 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     When I log in as "bilbo"
     And I am on site homepage
     Then I should see "the library closes"
-    And ".awareness.la-tpl-banner.la-pos-bottom" "css_element" should exist
-    And ".awareness.modal-lg" "css_element" should not exist
+    And ".local-awareness-notice.local-awareness-tpl-banner.local-awareness-pos-bottom" "css_element" should exist
+    And ".local-awareness-notice.modal-lg" "css_element" should not exist
 
   @javascript
   Scenario: A carousel turns its slides one at a time
@@ -128,6 +128,6 @@ Feature: A notice arrives in the layout, the position and the entrance its autho
     And I click on "Card" "text"
     And I click on "Preview" "button"
     Then I should see "The library closes at six." in the "Scheduled maintenance" "dialogue"
-    And ".awareness.la-tpl-card" "css_element" should exist
+    And ".local-awareness-notice.local-awareness-tpl-card" "css_element" should exist
     When I press the escape key
     Then I should not see "The library closes at six."

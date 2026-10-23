@@ -97,7 +97,7 @@ define([], function() {
         LAYOUT_RADIOS: 'input[name="template"]',
         POSITION_RADIOS: 'input[name="position"]',
         POSITION_GROUP: '#fgroup_id_positiongroup',
-        POSITION_NOTE: '[data-region="la-position-note"]'
+        POSITION_NOTE: '[data-region="local-awareness-position-note"]'
     };
 
     /*
@@ -181,7 +181,7 @@ define([], function() {
 
         var group = document.querySelector(LAYOUT_SELECTORS.POSITION_GROUP);
         if (group) {
-            group.classList.toggle('la-zones-covered', covered);
+            group.classList.toggle('local-awareness-zones-covered', covered);
         }
         var note = document.querySelector(LAYOUT_SELECTORS.POSITION_NOTE);
         if (note) {
