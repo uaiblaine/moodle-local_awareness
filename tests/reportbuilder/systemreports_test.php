@@ -295,4 +295,95 @@ final class systemreports_test extends \advanced_testcase {
             'another course\'s notice, a site notice, and a site notice behind the course\'s context are all refused'
         );
     }
+
+    /**
+     * The snapshot identity columns and filters a report offers.
+     *
+     * @param \core_reportbuilder\system_report $report The report.
+     * @return array Two sorted lists of unique identifiers, keyed columns and filters.
+     */
+    private function identity_offered(\core_reportbuilder\system_report $report): array {
+        $identity = ['acknowledgement:username', 'acknowledgement:idnumber'];
+        $columns = array_values(array_intersect($identity, array_keys($report->get_columns())));
+        $filters = array_values(array_intersect($identity, array_keys($report->get_filters())));
+        sort($columns);
+        sort($filters);
+        $this->assertArrayHasKey('user:fullname', $report->get_columns(), 'the report lost its name column; the read is broken');
+
+        return ['columns' => $columns, 'filters' => $filters];
+    }
+
+    /**
+     * The username and idnumber copies are offered only when the site lists them as identity fields.
+     *
+     * The same viewer and report with showuseridentity at core's default (email) and then listing
+     * both fields: the second build is the control proving the viewer could see them.
+     *
+     * @param string $class The system report class.
+     * @dataProvider report_provider
+     */
+    public function test_identity_columns_follow_showuseridentity(string $class): void {
+        $this->resetAfterTest();
+        $notice = $this->seed_notice();
+
+        set_config('showuseridentity', 'email');
+        $this->assertSame(
+            ['columns' => [], 'filters' => []],
+            $this->identity_offered($this->make_report($class, $notice)),
+            'an identity field the site does not list is offered'
+        );
+
+        set_config('showuseridentity', 'email,username,idnumber');
+        \core_reportbuilder\manager::reset_caches();
+        $both = ['acknowledgement:idnumber', 'acknowledgement:username'];
+        $this->assertSame(
+            ['columns' => $both, 'filters' => $both],
+            $this->identity_offered($this->make_report($class, $notice)),
+            'the identity fields the site lists are not offered to an administrator'
+        );
+    }
+
+    /**
+     * Seeing them takes moodle/site:viewuseridentity in the notice's own scope.
+     *
+     * A course reports holder reads a course notice's report with the fields listed: without the
+     * capability nothing is offered; granted in that course only, both are, so the decision is
+     * taken in the course and not in the system context the report is built in.
+     *
+     * @param string $class The system report class.
+     * @dataProvider report_provider
+     */
+    public function test_identity_columns_need_viewuseridentity_in_the_notice_s_scope(string $class): void {
+        $this->resetAfterTest();
+        set_config('showuseridentity', 'email,username,idnumber');
+
+        $course = $this->getDataGenerator()->create_course();
+        $coursecontext = \context_course::instance($course->id);
+        $this->setAdminUser();
+        $notice = $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice(['courseid' => $course->id]);
+
+        $user = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:viewreportscourse', CAP_ALLOW, $roleid, $coursecontext->id, true);
+        role_assign($roleid, $user->id, $coursecontext->id);
+        $this->setUser($user);
+
+        $this->assertFalse(has_capability('moodle/site:viewuseridentity', $coursecontext));
+        $this->assertSame(
+            ['columns' => [], 'filters' => []],
+            $this->identity_offered($this->make_report($class, $notice)),
+            'identity fields are offered to a viewer who may not see them'
+        );
+
+        assign_capability('moodle/site:viewuseridentity', CAP_ALLOW, $roleid, $coursecontext->id, true);
+        accesslib_clear_all_caches_for_unit_testing();
+        \core_reportbuilder\manager::reset_caches();
+        $this->assertFalse(has_capability('moodle/site:viewuseridentity', \context_system::instance()));
+        $both = ['acknowledgement:idnumber', 'acknowledgement:username'];
+        $this->assertSame(
+            ['columns' => $both, 'filters' => $both],
+            $this->identity_offered($this->make_report($class, $notice)),
+            'the capability held in the notice\'s course is not read'
+        );
+    }
 }

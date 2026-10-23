@@ -38,37 +38,37 @@
         "helpbody": "Os filtros combinam por <b>interseção</b>."
     }
 }}
-<div class="local-awareness-editor" data-region="la-editor" data-courseid="{{courseid}}">
-    <div class="la-shell la-shell--single">
-        <main class="la-shell-main">
+<div class="local-awareness-editor" data-region="local-awareness-editor" data-courseid="{{courseid}}">
+    <div class="local-awareness-shell local-awareness-shell--single">
+        <main class="local-awareness-shell-main">
 
-            <div class="la-pagehead">
-                <div class="la-pagehead-title">
+            <div class="local-awareness-pagehead">
+                <div class="local-awareness-pagehead-title">
                     <h2>{{pagetitle}}</h2>
-                    <p class="la-pagehead-sub">{{subtitle}}</p>
+                    <p class="local-awareness-pagehead-sub">{{subtitle}}</p>
                 </div>
-                <div class="la-pagehead-meta">
-                    <span class="la-status-badge {{#statusislive}}la-status-badge--live{{/statusislive}}{{#statusisblocked}}la-status-badge--blocked{{/statusisblocked}}">
-                        <span class="la-status-badge-ping" aria-hidden="true"></span>
+                <div class="local-awareness-pagehead-meta">
+                    <span class="local-awareness-status-badge {{#statusislive}}local-awareness-status-badge--live{{/statusislive}}{{#statusisblocked}}local-awareness-status-badge--blocked{{/statusisblocked}}">
+                        <span class="local-awareness-status-badge-ping" aria-hidden="true"></span>
                         {{statuslabel}}
                     </span>
                     {{#savedlabel}}
-                        <span class="la-pagehead-autosaved" data-region="la-savestate"
+                        <span class="local-awareness-pagehead-autosaved" data-region="local-awareness-savestate"
                               data-label-unsaved="{{unsavedlabel}}">{{savedlabel}}</span>
                     {{/savedlabel}}
                 </div>
             </div>
 
             {{#requirements}}
-                <div class="la-req-banner" role="status">
+                <div class="local-awareness-req-banner" role="status">
                     <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
                     <span>{{requirements}}</span>
                 </div>
             {{/requirements}}
 
-            <div class="la-navhelp" role="note">
-                <h3 class="la-navhelp-title"><i class="fa fa-info-circle" aria-hidden="true"></i> {{helptitle}}</h3>
-                <div class="la-navhelp-body">{{{helpbody}}}</div>
+            <div class="local-awareness-navhelp" role="note">
+                <h3 class="local-awareness-navhelp-title"><i class="fa fa-info-circle" aria-hidden="true"></i> {{helptitle}}</h3>
+                <div class="local-awareness-navhelp-body">{{{helpbody}}}</div>
             </div>
 
             {{{formhtml}}}

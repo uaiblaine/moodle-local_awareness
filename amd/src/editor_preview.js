@@ -35,7 +35,7 @@ import Pending from 'core/pending';
 import {getString} from 'core/str';
 
 const SELECTORS = {
-    editor: '[data-region="la-editor"]',
+    editor: '[data-region="local-awareness-editor"]',
     /*
      * By its own data-action, not by the group's id. Inside core's sticky footer the group is
      * rendered from a different template and carries data-groupname rather than #fgroup_id_buttonar,
