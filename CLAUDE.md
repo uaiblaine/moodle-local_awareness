@@ -626,11 +626,22 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `marketplace_readiness_test::test_styles_are_namespaced` wants the component in every selector
   (the plugins directory's CSS rule); the dialogue's root is `.local-awareness-notice`, its
   `#awareness-*` ids are styled inside it, and the `--la-*` custom properties keep their names.
-- **The reports' username and idnumber columns are identity fields.** The three system reports
-  take them, column and filter, from `entities\acknowledgement::identity_columns()` in the notice's
-  scope context (`core_user\fields::get_identity_fields()`), so core's default `showuseridentity`
-  shows neither; `systemreports_test` and `course_notices_test` pin both directions. The
-  datasources offer them to report authors as core's user entity does.
+- **The three system reports show the site's identity fields through core's user entity.** The
+  `systemreports\identity_fields` trait adds a second `core_reportbuilder\local\entities\user`,
+  named `identity` (columns `identity:email`, `identity:profilefield_<shortname>`, ...), joined on
+  the row's `userid` with `deleted = 0`, and hands back its `get_identity_columns()` and
+  `get_identity_filters()` for the notice's scope context (the course for a course notice), so
+  `showuseridentity`, `viewuseridentity`, `hiddenuserfields` and `is_visible()` decide exactly as
+  in core's reports. A custom field is decided twice by core: `get_identity_fields()` asks
+  `is_visible()` in the notice's context, and `user_profile_fields` makes the column available only
+  where `is_visible(system)` holds for another user (`SUPPORT_USER` is negative, so a teachers-only
+  field asks `viewuseridentity` in `$COURSE`, the front page in a web service, and a private one
+  `viewalldetails` at the site); the plugin does not override it. The `user` entity still names a deleted user; the `identity` join reads
+  nothing of one, because `delete_user()` leaves the department and the old email (in the
+  username) on the row. The snapshot `acknowledgement:username` and `:idnumber` are not offered
+  there; the datasources keep them for report authors. `identity_fields_test` pins all three
+  reports both ways; `course_notices_test::rows()` reads the title and action from the row's end,
+  because the identity columns sit after the name.
 - **Removed API, and what replaced it in tests.** `awareness::get_all_notices()`,
   `window::open_sql()` and `linkhistory::count_clicked_links()` are gone: tests read notices with
   `awareness::get_records()`, and that two clicks are two rows is pinned by

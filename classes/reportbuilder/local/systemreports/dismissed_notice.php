@@ -44,6 +44,8 @@ use pix_icon;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class dismissed_notice extends system_report {
+    use identity_fields;
+
     /**
      * Initialise report.
      */
@@ -81,16 +83,30 @@ class dismissed_notice extends system_report {
          * would repeat on every row. The title needed for the download name is read directly below.
          */
 
-        // The username and idnumber copies are identity fields, offered as core offers them, in the
-        // notice's own scope: a course notice's report is read with the course's capabilities.
+        /*
+         * The users' identity fields as the site configures them, shown as core's own reports show
+         * them and decided in the notice's own scope: a course notice's report is read with the
+         * course's capabilities. The username and idnumber copied into each row are not offered,
+         * because the live fields replace them under that rule ({@see identity_fields}).
+         */
         $notice = awareness::get_record(['id' => $noticeid]);
         $scope = $notice ? author_scope::of($notice) : null;
-        $identity = acknowledgement::identity_columns(
+        [$identitycolumns, $identityfilters] = $this->join_identity(
+            "{$ackalias}.userid",
             $scope && $scope->exists() ? $scope->context() : context_system::instance()
         );
 
-        $this->add_columns_from_entities(array_merge(['user:fullname'], $identity, ['acknowledgement:timecreated']));
-        $this->add_filters_from_entities(array_merge(['user:fullname'], $identity, ['acknowledgement:timecreated']));
+        $this->add_column_from_entity('user:fullname');
+        foreach ($identitycolumns as $identitycolumn) {
+            $this->add_column($identitycolumn);
+        }
+        $this->add_column_from_entity('acknowledgement:timecreated');
+
+        $this->add_filter_from_entity('user:fullname');
+        foreach ($identityfilters as $identityfilter) {
+            $this->add_filter($identityfilter);
+        }
+        $this->add_filter_from_entity('acknowledgement:timecreated');
 
         $this->set_initial_sort_column('acknowledgement:timecreated', SORT_DESC);
         // The download name identifies the notice by id and title; see acknowledged_notice::initialise().
