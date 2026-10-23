@@ -603,16 +603,16 @@ final class notice_form_test extends \advanced_testcase {
         libxml_clear_errors();
         $xpath = new \DOMXPath($dom);
 
-        $panels = $xpath->query('//*[@data-region="la-audience"]');
+        $panels = $xpath->query('//*[@data-region="local-awareness-audience"]');
         $this->assertSame(1, $panels->length, 'the estimate panel is not in the form');
 
-        $inside = $xpath->query('//*[@id="id_header_audience"]//*[@data-region="la-audience"]');
+        $inside = $xpath->query('//*[@id="id_header_audience"]//*[@data-region="local-awareness-audience"]');
         $this->assertSame(1, $inside->length, 'the estimate is not inside the audience section');
 
         // Control: not inside the appearance section, where an order check alone would also pass.
         $this->assertSame(
             0,
-            $xpath->query('//*[@id="id_header_appearance"]//*[@data-region="la-audience"]')->length
+            $xpath->query('//*[@id="id_header_appearance"]//*[@data-region="local-awareness-audience"]')->length
         );
     }
 

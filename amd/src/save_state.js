@@ -37,8 +37,8 @@
  */
 
 const SELECTORS = {
-    editor: '[data-region="la-editor"]',
-    line: '[data-region="la-savestate"]',
+    editor: '[data-region="local-awareness-editor"]',
+    line: '[data-region="local-awareness-savestate"]',
     form: 'form.mform',
 };
 
@@ -64,7 +64,7 @@ export const init = () => {
 
     const markDirty = () => {
         line.textContent = unsaved;
-        line.classList.add('la-pagehead-autosaved--dirty');
+        line.classList.add('local-awareness-pagehead-autosaved--dirty');
     };
 
     /*
