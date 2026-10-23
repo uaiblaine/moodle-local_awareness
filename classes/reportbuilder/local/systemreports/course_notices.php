@@ -45,6 +45,8 @@ use pix_icon;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class course_notices extends system_report {
+    use identity_fields;
+
     /**
      * Initialise report.
      */
@@ -84,13 +86,25 @@ class course_notices extends system_report {
             "LEFT JOIN {" . awareness::TABLE . "} {$noticealias} ON {$noticealias}.id = {$ackalias}.noticeid"
         ));
 
-        // The username and idnumber copies are identity fields, offered as core offers them in the course.
+        // The users' identity fields as core shows them in the course; see acknowledged_notice::initialise().
         $context = context_course::instance($courseid, IGNORE_MISSING);
-        $identity = acknowledgement::identity_columns($context ?: \context_system::instance());
+        [$identitycolumns, $identityfilters] = $this->join_identity(
+            "{$ackalias}.userid",
+            $context ?: \context_system::instance()
+        );
         $rest = ['notice:title', 'acknowledgement:action', 'acknowledgement:timecreated'];
 
-        $this->add_columns_from_entities(array_merge(['user:fullname'], $identity, $rest));
-        $this->add_filters_from_entities(array_merge(['user:fullname'], $identity, $rest));
+        $this->add_column_from_entity('user:fullname');
+        foreach ($identitycolumns as $identitycolumn) {
+            $this->add_column($identitycolumn);
+        }
+        $this->add_columns_from_entities($rest);
+
+        $this->add_filter_from_entity('user:fullname');
+        foreach ($identityfilters as $identityfilter) {
+            $this->add_filter($identityfilter);
+        }
+        $this->add_filters_from_entities($rest);
 
         $this->set_initial_sort_column('acknowledgement:timecreated', SORT_DESC);
 

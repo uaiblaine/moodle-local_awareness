@@ -135,11 +135,18 @@ The links are offered to whoever may read that notice's reports, and open the re
 An informational notice records neither acceptances nor refusals, so it offers no report. Reports
 include filtering and downloadable exports.
 
-Each row names the user, and keeps the username and ID number the user had when the row was
-written. Those two are identity fields: the reports show them, and let them be filtered on, only
-when the site lists them in *Show user identity* (`showuseridentity`) and the viewer holds
-`moodle/site:viewuseridentity` in the notice's context (the course, for a course notice), as core's
-own reports do. With core's default (email only) neither column appears.
+Each row names the user and shows the user's identity fields as the site configures them in
+*Show user identity* (`showuseridentity`): email, ID number, username, department, institution,
+phone, address, city, country or custom profile fields, each as a column and a filter, under core's
+own rules, decided in the notice's context (the course, for a course notice). The viewer needs
+`moodle/site:viewuseridentity` there; a field listed in *Hide user fields* (`hiddenuserfields`) also
+needs `moodle/course:viewhiddenuserfields` in a course, or `moodle/user:viewhiddendetails` at the
+site; a custom profile field shows only where its visibility setting lets the viewer see it, which
+core's report builder checks at the site as well (a field visible to teachers needs
+`moodle/site:viewuseridentity` at the site, one visible to nobody `moodle/user:viewalldetails`). With
+core's default the reports show the email. The values are the user's current ones; a deleted user
+is still named but shows no identity data. The username and ID number copied into each row are kept
+for the privacy export and offered only to custom report authors.
 
 A course also lists **Notice acknowledgements and dismissals** on its Reports page: one row per
 acknowledgement or dismissal across all of the course's notices, with the notice as a column. It is
@@ -216,7 +223,8 @@ The plugin owns seven tables:
   setting on.
 - `local_awareness_ack`: one row per acknowledgement or dismissal: the user's id, and copies of
   their username, first name, last name and ID number and of the notice title as they were at the
-  time, the action and the time. These rows are the reports' records, kept as `_lastview` is.
+  time, the action and the time. These rows are the reports' records, kept as `_lastview` is; the
+  reports show the user's current identity fields beside them, not the copies.
 - `local_awareness_audience_jobs`: audience estimate jobs: the user who asked, the audience
   criteria, the count and its per-rule breakdown. Deleted after a day by the *Purge spent audience
   estimate jobs* task.
