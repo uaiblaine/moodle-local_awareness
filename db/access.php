@@ -41,9 +41,9 @@ $capabilities = [
         ],
     ],
     /*
-     * The reports name users, and show their username and idnumber where the site lists them as
-     * identity fields and the holder may see those, so the holder sees personal data about people
-     * other than themselves.
+     * The reports name users and show the identity fields the site lists in showuseridentity, as
+     * core shows them to the holder, so the holder sees personal data about people other than
+     * themselves.
      */
     'local/awareness:viewreports' => [
         'captype' => 'read',
