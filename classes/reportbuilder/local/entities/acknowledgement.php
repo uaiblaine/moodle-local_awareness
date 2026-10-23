@@ -60,6 +60,30 @@ class acknowledgement extends base {
     }
 
     /**
+     * The snapshot identity columns a viewer may see in a context, as unique column identifiers.
+     *
+     * Each row copies the user's username and idnumber when it is written, and both are identity
+     * fields: core shows one only when the site lists it in showuseridentity and the viewer holds
+     * moodle/site:viewuseridentity in the context ({@see \core_user\fields::get_identity_fields()}).
+     * The system reports offer these columns and their filters through here, so they keep to the
+     * same rule; a filter on a hidden column would still let its value be probed. Custom profile
+     * fields are left out, since the row copies none.
+     *
+     * @param \context $context The context the report is decided in.
+     * @return array Unique identifiers such as 'acknowledgement:username', in the column order.
+     */
+    public static function identity_columns(\context $context): array {
+        $identity = \core_user\fields::get_identity_fields($context, false);
+        $columns = [];
+        foreach (['username', 'idnumber'] as $field) {
+            if (in_array($field, $identity, true)) {
+                $columns[] = 'acknowledgement:' . $field;
+            }
+        }
+        return $columns;
+    }
+
+    /**
      * Initialise the entity.
      *
      * @return base

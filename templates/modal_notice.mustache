@@ -43,7 +43,7 @@
 }}
 
 <div class="modal moodle-has-zindex" data-region="modal-container" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="{{uniqid}}-modal-title">
-    <div class="modal-dialog awareness modal-lg {{$classes}}{{/classes}}" role="document" data-region="modal" tabindex="0">
+    <div class="modal-dialog local-awareness-notice modal-lg {{$classes}}{{/classes}}" role="document" data-region="modal" tabindex="0">
         {{!
             No rounded, no bg-* and no border-* utility on the content box, the header or the
             footer: Bootstrap generates those with !important, which the layouts' own chrome in
@@ -70,10 +70,10 @@
                 layout fills it, by modal_notice.js; the header stays where it is in every layout
                 because it holds the dialogue's name and its close button.
             }}
-            <div class="la-media" data-region="media" hidden>
-                <div class="la-media-band" data-region="band"></div>
-                <div class="la-media-video" data-region="video"></div>
-                <div class="la-media-carousel" data-region="carousel"></div>
+            <div class="local-awareness-media" data-region="media" hidden>
+                <div class="local-awareness-media-band" data-region="band"></div>
+                <div class="local-awareness-media-video" data-region="video"></div>
+                <div class="local-awareness-media-carousel" data-region="carousel"></div>
             </div>
             <div id="{{uniqid}}-modal-body" class="modal-body px-4 py-3" data-region="body">
                 {{$body}}

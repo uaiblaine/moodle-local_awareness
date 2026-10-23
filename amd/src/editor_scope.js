@@ -24,7 +24,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-const EDITOR = '[data-region="la-editor"]';
+const EDITOR = '[data-region="local-awareness-editor"]';
 
 /**
  * The course the editor writes for; 0 for the site.

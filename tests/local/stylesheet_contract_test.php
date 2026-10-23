@@ -32,7 +32,7 @@ namespace local_awareness\local;
  */
 final class stylesheet_contract_test extends \basic_testcase {
     /** @var array The class-name prefixes the plugin owns; a class under one is the plugin's to emit. */
-    private const NAMESPACES = ['la-', 'local-awareness-', 'competency-picker-'];
+    private const NAMESPACES = ['local-awareness-'];
 
     /**
      * Absolute path to the plugin root.
@@ -190,8 +190,8 @@ final class stylesheet_contract_test extends \basic_testcase {
      * Whether the shipped code can put a class on an element.
      *
      * Either the class is written out, or it is built at runtime from a prefix of it: a JS constant
-     * such as 'la-tpl-' or a Mustache attribute such as la-layout-option--{{template}}. The prefix
-     * has to name more than the plugin's namespace, or every la-* class would pass on 'la-'. Which
+     * such as 'local-awareness-tpl-' or a Mustache attribute such as local-awareness-layout-option--{{template}}. The prefix
+     * has to name more than the plugin's namespace, or every local-awareness-* class would pass on 'local-awareness-'. Which
      * values a built class can take is motion_contract_test's business.
      *
      * @param string $class A class name without its dot.
@@ -257,15 +257,24 @@ final class stylesheet_contract_test extends \basic_testcase {
      * @return void
      */
     public function test_the_emission_check_reads_built_classes_and_no_further(): void {
-        $this->assertTrue($this->emitted('la-chip--brand', 'class="la-chip la-chip--brand"'), 'a written class');
-        $this->assertTrue($this->emitted('la-tpl-banner', "TEMPLATE: 'la-tpl-',"), 'a class built in JS');
-        $this->assertTrue($this->emitted('la-layout-option--card', 'la-layout-option--{{template}}'), 'a class built in Mustache');
+        $this->assertTrue(
+            $this->emitted('local-awareness-rulechip--brand', 'class="local-awareness-rulechip local-awareness-rulechip--brand"'),
+            'a written class'
+        );
+        $this->assertTrue($this->emitted('local-awareness-tpl-banner', "TEMPLATE: 'local-awareness-tpl-',"), 'a class built in JS');
+        $this->assertTrue(
+            $this->emitted('local-awareness-layout-option--card', 'local-awareness-layout-option--{{template}}'),
+            'a class built in Mustache'
+        );
 
-        $this->assertFalse($this->emitted('la-chip--muted', 'class="la-chip la-chip--brand"'), 'a sibling modifier');
-        $this->assertFalse($this->emitted('la-spinner', "var prefix = 'la-';"), 'the namespace alone');
-        $this->assertFalse($this->emitted('la-btn--soft', 'class="la-btn--softer"'), 'a longer class');
         $this->assertFalse(
-            $this->emitted('la-btn--soft', $this->code_of("<?php\n// Uses la-btn--soft.\n", 'php')),
+            $this->emitted('local-awareness-rulechip--muted', 'class="local-awareness-rulechip local-awareness-rulechip--brand"'),
+            'a sibling modifier'
+        );
+        $this->assertFalse($this->emitted('local-awareness-spinner', "var prefix = 'local-awareness-';"), 'the namespace alone');
+        $this->assertFalse($this->emitted('local-awareness-btn--soft', 'class="local-awareness-btn--softer"'), 'a longer class');
+        $this->assertFalse(
+            $this->emitted('local-awareness-btn--soft', $this->code_of("<?php\n// Uses local-awareness-btn--soft.\n", 'php')),
             'a class named in a comment'
         );
     }
@@ -335,13 +344,17 @@ final class stylesheet_contract_test extends \basic_testcase {
     public function test_the_page_head_rule_styles_the_heading_the_shell_renders(): void {
         $this->assertSame(
             1,
-            preg_match('/<div class="la-pagehead-title">\s*<(h[1-6])\b/', $this->read('templates/editor/shell.mustache'), $heading),
+            preg_match(
+                '/<div class="local-awareness-pagehead-title">\s*<(h[1-6])\b/',
+                $this->read('templates/editor/shell.mustache'),
+                $heading
+            ),
             'the shell no longer opens its page head with a heading'
         );
 
         $styled = [];
         foreach ($this->selectors() as $selector) {
-            if (preg_match('/^\.la-pagehead (h[1-6])$/', $selector, $match)) {
+            if (preg_match('/^\.local-awareness-pagehead (h[1-6])$/', $selector, $match)) {
                 $styled[] = $match[1];
             }
         }
