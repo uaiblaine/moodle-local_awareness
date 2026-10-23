@@ -42,12 +42,12 @@
         ]
     }
 }}
-<span class="la-slide-head">
-    <span class="la-slide-head-number">{{heading}}</span>
-    <span class="la-slide-head-actions">
+<span class="local-awareness-slide-head">
+    <span class="local-awareness-slide-head-number">{{heading}}</span>
+    <span class="local-awareness-slide-head-actions">
         {{#actions}}
         <input type="submit" name="{{name}}" value="{{label}}" aria-label="{{arialabel}}"
-            class="la-slide-action{{#destructive}} la-slide-action--remove{{/destructive}}"
+            class="local-awareness-slide-action{{#destructive}} local-awareness-slide-action--remove{{/destructive}}"
             data-no-submit="1" data-skip-validation="1" onclick="skipClientValidation = true;"
             {{#disabled}}disabled="disabled"{{/disabled}} {{#focus}}autofocus="autofocus"{{/focus}}>
         {{/actions}}

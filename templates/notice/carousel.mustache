@@ -34,30 +34,30 @@
     {
         "total": 2,
         "slides": [
-            {"type": "image", "html": "<img src=\"lab.png\" alt=\"The lab\" class=\"la-slide-image\">", "caption": "The lab", "index": 0, "number": 1, "first": true},
+            {"type": "image", "html": "<img src=\"lab.png\" alt=\"The lab\" class=\"local-awareness-slide-image\">", "caption": "The lab", "index": 0, "number": 1, "first": true},
             {"type": "text", "html": "", "caption": "Just words", "index": 1, "number": 2, "first": false}
         ]
     }
 }}
-<div class="la-carousel" role="region" aria-roledescription="{{#cleanstr}}carousel:label, local_awareness{{/cleanstr}}" aria-label="{{#cleanstr}}carousel:label, local_awareness{{/cleanstr}}" data-region="carousel-root" data-total="{{total}}">
-    <div class="la-carousel-track" data-region="carousel-track">
+<div class="local-awareness-carousel" role="region" aria-roledescription="{{#cleanstr}}carousel:label, local_awareness{{/cleanstr}}" aria-label="{{#cleanstr}}carousel:label, local_awareness{{/cleanstr}}" data-region="carousel-root" data-total="{{total}}">
+    <div class="local-awareness-carousel-track" data-region="carousel-track">
         {{#slides}}
-            <div class="la-carousel-slide la-carousel-slide--{{type}}" role="group" aria-roledescription="{{#cleanstr}}carousel:slide, local_awareness{{/cleanstr}}" aria-label="{{#cleanstr}}carousel:slideof, local_awareness, { "index": "{{number}}", "total": "{{total}}" }{{/cleanstr}}" data-region="carousel-slide" data-index="{{index}}" {{^first}}hidden{{/first}}>
-                <div class="la-carousel-media">{{{html}}}</div>
-                {{#caption}}<p class="la-carousel-caption">{{caption}}</p>{{/caption}}
+            <div class="local-awareness-carousel-slide local-awareness-carousel-slide--{{type}}" role="group" aria-roledescription="{{#cleanstr}}carousel:slide, local_awareness{{/cleanstr}}" aria-label="{{#cleanstr}}carousel:slideof, local_awareness, { "index": "{{number}}", "total": "{{total}}" }{{/cleanstr}}" data-region="carousel-slide" data-index="{{index}}" {{^first}}hidden{{/first}}>
+                <div class="local-awareness-carousel-media">{{{html}}}</div>
+                {{#caption}}<p class="local-awareness-carousel-caption">{{caption}}</p>{{/caption}}
             </div>
         {{/slides}}
     </div>
-    <button type="button" class="la-carousel-arrow la-carousel-arrow--prev" id="awareness-carousel-prev" data-action="carousel-prev" aria-label="{{#cleanstr}}carousel:previous, local_awareness{{/cleanstr}}">
+    <button type="button" class="local-awareness-carousel-arrow local-awareness-carousel-arrow--prev" id="awareness-carousel-prev" data-action="carousel-prev" aria-label="{{#cleanstr}}carousel:previous, local_awareness{{/cleanstr}}">
         <span aria-hidden="true">&lsaquo;</span>
     </button>
-    <button type="button" class="la-carousel-arrow la-carousel-arrow--next" id="awareness-carousel-next" data-action="carousel-next" aria-label="{{#cleanstr}}carousel:next, local_awareness{{/cleanstr}}">
+    <button type="button" class="local-awareness-carousel-arrow local-awareness-carousel-arrow--next" id="awareness-carousel-next" data-action="carousel-next" aria-label="{{#cleanstr}}carousel:next, local_awareness{{/cleanstr}}">
         <span aria-hidden="true">&rsaquo;</span>
     </button>
-    <div class="la-carousel-dots" role="group" aria-label="{{#cleanstr}}carousel:choose, local_awareness{{/cleanstr}}" data-region="carousel-dots">
+    <div class="local-awareness-carousel-dots" role="group" aria-label="{{#cleanstr}}carousel:choose, local_awareness{{/cleanstr}}" data-region="carousel-dots">
         {{#slides}}
-            <button type="button" class="la-carousel-dot" data-action="carousel-goto" data-index="{{index}}" aria-label="{{#cleanstr}}carousel:goto, local_awareness, {{number}}{{/cleanstr}}" {{#first}}aria-current="true"{{/first}}></button>
+            <button type="button" class="local-awareness-carousel-dot" data-action="carousel-goto" data-index="{{index}}" aria-label="{{#cleanstr}}carousel:goto, local_awareness, {{number}}{{/cleanstr}}" {{#first}}aria-current="true"{{/first}}></button>
         {{/slides}}
     </div>
-    <p class="la-offscreen" aria-live="polite" data-region="carousel-status">{{#str}}carousel:slideof, local_awareness, { "index": "1", "total": "{{total}}" }{{/str}}</p>
+    <p class="local-awareness-offscreen" aria-live="polite" data-region="carousel-status">{{#str}}carousel:slideof, local_awareness, { "index": "1", "total": "{{total}}" }{{/str}}</p>
 </div>

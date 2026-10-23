@@ -18,8 +18,10 @@ is a local plugin with one branch per Moodle version (`main` is 5.3; 5.2, 5.1 an
   these two capabilities; anyone who can write a notice without one of them is a finding.
 - `local/awareness:viewreports` (system, `RISK_PERSONAL`, default `manager`) and
   `local/awareness:viewreportscourse` (course, `RISK_PERSONAL`, no archetype) open the
-  dismissed and acknowledged reports, which show username and idnumber. A course holder
-  reads only the reports of that course's notices.
+  dismissed, acknowledged and course reports, which show the users' identity fields under
+  core's rule (`showuseridentity`, `moodle/site:viewuseridentity`, `hiddenuserfields`, custom
+  field visibility) in the notice's context, through core's user entity, and none of a deleted
+  user. A course holder reads only the reports of that course's notices.
 - Every plugin capability is checked in one place, `helper::require_author()`: the site
   capability is evaluated in the scope's own context (so it inherits down), the course
   capability counts only under a course scope. A page, verb or web service that checks a

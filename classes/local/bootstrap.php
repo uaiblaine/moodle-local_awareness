@@ -59,7 +59,7 @@ class bootstrap {
      * Call this from every page the plugin owns (editnotice.php, managenotice.php and the two
      * report pages); bootstrap_compat_test checks every page that sets a URL. The notice dialogue
      * is not covered: notice.js shows it on arbitrary pages, whose body never carries this marker,
-     * so its template uses no Bootstrap 5 utility and is styled by the plugin's own .awareness rules.
+     * so its template uses no Bootstrap 5 utility and is styled by the plugin's own .local-awareness-notice rules.
      *
      * @return void
      */

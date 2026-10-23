@@ -25,8 +25,9 @@ This repository is currently maintained and evolved under the Awareness directio
 - Audience targeting by cohort, role (optionally scoped to a course or category),
   course category, course, course format, theme, competency rules and, for a course
   notice, the course's groups.
-- An audience estimate in the editor, computed asynchronously, showing the reach of the
-  rules as they are edited.
+- An audience estimate in the editor, showing the reach of the rules: refreshed as they are
+  edited on a site with at most "Interactive audience estimate limit" users, and computed in the
+  background on request (which needs cron) on a larger one.
 - Optional requirement to complete a selected course before the notice stops appearing.
 - URL path matching to scope notices to specific pages. Without a `%` the pattern must match the
   whole page address (path and query string); with a `%` anywhere, each `%` stands for any text and
@@ -43,7 +44,8 @@ This repository is currently maintained and evolved under the Awareness directio
 - Optional modal background image.
 - Optional modal dimensions (width and height).
 - Outside-click close behavior control.
-- Session-based optimization through cached user notice resolution.
+- Cached notice resolution: the enabled notices and each user's view records are held in
+  application caches, so a page asks the database only when something changed.
 
 ## Compatibility
 
@@ -95,6 +97,20 @@ notification preferences.
 - Setting: Clean up info related to the deleted notice
 - Effect: when deletion is allowed, removes related records such as hyperlinks, hyperlink history, acknowledgements, and last view records.
 
+### Link-click history lifetime
+- Setting: Keep link-click history for (`local_awareness/linkhistory_lifetime`)
+- Effect: how long each record of a reader following a link inside a notice is kept: for ever (the
+  default), or 30, 90, 180, 365 or 730 days, purged nightly by the *Purge old link-click history* task.
+
+### Interactive audience estimate limit
+- Setting: Interactive audience estimate limit (`local_awareness/audience_sync_limit`, default 1000)
+- Effect: on a site with at most this many users the editor's audience estimate is interactive;
+  above it the estimate runs in the background on request. 0 never estimates interactively.
+
+All settings are stored per plugin (`local_awareness/<name>`). The scheduled tasks are *Purge spent
+audience estimate jobs* (daily at 03:20) and *Purge old link-click history* (daily at 03:40); the
+*Estimate a notice audience* adhoc task runs a background estimate.
+
 ## Notice authoring
 
 When creating or editing a notice, you can configure:
@@ -118,6 +134,19 @@ From Manage notice, each notice from the Blocking level up provides access to:
 The links are offered to whoever may read that notice's reports, and open the reports directly.
 An informational notice records neither acceptances nor refusals, so it offers no report. Reports
 include filtering and downloadable exports.
+
+Each row names the user and shows the user's identity fields as the site configures them in
+*Show user identity* (`showuseridentity`): email, ID number, username, department, institution,
+phone, address, city, country or custom profile fields, each as a column and a filter, under core's
+own rules, decided in the notice's context (the course, for a course notice). The viewer needs
+`moodle/site:viewuseridentity` there; a field listed in *Hide user fields* (`hiddenuserfields`) also
+needs `moodle/course:viewhiddenuserfields` in a course, or `moodle/user:viewhiddendetails` at the
+site; a custom profile field shows only where its visibility setting lets the viewer see it, which
+core's report builder checks at the site as well (a field visible to teachers needs
+`moodle/site:viewuseridentity` at the site, one visible to nobody `moodle/user:viewalldetails`). With
+core's default the reports show the email. The values are the user's current ones; a deleted user
+is still named but shows no identity data. The username and ID number copied into each row are kept
+for the privacy export and offered only to custom report authors.
 
 A course also lists **Notice acknowledgements and dismissals** on its Reports page: one row per
 acknowledgement or dismissal across all of the course's notices, with the notice as a column. It is
@@ -174,8 +203,59 @@ deletes its notices; one left behind all the same (after a failed deletion, for 
 the site list, where a holder of `local/awareness:manage` can delete, disable or enable it but not
 edit it, because no page can show it any more.
 
+## Data stored
+
+The plugin owns seven tables:
+
+- `local_awareness`: the notices (title, content, schedule, audience rules, layout), with the id of
+  the user who last created or edited each (`usermodified`). A notice stays until a holder of
+  `local/awareness:manage` (or, for a course notice, `local/awareness:managecourse`) deletes it,
+  which needs *Allow notice deletion*, or until its course is deleted.
+- `local_awareness_slides`: the carousel slides of a notice (media and caption), with
+  `usermodified`. Removed with their notice.
+- `local_awareness_hlinks`: the links found in a notice's content (text and address). No personal
+  data. Removed when edited out of the notice, or with the notice when *Clean up info related to
+  the deleted notice* is on.
+- `local_awareness_hlinks_his`: one row per click on a notice link: the user, the link and the
+  time. Kept for *Keep link-click history for* (for ever by default), and removed with its link.
+- `local_awareness_lastview`: per user and notice, the last time the notice was shown and what
+  the user did (dismissed or acknowledged). Kept until the notice is deleted with the clean-up
+  setting on.
+- `local_awareness_ack`: one row per acknowledgement or dismissal: the user's id, and copies of
+  their username, first name, last name and ID number and of the notice title as they were at the
+  time, the action and the time. These rows are the reports' records, kept as `_lastview` is; the
+  reports show the user's current identity fields beside them, not the copies.
+- `local_awareness_audience_jobs`: audience estimate jobs: the user who asked, the audience
+  criteria, the count and its per-rule breakdown. Deleted after a day by the *Purge spent audience
+  estimate jobs* task.
+
+Notice content, background images and slide media are stored as files of the plugin in the system
+context, and go with their notice. Deleting a user account removes none of these rows; a data
+deletion request does.
+
+All of it is covered by the Privacy API. A data request exports, into the user's own context, the
+user's rows of `_lastview`, `_ack`, `_hlinks_his` and `_audience_jobs`, with dates and the notice
+title or link they refer to. A deletion request removes those rows and the user's cached view
+records. The author stamp in `local_awareness` and `_slides` is declared but neither exported nor
+erased, because blanking it would rewrite the record of who published a notice. The "Audience
+estimate finished" notification is kept by core's messaging, whose provider exports and deletes it.
+
+## Translations
+
+The English strings ship in the package. The Brazilian Portuguese translation is maintained in this
+repository (`lang/pt_br`) and reaches sites through [AMOS](https://lang.moodle.org/), as the plugins
+directory requires; it is left out of the release package.
+
 ## Contributing
 
 Issues and pull requests are welcome:
 
 https://github.com/uaiblaine/moodle-local_awareness/issues
+
+## License
+
+This plugin is licensed under the [GNU GPL v3 or later](http://www.gnu.org/copyleft/gpl.html)
+(`LICENSE`, `COPYING.txt`).
+
+Copyright: Catalyst IT and contributors (the original `local_sitenotice`), and 2026 Anderson
+Blaine.
