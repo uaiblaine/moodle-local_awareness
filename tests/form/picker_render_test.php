@@ -89,8 +89,16 @@ final class picker_render_test extends \advanced_testcase {
             $option = $this->next_element($radio);
             $this->assertNotNull($option, "{$template}: nothing follows the radio");
             $classes = preg_split('/\s+/', trim($option->getAttribute('class')));
-            $this->assertContains('la-layout-option', $classes, "{$template}: the option is not the radio's next sibling");
-            $this->assertContains('la-layout-option--' . $template, $classes, "{$template}: the option carries no layout class");
+            $this->assertContains(
+                'local-awareness-layout-option',
+                $classes,
+                "{$template}: the option is not the radio's next sibling"
+            );
+            $this->assertContains(
+                'local-awareness-layout-option--' . $template,
+                $classes,
+                "{$template}: the option carries no layout class"
+            );
         }
 
         // Exactly one is chosen from the start, so the mark the stylesheet draws has a radio to draw it on.
@@ -112,7 +120,8 @@ final class picker_render_test extends \advanced_testcase {
 
         foreach (awareness::TEMPLATES as $template) {
             $nodes = $xpath->query(
-                '//span[contains(@class, "la-layout-option--' . $template . '")]//span[@class="la-layout-desc"]'
+                '//span[contains(@class, "local-awareness-layout-option--' . $template . '")]'
+                    . '//span[@class="local-awareness-layout-desc"]'
             );
             $this->assertSame(1, $nodes->length, "the {$template} card has no description element");
             $this->assertNotSame('', trim($nodes->item(0)->textContent), "the {$template} description is empty");
@@ -135,10 +144,18 @@ final class picker_render_test extends \advanced_testcase {
             $option = $this->next_element($radios->item(0));
             $this->assertNotNull($option, "{$position}: nothing follows the radio");
             $classes = preg_split('/\s+/', trim($option->getAttribute('class')));
-            $this->assertContains('la-zone', $classes, "{$position}: the cell is not the radio's next sibling");
-            $this->assertContains('la-zone--' . $position, $classes, "{$position}: the cell carries no position class");
+            $this->assertContains(
+                'local-awareness-zone',
+                $classes,
+                "{$position}: the cell is not the radio's next sibling"
+            );
+            $this->assertContains(
+                'local-awareness-zone--' . $position,
+                $classes,
+                "{$position}: the cell carries no position class"
+            );
 
-            $name = $xpath->query('.//span[@class="la-offscreen"]', $option);
+            $name = $xpath->query('.//span[@class="local-awareness-offscreen"]', $option);
             $this->assertSame(1, $name->length, "{$position}: the name is not carried offscreen");
             $this->assertSame(
                 notice_form::position_name($position),
@@ -148,7 +165,7 @@ final class picker_render_test extends \advanced_testcase {
         }
 
         // The note that replaces the field vanishing for a fullscreen layout, present and hidden.
-        $note = $xpath->query('//span[@data-region="la-position-note"]');
+        $note = $xpath->query('//span[@data-region="local-awareness-position-note"]');
         $this->assertSame(1, $note->length, 'the covered-screen note is missing');
         $this->assertTrue($note->item(0)->hasAttribute('hidden'), 'the note is shown before a layout asks for it');
     }

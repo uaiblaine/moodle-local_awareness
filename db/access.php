@@ -41,8 +41,9 @@ $capabilities = [
         ],
     ],
     /*
-     * The reports name users and show their username and idnumber, so the holder sees personal
-     * data about people other than themselves.
+     * The reports name users, and show their username and idnumber where the site lists them as
+     * identity fields and the holder may see those, so the holder sees personal data about people
+     * other than themselves.
      */
     'local/awareness:viewreports' => [
         'captype' => 'read',
@@ -66,7 +67,7 @@ $capabilities = [
     ],
     /*
      * RISK_PERSONAL like its site-level sibling: the reports of a course's notices name its users
-     * and show their username and idnumber. It opens the course's notice list read-only, the
+     * (and their identity fields, as core shows them). It opens the course's notice list read-only, the
      * preview, and the reports of notices belonging to the course it is held in (the reports
      * resolve the notice first and decide in its scope). It does not manage, and managecourse does
      * not read reports. No archetype, as for managecourse.

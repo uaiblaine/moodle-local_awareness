@@ -1,0 +1,1 @@
+s/\$this->add_filters_from_entities\(array_merge\(\['user:fullname'\], \$identity,/\$this->add_filters_from_entities(array_merge(['user:fullname'], ['acknowledgement:username', 'acknowledgement:idnumber'],/;

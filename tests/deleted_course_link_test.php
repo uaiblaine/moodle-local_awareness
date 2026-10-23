@@ -102,7 +102,7 @@ final class deleted_course_link_test extends \advanced_testcase {
         $links = $this->links((int) $course->id, (int) $notice->get('id'));
 
         // What each page prints once it has opened: the notice list, and the editor.
-        $markers = ['managenotice' => 'id="all_notices_table"', 'editnotice' => 'data-region="la-editor"'];
+        $markers = ['managenotice' => 'id="all_notices_table"', 'editnotice' => 'data-region="local-awareness-editor"'];
         $this->setUser($user);
         foreach ($links as $page => $params) {
             [$html, $thrown] = $this->run_page($page, $params);
