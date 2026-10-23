@@ -242,7 +242,7 @@ final class modal_contract_test extends \basic_testcase {
      * The class the JS toggles for the refused-click animation is the class the stylesheet animates.
      *
      * The JS puts jelly-anim on the element that must move, so a rule styling a descendant of it
-     * cannot match: `.awareness.jelly-anim .modal-dialog` finds nothing, because .awareness is
+     * cannot match: `.local-awareness-notice.jelly-anim .modal-dialog` finds nothing, because .local-awareness-notice is
      * itself the .modal-dialog. Without the animation the reader gets no sign that the backdrop
      * click was refused on purpose.
      *
@@ -282,10 +282,13 @@ final class modal_contract_test extends \basic_testcase {
      * contain, written out literally rather than assembled from the phrase list, so the control at
      * the end of the test can fail.
      *
+     * The pt_br row is offered only where lang/pt_br exists: it is export-ignored, so a site installed
+     * from the release package has the English pack only.
+     *
      * @return array Language directory => list of forbidden substrings, plus an offending sample.
      */
     public static function logout_claim_provider(): array {
-        return [
+        $rows = [
             'en' => [
                 'en',
                 ['log you off', 'logged out', 'log out', 'logged off'],
@@ -297,6 +300,10 @@ final class modal_contract_test extends \basic_testcase {
                 'Se você não aceitar o alerta, será desconectado do site.',
             ],
         ];
+        if (!is_file(dirname(__DIR__, 2) . '/lang/pt_br/local_awareness.php')) {
+            unset($rows['pt_br']);
+        }
+        return $rows;
     }
 
     /**

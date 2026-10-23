@@ -3,38 +3,38 @@
  * so a layout can clear them. The footer's side and bottom padding belong to the px-4 and pb-4 it
  * wears, which Bootstrap declares !important, so only its top padding is set here.
  */
-.awareness .modal-header {
+.local-awareness-notice .modal-header {
     border-bottom: 1px solid var(--la-line);
     background-color: var(--la-surface);
     padding: 1rem 1.5rem;
 }
 
-.awareness .modal-footer {
+.local-awareness-notice .modal-footer {
     border-top: 1px solid var(--la-line);
     background-color: var(--la-paper);
     padding-top: 1rem;
 }
 
-#awareness-modal-ackcheckbox {
+.local-awareness-notice #awareness-modal-ackcheckbox {
     width: 1.25rem;
     height: 1.25rem;
     cursor: pointer;
 }
 
-.awareness .form-check-label {
+.local-awareness-notice .form-check-label {
     font-size: 0.95rem;
     color: var(--bs-body-color, #495057);
     cursor: pointer;
     user-select: none;
 }
 
-#awareness-acceptbtn {
+.local-awareness-notice #awareness-acceptbtn {
     font-size: 1rem;
     font-weight: 600;
     transition: all 0.2s ease-in-out;
 }
 
-#awareness-acceptbtn:disabled {
+.local-awareness-notice #awareness-acceptbtn:disabled {
     opacity: 0.65;
     cursor: not-allowed;
     background-color: var(--bs-secondary, var(--secondary, #6c757d));
@@ -47,8 +47,8 @@
  * later in the compiled sheet, so this rule carries a third class to outrank them. It reaches every
  * button of the content box, the carousel's arrows and dots included.
  */
-.awareness .modal-content button:focus-visible,
-.awareness .modal-content input:focus-visible {
+.local-awareness-notice .modal-content button:focus-visible,
+.local-awareness-notice .modal-content input:focus-visible {
     outline: 3px solid var(--la-brand);
     outline-offset: 2px;
 }
@@ -59,12 +59,12 @@
  * (Boost's Bootstrap 5 does), modal_notice.js marks the dialogue data-cross="image" and the glyph is
  * hidden here. The image layout reverses the trade below.
  */
-.awareness[data-cross="image"] .btn-close > [data-region="close-glyph"] {
+.local-awareness-notice[data-cross="image"] .btn-close > [data-region="close-glyph"] {
     display: none;
 }
 
 /* Background Image Modal Styles */
-.awareness .modal-content.has-bg-image {
+.local-awareness-notice .modal-content.has-bg-image {
     position: relative;
     overflow: hidden;
 }
@@ -74,19 +74,19 @@
  * dark colour mode (Moodle 5.x) --bs-body-bg-rgb goes dark with the text, and a white panel under
  * light text is unreadable. Moodle 4.5 defines no such token, so its fallback is white.
  */
-.awareness .modal-content.has-bg-image .modal-header {
+.local-awareness-notice .modal-content.has-bg-image .modal-header {
     background-color: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.85);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
 }
 
-.awareness .modal-content.has-bg-image .modal-body {
+.local-awareness-notice .modal-content.has-bg-image .modal-body {
     background-color: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.8);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
 }
 
-.awareness .modal-content.has-bg-image .modal-footer {
+.local-awareness-notice .modal-content.has-bg-image .modal-footer {
     background-color: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.9);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
@@ -96,7 +96,7 @@
 
    modal_notice.js puts the class on getModal(), which is this element: modal_notice.mustache
    puts `awareness` on the .modal-dialog. So the selector is compound; a descendant selector
-   after .awareness.jelly-anim would match nothing. */
+   after .local-awareness-notice.jelly-anim would match nothing. */
 @keyframes awareness-jelly {
     0% {
         transform: scale(1);
@@ -111,7 +111,7 @@
     }
 }
 
-.awareness.jelly-anim {
+.local-awareness-notice.jelly-anim {
     animation: awareness-jelly 0.4s ease-in-out;
     transform-origin: center;
 }
@@ -303,9 +303,10 @@
 
    Not every selector below sits under .local-awareness-editor, and some cannot:
    core attaches the notice dialogue to its own element on document.body. What
-   keeps these rules off the rest of Moodle is the name: every selector the
-   plugin owns is anchored on .la-*, .awareness, .local-awareness-*,
-   .competency-picker-* or an #awareness-* id.
+   keeps these rules off the rest of Moodle is the name: every selector names a
+   class carrying the component, .local-awareness-* (the dialogue itself is
+   .local-awareness-notice), and the dialogue's #awareness-* ids are read
+   inside it.
 
    Every colour is read from the theme. The chain
    var(--bs-x, var(--x, literal)) resolves on both branches: Moodle 4.5 defines
@@ -320,14 +321,14 @@
    =========================================================================== */
 
 /*
- * Declared on the notice dialogue (.awareness) as well as on the editor. Custom properties inherit
+ * Declared on the notice dialogue (.local-awareness-notice) as well as on the editor. Custom properties inherit
  * down the DOM tree, and core attaches a modal to its own element on document.body — a sibling of
  * the editor, not a descendant. Scoped to the editor alone, every var(--la-*) inside the dialogue
  * would resolve to nothing, which does not fall back to the literal: it makes the whole declaration
  * invalid at computed-value time, so the dialogue would render with no surface, borders or colour.
  */
 .local-awareness-editor,
-.awareness {
+.local-awareness-notice {
     --la-brand: var(--bs-primary, var(--primary, #0f6cbf));
     --la-brand-strong: var(--bs-primary-text-emphasis, #0a4a84);
     --la-brand-soft: var(--bs-primary-bg-subtle, #e7f1fa);
@@ -364,7 +365,7 @@
 }
 
 /* Shell layout */
-.la-shell {
+.local-awareness-shell {
     display: grid;
     grid-template-columns: 1fr;
     gap: 28px;
@@ -373,17 +374,17 @@
     padding: 28px 0;
 }
 
-.la-shell--single {
+.local-awareness-shell--single {
     grid-template-columns: 1fr;
     max-width: 1280px;
 }
 
-.la-shell-main {
+.local-awareness-shell-main {
     min-width: 0;
 }
 
 /* Page head */
-.la-pagehead {
+.local-awareness-pagehead {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
@@ -391,28 +392,28 @@
     margin-bottom: 22px;
 }
 
-.la-pagehead h2 {
+.local-awareness-pagehead h2 {
     font-weight: 700;
     letter-spacing: -.02em;
     font-size: 1.75rem;
     margin: 0;
 }
 
-.la-pagehead-sub {
+.local-awareness-pagehead-sub {
     color: var(--la-ink-muted);
     margin-top: 6px;
     font-size: .92rem;
     margin-bottom: 0;
 }
 
-.la-pagehead-meta {
+.local-awareness-pagehead-meta {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 6px;
 }
 
-.la-status-badge {
+.local-awareness-status-badge {
     background: var(--la-brand-soft);
     color: var(--la-brand-strong);
     border: 1px solid var(--la-line);
@@ -425,14 +426,14 @@
     gap: .4rem;
 }
 
-.la-status-badge-ping {
+.local-awareness-status-badge-ping {
     width: 7px;
     height: 7px;
     border-radius: 50%;
     background: var(--la-brand);
 }
 
-.la-status-badge--live .la-status-badge-ping {
+.local-awareness-status-badge--live .local-awareness-status-badge-ping {
     background: var(--la-ok);
     box-shadow: 0 0 0 3px rgba(53, 122, 50, .25);
 }
@@ -442,13 +443,13 @@
  * green, because it is not live, and not the plain draft grey either, because the author did
  * publish it and the difference is the thing worth seeing. The banner under the head says which.
  */
-.la-status-badge--blocked .la-status-badge-ping {
+.local-awareness-status-badge--blocked .local-awareness-status-badge-ping {
     background: var(--la-warn);
     box-shadow: 0 0 0 3px rgba(240, 173, 78, .25);
 }
 
 /* The line stops reporting a time once it stops being true about one. */
-.la-pagehead-autosaved--dirty {
+.local-awareness-pagehead-autosaved--dirty {
     color: var(--la-ink);
     font-weight: 600;
 }
@@ -457,14 +458,14 @@
  * Digits line up through font-variant-numeric, not through a monospace family: the theme's own
  * face reads as part of Moodle, a second family as a different product.
  */
-.la-pagehead-autosaved {
+.local-awareness-pagehead-autosaved {
     font-size: .74rem;
     color: var(--la-ink-muted);
     font-variant-numeric: tabular-nums;
 }
 
 /* Required fields banner */
-.la-req-banner {
+.local-awareness-req-banner {
     background: var(--la-surface);
     border: 1px solid var(--la-line);
     border-left: 3px solid var(--la-warn);
@@ -478,12 +479,12 @@
     color: var(--la-ink);
 }
 
-.la-req-banner i {
+.local-awareness-req-banner i {
     color: var(--la-warn);
     font-size: 1.1rem;
 }
 
-.la-navhelp {
+.local-awareness-navhelp {
     margin-top: 16px;
     background: var(--la-surface);
     border: 1px solid var(--la-line);
@@ -493,18 +494,18 @@
     color: var(--la-ink);
 }
 
-.la-navhelp-title {
+.local-awareness-navhelp-title {
     font-weight: 700;
     font-size: .85rem;
     margin: 0 0 .35rem;
 }
 
-.la-navhelp-title i {
+.local-awareness-navhelp-title i {
     margin-right: .25rem;
     color: var(--la-brand-strong);
 }
 
-.la-navhelp-body {
+.local-awareness-navhelp-body {
     line-height: 1.45;
 }
 
@@ -613,7 +614,7 @@
  * The estimate panel is rendered into the audience section by notice_form, so it is a flex item of
  * that section, and it spans like the fields it answers.
  */
-.local-awareness-editor .mform .fcontainer > .la-audience {
+.local-awareness-editor .mform .fcontainer > .local-awareness-audience {
     flex: 1 1 100%;
 }
 
@@ -732,7 +733,7 @@
  * Core renders each radio of a group as <label><input> ...</label>, on 4.5 and 5.2 alike
  * (element-radio-inline.mustache): the input sits inside its label, and the option template is
  * the input's next sibling. So the label is the card, the input is hidden, and every state rule
- * reads "+ .la-layout-option", the sibling the input actually has; "+ label" matches nothing.
+ * reads "+ .local-awareness-layout-option", the sibling the input actually has; "+ label" matches nothing.
  * tests/form/picker_render_test.php pins the markup and motion_contract_test the selectors.
  */
 .local-awareness-editor #fgroup_id_templategroup fieldset > .d-flex {
@@ -754,7 +755,7 @@
     clip: rect(0, 0, 0, 0);
 }
 
-.la-layout-option {
+.local-awareness-layout-option {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -769,27 +770,27 @@
     transition: border-color 0.12s, box-shadow 0.12s, background-color 0.12s;
 }
 
-.la-layout-option:hover {
+.local-awareness-layout-option:hover {
     border-color: var(--la-ink-muted);
 }
 
-.local-awareness-editor input[name="template"]:checked + .la-layout-option {
+.local-awareness-editor input[name="template"]:checked + .local-awareness-layout-option {
     border-color: var(--la-brand);
     background: var(--la-brand-soft);
     box-shadow: 0 0 0 2px var(--la-brand);
 }
 
-.local-awareness-editor input[name="template"]:checked + .la-layout-option .la-layout-name {
+.local-awareness-editor input[name="template"]:checked + .local-awareness-layout-option .local-awareness-layout-name {
     color: var(--la-brand);
 }
 
-.local-awareness-editor input[name="template"]:focus-visible + .la-layout-option {
+.local-awareness-editor input[name="template"]:focus-visible + .local-awareness-layout-option {
     outline: 3px solid var(--la-brand);
     outline-offset: 2px;
 }
 
 /* The thumbnail: a screen, a scrim, and the dialogue's silhouette per layout. */
-.la-layout-thumb {
+.local-awareness-layout-thumb {
     position: relative;
     display: block;
     height: 4.5rem;
@@ -799,7 +800,7 @@
     background: var(--la-surface);
 }
 
-.la-layout-thumb::before {
+.local-awareness-layout-thumb::before {
     content: "";
     position: absolute;
     top: 0;
@@ -809,7 +810,7 @@
     background: rgba(29, 33, 37, 0.22);
 }
 
-.la-layout-thumb-box {
+.local-awareness-layout-thumb-box {
     position: absolute;
     left: 25%;
     right: 25%;
@@ -820,7 +821,7 @@
     background: var(--la-paper);
 }
 
-.la-layout-thumb-box::before {
+.local-awareness-layout-thumb-box::before {
     content: "";
     position: absolute;
     left: 0;
@@ -830,20 +831,20 @@
     background: var(--la-line);
 }
 
-.la-layout-option--hero .la-layout-thumb-box {
+.local-awareness-layout-option--hero .local-awareness-layout-thumb-box {
     left: 22%;
     right: 22%;
     top: 15%;
     bottom: 20%;
 }
 
-.la-layout-option--hero .la-layout-thumb-box::before,
-.la-layout-option--carousel .la-layout-thumb-box::before {
+.local-awareness-layout-option--hero .local-awareness-layout-thumb-box::before,
+.local-awareness-layout-option--carousel .local-awareness-layout-thumb-box::before {
     height: 42%;
     background: var(--la-brand);
 }
 
-.la-layout-option--fullscreen .la-layout-thumb-box {
+.local-awareness-layout-option--fullscreen .local-awareness-layout-thumb-box {
     top: 0;
     right: 0;
     bottom: 0;
@@ -851,7 +852,7 @@
     border-radius: 0;
 }
 
-.la-layout-option--card .la-layout-thumb-box {
+.local-awareness-layout-option--card .local-awareness-layout-thumb-box {
     left: auto;
     right: 6%;
     top: auto;
@@ -860,24 +861,24 @@
     height: 36%;
 }
 
-.la-layout-option--card .la-layout-thumb-box::before {
+.local-awareness-layout-option--card .local-awareness-layout-thumb-box::before {
     height: 40%;
     background: var(--la-brand);
 }
 
-.la-layout-option--video .la-layout-thumb-box {
+.local-awareness-layout-option--video .local-awareness-layout-thumb-box {
     left: 20%;
     right: 20%;
     top: 14%;
     bottom: 18%;
 }
 
-.la-layout-option--video .la-layout-thumb-box::before {
+.local-awareness-layout-option--video .local-awareness-layout-thumb-box::before {
     height: 52%;
     background: var(--la-ink);
 }
 
-.la-layout-option--video .la-layout-thumb-box::after {
+.local-awareness-layout-option--video .local-awareness-layout-thumb-box::after {
     content: "";
     position: absolute;
     left: 50%;
@@ -889,7 +890,7 @@
     background: var(--la-paper);
 }
 
-.la-layout-option--carousel .la-layout-thumb-box::after {
+.local-awareness-layout-option--carousel .local-awareness-layout-thumb-box::after {
     content: "";
     position: absolute;
     left: 38%;
@@ -900,31 +901,31 @@
     background: var(--la-paper);
 }
 
-.la-layout-option--split .la-layout-thumb-box {
+.local-awareness-layout-option--split .local-awareness-layout-thumb-box {
     left: 15%;
     right: 15%;
 }
 
-.la-layout-option--split .la-layout-thumb-box::before {
+.local-awareness-layout-option--split .local-awareness-layout-thumb-box::before {
     width: 38%;
     height: 100%;
     background: var(--la-brand);
 }
 
-.la-layout-option--minimal .la-layout-thumb-box {
+.local-awareness-layout-option--minimal .local-awareness-layout-thumb-box {
     left: 30%;
     right: 30%;
     top: 28%;
     bottom: 28%;
 }
 
-.la-layout-option--minimal .la-layout-thumb-box::before,
-.la-layout-option--banner .la-layout-thumb-box::before,
-.la-layout-option--image .la-layout-thumb-box::before {
+.local-awareness-layout-option--minimal .local-awareness-layout-thumb-box::before,
+.local-awareness-layout-option--banner .local-awareness-layout-thumb-box::before,
+.local-awareness-layout-option--image .local-awareness-layout-thumb-box::before {
     display: none;
 }
 
-.la-layout-option--banner .la-layout-thumb-box {
+.local-awareness-layout-option--banner .local-awareness-layout-thumb-box {
     top: 0;
     right: 0;
     bottom: auto;
@@ -935,7 +936,7 @@
 }
 
 /* The image thumbnail is the picture itself, with the close disc at its corner. */
-.la-layout-option--image .la-layout-thumb-box {
+.local-awareness-layout-option--image .local-awareness-layout-thumb-box {
     left: 24%;
     right: 24%;
     top: 20%;
@@ -943,7 +944,7 @@
     background: var(--la-brand);
 }
 
-.la-layout-option--image .la-layout-thumb-box::after {
+.local-awareness-layout-option--image .local-awareness-layout-thumb-box::after {
     content: "";
     position: absolute;
     top: -0.35rem;
@@ -955,7 +956,7 @@
     background: var(--la-paper);
 }
 
-.la-layout-name {
+.local-awareness-layout-name {
     text-align: center;
 }
 
@@ -963,7 +964,7 @@
  * The sentence that says what the layout is for, on the card where the choice is made rather than
  * only in the help text beside the group.
  */
-.la-layout-desc {
+.local-awareness-layout-desc {
     font-size: 0.74rem;
     font-weight: 400;
     line-height: 1.3;
@@ -971,7 +972,7 @@
     text-align: center;
 }
 
-.local-awareness-editor input[name="template"]:checked + .la-layout-option .la-layout-desc {
+.local-awareness-editor input[name="template"]:checked + .local-awareness-layout-option .local-awareness-layout-desc {
     color: var(--la-ink);
 }
 
@@ -1028,7 +1029,7 @@
 }
 
 /* One cell of the screen: the dialogue's silhouette where it would land. */
-.la-zone {
+.local-awareness-zone {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1040,33 +1041,33 @@
     transition: border-color 0.12s, background-color 0.12s;
 }
 
-.la-zone-shape {
+.local-awareness-zone-shape {
     width: 58%;
     height: 46%;
     border-radius: 0.2rem;
     background: var(--la-line);
 }
 
-.la-zone-shape--small {
+.local-awareness-zone-shape--small {
     width: 38%;
     height: 40%;
 }
 
-.la-zone:hover {
+.local-awareness-zone:hover {
     border-color: var(--la-brand);
 }
 
-.local-awareness-editor input[name="position"]:checked + .la-zone {
+.local-awareness-editor input[name="position"]:checked + .local-awareness-zone {
     border-style: solid;
     border-color: var(--la-brand);
     background: var(--la-brand-soft);
 }
 
-.local-awareness-editor input[name="position"]:checked + .la-zone .la-zone-shape {
+.local-awareness-editor input[name="position"]:checked + .local-awareness-zone .local-awareness-zone-shape {
     background: var(--la-brand);
 }
 
-.local-awareness-editor input[name="position"]:focus-visible + .la-zone {
+.local-awareness-editor input[name="position"]:focus-visible + .local-awareness-zone {
     outline: 3px solid var(--la-brand);
     outline-offset: 2px;
 }
@@ -1076,28 +1077,28 @@
     cursor: not-allowed;
 }
 
-.local-awareness-editor #fgroup_id_positiongroup label:has(input:disabled) .la-zone:hover {
+.local-awareness-editor #fgroup_id_positiongroup label:has(input:disabled) .local-awareness-zone:hover {
     border-color: var(--la-line);
 }
 
 /*
  * Full screen has no position. Hiding the field would read as a fault rather than as a rule, so
- * the screen fills instead and the note beside it says why. notice_form.js adds la-zones-covered
+ * the screen fills instead and the note beside it says why. notice_form.js adds local-awareness-zones-covered
  * and unhides the note, whose text the form renders; the covered screen is drawn here.
  */
-.local-awareness-editor .la-zone-note {
+.local-awareness-editor .local-awareness-zone-note {
     align-self: center;
     font-size: 0.8rem;
     color: var(--la-ink-muted);
     max-width: 14rem;
 }
 
-.local-awareness-editor #fgroup_id_positiongroup.la-zones-covered fieldset > .d-flex {
+.local-awareness-editor #fgroup_id_positiongroup.local-awareness-zones-covered fieldset > .d-flex {
     border-color: var(--la-brand);
     background: var(--la-brand-soft);
 }
 
-.local-awareness-editor .la-zones-covered .la-zone {
+.local-awareness-editor .local-awareness-zones-covered .local-awareness-zone {
     border-color: transparent;
     background: transparent;
 }
@@ -1107,7 +1108,7 @@
  * positions chosen, which is the opposite of what it means: the screen itself is the dialogue, so
  * the screen is what is filled, and the cells only hold its shape open.
  */
-.local-awareness-editor .la-zones-covered .la-zone-shape {
+.local-awareness-editor .local-awareness-zones-covered .local-awareness-zone-shape {
     display: none;
 }
 
@@ -1116,7 +1117,7 @@
  * attribute and a pseudo-class against two classes — so without this the chosen cell stayed drawn
  * on a screen that is meant to read as one surface.
  */
-.local-awareness-editor .la-zones-covered input[name="position"]:checked + .la-zone {
+.local-awareness-editor .local-awareness-zones-covered input[name="position"]:checked + .local-awareness-zone {
     border-color: transparent;
     background: transparent;
 }
@@ -1162,14 +1163,14 @@
     flex: 1 1 100%;
 }
 
-.local-awareness-editor .mform .la-slide-head {
+.local-awareness-editor .mform .local-awareness-slide-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
 }
 
-.local-awareness-editor .mform .la-slide-head-number {
+.local-awareness-editor .mform .local-awareness-slide-head-number {
     margin-right: auto;
     font-weight: 600;
     font-size: 0.8rem;
@@ -1178,7 +1179,7 @@
     color: var(--la-brand);
 }
 
-.local-awareness-editor .mform .la-slide-head-actions {
+.local-awareness-editor .mform .local-awareness-slide-head-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.3rem;
@@ -1188,7 +1189,7 @@
  * Rearranging is the slide's least-wanted action, so none of the three looks like its main one.
  * Remove alone turns red on hover; a disabled one is the end of the strip and says so by fading.
  */
-.local-awareness-editor .mform .la-slide-action {
+.local-awareness-editor .mform .local-awareness-slide-action {
     background: transparent;
     border: 1px solid var(--la-line);
     color: var(--la-ink-muted);
@@ -1197,23 +1198,23 @@
     padding: 0.2rem 0.6rem;
 }
 
-.local-awareness-editor .mform .la-slide-action:hover:not([disabled]) {
+.local-awareness-editor .mform .local-awareness-slide-action:hover:not([disabled]) {
     border-color: var(--la-brand);
     color: var(--la-brand);
 }
 
-.local-awareness-editor .mform .la-slide-action--remove:hover:not([disabled]) {
+.local-awareness-editor .mform .local-awareness-slide-action--remove:hover:not([disabled]) {
     border-color: var(--la-danger);
     color: var(--la-danger);
 }
 
-.local-awareness-editor .mform .la-slide-action[disabled] {
+.local-awareness-editor .mform .local-awareness-slide-action[disabled] {
     opacity: 0.45;
     cursor: default;
 }
 
 /* Buttons */
-.la-btn {
+.local-awareness-btn {
     border-radius: 9px;
     font-weight: 600;
     font-size: .88rem;
@@ -1228,38 +1229,38 @@
     transition: background .12s, border-color .12s, color .12s;
 }
 
-.la-btn:disabled,
-.la-btn[disabled] {
+.local-awareness-btn:disabled,
+.local-awareness-btn[disabled] {
     opacity: .55;
     cursor: not-allowed;
 }
 
-.la-btn--brand {
+.local-awareness-btn--brand {
     background: var(--la-brand);
     border-color: var(--la-brand);
     color: #fff;
 }
 
-.la-btn--brand:hover:not(:disabled) {
+.local-awareness-btn--brand:hover:not(:disabled) {
     background: var(--la-brand-strong);
     border-color: var(--la-brand-strong);
     color: #fff;
 }
 
-.la-btn--ghost {
+.local-awareness-btn--ghost {
     background: transparent;
     border-color: var(--la-line);
     color: var(--la-ink);
 }
 
-.la-btn--ghost:hover {
+.local-awareness-btn--ghost:hover {
     background: var(--la-surface);
     color: var(--la-ink);
     text-decoration: none;
 }
 
 /* Audience panel */
-.la-audience {
+.local-awareness-audience {
     margin-top: 16px;
     background: var(--la-paper);
     border: 1px solid var(--la-line);
@@ -1267,14 +1268,14 @@
     padding: 14px 16px;
 }
 
-.la-audience-head {
+.local-awareness-audience-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 8px;
 }
 
-.la-audience-title {
+.local-awareness-audience-title {
     font-weight: 700;
     font-size: .9rem;
     display: flex;
@@ -1283,15 +1284,15 @@
     margin: 0;
 }
 
-.la-audience-title i {
+.local-awareness-audience-title i {
     color: var(--la-brand-strong);
 }
 
-.la-audience-summary {
+.local-awareness-audience-summary {
     margin: 0;
 }
 
-.la-audience-summary-item {
+.local-awareness-audience-summary-item {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -1300,24 +1301,24 @@
     border-bottom: 1px dashed var(--la-line);
 }
 
-.la-audience-summary-item:last-child {
+.local-awareness-audience-summary-item:last-child {
     border-bottom: none;
 }
 
-.la-audience-summary-item dt {
+.local-awareness-audience-summary-item dt {
     color: var(--la-ink-muted);
     font-weight: 500;
     margin: 0;
 }
 
-.la-audience-summary-item dd {
+.local-awareness-audience-summary-item dd {
     color: var(--la-ink);
     font-weight: 600;
     margin: 0;
     font-variant-numeric: tabular-nums;
 }
 
-.la-audience-reach {
+.local-awareness-audience-reach {
     margin-top: 12px;
     padding: 12px 14px;
     background: var(--la-surface);
@@ -1329,7 +1330,7 @@
     gap: 4px;
 }
 
-.la-audience-reach-meta {
+.local-awareness-audience-reach-meta {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
@@ -1338,34 +1339,34 @@
     color: var(--la-ink-muted);
 }
 
-.la-audience-reach-label {
+.local-awareness-audience-reach-label {
     font-weight: 500;
 }
 
-.la-audience-reach-state {
+.local-awareness-audience-reach-state {
     text-align: right;
     font-style: italic;
 }
 
-.la-audience-reach-value {
+.local-awareness-audience-reach-value {
     font-weight: 800;
     font-size: 1.1rem;
     color: var(--la-brand-strong);
     font-variant-numeric: tabular-nums;
 }
 
-.la-audience-actions {
+.local-awareness-audience-actions {
     margin-top: 10px;
     display: flex;
     gap: 8px;
 }
 
-.la-audience-actions .la-btn {
+.local-awareness-audience-actions .local-awareness-btn {
     flex: 1;
     justify-content: center;
 }
 
-.la-audience-breakdown {
+.local-awareness-audience-breakdown {
     margin-top: 10px;
     display: flex;
     flex-wrap: wrap;
@@ -1373,21 +1374,21 @@
     font-size: .76rem;
 }
 
-.la-audience-breakdown[hidden] {
+.local-awareness-audience-breakdown[hidden] {
     display: none;
 }
 
-.la-audience-context {
+.local-awareness-audience-context {
     margin-top: 14px;
     padding-top: 12px;
     border-top: 1px dashed var(--la-line);
 }
 
-.la-audience-context[hidden] {
+.local-awareness-audience-context[hidden] {
     display: none;
 }
 
-.la-audience-context-title {
+.local-awareness-audience-context-title {
     font-size: .82rem;
     font-weight: 700;
     margin: 0 0 .25rem;
@@ -1397,14 +1398,14 @@
     color: var(--la-ink);
 }
 
-.la-audience-context-hint {
+.local-awareness-audience-context-hint {
     font-size: .76rem;
     color: var(--la-ink-muted);
     margin: 0 0 .5rem;
     line-height: 1.4;
 }
 
-.la-audience-chips {
+.local-awareness-audience-chips {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -1413,7 +1414,7 @@
     gap: 4px;
 }
 
-.la-chip {
+.local-awareness-rulechip {
     display: inline-flex;
     align-items: center;
     background: var(--la-surface);
@@ -1425,42 +1426,42 @@
     font-weight: 500;
 }
 
-.la-chip--brand {
+.local-awareness-rulechip--brand {
     background: var(--la-brand-soft);
     border-color: var(--la-line);
     color: var(--la-brand-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .la-btn {
+    .local-awareness-btn {
         transition: none;
     }
 }
 
-.awareness .modal-title {
+.local-awareness-notice .modal-title {
     font-weight: 700;
 }
 
 /* ===========================================================================
    Notice dialogue - layouts, positions, entrances, media
 
-   Every class is plugin-owned (la-tpl-*, la-pos-*, la-anim-*, la-media-*,
-   la-carousel-*) and every rule is ungated, because the dialogue is injected on
+   Every class is plugin-owned (local-awareness-tpl-*, local-awareness-pos-*, local-awareness-anim-*, local-awareness-media-*,
+   local-awareness-carousel-*) and every rule is ungated, because the dialogue is injected on
    arbitrary pages. Specificity is not the problem:
-   .awareness.la-x (0,2,0) beats core's (0,1,0) .modal-dialog and .modal-lg
+   .local-awareness-notice.local-awareness-x (0,2,0) beats core's (0,1,0) .modal-dialog and .modal-lg
    rules whatever the order. What no plugin rule can beat is a Bootstrap
    utility, declared !important, so the template carries no bg-* or rounded
    utility, and no rule here sets a property owned by a utility it does wear
    (border-0, px-4, d-flex and the rest); motion_contract_test checks it.
 
-   .awareness is the .modal-dialog, inside a .modal that is fixed, full-viewport
+   .local-awareness-notice is the .modal-dialog, inside a .modal that is fixed, full-viewport
    and overflow-y auto. The dialog is what is placed, sized and animated; the
    backdrop is core's singleton on the body and is not reachable from here.
    =========================================================================== */
 
 /* The radius is the plugin's, not the rounded utility's: that one is !important,
    and a banner and a fullscreen dialogue have to drop it. */
-.awareness > .modal-content {
+.local-awareness-notice > .modal-content {
     width: 100%;
     border-radius: 0.5rem;
 }
@@ -1468,89 +1469,89 @@
 /* ---- Positions. Centre is a real centre: core's own .modal-dialog-centered
    definition, spelled here so it does not depend on a second class. start/end
    are logical, so a corner flips under RTL without a second rule. ---- */
-.awareness.la-pos-center,
-.awareness.la-pos-bottom,
-.awareness.la-pos-bottom-start,
-.awareness.la-pos-bottom-end {
+.local-awareness-notice.local-awareness-pos-center,
+.local-awareness-notice.local-awareness-pos-bottom,
+.local-awareness-notice.local-awareness-pos-bottom-start,
+.local-awareness-notice.local-awareness-pos-bottom-end {
     display: flex;
     min-height: calc(100% - 3.5rem);
 }
 
-.awareness.la-pos-center {
+.local-awareness-notice.local-awareness-pos-center {
     align-items: center;
 }
 
-.awareness.la-pos-bottom,
-.awareness.la-pos-bottom-start,
-.awareness.la-pos-bottom-end {
+.local-awareness-notice.local-awareness-pos-bottom,
+.local-awareness-notice.local-awareness-pos-bottom-start,
+.local-awareness-notice.local-awareness-pos-bottom-end {
     align-items: flex-end;
 }
 
-.awareness.la-pos-top-start,
-.awareness.la-pos-bottom-start {
+.local-awareness-notice.local-awareness-pos-top-start,
+.local-awareness-notice.local-awareness-pos-bottom-start {
     margin-inline-start: 1rem;
     margin-inline-end: auto;
 }
 
-.awareness.la-pos-top-end,
-.awareness.la-pos-bottom-end {
+.local-awareness-notice.local-awareness-pos-top-end,
+.local-awareness-notice.local-awareness-pos-bottom-end {
     margin-inline-start: auto;
     margin-inline-end: 1rem;
 }
 
 /* ---- Card: compact, plain header, one line of actions. ---- */
-.awareness.la-tpl-card {
+.local-awareness-notice.local-awareness-tpl-card {
     max-width: 22rem;
 }
 
-.awareness.la-tpl-card .modal-header {
+.local-awareness-notice.local-awareness-tpl-card .modal-header {
     padding-bottom: 0;
     border-bottom: 0;
     background-color: transparent;
 }
 
-.awareness.la-tpl-card .modal-title {
+.local-awareness-notice.local-awareness-tpl-card .modal-title {
     font-size: 1.1rem;
 }
 
-.awareness.la-tpl-card .modal-body {
+.local-awareness-notice.local-awareness-tpl-card .modal-body {
     font-size: 0.95rem;
 }
 
-.awareness.la-tpl-card .modal-footer {
+.local-awareness-notice.local-awareness-tpl-card .modal-footer {
     padding-top: 0.25rem;
     border-top: 0;
 }
 
 /* ---- Fullscreen: the dialog is the viewport; the body is what scrolls. ---- */
-.awareness.la-tpl-fullscreen {
+.local-awareness-notice.local-awareness-tpl-fullscreen {
     width: 100vw;
     max-width: none;
     height: 100%;
     margin: 0;
 }
 
-.awareness.la-tpl-fullscreen > .modal-content {
+.local-awareness-notice.local-awareness-tpl-fullscreen > .modal-content {
     height: 100%;
     border-radius: 0;
 }
 
-.awareness.la-tpl-fullscreen .modal-body {
+.local-awareness-notice.local-awareness-tpl-fullscreen .modal-body {
     flex: 1 1 auto;
     overflow-y: auto;
 }
 
 /* The header only: the footer wears px-4, which is !important. */
-.awareness.la-tpl-fullscreen .modal-header {
+.local-awareness-notice.local-awareness-tpl-fullscreen .modal-header {
     padding-right: 2.5rem;
     padding-left: 2.5rem;
 }
 
 /* ---- The media band: hidden until a layout fills it (the hidden attribute
    is core's reboot rule); each child is shown by the layout that owns it. ---- */
-.awareness .la-media-band,
-.awareness .la-media-video,
-.awareness .la-media-carousel {
+.local-awareness-notice .local-awareness-media-band,
+.local-awareness-notice .local-awareness-media-video,
+.local-awareness-notice .local-awareness-media-carousel {
     display: none;
 }
 
@@ -1558,11 +1559,11 @@
    fixed gradient, independent of the photo, so the title always clears the
    contrast floor; a text shadow alone cannot bound the worst case. The close
    button gets a light disc so the cross reads on the scrim on both branches. ---- */
-.awareness.la-tpl-hero > .modal-content {
+.local-awareness-notice.local-awareness-tpl-hero > .modal-content {
     overflow: hidden;
 }
 
-.awareness.la-tpl-hero .la-media-band {
+.local-awareness-notice.local-awareness-tpl-hero .local-awareness-media-band {
     display: block;
     height: 12rem;
     background-color: var(--la-brand);
@@ -1570,7 +1571,7 @@
     background-size: cover;
 }
 
-.awareness.la-tpl-hero .modal-header {
+.local-awareness-notice.local-awareness-tpl-hero .modal-header {
     position: absolute;
     top: 0;
     right: 0;
@@ -1582,13 +1583,13 @@
     background: linear-gradient(180deg, rgba(10, 30, 50, 0) 0%, rgba(10, 30, 50, 0.78) 100%);
 }
 
-.awareness.la-tpl-hero .modal-title {
+.local-awareness-notice.local-awareness-tpl-hero .modal-title {
     color: #fff;
     font-size: 1.4rem;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
-.awareness.la-tpl-hero .btn-close {
+.local-awareness-notice.local-awareness-tpl-hero .btn-close {
     align-self: flex-start;
     padding: 0.5rem;
     border-radius: 50%;
@@ -1600,29 +1601,29 @@
 /* ---- Video: the player fills the band. The filter wraps its player in an
    element carrying an inline max-width, which modal_notice.js removes; the
    sizing here is the padding trick, which every branch's stylelint accepts. ---- */
-.awareness.la-tpl-video .la-media-video {
+.local-awareness-notice.local-awareness-tpl-video .local-awareness-media-video {
     display: block;
     background-color: #0b1016;
 }
 
-.awareness .la-video .mediaplugin,
-.awareness .la-carousel-media .mediaplugin {
+.local-awareness-notice .local-awareness-video .mediaplugin,
+.local-awareness-notice .local-awareness-carousel-media .mediaplugin {
     display: block;
     margin: 0;
 }
 
-.awareness .la-video .mediaplugin_youtube,
-.awareness .la-video .mediaplugin_vimeo,
-.awareness .la-carousel-media .mediaplugin_youtube,
-.awareness .la-carousel-media .mediaplugin_vimeo {
+.local-awareness-notice .local-awareness-video .mediaplugin_youtube,
+.local-awareness-notice .local-awareness-video .mediaplugin_vimeo,
+.local-awareness-notice .local-awareness-carousel-media .mediaplugin_youtube,
+.local-awareness-notice .local-awareness-carousel-media .mediaplugin_vimeo {
     position: relative;
     padding-top: 56.25%;
 }
 
-.awareness .la-video .mediaplugin_youtube iframe,
-.awareness .la-video .mediaplugin_vimeo iframe,
-.awareness .la-carousel-media .mediaplugin_youtube iframe,
-.awareness .la-carousel-media .mediaplugin_vimeo iframe {
+.local-awareness-notice .local-awareness-video .mediaplugin_youtube iframe,
+.local-awareness-notice .local-awareness-video .mediaplugin_vimeo iframe,
+.local-awareness-notice .local-awareness-carousel-media .mediaplugin_youtube iframe,
+.local-awareness-notice .local-awareness-carousel-media .mediaplugin_vimeo iframe {
     position: absolute;
     top: 0;
     left: 0;
@@ -1631,13 +1632,13 @@
     border: 0;
 }
 
-.awareness .la-video .video-js,
-.awareness .la-carousel-media .video-js {
+.local-awareness-notice .local-awareness-video .video-js,
+.local-awareness-notice .local-awareness-carousel-media .video-js {
     width: 100%;
 }
 
-.awareness .la-video .la-media-link,
-.awareness .la-carousel-media .la-media-link {
+.local-awareness-notice .local-awareness-video .local-awareness-media-link,
+.local-awareness-notice .local-awareness-carousel-media .local-awareness-media-link {
     display: block;
     padding: 1rem 1.5rem;
     color: #fff;
@@ -1648,26 +1649,26 @@
    Nothing here is Bootstrap's carousel: its transition classes are applied by
    its own JS and change name between 4.5 and 5.2. The media well is dark in
    every theme, as a letterbox is. ---- */
-.awareness.la-tpl-carousel .la-media-carousel {
+.local-awareness-notice.local-awareness-tpl-carousel .local-awareness-media-carousel {
     display: block;
 }
 
-.la-carousel {
+.local-awareness-carousel {
     position: relative;
     background-color: #0b1016;
     color: #fff;
 }
 
-.la-carousel-media {
+.local-awareness-carousel-media {
     position: relative;
     min-height: 4rem;
 }
 
-.la-carousel-slide--image .la-carousel-media {
+.local-awareness-carousel-slide--image .local-awareness-carousel-media {
     padding-top: 56.25%;
 }
 
-.la-carousel-slide--image .la-slide-image {
+.local-awareness-carousel-slide--image .local-awareness-slide-image {
     position: absolute;
     top: 0;
     left: 0;
@@ -1676,18 +1677,18 @@
     object-fit: cover;
 }
 
-.la-carousel-slide--text .la-carousel-media {
+.local-awareness-carousel-slide--text .local-awareness-carousel-media {
     display: none;
 }
 
-.la-carousel-caption {
+.local-awareness-carousel-caption {
     margin: 0;
     padding: 0.75rem 3.5rem;
     font-size: 0.95rem;
     text-align: center;
 }
 
-.la-carousel-arrow {
+.local-awareness-carousel-arrow {
     position: absolute;
     top: 50%;
     width: 2.5rem;
@@ -1703,22 +1704,22 @@
     cursor: pointer;
 }
 
-.la-carousel-arrow--prev {
+.local-awareness-carousel-arrow--prev {
     inset-inline-start: 0.75rem;
 }
 
-.la-carousel-arrow--next {
+.local-awareness-carousel-arrow--next {
     inset-inline-end: 0.75rem;
 }
 
-.la-carousel-dots {
+.local-awareness-carousel-dots {
     display: flex;
     justify-content: center;
     gap: 0.5rem;
     padding: 0.5rem 0 0.75rem;
 }
 
-.la-carousel-dot {
+.local-awareness-carousel-dot {
     width: 0.75rem;
     height: 0.75rem;
     padding: 0;
@@ -1728,7 +1729,7 @@
     cursor: pointer;
 }
 
-.la-carousel-dot[aria-current="true"] {
+.local-awareness-carousel-dot[aria-current="true"] {
     width: 1.75rem;
     border-radius: 0.375rem;
     background-color: #fff;
@@ -1736,7 +1737,7 @@
 
 /* Bootstrap 4 calls this sr-only and 5.x visually-hidden; the dialogue can gate
    on neither, so it (and the position picker) uses its own name for the same rule. */
-.la-offscreen {
+.local-awareness-offscreen {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1752,7 +1753,7 @@
    there is none. The content box becomes a grid so the band, which sits between
    the header and the body in the DOM, can span the side; below 40rem the panel
    goes back to a band across the top, where a narrow screen has the room. ---- */
-.awareness.la-tpl-split > .modal-content {
+.local-awareness-notice.local-awareness-tpl-split > .modal-content {
     display: grid;
     grid-template-columns: 38% 1fr;
     grid-template-rows: auto 1fr auto;
@@ -1760,12 +1761,12 @@
 }
 
 /* The band's wrapper is the grid item - it is the content box's child, the band its grandchild. */
-.awareness.la-tpl-split .la-media {
+.local-awareness-notice.local-awareness-tpl-split .local-awareness-media {
     grid-row: 1 / 4;
     grid-column: 1;
 }
 
-.awareness.la-tpl-split .la-media-band {
+.local-awareness-notice.local-awareness-tpl-split .local-awareness-media-band {
     display: block;
     height: 100%;
     min-height: 16rem;
@@ -1774,39 +1775,39 @@
     background-size: cover;
 }
 
-.awareness.la-tpl-split .modal-header,
-.awareness.la-tpl-split .modal-body,
-.awareness.la-tpl-split .modal-footer {
+.local-awareness-notice.local-awareness-tpl-split .modal-header,
+.local-awareness-notice.local-awareness-tpl-split .modal-body,
+.local-awareness-notice.local-awareness-tpl-split .modal-footer {
     grid-column: 2;
 }
 
-.awareness.la-tpl-split .modal-header {
+.local-awareness-notice.local-awareness-tpl-split .modal-header {
     padding-bottom: 0.25rem;
     border-bottom: 0;
     background-color: transparent;
 }
 
-.awareness.la-tpl-split .modal-title {
+.local-awareness-notice.local-awareness-tpl-split .modal-title {
     font-size: 1.35rem;
 }
 
-.awareness.la-tpl-split .modal-footer {
+.local-awareness-notice.local-awareness-tpl-split .modal-footer {
     padding-top: 0.25rem;
     border-top: 0;
     background-color: transparent;
 }
 
 @media (max-width: 40rem) {
-    .awareness.la-tpl-split > .modal-content {
+    .local-awareness-notice.local-awareness-tpl-split > .modal-content {
         display: flex;
     }
 
     /* First in the column, ahead of the header: a band across the top, as the hero has. */
-    .awareness.la-tpl-split .la-media {
+    .local-awareness-notice.local-awareness-tpl-split .local-awareness-media {
         order: -1;
     }
 
-    .awareness.la-tpl-split .la-media-band {
+    .local-awareness-notice.local-awareness-tpl-split .local-awareness-media-band {
         min-height: 10rem;
     }
 }
@@ -1814,21 +1815,21 @@
 /* ---- Minimal: a narrow box with the chrome stripped. The header stays - it
    holds the dialogue's name and the close button - and only its ground and
    rule go. ---- */
-.awareness.la-tpl-minimal {
+.local-awareness-notice.local-awareness-tpl-minimal {
     max-width: 30rem;
 }
 
-.awareness.la-tpl-minimal .modal-header {
+.local-awareness-notice.local-awareness-tpl-minimal .modal-header {
     padding-bottom: 0;
     border-bottom: 0;
     background-color: transparent;
 }
 
-.awareness.la-tpl-minimal .modal-title {
+.local-awareness-notice.local-awareness-tpl-minimal .modal-title {
     font-size: 1.25rem;
 }
 
-.awareness.la-tpl-minimal .modal-footer {
+.local-awareness-notice.local-awareness-tpl-minimal .modal-footer {
     padding-top: 0.25rem;
     border-top: 0;
     background-color: transparent;
@@ -1839,17 +1840,17 @@
    The header is flattened into the row with display: contents, so its two
    children become the strip's first and last items; the element, the dialogue's
    name and the close button all stay where the contract test expects them. ---- */
-.awareness.la-tpl-banner {
+.local-awareness-notice.local-awareness-tpl-banner {
     width: 100%;
     max-width: none;
     margin: 0;
 }
 
-.awareness.la-tpl-banner.la-pos-bottom {
+.local-awareness-notice.local-awareness-tpl-banner.local-awareness-pos-bottom {
     min-height: 100%;
 }
 
-.awareness.la-tpl-banner > .modal-content {
+.local-awareness-notice.local-awareness-tpl-banner > .modal-content {
     flex-direction: row;
     align-items: center;
     border-radius: 0;
@@ -1857,7 +1858,7 @@
 
 /* The brand edge is drawn, not bordered: the content box carries border-0,
    which Bootstrap declares with !important. */
-.awareness.la-tpl-banner > .modal-content::before {
+.local-awareness-notice.local-awareness-tpl-banner > .modal-content::before {
     content: "";
     position: absolute;
     top: 0;
@@ -1867,11 +1868,11 @@
     background-color: var(--la-brand);
 }
 
-.awareness.la-tpl-banner .modal-header {
+.local-awareness-notice.local-awareness-tpl-banner .modal-header {
     display: contents;
 }
 
-.awareness.la-tpl-banner .modal-title {
+.local-awareness-notice.local-awareness-tpl-banner .modal-title {
     order: 1;
     flex: 0 0 auto;
     padding: 0.9rem 1.25rem;
@@ -1879,7 +1880,7 @@
     white-space: nowrap;
 }
 
-.awareness.la-tpl-banner .modal-body {
+.local-awareness-notice.local-awareness-tpl-banner .modal-body {
     order: 2;
     flex: 1 1 auto;
     min-width: 0;
@@ -1889,17 +1890,17 @@
     text-overflow: ellipsis;
 }
 
-.awareness.la-tpl-banner .modal-body > * {
+.local-awareness-notice.local-awareness-tpl-banner .modal-body > * {
     display: inline;
     margin: 0;
 }
 
-.awareness.la-tpl-banner .modal-body > * + * {
+.local-awareness-notice.local-awareness-tpl-banner .modal-body > * + * {
     display: none;
 }
 
 /* pb-4 is !important, so the top padding matches it and the buttons sit on the strip's centre line. */
-.awareness.la-tpl-banner .modal-footer {
+.local-awareness-notice.local-awareness-tpl-banner .modal-footer {
     order: 3;
     flex: 0 0 auto;
     padding-top: 1.5rem;
@@ -1907,7 +1908,7 @@
     background-color: transparent;
 }
 
-.awareness.la-tpl-banner .btn-close {
+.local-awareness-notice.local-awareness-tpl-banner .btn-close {
     order: 4;
     margin-inline-end: 0.75rem;
 }
@@ -1916,30 +1917,30 @@
    the close button floats outside the corner on a light disc, so no picture can
    swallow it. The title and the text stay in the DOM, offscreen: the title is the
    dialogue's name and the picture's alternative text, the text its description.
-   The offscreen recipe of .la-offscreen, minus its padding: the body wears py-3
+   The offscreen recipe of .local-awareness-offscreen, minus its padding: the body wears py-3
    and px-4, which are !important, and the clip makes the padding moot anyway. ---- */
-.awareness.la-tpl-image {
+.local-awareness-notice.local-awareness-tpl-image {
     width: fit-content;
     max-width: calc(100vw - 5rem);
 }
 
-.awareness.la-tpl-image > .modal-content {
+.local-awareness-notice.local-awareness-tpl-image > .modal-content {
     overflow: visible;
     background-color: transparent;
 }
 
-.awareness.la-tpl-image .la-media-band {
+.local-awareness-notice.local-awareness-tpl-image .local-awareness-media-band {
     display: block;
 }
 
-.awareness.la-tpl-image .la-image {
+.local-awareness-notice.local-awareness-tpl-image .local-awareness-image {
     display: block;
     max-width: 100%;
     max-height: calc(100vh - 6rem);
     border-radius: 0.5rem;
 }
 
-.awareness.la-tpl-image .modal-header {
+.local-awareness-notice.local-awareness-tpl-image .modal-header {
     position: absolute;
     top: 0;
     inset-inline-end: 0;
@@ -1948,8 +1949,8 @@
     background-color: transparent;
 }
 
-.awareness.la-tpl-image .modal-title,
-.awareness.la-tpl-image .modal-body {
+.local-awareness-notice.local-awareness-tpl-image .modal-title,
+.local-awareness-notice.local-awareness-tpl-image .modal-body {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1960,7 +1961,7 @@
     border: 0;
 }
 
-.awareness.la-tpl-image .btn-close {
+.local-awareness-notice.local-awareness-tpl-image .btn-close {
     position: absolute;
     top: -1.25rem;
     inset-inline-end: -1.25rem;
@@ -1979,48 +1980,48 @@
     line-height: 1;
 }
 
-.awareness.la-tpl-image .btn-close:hover,
-.awareness.la-tpl-image .btn-close:focus-visible {
+.local-awareness-notice.local-awareness-tpl-image .btn-close:hover,
+.local-awareness-notice.local-awareness-tpl-image .btn-close:focus-visible {
     color: #fff;
     background-color: var(--la-brand);
 }
 
 /* The glyph rather than Bootstrap 5's image, which is drawn in a fixed black the hover above could
    not turn white on the brand disc. */
-.awareness.la-tpl-image[data-cross="image"] .btn-close {
+.local-awareness-notice.local-awareness-tpl-image[data-cross="image"] .btn-close {
     background-image: none;
 }
 
-.awareness.la-tpl-image[data-cross="image"] .btn-close > [data-region="close-glyph"] {
+.local-awareness-notice.local-awareness-tpl-image[data-cross="image"] .btn-close > [data-region="close-glyph"] {
     display: inline;
 }
 
 /* Not display: none - the footer carries d-flex, which Bootstrap declares with
    !important. Out of the flow and invisible is the same to a reader and to
    the keyboard, and it is what a plugin rule can win. */
-.awareness.la-tpl-image .modal-footer {
+.local-awareness-notice.local-awareness-tpl-image .modal-footer {
     position: absolute;
     visibility: hidden;
 }
 
 /* ---- Entrances. Transform and opacity only, 200-420 ms, on the dialog.
-   modal_notice.js adds the la-anim-* class after show() and drops it on
+   modal_notice.js adds the local-awareness-anim-* class after show() and drops it on
    animationend, so the jelly shake below can play on the same element later.
-   slide takes its edge from the position (la-from-top / la-from-bottom). ---- */
-@keyframes la-enter-fade {
+   slide takes its edge from the position (local-awareness-from-top / local-awareness-from-bottom). ---- */
+@keyframes local-awareness-enter-fade {
     from {
         opacity: 0;
     }
 }
 
-@keyframes la-enter-zoom {
+@keyframes local-awareness-enter-zoom {
     from {
         opacity: 0;
         transform: scale(0.94);
     }
 }
 
-@keyframes la-enter-spring {
+@keyframes local-awareness-enter-spring {
     0% {
         opacity: 0;
         transform: scale(0.9);
@@ -2036,38 +2037,38 @@
     }
 }
 
-@keyframes la-enter-slide-top {
+@keyframes local-awareness-enter-slide-top {
     from {
         opacity: 0;
         transform: translateY(-1.5rem);
     }
 }
 
-@keyframes la-enter-slide-bottom {
+@keyframes local-awareness-enter-slide-bottom {
     from {
         opacity: 0;
         transform: translateY(1.5rem);
     }
 }
 
-.awareness.la-anim-fade {
-    animation: la-enter-fade 260ms ease-out both;
+.local-awareness-notice.local-awareness-anim-fade {
+    animation: local-awareness-enter-fade 260ms ease-out both;
 }
 
-.awareness.la-anim-zoom {
-    animation: la-enter-zoom 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+.local-awareness-notice.local-awareness-anim-zoom {
+    animation: local-awareness-enter-zoom 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-.awareness.la-anim-spring {
-    animation: la-enter-spring 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+.local-awareness-notice.local-awareness-anim-spring {
+    animation: local-awareness-enter-spring 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-.awareness.la-anim-slide.la-from-top {
-    animation: la-enter-slide-top 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+.local-awareness-notice.local-awareness-anim-slide.local-awareness-from-top {
+    animation: local-awareness-enter-slide-top 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-.awareness.la-anim-slide.la-from-bottom {
-    animation: la-enter-slide-bottom 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+.local-awareness-notice.local-awareness-anim-slide.local-awareness-from-bottom {
+    animation: local-awareness-enter-slide-bottom 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 /* Both guards, hand-written because a plugin stylesheet is plain CSS and cannot
@@ -2075,17 +2076,17 @@
    every entrance to a fade and silences the refused-click shake; the test site
    gets none at all, because WebDriver clicks where the box was a frame ago. */
 @media (prefers-reduced-motion: reduce) {
-    .awareness[class*="la-anim-"] {
-        animation: la-enter-fade 200ms ease-out both;
+    .local-awareness-notice[class*="local-awareness-anim-"] {
+        animation: local-awareness-enter-fade 200ms ease-out both;
     }
 
-    .awareness.jelly-anim {
+    .local-awareness-notice.jelly-anim {
         animation: none;
     }
 }
 
-body.behat-site .awareness[class*="la-anim-"],
-body.behat-site .awareness.jelly-anim {
+body.behat-site .local-awareness-notice[class*="local-awareness-anim-"],
+body.behat-site .local-awareness-notice.jelly-anim {
     animation: none;
 }
 
@@ -2094,6 +2095,6 @@ body.behat-site .awareness.jelly-anim {
  * computed per row and cannot be a class. So the row wears no horizontal spacing utility: Bootstrap
  * declares those !important, and one would beat the inline indent. Its right padding is set here.
  */
-.competency-picker-item {
+.local-awareness-competency-picker-item {
     padding-right: 0.5rem;
 }

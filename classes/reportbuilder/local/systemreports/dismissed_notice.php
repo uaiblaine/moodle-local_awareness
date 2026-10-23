@@ -81,19 +81,16 @@ class dismissed_notice extends system_report {
          * would repeat on every row. The title needed for the download name is read directly below.
          */
 
-        $this->add_columns_from_entities([
-            'user:fullname',
-            'acknowledgement:username',
-            'acknowledgement:idnumber',
-            'acknowledgement:timecreated',
-        ]);
+        // The username and idnumber copies are identity fields, offered as core offers them, in the
+        // notice's own scope: a course notice's report is read with the course's capabilities.
+        $notice = awareness::get_record(['id' => $noticeid]);
+        $scope = $notice ? author_scope::of($notice) : null;
+        $identity = acknowledgement::identity_columns(
+            $scope && $scope->exists() ? $scope->context() : context_system::instance()
+        );
 
-        $this->add_filters_from_entities([
-            'user:fullname',
-            'acknowledgement:username',
-            'acknowledgement:idnumber',
-            'acknowledgement:timecreated',
-        ]);
+        $this->add_columns_from_entities(array_merge(['user:fullname'], $identity, ['acknowledgement:timecreated']));
+        $this->add_filters_from_entities(array_merge(['user:fullname'], $identity, ['acknowledgement:timecreated']));
 
         $this->set_initial_sort_column('acknowledgement:timecreated', SORT_DESC);
         // The download name identifies the notice by id and title; see acknowledged_notice::initialise().

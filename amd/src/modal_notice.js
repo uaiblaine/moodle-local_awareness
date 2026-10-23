@@ -60,10 +60,10 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
          * against it by tests/local/motion_contract_test.php.
          */
         var APPEARANCE = {
-            TEMPLATE: 'la-tpl-',
-            POSITION: 'la-pos-',
-            ANIMATION: 'la-anim-',
-            FROM: 'la-from-',
+            TEMPLATE: 'local-awareness-tpl-',
+            POSITION: 'local-awareness-pos-',
+            ANIMATION: 'local-awareness-anim-',
+            FROM: 'local-awareness-from-',
             LARGE: 'modal-lg',
             NONE: 'none',
             // The layouts narrower than, or shaped unlike, core's large dialogue. Mirrors awareness::COMPACT.
@@ -379,7 +379,7 @@ define(['jquery', 'core/modal', 'core/key_codes', 'core/templates', 'local_aware
         /**
          * Dress the dialogue as one of the layouts.
          *
-         * Swaps the layout class on the dialog, which is .awareness, and manages modal-lg itself:
+         * Swaps the layout class on the dialog, which is .local-awareness-notice, and manages modal-lg itself:
          * the template bakes that class in, so configure({large: true}) is a no-op against it and
          * a compact layout has to take it off by hand, for every notice including the first.
          *

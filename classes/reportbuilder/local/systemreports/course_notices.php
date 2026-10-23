@@ -85,29 +85,18 @@ class course_notices extends system_report {
             "LEFT JOIN {" . awareness::TABLE . "} {$noticealias} ON {$noticealias}.id = {$ackalias}.noticeid"
         ));
 
-        $this->add_columns_from_entities([
-            'user:fullname',
-            'acknowledgement:username',
-            'acknowledgement:idnumber',
-            'notice:title',
-            'acknowledgement:action',
-            'acknowledgement:timecreated',
-        ]);
+        // The username and idnumber copies are identity fields, offered as core offers them in the course.
+        $context = context_course::instance($courseid, IGNORE_MISSING);
+        $identity = acknowledgement::identity_columns($context ?: \context_system::instance());
+        $rest = ['notice:title', 'acknowledgement:action', 'acknowledgement:timecreated'];
 
-        $this->add_filters_from_entities([
-            'user:fullname',
-            'acknowledgement:username',
-            'acknowledgement:idnumber',
-            'notice:title',
-            'acknowledgement:action',
-            'acknowledgement:timecreated',
-        ]);
+        $this->add_columns_from_entities(array_merge(['user:fullname'], $identity, $rest));
+        $this->add_filters_from_entities(array_merge(['user:fullname'], $identity, $rest));
 
         $this->set_initial_sort_column('acknowledgement:timecreated', SORT_DESC);
 
         // By id and short name, for the reasons acknowledged_notice::initialise() gives for its title.
         $shortname = (string) $DB->get_field('course', 'shortname', ['id' => $courseid]);
-        $context = context_course::instance($courseid, IGNORE_MISSING);
         $downloadname = (object) [
             'id' => $courseid,
             'shortname' => core_text::substr(

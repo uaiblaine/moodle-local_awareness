@@ -16,7 +16,7 @@ contextlist, export and delete paths.
 `tests/privacy/provider_test.php::test_every_user_id_column_is_declared` sweeps
 every `userid`/`usermodified` column against `get_metadata()`, because core's
 compliance test finds user columns only through foreign keys to `{user}`. It
-integrates with core Report Builder (five datasources, two
+integrates with core Report Builder (five datasources, three
 system reports), the Cohort, Competency and Role subsystems, and injects itself
 into every page through the `before_footer_html_generation` hook.
 
@@ -269,24 +269,24 @@ Behat site fails every scenario on the same core locator and looks like your bug
   editor web services (`check_collision`, `estimate_audience`, `get_estimate`, `preview_notice`,
   `search_courses`, `search_roles`) taking `courseid`, gating on it and answering inside it. Their
   JavaScript reads the scope through one module, `local_awareness/editor_scope` (`courseId()`),
-  from the `data-courseid` that `editor_page` renders on `[data-region="la-editor"]` from the scope
+  from the `data-courseid` that `editor_page` renders on `[data-region="local-awareness-editor"]` from the scope
   the page resolved; no editor module reads it from the URL, where a course notice opened without
   `?courseid=` would read as the site. `tests/local/editor_js_contract_test.php` pins it. The
   per-rule chips are withheld at the READ for a course scope, because jobs are shared by criteria
   hash across scopes; a rival outside the scope is described, never named. A course-notice role
   needs enrolment or `moodle/course:view` beside `managecourse`.
 
-- **The dialogue's layout, position and entrance are `la-*` classes with hand-written CSS, and
+- **The dialogue's layout, position and entrance are `local-awareness-*` classes with hand-written CSS, and
   nothing in it may be a Bootstrap 5 utility.** The dialogue is injected on every page by the hook,
   and a backport of its markup lands on the 4.5 branch, where `modal-fullscreen`, `rounded-3`,
   `sticky-bottom`, `visually-hidden` and `fw-bold` resolve to nothing on any page. Specificity is
-  rarely the problem: `.awareness.la-x` (0,2,0) beats core's layout rules on `.modal-dialog`, and
+  rarely the problem: `.local-awareness-notice.local-awareness-x` (0,2,0) beats core's layout rules on `.modal-dialog`, and
   Bootstrap's `.modal.fade .modal-dialog` and `.modal.show .modal-dialog` (0,3,0) set only the
   transform and transition, which the plugin does not fight. What cannot be beaten is a utility,
   generated with `!important`, so the template carries no `bg-*`, and its one border utility is
   `border-0` on `.modal-content`, which both branches define; an edge the plugin wants is drawn
   some other way (the banner's brand edge). The keyboard focus ring is
-  `.awareness .modal-content button:focus-visible` (and `input`), (0,3,1), a 3px outline in
+  `.local-awareness-notice .modal-content button:focus-visible` (and `input`), (0,3,1), a 3px outline in
   `var(--la-brand)`: core's `button.btn-close:focus` and `input[type="checkbox"]:focus` zero the
   outline at (0,2,1) and come later in the compiled sheet, so a two-class selector ties and loses.
   `motion_contract_test::test_the_dialogue_keeps_a_visible_focus_ring` checks the specificity and
@@ -355,7 +355,7 @@ Behat site fails every scenario on the same core locator and looks like your bug
 - **Core puts a grouped radio INSIDE its label, and `.d-flex` is `!important`.**
   `element-radio-inline.mustache` (4.5 and 5.2 alike) renders `<label><input type="radio"> label</label>`,
   so a rule written `input:checked + label` matches nothing; the layout picker's states read
-  `input:checked + .la-layout-option`, the sibling the radio actually has, and a position label is
+  `input:checked + .local-awareness-layout-option`, the sibling the radio actually has, and a position label is
   found with `label:has(input...)`, which core's own Boost stylesheet uses on both branches. The
   group wraps its children in a `fieldset` before the `.d-flex`, whose `display: flex !important` no
   plugin rule can beat: the position grid is flex geometry (fixed cells, a container three cells
@@ -617,11 +617,20 @@ Behat site fails every scenario on the same core locator and looks like your bug
   comments, so a key named only in a test or a comment is dead, and it exempts only `_help`,
   `cachedef_` and `messageprovider:` keys (every task fetches its `task_` string in `get_name()`).
   `bootstrap_compat_test::code_lines()` follows multi-line `{{! }}` and `/* */` comments, so
-  template docblock prose is never scanned as markup. `stylesheet_contract_test` fails on a `la-*`, `local-awareness-*` or
-  `competency-picker-*` class the stylesheet styles and no shipped code emits, on a property set
+  template docblock prose is never scanned as markup. `stylesheet_contract_test` fails on a `local-awareness-*`
+  class the stylesheet styles and no shipped code emits, on a property set
   twice in one media context, on a form id selector not scoped to `.local-awareness-editor`, and
-  on a `.la-pagehead` heading level the shell does not render: removing markup that emits a class
+  on a `.local-awareness-pagehead` heading level the shell does not render: removing markup that emits a class
   means deleting its rule in the same change.
+- **Every class the stylesheet styles is `local-awareness-*`**, because
+  `marketplace_readiness_test::test_styles_are_namespaced` wants the component in every selector
+  (the plugins directory's CSS rule); the dialogue's root is `.local-awareness-notice`, its
+  `#awareness-*` ids are styled inside it, and the `--la-*` custom properties keep their names.
+- **The reports' username and idnumber columns are identity fields.** The three system reports
+  take them, column and filter, from `entities\acknowledgement::identity_columns()` in the notice's
+  scope context (`core_user\fields::get_identity_fields()`), so core's default `showuseridentity`
+  shows neither; `systemreports_test` and `course_notices_test` pin both directions. The
+  datasources offer them to report authors as core's user entity does.
 - **Removed API, and what replaced it in tests.** `awareness::get_all_notices()`,
   `window::open_sql()` and `linkhistory::count_clicked_links()` are gone: tests read notices with
   `awareness::get_records()`, and that two clicks are two rows is pinned by
