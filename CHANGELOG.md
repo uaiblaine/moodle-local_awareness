@@ -11,11 +11,16 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 #### Fixed
 
 - The acknowledgement, dismissal and course reports showed every row's username and ID number to
-  any reader of the reports. Both are identity fields: the columns and their filters now appear
-  only when the site lists the field in *Show user identity* (`showuseridentity`) and the viewer
-  holds `moodle/site:viewuseridentity` in the notice's context (the course, for a course notice),
-  as in core's own reports. With core's default (email only) neither column is shown; a site that
-  wants them adds `username` and `idnumber` to that setting.
+  any reader of the reports. They now show the user's identity fields as the site configures them
+  in *Show user identity* (`showuseridentity`), each as a column and a filter, under core's rules
+  and in the notice's context (the course, for a course notice), as core's own reports do: the
+  viewer needs `moodle/site:viewuseridentity`, a field in *Hide user fields* needs
+  `moodle/course:viewhiddenuserfields` (in a course) or `moodle/user:viewhiddendetails`, and a
+  custom profile field shows only where its visibility lets the viewer see it (core's report
+  builder also checks that at the site). With core's default
+  the email is shown. The values are the user's current ones, read through core's user entity, and
+  a deleted user shows none. The username and ID number copied into each row are no longer columns
+  or filters of these three reports; they stay in the table and in the custom report sources.
 - Every stylesheet selector now names the component. The plugin's classes were renamed from `la-*`,
   `awareness` and `competency-picker-item` to `local-awareness-*` (the dialogue is
   `.local-awareness-notice`, the audience panel's chip `.local-awareness-rulechip`), and the
