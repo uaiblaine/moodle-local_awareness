@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project follows Semantic Versioning principles where possible.
 
+## [v5.3-r2] - Unreleased
+
+### Plugins directory submission guidelines (version 2026100502)
+
+#### Fixed
+
+- The acknowledgement, dismissal and course reports showed every row's username and ID number to
+  any reader of the reports. They now show the user's identity fields as the site configures them
+  in *Show user identity* (`showuseridentity`), each as a column and a filter, under core's rules
+  and in the notice's context (the course, for a course notice), as core's own reports do: the
+  viewer needs `moodle/site:viewuseridentity`, a field in *Hide user fields* needs
+  `moodle/course:viewhiddenuserfields` (in a course) or `moodle/user:viewhiddendetails`, and a
+  custom profile field shows only where its visibility lets the viewer see it (core's report
+  builder also checks that at the site). With core's default
+  the email is shown. The values are the user's current ones, read through core's user entity, and
+  a deleted user shows none. The username and ID number copied into each row are no longer columns
+  or filters of these three reports; they stay in the table and in the custom report sources.
+- Every stylesheet selector now names the component. The plugin's classes were renamed from `la-*`,
+  `awareness` and `competency-picker-item` to `local-awareness-*` (the dialogue is
+  `.local-awareness-notice`, the audience panel's chip `.local-awareness-rulechip`), and the
+  dialogue's two id rules are read inside it. A theme that styled the old names must follow them.
+- The tests that read `lang/pt_br` skip it when it is absent, so the suite runs from the release
+  package.
+
+#### Added
+
+- `LICENSE` (the GPL v3 text, as `COPYING.txt`), shipped in the package.
+- `tests/marketplace_readiness_test.php`, the fleet's file-reading check of the directory's
+  requirements (licence files, English-only package, data-only lang files, README coverage,
+  setting names, scoped CSS, boilerplate, privacy cover of stamped core rows).
+- README sections "Data stored" (every table, what it keeps, how long, what removes it, and what a
+  data request exports and deletes), the two missing settings, the scheduled tasks, identity fields
+  in the reports, "Translations" and "License".
+- `mutations/gates.conf`, the mutation spec of these guards (export-ignored).
+
+#### Changed
+
+- `lang/pt_br` leaves the release package (`export-ignore`): the plugins directory accepts only
+  English strings, and the Brazilian Portuguese translation reaches sites through AMOS. It stays
+  in the repository.
+- The README no longer calls the audience estimate asynchronous (it is interactive below the
+  *Interactive audience estimate limit*) or the notice cache session-based (both caches are
+  application caches).
+
 ## [v5.3-r1] - 2026-10-21
 
 ### Moodle 5.3 clean-up on `main` (version 2026100501)

@@ -178,9 +178,15 @@ final class lang_usage_test extends \basic_testcase {
     /**
      * The two packs define exactly the same keys.
      *
+     * Skipped where lang/pt_br is absent: it is export-ignored, so a site installed from the release
+     * package has the English pack only, and translations reach it through AMOS.
+     *
      * @return void
      */
     public function test_the_packs_are_in_lockstep(): void {
+        if (!is_file($this->plugin_root() . '/lang/pt_br/local_awareness.php')) {
+            $this->markTestSkipped('lang/pt_br is not in the release package; the lockstep is checked in the repository.');
+        }
         $keys = [];
         foreach (['en', 'pt_br'] as $pack) {
             $source = file_get_contents($this->plugin_root() . '/lang/' . $pack . '/local_awareness.php');

@@ -85,14 +85,14 @@ final class editor_js_contract_test extends \advanced_testcase {
             (new editor_page($notice, '', $scope))->export_for_template($output)
         );
         $this->assertMatchesRegularExpression(
-            '/data-region="la-editor"[^>]*data-courseid="' . $course->id . '"/',
+            '/data-region="local-awareness-editor"[^>]*data-courseid="' . $course->id . '"/',
             $html,
             'the editor root no longer carries the scope the page resolved'
         );
 
         // The one reader of that attribute.
         $reader = $this->read('amd/src/editor_scope.js');
-        $this->assertStringContainsString('[data-region="la-editor"]', $reader);
+        $this->assertStringContainsString('[data-region="local-awareness-editor"]', $reader);
         $this->assertStringContainsString("getAttribute('data-courseid')", $reader);
 
         foreach (self::SCOPED_MODULES as $module) {

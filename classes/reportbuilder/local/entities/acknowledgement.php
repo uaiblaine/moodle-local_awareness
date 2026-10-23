@@ -36,6 +36,11 @@ use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
  * Maps to local_awareness_ack which stores both dismissed (action=0) and
  * acknowledged (action=1) interactions.
  *
+ * The username, names and idnumber are copies taken when the row was written. They are offered to
+ * custom report authors, as core's user entity offers the live fields; the system reports leave the
+ * username and idnumber copies out and show the live identity fields under core's identity rule
+ * ({@see \local_awareness\reportbuilder\local\systemreports\identity_fields}).
+ *
  * @package    local_awareness
  * @copyright  2026 Anderson Blaine
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later

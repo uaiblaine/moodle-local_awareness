@@ -40,39 +40,39 @@
         }
     }
 }}
-<section class="la-audience"
-         data-region="la-audience"
+<section class="local-awareness-audience"
+         data-region="local-awareness-audience"
          data-threshold="{{audience.threshold}}"
          data-auto="{{audience.auto}}"
          data-poll-interval-ms="{{audience.poll_interval_ms}}"
          data-poll-max="{{audience.poll_max}}"
-         aria-labelledby="la-audience-title">
-    <header class="la-audience-head">
-        <h3 id="la-audience-title" class="la-audience-title">
+         aria-labelledby="local-awareness-audience-title">
+    <header class="local-awareness-audience-head">
+        <h3 id="local-awareness-audience-title" class="local-awareness-audience-title">
             <i class="fa fa-bullseye" aria-hidden="true"></i>
             {{#str}}audience:title, local_awareness{{/str}}
         </h3>
     </header>
 
-    <dl class="la-audience-summary" data-slot="summary">
+    <dl class="local-awareness-audience-summary" data-slot="summary">
         {{#audience.summary}}
-            <div class="la-audience-summary-item">
+            <div class="local-awareness-audience-summary-item">
                 <dt>{{label}}</dt>
                 <dd data-summary-key="{{key}}">{{value}}</dd>
             </div>
         {{/audience.summary}}
     </dl>
 
-    <div class="la-audience-reach" data-slot="reach"
+    <div class="local-awareness-audience-reach" data-slot="reach"
          aria-live="polite" aria-atomic="true">
-        <div class="la-audience-reach-meta">
-            <span class="la-audience-reach-label">{{#str}}audience:reach:label, local_awareness{{/str}}</span>
-            <span class="la-audience-reach-state" data-slot="state">
+        <div class="local-awareness-audience-reach-meta">
+            <span class="local-awareness-audience-reach-label">{{#str}}audience:reach:label, local_awareness{{/str}}</span>
+            <span class="local-awareness-audience-reach-state" data-slot="state">
                 {{#audience.initialstate_idle}}{{#str}}audience:state:idle, local_awareness{{/str}}{{/audience.initialstate_idle}}
                 {{#audience.initialstate_cached}}{{audience.cachedlabel}}{{/audience.initialstate_cached}}
             </span>
         </div>
-        <div class="la-audience-reach-value" data-slot="value">
+        <div class="local-awareness-audience-reach-value" data-slot="value">
             {{! hascount, not initialcount: a real audience of zero is a number worth showing, and
                 a section on the value itself would render it as "not calculated". }}
             {{#audience.hascount}}{{audience.initialcountformatted}}{{/audience.hascount}}
@@ -80,30 +80,30 @@
         </div>
     </div>
 
-    <div class="la-audience-actions" data-slot="actions">
-        <button type="button" class="la-btn la-btn--brand" data-action="calculate"
+    <div class="local-awareness-audience-actions" data-slot="actions">
+        <button type="button" class="local-awareness-btn local-awareness-btn--brand" data-action="calculate"
                 {{#audience.autotrigger}}hidden{{/audience.autotrigger}}>
             <i class="fa fa-bolt" aria-hidden="true"></i>
             {{#str}}audience:btn:calculate, local_awareness{{/str}}
         </button>
-        <button type="button" class="la-btn la-btn--ghost" data-action="retry" hidden>
+        <button type="button" class="local-awareness-btn local-awareness-btn--ghost" data-action="retry" hidden>
             <i class="fa fa-refresh" aria-hidden="true"></i>
             {{#str}}audience:btn:retry, local_awareness{{/str}}
         </button>
     </div>
 
-    <div class="la-audience-breakdown" data-slot="breakdown" hidden></div>
+    <div class="local-awareness-audience-breakdown" data-slot="breakdown" hidden></div>
 
-    <div class="la-audience-context" data-slot="context"
+    <div class="local-awareness-audience-context" data-slot="context"
          {{^audience.contextrules}}hidden{{/audience.contextrules}}>
-        <h4 class="la-audience-context-title">
+        <h4 class="local-awareness-audience-context-title">
             <i class="fa fa-filter" aria-hidden="true"></i>
             {{#str}}audience:context_restrictions:title, local_awareness{{/str}}
         </h4>
-        <p class="la-audience-context-hint">{{#str}}audience:context_restrictions:hint, local_awareness{{/str}}</p>
-        <ul class="la-audience-chips" data-slot="contextchips">
+        <p class="local-awareness-audience-context-hint">{{#str}}audience:context_restrictions:hint, local_awareness{{/str}}</p>
+        <ul class="local-awareness-audience-chips" data-slot="contextchips">
             {{#audience.contextrules}}
-                <li class="la-chip" data-key="{{key}}">{{label}}</li>
+                <li class="local-awareness-rulechip" data-key="{{key}}">{{label}}</li>
             {{/audience.contextrules}}
         </ul>
     </div>

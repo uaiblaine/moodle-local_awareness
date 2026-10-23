@@ -105,7 +105,11 @@ final class motion_contract_test extends \basic_testcase {
     public function test_every_dialogue_animation_has_both_motion_guards(): void {
         $css = $this->css();
 
-        preg_match_all('/\.awareness(?:\.[a-z0-9-]+)*\s*\{[^}]*\banimation\s*:\s*la-enter-[^;]+;/', $css, $matches);
+        preg_match_all(
+            '/\.local-awareness-notice(?:\.[a-z0-9-]+)*\s*\{[^}]*\banimation\s*:\s*local-awareness-enter-[^;]+;/',
+            $css,
+            $matches
+        );
         $animated = $matches[0];
         $this->assertGreaterThanOrEqual(5, count($animated), 'Found too few entrance rules for the scan to mean anything.');
 
@@ -114,30 +118,31 @@ final class motion_contract_test extends \basic_testcase {
         $reduced = implode("\n", $blocks[1]);
         $this->assertNotEmpty($reduced, 'No prefers-reduced-motion block in styles.css.');
         $this->assertMatchesRegularExpression(
-            '/\.awareness\[class\*="la-anim-"\]\s*\{[^}]*animation\s*:\s*(none|la-enter-fade)/',
+            '/\.local-awareness-notice\[class\*="local-awareness-anim-"\]\s*\{[^}]*'
+                . 'animation\s*:\s*(none|local-awareness-enter-fade)/',
             $reduced,
             'The reduced-motion block does not collapse the entrance animations.'
         );
         $this->assertMatchesRegularExpression(
-            '/\.awareness\.jelly-anim\s*\{[^}]*animation\s*:\s*none/',
+            '/\.local-awareness-notice\.jelly-anim\s*\{[^}]*animation\s*:\s*none/',
             $reduced,
             'The refused-click shake still plays under reduced motion.'
         );
 
         $this->assertMatchesRegularExpression(
-            '/body\.behat-site\s+\.awareness\[class\*="la-anim-"\][^{]*\{[^}]*animation\s*:\s*none/',
+            '/body\.behat-site\s+\.local-awareness-notice\[class\*="local-awareness-anim-"\][^{]*\{[^}]*animation\s*:\s*none/',
             $css,
             'The test site still gets the entrance animations.'
         );
         $this->assertMatchesRegularExpression(
-            '/body\.behat-site[^{]*\.awareness\.jelly-anim[^{]*\{[^}]*animation\s*:\s*none/',
+            '/body\.behat-site[^{]*\.local-awareness-notice\.jelly-anim[^{]*\{[^}]*animation\s*:\s*none/',
             $css,
             'The test site still gets the refused-click shake.'
         );
 
         // Every declared entrance is at least 200 ms: anything shorter reads as a flicker.
         foreach ($animated as $rule) {
-            preg_match('/animation\s*:\s*la-enter-[a-z-]+\s+(\d+)ms/', $rule, $duration);
+            preg_match('/animation\s*:\s*local-awareness-enter-[a-z-]+\s+(\d+)ms/', $rule, $duration);
             $this->assertNotEmpty($duration, "Entrance rule without a millisecond duration: {$rule}");
             $this->assertGreaterThanOrEqual(200, (int) $duration[1], $rule);
         }
@@ -154,14 +159,30 @@ final class motion_contract_test extends \basic_testcase {
         $css = $this->css();
 
         foreach (array_diff(awareness::TEMPLATES, ['classic']) as $template) {
-            $this->assertStringContainsString(".awareness.la-tpl-{$template}", $css, "No rule for the {$template} layout.");
+            $this->assertStringContainsString(
+                ".local-awareness-notice.local-awareness-tpl-{$template}",
+                $css,
+                "No rule for the {$template} layout."
+            );
         }
         foreach (array_diff(awareness::POSITIONS, ['center']) as $position) {
-            $this->assertStringContainsString(".awareness.la-pos-{$position}", $css, "No rule for the {$position} position.");
+            $this->assertStringContainsString(
+                ".local-awareness-notice.local-awareness-pos-{$position}",
+                $css,
+                "No rule for the {$position} position."
+            );
         }
-        $this->assertStringContainsString('.awareness.la-pos-center', $css, 'The centre is a real centre, and needs its rule.');
+        $this->assertStringContainsString(
+            '.local-awareness-notice.local-awareness-pos-center',
+            $css,
+            'The centre is a real centre, and needs its rule.'
+        );
         foreach (array_diff(awareness::ANIMATIONS, ['none']) as $animation) {
-            $this->assertStringContainsString(".awareness.la-anim-{$animation}", $css, "No rule for the {$animation} entrance.");
+            $this->assertStringContainsString(
+                ".local-awareness-notice.local-awareness-anim-{$animation}",
+                $css,
+                "No rule for the {$animation} entrance."
+            );
         }
     }
 
@@ -176,7 +197,7 @@ final class motion_contract_test extends \basic_testcase {
         $rules = $this->rules($this->css());
         $checked = 0;
         foreach ($rules as [$selector, $declarations]) {
-            if (!str_contains($selector, '.la-tpl-') || !str_contains($selector, '.modal-header')) {
+            if (!str_contains($selector, '.local-awareness-tpl-') || !str_contains($selector, '.modal-header')) {
                 continue;
             }
             $checked++;
@@ -197,7 +218,7 @@ final class motion_contract_test extends \basic_testcase {
         $template = $this->read('templates/modal_notice.mustache');
         $this->assertMatchesRegularExpression(
             '/<div class="modal-header[^>]*data-region="header">.*?id="awareness-closebtn".*?<\/div>\s*'
-                . '(?:\{\{!.*?\}\}\s*)?<div class="la-media"/s',
+                . '(?:\{\{!.*?\}\}\s*)?<div class="local-awareness-media"/s',
             $template,
             'The header close button has moved out of the header.'
         );
@@ -237,8 +258,8 @@ final class motion_contract_test extends \basic_testcase {
 
         /*
          * What each addressed element wears, read from the template: every class except the
-         * subjects themselves, core's modal-* component names, the plugin's own names (awareness,
-         * la-*) and Mustache blocks. Whatever is left is a utility and must be in $owners.
+         * subjects themselves, core's modal-* component names, the plugin's own names (local-awareness-*)
+         * and Mustache blocks. Whatever is left is a utility and must be in $owners.
          */
         preg_match_all('/<(?:div|button|h5|input)\b[^>]*\bclass="([^"]+)"/', $this->read('templates/modal_notice.mustache'), $tags);
         $worn = [];
@@ -248,8 +269,7 @@ final class motion_contract_test extends \basic_testcase {
                 if (in_array($subject, $list, true)) {
                     $worn[$subject] = array_values(array_filter($list, static function (string $class) use ($subjects): bool {
                         return !in_array($class, $subjects, true)
-                            && $class !== 'awareness'
-                            && !preg_match('/^(la|modal)-/', $class);
+                            && !preg_match('/^(local-awareness|modal)-/', $class);
                     }));
                 }
             }
@@ -310,7 +330,7 @@ final class motion_contract_test extends \basic_testcase {
         $rings = [];
         foreach ($this->rules($this->css()) as [$group, $declarations]) {
             foreach (array_map('trim', explode(',', $group)) as $selector) {
-                if (!str_contains($selector, ':focus') || !preg_match('/\.(awareness|la-carousel)\b/', $selector)) {
+                if (!str_contains($selector, ':focus') || !preg_match('/\.local-awareness-(notice|carousel)\b/', $selector)) {
                     continue;
                 }
                 $focusrules++;
@@ -339,8 +359,8 @@ final class motion_contract_test extends \basic_testcase {
 
         // The ring reaches the carousel because its arrows and dots are buttons inside the content box.
         $carousel = $this->read('templates/notice/carousel.mustache');
-        $this->assertSame(2, preg_match_all('/<button\b[^>]*\bclass="la-carousel-arrow\b/', $carousel));
-        $this->assertSame(1, preg_match_all('/<button\b[^>]*\bclass="la-carousel-dot\b/', $carousel));
+        $this->assertSame(2, preg_match_all('/<button\b[^>]*\bclass="local-awareness-carousel-arrow\b/', $carousel));
+        $this->assertSame(1, preg_match_all('/<button\b[^>]*\bclass="local-awareness-carousel-dot\b/', $carousel));
         $this->assertMatchesRegularExpression(
             '/<div class="modal-content\b.*data-region="carousel"/s',
             $this->read('templates/modal_notice.mustache'),
@@ -441,8 +461,8 @@ final class motion_contract_test extends \basic_testcase {
             $js,
             'the module no longer names the layout that covers the screen'
         );
-        $this->assertStringContainsString('la-zones-covered', $js, 'the covered state is never applied');
-        $this->assertStringContainsString('la-position-note', $js, 'the note is never revealed');
+        $this->assertStringContainsString('local-awareness-zones-covered', $js, 'the covered state is never applied');
+        $this->assertStringContainsString('local-awareness-position-note', $js, 'the note is never revealed');
 
         /*
          * The note's words belong to the form; only its visibility is the module's business. Read
@@ -464,7 +484,7 @@ final class motion_contract_test extends \basic_testcase {
      *
      * A grouped radio is <label><input> ...</label> (element-radio-inline.mustache, 4.5 and 5.2):
      * the option template is the input's next sibling and the label is its parent. So the only
-     * combinator that reaches the option from the radio's state is "+ .la-layout-option", and a
+     * combinator that reaches the option from the radio's state is "+ .local-awareness-layout-option", and a
      * rule written "+ label" is dead. The markup half of this contract is
      * tests/form/picker_render_test.php.
      */
@@ -479,7 +499,7 @@ final class motion_contract_test extends \basic_testcase {
                 if (preg_match('/input\[name="template"\]:(checked|focus-visible)/', $part)) {
                     $states[] = $part;
                     $this->assertMatchesRegularExpression(
-                        '/:(checked|focus-visible)\s*\+\s*\.la-layout-option/',
+                        '/:(checked|focus-visible)\s*\+\s*\.local-awareness-layout-option/',
                         $part,
                         'a picker state rule does not read the option as the radio\'s next sibling'
                     );
@@ -518,7 +538,7 @@ final class motion_contract_test extends \basic_testcase {
         $found = [];
         foreach ($this->rules($this->css()) as [$group, $declarations]) {
             foreach (array_map('trim', explode(',', $group)) as $selector) {
-                $image = str_contains($selector, '.la-tpl-image');
+                $image = str_contains($selector, '.local-awareness-tpl-image');
                 $marked = str_contains($selector, '[data-cross="image"]');
                 $onglyph = str_ends_with($selector, '.btn-close > [data-region="close-glyph"]');
                 if ($marked && $onglyph && !$image && preg_match('/display\s*:\s*none/', $declarations)) {
