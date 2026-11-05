@@ -27,6 +27,7 @@ use core_text;
 use lang_string;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
+use local_awareness\local\group_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\reportbuilder\local\entities\acknowledgement;
 use local_awareness\reportbuilder\local\entities\notice;
@@ -73,6 +74,21 @@ class course_notices extends system_report {
         $noticeids = self::reachable_notice_ids($courseid) ?: [0];
         [$insql, $inparams] = $DB->get_in_or_equal($noticeids, SQL_PARAMS_NAMED, database::generate_param_name() . '_');
         $this->add_base_condition_sql("{$ackalias}.noticeid {$insql}", $inparams);
+
+        /*
+         * Separate groups confine the people as well as the notices: a confined reader sees only the
+         * rows of participants who share one of their groups, whatever notice the rows belong to, a
+         * notice for the whole course included ({@see group_scope::members_only_sql()}).
+         */
+        if ($courseid > SITEID) {
+            [$membersql, $memberparams] = group_scope::for_author(author_scope::course($courseid))->members_only_sql(
+                "{$ackalias}.userid",
+                database::generate_param_name() . '_'
+            );
+            if ($membersql !== '') {
+                $this->add_base_condition_sql($membersql, $memberparams);
+            }
+        }
 
         $userentity = new user();
         $useralias = $userentity->get_table_alias('user');

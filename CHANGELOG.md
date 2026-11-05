@@ -6,6 +6,49 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [v5.3-r2] - Unreleased
 
+### Security audit of November 2026 (version 2026100503)
+
+#### Security
+
+- **Separate groups now hold for notices for the whole course.** In a course in separate groups
+  mode, an author without `moodle/site:accessallgroups` could publish a notice for everyone in the
+  course (by leaving the groups field empty, or by having no group, when the field was hidden), and
+  could edit, switch, reset or delete the course-wide notices of a coordinator. They must now
+  choose at least one of their own groups; the field is shown to them even with no group to offer,
+  and the save refuses an empty choice. They still read a notice for the whole course and its
+  reports, and the list offers them its preview and reports only.
+- **The reports respect separate groups row by row.** The acknowledgement, dismissal and course
+  reports listed a confined reader every participant who had answered a notice for the whole
+  course, or a notice whose members had since changed groups, with their identity fields, on screen
+  and in every download. They now list only the participants who share one of the reader's groups.
+- **A rival notice for another group is no longer named.** The conflict warning (in the editor and
+  after a save) gave a confined author the title of a repeating notice aimed only at another group;
+  it now says "a notice for groups you cannot access". The counts above the list no longer include
+  such notices either.
+- **A suspended or ended enrolment closes the course's notices and reports.** A course role
+  outlives its enrolment, and the per-notice report pages, core's report web service and the report
+  download asked only the capability, so an ex-tutor kept reading and exporting the reports. A
+  capability held in a course, and not at the system level, now counts only with an active
+  enrolment or `moodle/course:view`, on every route.
+- **Report cells clean the notice body.** A custom report with the notice's Content column rendered
+  every notice of the site, course notices included, without cleaning, so a course author's script
+  ran in the session of the administrator who opened the report. The column now cleans the body;
+  the dialogue still renders it as written, as `local/awareness:managecourse`'s `RISK_XSS` declares.
+- **Notice files that are not media or PDF are downloaded.** The content area accepts any file, and
+  an HTML or XML document opened from it rendered as the site. Images (but SVG, which core already
+  downloads), audio, video and PDF still open in the browser.
+- **A site notice limited to courses or categories serves its files to those courses only.** Its
+  images and attachments were served to anyone logged in who guessed the notice's id. They now need
+  a place in a listed course, or in a course of a listed category.
+- **An audience estimate is reported only to the author who asked for it.** A save whose filters
+  matched another author's estimate in progress joined that estimate, and the other author was then
+  notified with the saved notice's title. A save now joins only its own author's estimate.
+
+#### Fixed
+
+- A reader holding only the reports capability saw broken images in the list's preview of an
+  unpublished notice: the file gate admitted authors only.
+
 ### Plugins directory submission guidelines (version 2026100502)
 
 #### Fixed

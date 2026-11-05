@@ -234,6 +234,9 @@ class helper {
             );
         }
         $criteria = $result->criteria();
+        if ($scope->addresses_unreachable_groups($criteria)) {
+            throw new \invalid_parameter_exception('Refused by the author scope: filter_groups');
+        }
 
         $filterfields = [
             'filter_role_context',
@@ -881,7 +884,23 @@ class helper {
     }
 
     /**
-     * Refuse an action on a notice whose groups the current user may not reach.
+     * Whether a user may change a notice as far as its groups go.
+     *
+     * Stricter than may_reach_groups() for a notice naming no group: a confined user reads a
+     * notice for the whole course, but may not save, switch, reset or delete one, since the whole
+     * course holds the groups they are kept from ({@see group_scope::may_write()}). Asked by every
+     * write: the five action methods through require_group_reach(), the editor page through
+     * resolve_notice_as_author() and the list's row actions.
+     *
+     * @param awareness $notice The notice.
+     * @return bool
+     */
+    public static function may_write_groups(awareness $notice): bool {
+        return group_scope::for_author(author_scope::of($notice))->may_write(group_scope::targeted($notice));
+    }
+
+    /**
+     * Refuse an action on a notice whose groups the current user may not change.
      *
      * The capability named is the one that would open it: the author holds the plugin's own, or
      * require_author() would have refused first.
@@ -890,7 +909,7 @@ class helper {
      * @throws \required_capability_exception
      */
     private static function require_group_reach(awareness $notice): void {
-        if (!self::may_reach_groups($notice)) {
+        if (!self::may_write_groups($notice)) {
             throw new \required_capability_exception(
                 author_scope::of($notice)->context(),
                 'moodle/site:accessallgroups',
@@ -1736,6 +1755,25 @@ class helper {
         if (!$allowed && !$scope->is_site() && $coursecapability !== null) {
             $allowed = has_capability($coursecapability, $context);
         }
+
+        /*
+         * A role held in a course outlives the enrolment that gave it: suspending or ending an
+         * enrolment leaves the role assignment, so has_capability() still answers yes for an
+         * ex-tutor. Pages close that through require_login($course); the report web services and
+         * downloads core builds from client parameters ask only this method. So a capability held
+         * in the course, and not at the system level, counts only for someone with a place in the
+         * course: an active enrolment, or moodle/course:view (is_viewing()), the two require_login()
+         * accepts besides guest access, which grants nobody an author's authority. Either verb's
+         * capability held at the system level is a site-wide grant no enrolment gave or can end.
+         */
+        if ($allowed && !$scope->is_site()) {
+            $system = \context_system::instance();
+            $sitewide = has_capability($sitecapability, $system)
+                || ($coursecapability !== null && has_capability($coursecapability, $system));
+            if (!$sitewide) {
+                $allowed = is_enrolled($context, null, '', true) || is_viewing($context);
+            }
+        }
         if (!$allowed && $throw) {
             $refused = $scope->is_site() ? $sitecapability : ($coursecapability ?? $sitecapability);
             throw new \required_capability_exception($context, $refused, 'nopermissions', '');
@@ -1765,8 +1803,11 @@ class helper {
             throw new \moodle_exception('notification:noticedoesnotexist', 'local_awareness');
         }
         // The same answer for a notice aimed only at groups the caller may not reach: under separate
-        // groups that notice is not theirs to know about, and the list never showed it.
-        if ($notice !== null && !self::may_reach_groups($notice)) {
+        // groups that notice is not theirs to know about, and the list never showed it. Managing asks
+        // for more, the right to change it: a confined author reads a notice for the whole course
+        // and its reports, and may not open it in the editor.
+        $reach = $verb === 'manage' ? self::may_write_groups(...) : self::may_reach_groups(...);
+        if ($notice !== null && !$reach($notice)) {
             throw new \moodle_exception('notification:noticedoesnotexist', 'local_awareness');
         }
 
@@ -1779,9 +1820,10 @@ class helper {
      * The gate local_awareness_pluginfile() stands behind, kept here so it can be tested without
      * serving a file. A file URL carries a notice id and nothing about where the reader came from,
      * so the audience is resolved the way the web-service writes resolve it, through
-     * is_notice_available_to_user(). The page-dependent rules in check_filters() (category, course,
-     * format, theme, competency) need a page URL this request has not got, so this gate is PARTIAL
-     * by construction.
+     * is_notice_available_to_user(). The page-dependent rules in check_filters() need a page URL
+     * this request has not got; the course and category rules of a site notice are answered from
+     * the user's place in the courses they name ({@see self::may_reach_course_rules_of()}), and the
+     * format, theme and competency rules are not, so this gate is PARTIAL by construction.
      *
      * Authors bypass it so the editor and the manage table can render an unpublished notice, judged
      * in the notice's own scope and within its group reach: a course author reaches the files of
@@ -1795,7 +1837,9 @@ class helper {
         global $DB;
 
         $scope = author_scope::of($notice);
-        if (self::require_author($scope, 'manage', false) && self::may_reach_groups($notice)) {
+        // Either verb: a reports reader is offered the list's preview, which shows these files.
+        $author = self::require_author($scope, 'manage', false) || self::require_author($scope, 'viewreports', false);
+        if ($author && self::may_reach_groups($notice)) {
             return true;
         }
 
@@ -1812,9 +1856,89 @@ class helper {
             if (!$course || !can_access_course($course, null, '', true)) {
                 return false;
             }
+        } else if (!self::may_reach_course_rules_of($notice)) {
+            return false;
         }
 
         return self::is_notice_available_to_user($notice);
+    }
+
+    /**
+     * Whether the current user has a place in a course a site notice's course rules point at.
+     *
+     * The file gate's answer to the course and category rules it cannot evaluate without a page.
+     * check_filters() shows such a notice only on a page of a listed course, or of a course in a
+     * listed category (that category itself, not its children), and only to someone that course
+     * admits; so its files are for someone some such course admits. A listed course is asked as
+     * check_filters() asks, through can_access_course() with active enrolments, guest access
+     * included. A category alone is answered from the user's active enrolments, or
+     * moodle/course:view in the category, because asking every course of a category would cost a
+     * query per course on every file request; a guest of such a course is not served the files.
+     * Both rules together are the courses listed in those categories, as check_filters() ANDs them.
+     *
+     * @param awareness $notice A site notice.
+     * @return bool True when the notice names neither rule, or the user reaches a course it names.
+     */
+    private static function may_reach_course_rules_of(awareness $notice): bool {
+        global $DB;
+
+        $filters = json_decode((string) $notice->get('filtervalues'), true);
+        if (!is_array($filters)) {
+            return true;
+        }
+        $courseids = empty($filters['filter_course']) ? [] : array_map('intval', (array) $filters['filter_course']);
+        $categoryids = empty($filters['filter_category']) ? [] : array_map('intval', (array) $filters['filter_category']);
+        if ($courseids === [] && $categoryids === []) {
+            return true;
+        }
+
+        if ($courseids !== []) {
+            [$insql, $params] = $DB->get_in_or_equal($courseids);
+            foreach ($DB->get_records_select('course', "id {$insql}", $params) as $course) {
+                if ($categoryids !== [] && !in_array((int) $course->category, $categoryids, true)) {
+                    continue;
+                }
+                if (can_access_course($course, null, '', true)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        foreach (enrol_get_my_courses() as $course) {
+            if (in_array((int) $course->category, $categoryids, true)) {
+                return true;
+            }
+        }
+        foreach ($categoryids as $categoryid) {
+            $context = \context_coursecat::instance($categoryid, IGNORE_MISSING);
+            if ($context && has_capability('moodle/course:view', $context)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether a notice's file may be shown in the browser rather than downloaded.
+     *
+     * Files are served from the site's own origin, and the content area takes any type, so an HTML,
+     * XHTML or XML document there would run its scripts as the site when opened. Only media and
+     * PDF render without doing that; everything else is sent as an attachment. SVG is an image that
+     * runs scripts, and core's send_file() already forces it to download.
+     *
+     * @param string $mimetype The stored file's MIME type.
+     * @return bool
+     */
+    public static function serves_inline(string $mimetype): bool {
+        if ($mimetype === 'application/pdf') {
+            return true;
+        }
+        $family = strtok($mimetype, '/');
+
+        return in_array($family, ['image', 'audio', 'video'], true) && !file_is_svg_image_from_mimetype($mimetype);
     }
 
     /**
@@ -2088,15 +2212,27 @@ class helper {
      * building a persistent per row would cost one extra query per report row.
      *
      * Both entry points come through here so the rules exist once, and the report and the modal
-     * cannot drift apart.
+     * cannot drift apart in anything but the cleaning.
+     *
+     * The dialogue renders the body unclean, which is what local/awareness:managecourse's RISK_XSS
+     * declares: its reader opened a page the notice was published on. A report cell is cleaned,
+     * because a custom report lists every notice of the site, course notices included, to an
+     * administrator who opened a report, not a course: unclean there, any course author's script
+     * would run in that session without anyone choosing to look at their notice.
      *
      * @param string $content Stored content, as the author wrote it.
      * @param int $contentformat One of the FORMAT_* constants.
      * @param int $noticeid Notice id, which is the itemid of the content file area.
+     * @param bool $clean Whether to run the body through Moodle's HTML cleaning; false for the dialogue.
      * @return string HTML ready to place in the modal.
      * @throws \coding_exception
      */
-    public static function render_content_parts(string $content, int $contentformat, int $noticeid): string {
+    public static function render_content_parts(
+        string $content,
+        int $contentformat,
+        int $noticeid,
+        bool $clean = false
+    ): string {
         $content = file_rewrite_pluginfile_urls(
             $content,
             'pluginfile.php',
@@ -2107,7 +2243,7 @@ class helper {
         );
 
         return format_text($content, $contentformat, [
-            'noclean' => true,
+            'noclean' => !$clean,
             'context' => \context_system::instance(),
         ]);
     }

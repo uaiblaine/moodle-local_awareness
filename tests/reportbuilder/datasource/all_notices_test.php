@@ -23,6 +23,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/datasource_testcase.php');
 
 use core_reportbuilder_generator;
+use local_awareness\helper;
 use local_awareness\reportbuilder\datasource\all_notices;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -241,6 +242,38 @@ final class all_notices_test extends datasource_testcase {
 
         // And the ordinary case still carries its markup through.
         $this->assertStringContainsString('<em>policy</em>', $cells['Html row']);
+    }
+
+    /**
+     * The content column cleans the body, which the dialogue renders as written.
+     *
+     * A custom report lists every notice of the site, course notices included, to whoever opened
+     * the report, so a course author's script must not run there. The dialogue rendering the same
+     * row unclean is the control that the cleaning is the column's, not the stored content's.
+     */
+    public function test_the_content_column_cleans_the_body(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $course = $this->getDataGenerator()->create_course();
+        $notice = $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice([
+            'title' => 'Course row',
+            'courseid' => $course->id,
+            'content' => '<p>Kept</p><script>alert(1)</script><img src="x.png" onerror="alert(2)">',
+        ]);
+        $this->assertStringContainsString('<script', helper::render_content($notice), 'the dialogue keeps the script');
+
+        /** @var core_reportbuilder_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_reportbuilder');
+        $report = $generator->create_report(['name' => 'Cleaned', 'source' => all_notices::class, 'default' => 0]);
+        $generator->create_column(['reportid' => $report->get('id'), 'uniqueidentifier' => 'notice:content']);
+
+        $rows = $this->get_custom_report_content($report->get('id'));
+        $cells = array_map(static fn(array $row): string => (string) reset($row), $rows);
+        $this->assertCount(1, $cells);
+        $this->assertStringContainsString('Kept', $cells[0]);
+        $this->assertStringNotContainsString('<script', $cells[0]);
+        $this->assertStringNotContainsString('onerror', $cells[0]);
     }
 
     /**

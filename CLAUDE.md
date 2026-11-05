@@ -274,7 +274,14 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `?courseid=` would read as the site. `tests/local/editor_js_contract_test.php` pins it. The
   per-rule chips are withheld at the READ for a course scope, because jobs are shared by criteria
   hash across scopes; a rival outside the scope is described, never named. A course-notice role
-  needs enrolment or `moodle/course:view` beside `managecourse`.
+  needs an active enrolment or `moodle/course:view` beside `managecourse`, and
+  `helper::require_author()` itself asks it whenever the capability is not held at the system
+  level: a suspended or ended enrolment keeps its role assignment, and core's report web services
+  and `download.php` ask only `can_view()`. Tests granting a course role must enrol the user
+  (`enrol_user(..., 0)`, no extra role); `course_place_test` pins the suspended, ended and
+  category-manager cases. A save joins an editor's draft audience job only when the job's `userid`
+  is the saver's (`notice_audience::refresh()`): the hash names no author or scope, and the job's
+  user is who is told the result.
 
 - **The dialogue's layout, position and entrance are `local-awareness-*` classes with hand-written CSS, and
   nothing in it may be a Bootstrap 5 utility.** The dialogue is injected on every page by the hook,
@@ -386,6 +393,17 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `notification:noticedoesnotexist` the pages give, and gates BEFORE `validate_context()`, whose
   login check on another course's context would otherwise refuse differently and say the id
   exists.
+  **Reading and writing are two gates.** `admits()` / `helper::may_reach_groups()` answer who may
+  READ (the list, the preview, the reports, the file gate's author branch) and admit a notice for
+  the whole course; `may_write()` / `helper::may_write_groups()` answer who may CHANGE it and refuse
+  a confined author a notice naming no live group, because the whole course holds the groups they
+  are kept from. The writes are `require_group_reach()` (the five action methods),
+  `resolve_notice_as_author()` for the manage verb (the editor page) and the list's row actions; a
+  save asks `author_scope::addresses_unreachable_groups()` beside `apply()` (both write paths and
+  `notice_form::extra_validation()`, which renders the picker for every confined author so the
+  refusal has a field). Separation also cuts the PEOPLE: the three system reports add
+  `group_scope::members_only_sql()` on the row's `userid`, so a confined reader sees only members
+  of their groups, whatever notice the row is for. `separate_groups_confinement_test` pins all of it.
   `narrow()` and `admits()` answer DIFFERENT questions — what may be SAVED, and who may REACH what
   is saved — and only the second is about separation: a deleted group, a non-participation group, a
   deleted course and the site scope confine nobody, or deleting a group would hide the notices naming
