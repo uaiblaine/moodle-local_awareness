@@ -27,6 +27,7 @@ use core_text;
 use lang_string;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
+use local_awareness\local\group_scope;
 use local_awareness\persistent\acknowledgement as acknowledgement_persistent;
 use local_awareness\persistent\awareness;
 use local_awareness\reportbuilder\local\entities\acknowledgement;
@@ -90,6 +91,21 @@ class acknowledged_notice extends system_report {
          */
         $notice = awareness::get_record(['id' => $noticeid]);
         $scope = $notice ? author_scope::of($notice) : null;
+
+        /*
+         * Separate groups confine the people as well as the notices: a confined reader sees only the
+         * rows of participants who share one of their groups, whatever notice the rows belong to, a
+         * notice for the whole course included ({@see group_scope::members_only_sql()}).
+         */
+        if ($scope && $scope->exists() && !$scope->is_site()) {
+            [$membersql, $memberparams] = group_scope::for_author($scope)->members_only_sql(
+                "{$ackalias}.userid",
+                database::generate_param_name() . '_'
+            );
+            if ($membersql !== '') {
+                $this->add_base_condition_sql($membersql, $memberparams);
+            }
+        }
         [$identitycolumns, $identityfilters] = $this->join_identity(
             "{$ackalias}.userid",
             $scope && $scope->exists() ? $scope->context() : context_system::instance()

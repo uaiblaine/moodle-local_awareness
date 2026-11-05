@@ -257,6 +257,7 @@ final class systemreports_test extends \advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $roleid = $this->getDataGenerator()->create_role();
         assign_capability('local/awareness:viewreportscourse', CAP_ALLOW, $roleid, \context_course::instance($mine->id)->id, true);
+        $this->getDataGenerator()->enrol_user($user->id, $mine->id, 0);
         role_assign($roleid, $user->id, \context_course::instance($mine->id)->id);
         $this->setUser($user);
 

@@ -185,14 +185,18 @@ This enables custom report composition with filters, columns, export, and reuse 
 
 A notice can belong to a course. Grant `local/awareness:managecourse` in the course to whoever may
 author its notices, and `local/awareness:viewreportscourse` to whoever may read their reports;
-neither has a default archetype. The holder also needs to be enrolled, or to hold
-`moodle/course:view`, because the pages live inside the course and `require_login()` is a gate of
-its own. A course notice appears on its course's main page, to anyone who can open it — guests
+neither has a default archetype. The holder also needs an active enrolment, or to hold
+`moodle/course:view`: the pages live inside the course and `require_login()` is a gate of its own,
+and the plugin asks the same of every route to the course's notices and reports, so suspending or
+ending a tutor's enrolment closes them even though the role assignment stays. A course notice appears on its course's main page, to anyone who can open it — guests
 included where the course allows guest access — so add a role, cohort or group rule to narrow it
 further; category, theme and course-format filters do not apply to it, and it does not travel with a
 course backup. Groups follow the course's group mode the way Moodle applies it everywhere else: in
 separate groups mode an author without `moodle/site:accessallgroups` may address only their own
-groups and sees only the notices aimed at them; otherwise, any group of the course. The course's
+groups, and must choose at least one: a notice for everyone in the course holds the groups they are
+kept from, so they read one but may not publish, change, switch, reset or delete it. They see the
+notices aimed at their groups and those for the whole course, and the reports list them only the
+participants who share one of their groups; otherwise, any group of the course. The course's
 group mode does not have to be set for a notice to address a group — that setting governs how
 activities separate participants, not who a notice reaches. The same separation applies to the
 list's preview and to both reports. A holder of `viewreportscourse` alone sees the course's list
@@ -230,7 +234,9 @@ The plugin owns seven tables:
   estimate jobs* task.
 
 Notice content, background images and slide media are stored as files of the plugin in the system
-context, and go with their notice. Deleting a user account removes none of these rows; a data
+context, and go with their notice. They are served to the notice's audience and its authors, and a
+site notice limited to courses or categories serves them only to people with a place in such a
+course. Images, audio, video and PDF open in the browser; any other file is downloaded. Deleting a user account removes none of these rows; a data
 deletion request does.
 
 All of it is covered by the Privacy API. A data request exports, into the user's own context, the
