@@ -289,7 +289,8 @@ class notice extends base {
                     return $value;
                 }
 
-                return helper::render_content_parts($value, (int) $row->contentformat, (int) $row->id);
+                // Cleaned, unlike the dialogue: see render_content_parts().
+                return helper::render_content_parts($value, (int) $row->contentformat, (int) $row->id, true);
             });
 
         $columns[] = (new column(

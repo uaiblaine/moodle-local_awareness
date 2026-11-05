@@ -222,18 +222,23 @@ class notice_form extends \core\form\persistent {
          * moodle/site:accessallgroups, through group_scope. It is offered when the author has a
          * group to target (group_scope::offered()), and a notice already naming groups keeps its
          * field regardless, so the author can see and clear what it names. The save narrows what
-         * the scope refuses and extra_validation() reports it on this field.
+         * the scope refuses and extra_validation() reports it on this field. An author confined to
+         * their own groups always gets the field, even with nothing to offer, because an empty
+         * selection is refused to them ({@see author_scope::addresses_unreachable_groups()}) and the
+         * refusal needs a field to be reported on; their empty selection is not "everyone".
          */
         if ($coursemode) {
             $groups = group_scope::for_author($scope);
             $targeted = ($persistent && $persistent->get('id') > 0) ? group_scope::targeted($persistent) : [];
-            if ($groups->offered() || $targeted !== []) {
+            $confined = $groups->is_restricted();
+            $emptylabel = get_string($confined ? 'notice:groups:own' : 'notice:groups:all', 'local_awareness');
+            if ($groups->offered() || $targeted !== [] || $confined) {
                 $mform->addElement(
                     'autocomplete',
                     'filter_groups',
                     get_string('notice:groups', 'local_awareness'),
                     $groups->options(),
-                    ['noselectionstring' => get_string('notice:groups:all', 'local_awareness'), 'multiple' => true]
+                    ['noselectionstring' => $emptylabel, 'multiple' => true]
                 );
                 $mform->addHelpButton('filter_groups', 'notice:groups', 'local_awareness');
             }
@@ -723,6 +728,10 @@ class notice_form extends \core\form\persistent {
             // The competency rules travel in a hidden field; its label is what the author sees.
             $element = $field === 'filter_competency_rules' ? 'filter_competency_label' : $field;
             $extra[$element] = self::problem_message($field);
+        }
+        // The save refuses this too, with an exception; here it reaches the author on the field.
+        if (!isset($extra['filter_groups']) && $this->scope()->addresses_unreachable_groups($result->criteria())) {
+            $extra['filter_groups'] = get_string('scope:problem:filter_groups:own', 'local_awareness');
         }
 
         return $extra + $this->validate_layout($data);
