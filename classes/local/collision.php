@@ -196,7 +196,9 @@ class collision {
      * The warning exists to say that the pages are contested, and an author who cannot see the
      * rival still needs to know — so a competitor outside the scope is reported, but as "a site
      * notice" or "a notice in another course" rather than by name: only the titles inside the
-     * scope cross the boundary. The site scope sees every title, as it sees every notice.
+     * scope cross the boundary. The site scope sees every title, as it sees every notice. Inside
+     * a course, a rival aimed only at groups a confined author is kept from is described as such,
+     * because the course list never shows it to them ({@see helper::may_reach_groups()}).
      *
      * @param awareness $other The competing notice.
      * @param author_scope $scope The scope of the author being warned.
@@ -204,8 +206,13 @@ class collision {
      */
     public static function visible_title(awareness $other, author_scope $scope): string {
         $courseid = (int) $other->get('courseid');
-        if ($scope->is_site() || $courseid === $scope->get_courseid()) {
+        if ($scope->is_site()) {
             return $other->get('title');
+        }
+        if ($courseid === $scope->get_courseid()) {
+            return helper::may_reach_groups($other)
+                ? $other->get('title')
+                : get_string('collision:redacted:group', 'local_awareness');
         }
 
         return get_string(

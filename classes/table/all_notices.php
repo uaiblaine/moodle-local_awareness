@@ -560,9 +560,14 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
          * A viewer who may not manage this notice gets the preview and, where they may read them,
          * the reports; none of the verbs: a link to an action require_author() would refuse is a
          * link to an error. Decided per row because each row is judged in its own scope, and on
-         * the site list a capability overridden in one course differs from row to row.
+         * the site list a capability overridden in one course differs from row to row. A confined
+         * author reads a notice for the whole course and may change none
+         * ({@see helper::may_write_groups()}), so that row is read-only for them too.
          */
-        if (!helper::require_author(author_scope::of($awareness), 'manage', false)) {
+        if (
+            !helper::require_author(author_scope::of($awareness), 'manage', false)
+            || !helper::may_write_groups($awareness)
+        ) {
             return $this->report_only_actions($awareness, $menu);
         }
 
