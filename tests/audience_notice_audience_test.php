@@ -493,4 +493,43 @@ final class audience_notice_audience_test extends \advanced_testcase {
         $this->assertNotFalse($secondjob, 'The second notice needs a job of its own, not none at all.');
         $this->assertNotSame($firstjob->get('jobid'), $secondjob->get('jobid'));
     }
+
+    /**
+     * A save joins only the editor's job its own author raised.
+     *
+     * The job's user is who is told the result, with the saved notice's title, and the criteria
+     * hash names no author: the save of another author whose filters hash the same must queue a job
+     * of its own and leave the first author's draft job alone. The control that a save does join
+     * its author's own job is test_a_course_notice_joins_the_editor_s_job().
+     */
+    public function test_another_author_s_save_does_not_claim_an_editor_s_job(): void {
+        global $DB;
+
+        set_config('audience_sync_limit', 0, 'local_awareness');
+        live_mode::reset_cache();
+
+        $_POST['sesskey'] = sesskey();
+        $response = \core_external\external_api::call_external_function(
+            'local_awareness_estimate_audience',
+            ['criteria' => json_encode([])],
+            false
+        );
+        $this->assertFalse($response['error']);
+        $editorjob = audience_job::get_record(['jobid' => $response['data']['jobid']]);
+        $this->assertSame(audience_job::STATUS_PENDING, $editorjob->get('status'));
+
+        $manager = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->role_assign('manager', $manager->id);
+        $this->setUser($manager);
+        $state = helper::create_new_notice($this->form_data(['title' => 'Manager notice']));
+
+        $notice = awareness::get_record(['title' => 'Manager notice']);
+        $this->assertSame(notice_audience::STATE_PENDING, $state);
+        $this->assertSame($editorjob->get('criteriahash'), notice_audience::hash_for($notice), 'the two must hash alike');
+        $reread = audience_job::get_record(['jobid' => $editorjob->get('jobid')]);
+        $this->assertEmpty($reread->get('noticeid'), 'another author\'s save claimed the editor\'s job');
+        $own = audience_job::get_record(['noticeid' => $notice->get('id')]);
+        $this->assertSame((int) $manager->id, (int) $own->get('userid'));
+        $this->assertSame(2, $DB->count_records(audience_job::TABLE));
+    }
 }

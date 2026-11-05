@@ -66,6 +66,7 @@ final class navigation_test extends \advanced_testcase {
         $roleid = $this->getDataGenerator()->create_role();
         $context = \context_course::instance($course->id);
         assign_capability($capability, CAP_ALLOW, $roleid, $context->id, true);
+        $this->getDataGenerator()->enrol_user($user->id, $course->id, 0);
         role_assign($roleid, $user->id, $context->id);
         $this->setUser($user);
 

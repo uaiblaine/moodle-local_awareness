@@ -84,6 +84,11 @@ function local_awareness_pluginfile($course, $cm, $context, $filearea, $args, $f
         return false;
     }
 
+    // Anything that is not media or PDF is downloaded, never rendered as the site: see the helper.
+    if (!\local_awareness\helper::serves_inline((string) $file->get_mimetype())) {
+        $forcedownload = true;
+    }
+
     send_stored_file($file, null, 0, $forcedownload, $options);
 }
 

@@ -127,6 +127,7 @@ final class identity_fields_test extends \advanced_testcase {
         $this->reader = $generator->create_user();
         $this->roleid = $generator->create_role();
         $this->grant('local/awareness:viewreportscourse');
+        $generator->enrol_user($this->reader->id, $this->course->id, 0);
         role_assign($this->roleid, $this->reader->id, \context_course::instance($this->course->id)->id);
         $this->setUser($this->reader);
     }
