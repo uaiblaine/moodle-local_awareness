@@ -306,6 +306,27 @@ final class author_scope {
     }
 
     /**
+     * Whether a saved notice with these criteria would reach groups its confined author is kept from.
+     *
+     * apply() narrows the groups an author names to the ones they may address, and an empty list
+     * passes it, because an empty list is not a value outside the scope: it is "everyone in the
+     * course". For an author confined to their own groups ({@see group_scope::is_restricted()})
+     * that is exactly what they may not address, so a save asks this as well as apply(). The
+     * estimate and the collision check do not: they write nothing, and an author must be able to
+     * ask about the course before choosing a group.
+     *
+     * @param array $criteria The criteria as apply() left them.
+     * @return bool True when the save must be refused on filter_groups.
+     */
+    public function addresses_unreachable_groups(array $criteria): bool {
+        if ($this->is_site()) {
+            return false;
+        }
+
+        return !group_scope::for_author($this)->may_write(self::int_list($criteria['filter_groups'] ?? []));
+    }
+
+    /**
      * Apply the scope to a set of submitted criteria.
      *
      * Only the fields in RULES are touched; anything else in the array is passed through as it

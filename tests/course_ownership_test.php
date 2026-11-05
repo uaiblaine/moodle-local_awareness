@@ -69,6 +69,10 @@ final class course_ownership_test extends \advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $roleid = $this->getDataGenerator()->create_role();
         assign_capability($capability, CAP_ALLOW, $roleid, $context->id, true);
+        if ($context->contextlevel == CONTEXT_COURSE) {
+            // A course role counts only with a place in the course ({@see helper::require_author()}).
+            $this->getDataGenerator()->enrol_user($user->id, $context->instanceid, 0);
+        }
         role_assign($roleid, $user->id, $context->id);
         $this->setUser($user);
 
