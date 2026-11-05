@@ -48,7 +48,13 @@ is a local plugin with one branch per Moodle version (`main` is 5.3; 5.2, 5.1 an
   `course_notices` decides `can_view()` from that parameter and lists only the course's
   notices within the viewer's group reach).
 - File serving: `local_awareness_pluginfile()` serves `content`, `bgimage` and `slidemedia`
-  at system context with `send_stored_file()`, behind `helper::may_serve_files_of()`.
+  at system context with `send_stored_file()`, behind `helper::may_serve_files_of()`, and forces
+  a download for anything but media and PDF (`helper::serves_inline()`).
+- A course capability counts only with a place in the course: `require_author()` asks an active
+  enrolment or `moodle/course:view` whenever the capability is not held at the system level.
+- Separate groups: a confined author reads a course-wide notice but may not write one
+  (`helper::may_write_groups()`), and the three system reports list a confined reader only the
+  members of their groups (`group_scope::members_only_sql()`).
 - Hooks: `before_footer_html_generation` loads the AMD module (it catches `\Throwable` on
   purpose, since it runs on nearly every page); `before_course_deleted` purges the course's
   notices. Tasks: scheduled `purge_audience_jobs` and `purge_link_history`, adhoc
@@ -63,14 +69,16 @@ is a local plugin with one branch per Moodle version (`main` is 5.3; 5.2, 5.1 an
 
 ## Facts that look like findings but are by design
 
-- **`noclean` on notice content is the feature** (embedded media must survive). It is safe
-  only because authoring is gated as above. Content is stored as typed, with
+- **`noclean` on notice content is the feature** (embedded media must survive) in the dialogue
+  and the previews. It is safe only because authoring is gated as above. The report builder's
+  Content column cleans, because a custom report lists every scope's notices. Content is stored as typed, with
   `@@PLUGINFILE@@` placeholders, and resolved at render so multilang notices work; do not
   clean at save time. Titles go through `format_string()` and `pathmatch` through `s()` at
   every output; both columns are `PARAM_RAW`.
 - **The file gate is partial by construction.** A file URL carries a notice id but no page,
-  so the gate checks authorship in scope, course access for a course notice, and audience,
-  but not the page rules (category, theme, format, competency).
+  so the gate checks authorship in scope, course access for a course notice, a place in a
+  listed course for a site notice limited to courses or categories, and audience, but not the
+  other page rules (theme, format, competency).
 - **`pageurl` and `pathmatch` are client assertions** on the read path; forging them costs a
   reader no more than forging a write would.
 - **Guests are not rejected.** They get a session-only marker, because all guest sessions

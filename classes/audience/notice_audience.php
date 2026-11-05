@@ -150,11 +150,15 @@ class notice_audience {
              * notice (two site-wide notices with no filters hash the same), and a job writes its
              * answer back to exactly one notice, so taking over another notice's job would leave
              * that notice pending for ever. A job the editor raised about an unsaved form has a null
-             * noticeid, read here as 0, and is free to claim. Any other job is left alone and this
-             * notice gets a job of its own below.
+             * noticeid, read here as 0, and is free to claim by the author who raised it, and only
+             * by them: the job's userid is who hears the result, with the notice's title, and the
+             * hash names no scope, so another author's draft can share it, a course author's with
+             * a site notice among them. Any other job is left alone and this notice gets a job of
+             * its own below.
              */
             $owner = (int) $existing->get('noticeid');
-            if ($owner === 0 || $owner === (int) $notice->get('id')) {
+            $mine = (int) $existing->get('userid') === (int) $USER->id;
+            if (($owner === 0 && $mine) || $owner === (int) $notice->get('id')) {
                 // Someone is already computing exactly this; joining costs nothing and queues nothing.
                 self::attach($existing, (int) $notice->get('id'));
                 return self::STATE_PENDING;
