@@ -117,6 +117,7 @@ final class manage_page_test extends \advanced_testcase {
         $reader = $this->getDataGenerator()->create_user();
         $roleid = $this->getDataGenerator()->create_role();
         assign_capability('local/awareness:viewreportscourse', CAP_ALLOW, $roleid, $context->id, true);
+        $this->getDataGenerator()->enrol_user($reader->id, $course->id, 0);
         role_assign($roleid, $reader->id, $context->id);
         $this->setUser($reader);
         $this->assertSame('', $this->export($scope)['createurl'], 'a reader is offered nothing to create');
@@ -124,6 +125,7 @@ final class manage_page_test extends \advanced_testcase {
         $author = $this->getDataGenerator()->create_user();
         $authorrole = $this->getDataGenerator()->create_role();
         assign_capability('local/awareness:managecourse', CAP_ALLOW, $authorrole, $context->id, true);
+        $this->getDataGenerator()->enrol_user($author->id, $course->id, 0);
         role_assign($authorrole, $author->id, $context->id);
         $this->setUser($author);
         $this->assertSame('/create', $this->export($scope)['createurl'], 'an author is: the control');

@@ -19,6 +19,7 @@ namespace local_awareness\output;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\local\collision;
+use local_awareness\local\group_scope;
 use local_awareness\persistent\awareness;
 use local_awareness\table\all_notices_filterset;
 use renderable;
@@ -78,11 +79,32 @@ class manage_page implements renderable, templatable {
         // The population the numbers describe is the list's: a course page counts that course only.
         $where = $this->scope->is_site() ? '' : ' WHERE courseid = :courseid';
         $params = $this->scope->is_site() ? [] : ['courseid' => $this->scope->get_courseid()];
-        $sql = 'SELECT SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) AS live,
-                       SUM(CASE WHEN enabled = 0 THEN 1 ELSE 0 END) AS draft,
-                       SUM(COALESCE(audiencecount, 0)) AS reach
-                  FROM {' . awareness::TABLE . '}' . $where;
-        $row = $DB->get_record_sql($sql, $params);
+        $clashing = collision::clashing_ids($this->scope);
+
+        /*
+         * And a confined viewer's list leaves out the notices aimed only at groups they are kept
+         * from, so the counts do too: a tile counting them would say they exist. Counted from the
+         * rows here, as the list decides them, because only this course's notices are in question.
+         */
+        if (!$this->scope->is_site() && group_scope::for_author($this->scope)->is_restricted()) {
+            $row = (object) ['live' => 0, 'draft' => 0, 'reach' => 0];
+            $reachable = [];
+            foreach (awareness::get_records(['courseid' => $this->scope->get_courseid()]) as $notice) {
+                if (!helper::may_reach_groups($notice)) {
+                    continue;
+                }
+                $reachable[] = (int) $notice->get('id');
+                $row->{$notice->get('enabled') ? 'live' : 'draft'}++;
+                $row->reach += (int) $notice->get('audiencecount');
+            }
+            $clashing = array_intersect($clashing, $reachable);
+        } else {
+            $sql = 'SELECT SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) AS live,
+                           SUM(CASE WHEN enabled = 0 THEN 1 ELSE 0 END) AS draft,
+                           SUM(COALESCE(audiencecount, 0)) AS reach
+                      FROM {' . awareness::TABLE . '}' . $where;
+            $row = $DB->get_record_sql($sql, $params);
+        }
 
         /* Counts come back as strings under both drivers, so they are cast before formatting. */
         return [
@@ -103,7 +125,7 @@ class manage_page implements renderable, templatable {
             ],
             [
                 'label' => get_string('manage:stat:clash', 'local_awareness'),
-                'value' => number_format(count(collision::clashing_ids($this->scope))),
+                'value' => number_format(count($clashing)),
                 'accent' => false,
             ],
         ];
