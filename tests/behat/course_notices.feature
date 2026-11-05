@@ -30,8 +30,16 @@ Feature: Notices that belong to a course
       | Site-wide notice | <p>Site</p>      | 1       |        |
       | Astrophysics tip | <p>Elsewhere</p> | 1       | C2     |
 
+  # C1 confines the author to their own groups, so the notice names one of them; the next scenario
+  # but one is the refusal of a notice for everyone in the course.
   Scenario: A course author creates a notice from the course and sees only that course's notices
-    Given I am on the "C1" "Course" page logged in as "teacher"
+    Given the following "groups" exist:
+      | name | course | idnumber |
+      | Dome | C1     | DOME     |
+    And the following "group members" exist:
+      | user    | group |
+      | teacher | DOME  |
+    And I am on the "C1" "Course" page logged in as "teacher"
     When I navigate to "Notices" in current page administration
     # An empty list shows its empty state, not a count of zero.
     Then I should see "No notices have been created yet."
@@ -40,6 +48,7 @@ Feature: Notices that belong to a course
     When I click on "Create new notice" "link"
     And I set the field "Title" to "Observatory closed on Friday"
     And I set the field "Content" to "The dome is being serviced."
+    And I set the field "Groups" to "Dome"
     And I click on "Save changes" "button"
     Then I should see "Observatory closed on Friday"
     And I should see "Notices found: 1"
@@ -67,6 +76,18 @@ Feature: Notices that belong to a course
     When I click on "Save changes" "button"
     Then I should see "Red team briefing"
     And I should see "Notices found: 1"
+
+  # In separate groups and in no group, the author has nobody of their own to address: the field is
+  # shown all the same, and the save is refused on it instead of publishing to the whole course.
+  Scenario: A confined course author may not publish to everyone in the course
+    Given I am on the "C1" "Course" page logged in as "teacher"
+    And I navigate to "Notices" in current page administration
+    And I click on "Create new notice" "link"
+    And I set the field "Title" to "Everyone, look up"
+    And I set the field "Content" to "A comet tonight."
+    When I click on "Save changes" "button"
+    Then I should see "Choose at least one of your groups. In this course you can address only your own groups"
+    And I should not see "Notices found"
 
   Scenario: The entry is only in the course where the capability is held
     Given I am on the "C2" "Course" page logged in as "teacher"

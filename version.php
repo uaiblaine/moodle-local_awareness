@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_awareness';
-$plugin->version = 2026100502;
+$plugin->version = 2026100503;
 $plugin->requires = 2026100500;
 $plugin->supported = [503, 503];
 $plugin->release = 'v5.3-r2';

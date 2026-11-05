@@ -127,6 +127,7 @@ final class course_notices_test extends \advanced_testcase {
         $roleid = $this->getDataGenerator()->create_role();
         $context = \context_course::instance($course->id);
         assign_capability($capability, CAP_ALLOW, $roleid, $context->id, true);
+        $this->getDataGenerator()->enrol_user($user->id, $course->id, 0);
         role_assign($roleid, $user->id, $context->id);
         $this->setUser($user);
 
@@ -224,6 +225,9 @@ final class course_notices_test extends \advanced_testcase {
         $teacher = $generator->create_and_enrol($course, 'teacher');
         $editor = $generator->create_and_enrol($course, 'editingteacher');
         $generator->create_group_member(['groupid' => $red->id, 'userid' => $teacher->id]);
+        // In the teacher's group, so the rows tested here are cut by notice; the cut by member is
+        // separate_groups_confinement_test's.
+        $generator->create_group_member(['groupid' => $red->id, 'userid' => $student->id]);
 
         $context = \context_course::instance($course->id);
         foreach (['teacher', 'editingteacher'] as $shortname) {

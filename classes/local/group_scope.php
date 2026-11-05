@@ -222,6 +222,61 @@ final class group_scope {
     }
 
     /**
+     * Whether the separation of groups lets the user write a notice aimed at these.
+     *
+     * Stricter than admits() in one case only: a confined user may read a notice for the whole
+     * course, but may not save, change, switch, reset or delete one, because the whole course holds
+     * the groups they are kept from, and a notice for {A, B} is already refused to a member of A
+     * alone. A notice naming only deleted groups reaches nobody and counts as naming none here, so
+     * only someone who may access all groups can repair it. Anyone admits() lets through
+     * unconditionally (no separation, the accessallgroups capability, the site scope, a course that
+     * is gone) may write anything it admits.
+     *
+     * @param int[] $groupids Group ids, empty for everyone in the course.
+     * @return bool
+     */
+    public function may_write(array $groupids): bool {
+        if (!$this->is_restricted()) {
+            return true;
+        }
+        $named = array_intersect(array_map('intval', $groupids), $this->course_group_ids());
+
+        return $named !== [] && array_diff($named, $this->allowed_ids()) === [];
+    }
+
+    /**
+     * A condition keeping only the users who share a group with this user, or nothing.
+     *
+     * Core's separate groups promise covers people, not only notices: a confined user never reads
+     * the records of a participant outside their own groups, so a report that lists participants
+     * filters its rows with this, whatever notice the rows belong to. A user nobody confines gets
+     * an empty condition; a confined user in no group gets one that admits nobody, as
+     * groups_get_activity_allowed_groups() gives them nobody to see.
+     *
+     * @param string $useridfield The SQL expression holding each row's user id.
+     * @param string $prefix A prefix for the placeholders and the alias, unique in the statement.
+     * @return array [sql, params], the sql empty when nobody is excluded.
+     */
+    public function members_only_sql(string $useridfield, string $prefix): array {
+        global $DB;
+
+        if (!$this->is_restricted()) {
+            return ['', []];
+        }
+        $allowed = $this->allowed_ids();
+        if ($allowed === []) {
+            return ['1 = 0', []];
+        }
+        [$insql, $params] = $DB->get_in_or_equal($allowed, SQL_PARAMS_NAMED, $prefix);
+
+        return [
+            "EXISTS (SELECT 1 FROM {groups_members} {$prefix}gm"
+                . " WHERE {$prefix}gm.userid = {$useridfield} AND {$prefix}gm.groupid {$insql})",
+            $params,
+        ];
+    }
+
+    /**
      * The given groups cut to the ones the user may target, in the order given.
      *
      * @param int[] $groupids Group ids.
