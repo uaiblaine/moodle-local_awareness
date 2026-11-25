@@ -50,9 +50,10 @@ class notice_payload {
      * read a field gets it empty, so the client never paints a background the author could not see.
      *
      * @param awareness $notice The notice.
+     * @param bool $clean Whether the body is cleaned; false for a reader, whose dialogue shows it as written.
      * @return array As structure() declares.
      */
-    public static function build(awareness $notice): array {
+    public static function build(awareness $notice, bool $clean = false): array {
         $record = $notice->to_record();
         $context = \context_system::instance();
 
@@ -62,7 +63,8 @@ class notice_payload {
         }
         // One level rather than the columns it is derived from; see awareness::get_insistence().
         $payload['insistence'] = $notice->get_insistence();
-        $payload['content'] = helper::render_content($notice);
+        // The one field that carries the author's own markup; the media is built from URLs.
+        $payload['content'] = helper::render_content($notice, $clean);
         // The title gets the same treatment as the content, or a multilang title shows its markup.
         $payload['title'] = format_string($record->title, true, ['context' => $context]);
         $payload['bgimageurl'] = !empty($record->bgimage) && awareness::uses_bgimage($record->template)

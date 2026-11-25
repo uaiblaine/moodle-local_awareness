@@ -21,6 +21,7 @@ use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
+use local_awareness\form\notice_form;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\local\notice_payload;
@@ -202,7 +203,8 @@ class preview_notice extends external_api {
     private static function preview_slides(array $rows): array {
         $context = \context_system::instance();
         $slides = [];
-        foreach ($rows as $row) {
+        // No more rows than the form builds: each one is a draft area read and a render.
+        foreach (array_slice($rows, 0, notice_form::SLIDES_MAX) as $row) {
             $caption = format_string((string) $row['caption'], true, ['context' => $context, 'escape' => false]);
             $url = self::draft_file_url((int) $row['imagedraftid']);
             $link = trim((string) $row['videourl']);

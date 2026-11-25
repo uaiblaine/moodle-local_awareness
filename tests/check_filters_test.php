@@ -48,6 +48,16 @@ final class check_filters_test extends \advanced_testcase {
             'wildcard matches a tail' => ['/mod/%', '/mod/quiz/view.php', true],
             'wildcard does not match another tree' => ['/mod/%', '/course/view.php', false],
             'wildcard in the middle' => ['/mod/%/view.php', '/mod/quiz/view.php', true],
+            'wildcard pieces in order' => ['/mod/%/view%id=7', '/mod/quiz/view.php?id=7&lang=en', true],
+            'wildcard pieces out of order' => ['/mod/%id=7%/view', '/mod/quiz/view.php?id=7', false],
+            'a piece is not found twice' => ['/a%ab%ab', '/a-ab', false],
+            'pieces may touch' => ['/a%ab%ab', '/aabab', true],
+            'repeated wildcards are one' => ['/mod/%%/view.php', '/mod/quiz/view.php', true],
+            'leading wildcard' => ['%/view.php', '/mod/quiz/view.php?id=2', true],
+            'leading wildcard still needs its piece' => ['%/edit.php', '/mod/quiz/view.php', false],
+            'a lone wildcard admits everything' => ['%', '/anything', true],
+            'the start is literal up to the wildcard' => ['/mod/quiz%', '/mod/qui', false],
+            'regular expression characters are literal' => ['/mod/.+/view.php', '/mod/quiz/view.php', false],
             'FRONTPAGE token on the front page' => ['FRONTPAGE', '/', true],
             'FRONTPAGE token with redirect guard' => ['FRONTPAGE', '/?redirect=0', true],
             'FRONTPAGE token off the front page' => ['FRONTPAGE', '/my/', false],
@@ -59,6 +69,26 @@ final class check_filters_test extends \advanced_testcase {
             'combined token covers the other' => ['FRONTPAGE_MY', '/', true],
             'combined token excludes a third' => ['FRONTPAGE_MY', '/course/view.php', false],
         ];
+    }
+
+    /**
+     * A wildcard pattern is matched in one pass, with no regular expression behind it.
+     *
+     * The page URL is the client's, and a pattern with several wildcards against a long URL that
+     * almost matches is where an expression engine backtracks without end. With the engine allowed
+     * no backtracking at all, both answers below still come out right.
+     */
+    public function test_a_wildcard_pattern_is_matched_without_backtracking(): void {
+        $limit = ini_set('pcre.backtrack_limit', '1');
+        $jit = ini_set('pcre.jit', '0');
+        try {
+            $long = '/mod/' . str_repeat('a/view', 2000);
+            $this->assertTrue(helper::check_path_match('/mod/%/view%/view%.php%', $long . '.php?id=1'));
+            $this->assertFalse(helper::check_path_match('/mod/%/view%/view%.php%', $long));
+        } finally {
+            ini_set('pcre.backtrack_limit', (string) $limit);
+            ini_set('pcre.jit', (string) $jit);
+        }
     }
 
     /**
