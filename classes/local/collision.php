@@ -96,6 +96,30 @@ class collision {
     }
 
     /**
+     * Whether a notice of the given course and reach can meet another notice on a page.
+     *
+     * The one pair rule behind the editor's warning, the list's badge and its filter. Notices of
+     * two different courses never meet, whatever their patterns say: each shows only on its own
+     * course's pages, and every course notice carries the same forced reach, so comparing patterns
+     * alone would make every course's repeating notice a rival of every other course's, and tell
+     * each author how many of those the rest of the site holds.
+     *
+     * @param int $courseid The course of the notice being judged; 0 for a site notice.
+     * @param string|null $pathmatch Its page reach.
+     * @param awareness $other The possible rival.
+     * @return bool
+     * @throws \coding_exception
+     */
+    private static function may_meet(int $courseid, ?string $pathmatch, awareness $other): bool {
+        $othercourse = (int) $other->get('courseid');
+        if ($courseid > SITEID && $othercourse > SITEID && $courseid !== $othercourse) {
+            return false;
+        }
+
+        return self::pathmatch_overlaps($pathmatch, $other->get('pathmatch'));
+    }
+
+    /**
      * Enabled repeating notices that have not ended, other than the one given, whose page reach overlaps it.
      *
      * Returns nothing when the notice itself does not repeat, or when its own end has passed: a
@@ -107,11 +131,18 @@ class collision {
      * @param string|null $pathmatch Its page reach.
      * @param int $resetinterval Its repeat interval; zero means it does not repeat.
      * @param int $timeend Its end as the save stores it; 0 for none, which is what a perpetual notice has.
+     * @param int $courseid Its course; 0 for a site notice.
      * @return awareness[] Clashing notices, keyed by id.
      * @throws \coding_exception
      * @throws \dml_exception
      */
-    public static function clashes_for(int $noticeid, ?string $pathmatch, int $resetinterval, int $timeend = 0): array {
+    public static function clashes_for(
+        int $noticeid,
+        ?string $pathmatch,
+        int $resetinterval,
+        int $timeend = 0,
+        int $courseid = 0
+    ): array {
         if ($resetinterval <= 0 || window::has_ended($timeend, time())) {
             return [];
         }
@@ -121,7 +152,7 @@ class collision {
             if ((int) $other->get('id') === $noticeid) {
                 continue;
             }
-            if (self::pathmatch_overlaps($pathmatch, $other->get('pathmatch'))) {
+            if (self::may_meet($courseid, $pathmatch, $other)) {
                 $clashes[(int) $other->get('id')] = $other;
             }
         }
@@ -147,7 +178,8 @@ class collision {
             $notice ? (int) $notice->get('id') : 0,
             (string) $scope->apply(['pathmatch' => $formdata->pathmatch ?? ''])->criteria()['pathmatch'],
             (int) ($formdata->resetinterval ?? 0),
-            (int) ($formdata->timeend ?? 0)
+            (int) ($formdata->timeend ?? 0),
+            $scope->get_courseid()
         );
     }
 
@@ -178,7 +210,7 @@ class collision {
                 if ((int) $other->get('id') === (int) $notice->get('id')) {
                     continue;
                 }
-                if (self::pathmatch_overlaps($notice->get('pathmatch'), $other->get('pathmatch'))) {
+                if (self::may_meet((int) $notice->get('courseid'), $notice->get('pathmatch'), $other)) {
                     $titles[] = self::visible_title($other, $scope);
                 }
             }
@@ -195,10 +227,11 @@ class collision {
      *
      * The warning exists to say that the pages are contested, and an author who cannot see the
      * rival still needs to know — so a competitor outside the scope is reported, but as "a site
-     * notice" or "a notice in another course" rather than by name: only the titles inside the
-     * scope cross the boundary. The site scope sees every title, as it sees every notice. Inside
-     * a course, a rival aimed only at groups a confined author is kept from is described as such,
-     * because the course list never shows it to them ({@see helper::may_reach_groups()}).
+     * notice" rather than by name: only the titles inside the scope cross the boundary, and the
+     * site's are the only notices outside a course that meet its own ({@see self::may_meet()}).
+     * The site scope sees every title, as it sees every notice. Inside a course, a rival aimed
+     * only at groups a confined author is kept from is described as such, because the course list
+     * never shows it to them ({@see helper::may_reach_groups()}).
      *
      * @param awareness $other The competing notice.
      * @param author_scope $scope The scope of the author being warned.
@@ -215,10 +248,7 @@ class collision {
                 : get_string('collision:redacted:group', 'local_awareness');
         }
 
-        return get_string(
-            $courseid > 0 ? 'collision:redacted:course' : 'collision:redacted:site',
-            'local_awareness'
-        );
+        return get_string('collision:redacted:site', 'local_awareness');
     }
 
     /**
@@ -255,7 +285,7 @@ class collision {
      * the number of enabled repeating notices, and it keeps the predicate inside the SQL, which is
      * what keeps pagination honest: filtering after the query would fetch a page of 25 and show 9.
      *
-     * Shares enabled_repeating_notices() and pathmatch_overlaps() with clash_titles_for(), so the
+     * Shares enabled_repeating_notices() and may_meet() with clash_titles_for(), so the
      * filter and the badge cannot disagree about what a clash is.
      *
      * @param author_scope|null $scope Whose list it is; the site when not given. Only that scope's ids are listed.
@@ -272,7 +302,7 @@ class collision {
 
         $ids = [];
         foreach ($repeating as $notice) {
-            // A clash is a clash whoever the rival is; what the scope narrows is whose ids are listed.
+            // A clash is a clash whether or not the rival is listed; what the scope narrows is whose ids are.
             if (!$scope->is_site() && (int) $notice->get('courseid') !== $scope->get_courseid()) {
                 continue;
             }
@@ -280,7 +310,7 @@ class collision {
                 if ((int) $other->get('id') === (int) $notice->get('id')) {
                     continue;
                 }
-                if (self::pathmatch_overlaps($notice->get('pathmatch'), $other->get('pathmatch'))) {
+                if (self::may_meet((int) $notice->get('courseid'), $notice->get('pathmatch'), $other)) {
                     $ids[] = (int) $notice->get('id');
                     break;
                 }

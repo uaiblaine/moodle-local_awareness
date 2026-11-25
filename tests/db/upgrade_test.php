@@ -16,6 +16,8 @@
 
 namespace local_awareness\db;
 
+use local_awareness\audience\notice_audience;
+use local_awareness\persistent\awareness;
 use PHPUnit\Framework\Attributes\CoversFunction;
 
 /**
@@ -68,6 +70,40 @@ final class upgrade_test extends \advanced_testcase {
                 'local_awareness_slides'
             );
         }
+    }
+
+    /**
+     * The step for the role rule marks the stored counts of notices with a role rule out of date.
+     *
+     * A role held in a course stopped counting without an active enrolment, so a count stored
+     * before may be too high, and its hash would still call it current. The notice beside it has
+     * no role rule (a role context alone is not one) and keeps its hash: the control that the
+     * step is aimed.
+     *
+     * @return void
+     */
+    public function test_the_role_rule_step_marks_stored_role_counts_out_of_date(): void {
+        $this->load_upgrade_lib();
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $stored = ['audiencecount' => 12, 'audiencecomputed' => time(), 'audiencehash' => str_repeat('a', 64)];
+        $withrole = $generator->create_notice($stored + [
+            'filtervalues' => json_encode(['filter_role' => [5], 'filter_role_context' => CONTEXT_COURSE]),
+        ]);
+        $without = $generator->create_notice($stored + [
+            'filtervalues' => json_encode(['filter_role_context' => CONTEXT_COURSE, 'filter_course' => [3]]),
+        ]);
+
+        set_config('version', 2026100504, 'local_awareness');
+        $this->assertTrue(xmldb_local_awareness_upgrade(2026100504));
+
+        $withrole = new awareness($withrole->get('id'));
+        $this->assertNull($withrole->get('audiencehash'));
+        $this->assertSame(12, (int) $withrole->get('audiencecount'), 'the count itself stays, marked as out of date');
+        $this->assertSame(notice_audience::STATE_STALE, notice_audience::state_of($withrole));
+        $this->assertSame(str_repeat('a', 64), (new awareness($without->get('id')))->get('audiencehash'));
     }
 
     /**

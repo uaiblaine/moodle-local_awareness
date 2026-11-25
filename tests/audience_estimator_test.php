@@ -966,6 +966,44 @@ final class audience_estimator_test extends \advanced_testcase {
     }
 
     /**
+     * The count leaves out a role whose enrolment is not active, as the per-user rule does.
+     *
+     * Two teachers of one course; one is suspended and keeps the role assignment. Both counted is
+     * the control, and the count agrees with the per-user rule before and after, under the two
+     * role contexts that reach a course role.
+     */
+    public function test_the_role_count_leaves_out_an_enrolment_that_is_not_active(): void {
+        global $DB;
+
+        $teacherroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'editingteacher']);
+        $course = $this->getDataGenerator()->create_course();
+        $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
+        $suspended = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
+        $instance = $DB->get_record('enrol', ['courseid' => $course->id, 'enrol' => 'manual'], '*', MUST_EXIST);
+
+        $rules = [
+            'any context' => ['filter_role' => [$teacherroleid]],
+            'a course' => ['filter_role' => [$teacherroleid], 'filter_role_context' => CONTEXT_COURSE],
+        ];
+        $counts = function () use ($rules): array {
+            $this->setAdminUser();
+            $counts = [];
+            foreach ($rules as $name => $rule) {
+                $counts[$name] = (int) (new estimator())->estimate(estimator::normalise($rule))['count'];
+                $this->assertSame($this->users_admitted_by_the_rule($rule), $counts[$name], "{$name}: the two rules disagree");
+            }
+
+            return $counts;
+        };
+
+        $this->assertSame(['any context' => 2, 'a course' => 2], $counts(), 'the control: both enrolments active');
+
+        enrol_get_plugin('manual')->update_user_enrol($instance, $suspended->id, ENROL_USER_SUSPENDED);
+        $this->assertTrue(user_has_role_assignment($suspended->id, $teacherroleid, \context_course::instance($course->id)->id));
+        $this->assertSame(['any context' => 1, 'a course' => 1], $counts());
+    }
+
+    /**
      * The front page role counts for a rule in any context and not for a system-level one.
      *
      * Core holds it in the site course's context, which is not the system context. The default user

@@ -356,6 +356,45 @@ final class all_notices_test extends \advanced_testcase {
     }
 
     /**
+     * The group line does not name a group whose membership core keeps from the viewer.
+     *
+     * A group visible to its members only is named to a member and to whoever may see hidden
+     * groups; anyone else reads that a group is named, and not which. The open group beside it is
+     * the control that the line is drawn at the hidden group, not at the viewer.
+     */
+    public function test_the_group_line_withholds_a_group_the_viewer_may_not_see(): void {
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course();
+        $open = $this->getDataGenerator()->create_group(['courseid' => $course->id, 'name' => 'Open team']);
+        $hidden = $this->getDataGenerator()->create_group([
+            'courseid' => $course->id,
+            'name' => 'Quiet circle',
+            'visibility' => GROUPS_VISIBILITY_MEMBERS,
+        ]);
+        $member = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $outsider = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        groups_add_member($hidden, $member);
+        $notice = $this->notice([
+            'courseid' => (int) $course->id,
+            'filtervalues' => json_encode(['filter_groups' => [(int) $hidden->id, (int) $open->id]]),
+        ]);
+
+        $list = function () use ($notice): string {
+            $table = new all_notices('probe', new \moodle_url('/local/awareness/managenotice.php'));
+            $table->rawdata = [$notice];
+            $render = new \ReflectionMethod(all_notices::class, 'group_line');
+
+            return $render->invoke($table, $notice)[1];
+        };
+
+        $this->assertSame('Quiet circle, Open team', $list(), 'the control: an administrator sees hidden groups');
+        $this->setUser($member);
+        $this->assertSame('Quiet circle, Open team', $list(), 'a member sees their own group');
+        $this->setUser($outsider);
+        $this->assertSame(get_string('notice:audience:hiddengroup', 'local_awareness') . ', Open team', $list());
+    }
+
+    /**
      * The group line names the notice's groups, and resolves every name on the page in one read.
      *
      * Same shape as the cohort line below: the names every row on the page needs are read in one

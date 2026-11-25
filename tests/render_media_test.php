@@ -122,6 +122,20 @@ final class render_media_test extends \advanced_testcase {
     }
 
     /**
+     * A link that is no URL renders nothing, wherever it came from.
+     *
+     * A stored link is a URL already; the editor's preview passes on what the author typed. The
+     * plain link beside it is the control that a link does render.
+     */
+    public function test_a_link_that_is_no_url_renders_nothing(): void {
+        $this->resetAfterTest();
+
+        $this->assertSame('', helper::render_media_link('javascript:alert(document.domain)'));
+        $this->assertSame('', helper::render_media_link('data:text/html,<script>alert(1)</script>'));
+        $this->assertStringContainsString('href="https://example.com/page"', helper::render_media_link('https://example.com/page'));
+    }
+
+    /**
      * A notice without a link renders no video, so the layout has nothing to fall back to by accident.
      */
     public function test_a_notice_without_a_link_renders_no_video(): void {

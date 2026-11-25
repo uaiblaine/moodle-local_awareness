@@ -160,6 +160,7 @@ final class events_test extends \advanced_testcase {
             'title' => 'Course notice',
             'content' => '<p>Read <a href="https://example.com/policy">the policy</a>.</p>',
             'perpetual' => 1,
+            'reqack' => 1,
         ], $scope);
         $notice = awareness::get_record(['title' => 'Course notice']);
         $this->assertSame((int) $course->id, (int) $notice->get('courseid'), 'the notice must belong to the course');
@@ -168,6 +169,7 @@ final class events_test extends \advanced_testcase {
             'title' => 'Course notice',
             'content' => '<p>Read <a href="https://example.com/policy">the policy</a> again.</p>',
             'perpetual' => 1,
+            'reqack' => 1,
         ]);
         $notice = new awareness($notice->get('id'));
         helper::disable_notice($notice);

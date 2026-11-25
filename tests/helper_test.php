@@ -99,6 +99,28 @@ final class helper_test extends \advanced_testcase {
     }
 
     /**
+     * A saved link opens its page with no handle on this one and no referrer.
+     *
+     * Every anchor is given target="_blank" at save time; the rel goes with it, and joins whatever
+     * the author already wrote there.
+     */
+    public function test_a_saved_link_carries_noopener_and_noreferrer(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $formdata = new \stdClass();
+        $formdata->title = 'Two links';
+        $formdata->content = '<p><a href="https://a.example">one</a> <a rel="nofollow" href="https://b.example">two</a></p>';
+        helper::create_new_notice($formdata);
+
+        $notices = awareness::get_records();
+        $stored = reset($notices)->get('content');
+        $this->assertSame(2, substr_count($stored, 'target="_blank"'), 'the control: both anchors were stamped');
+        $this->assertStringContainsString('rel="noopener noreferrer"', $stored);
+        $this->assertStringContainsString('rel="nofollow noopener noreferrer"', $stored);
+    }
+
+    /**
      * Saving a notice must not wrap its content in a whole HTML document.
      *
      * update_hyperlinks() parses the content with DOMDocument to stamp each anchor with its link
