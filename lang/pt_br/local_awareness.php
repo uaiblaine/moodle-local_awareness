@@ -163,17 +163,23 @@ $string['filter_role_context'] = 'Contexto do papel';
 $string['filter_role_context:category'] = 'Categoria de curso';
 $string['filter_role_context:course'] = 'Curso';
 $string['filter_role_context:system'] = 'Sistema';
-$string['filter_role_context_help'] = 'Onde o leitor precisa ter um dos papéis selecionados para que a regra de papel o inclua. Não muda nada enquanto nenhum papel estiver selecionado.
+$string['filter_role_context_help'] = 'Onde o leitor precisa ter um dos papéis selecionados para que a regra de papel o inclua.
 
-Todos: vale um papel atribuído em qualquer lugar, em qualquer contexto. Todo usuário logado também conta como tendo o Papel padrão para todos usuários e o Papel padrão da página principal (normalmente Usuário autenticado e Usuário autenticado na página inicial), então selecionar qualquer um deles alcança todos os usuários logados.
+* **Todos**: um papel atribuído em qualquer contexto. Um papel atribuído em um curso só conta enquanto a inscrição do leitor nesse curso estiver ativa. Todo usuário logado também conta como tendo o Papel padrão para todos usuários e o Papel padrão da página principal (normalmente Usuário autenticado e Usuário autenticado na página inicial), então selecionar qualquer um deles alcança todos os usuários logados.
+* **Sistema**: apenas papéis atribuídos no nível do sistema, mais o Papel padrão para todos usuários.
+* **Categoria de curso**: apenas papéis atribuídos em uma categoria de curso; quando há categorias escolhidas em "Filtros de exibição", apenas nelas.
+* **Curso**: apenas papéis atribuídos no próprio curso, não em suas atividades, e só enquanto a inscrição do leitor nesse curso estiver ativa; quando há cursos ou categorias escolhidos em "Filtros de exibição", apenas nesses cursos e nos cursos dessas categorias.
 
-Sistema: apenas papéis atribuídos no nível do sistema, mais o Papel padrão para todos usuários.
+Quando usar cada uma:
 
-Categoria de curso: apenas papéis atribuídos em uma categoria de curso; quando há categorias escolhidas em Filtros de exibição, apenas nelas.
+* Um alerta para todos que lecionam em algum curso do site: **Curso**.
+* Um alerta para os gestores do site: **Sistema**.
+* Um alerta para os coordenadores de uma unidade: **Categoria de curso**, com a categoria dela escolhida.
+* Um alerta para todos os usuários logados: **Todos**, com o Papel padrão para todos usuários selecionado.
 
-Curso: apenas papéis atribuídos no próprio curso, não em suas atividades; quando há cursos ou categorias escolhidos em Filtros de exibição, apenas nesses cursos e nos cursos dessas categorias.
+**Exemplo**: com o papel Professor e o contexto **Curso**, um professor cuja inscrição foi suspensa ou terminou deixa de receber o alerta, embora o papel continue atribuído a ele; o mesmo vale para quem recebeu o papel em um curso sem estar inscrito nele.
 
-O usuário visitante não conta como tendo nenhum dos dois papéis padrão.';
+Não muda nada enquanto nenhum papel estiver selecionado. O usuário visitante não conta como tendo nenhum dos dois papéis padrão.';
 $string['filter_theme'] = 'Tema';
 $string['filters'] = 'Filtros';
 $string['manage:empty:filtered'] = 'Nenhum aviso corresponde a estes filtros.';

@@ -164,17 +164,23 @@ $string['filter_role_context'] = 'Role context';
 $string['filter_role_context:category'] = 'Course category';
 $string['filter_role_context:course'] = 'Course';
 $string['filter_role_context:system'] = 'System';
-$string['filter_role_context_help'] = 'Where the reader must hold one of the selected roles for the role rule to count them. It changes nothing while no role is selected.
+$string['filter_role_context_help'] = 'Where the reader must hold one of the selected roles for the role rule to count them.
 
-All: a role held anywhere counts, in any context. Every logged-in user also counts as holding the Default role for all users and the Default site home role (normally Authenticated user and Authenticated user on site home), so selecting either of those reaches everyone who is logged in.
+* **All**: a role held in any context. A role held in a course counts only while the reader\'s enrolment in that course is active. Every logged-in user also counts as holding the Default role for all users and the Default site home role (normally Authenticated user and Authenticated user on site home), so selecting either of those reaches everyone who is logged in.
+* **System**: only roles assigned at the system level, plus the Default role for all users.
+* **Course category**: only roles assigned in a course category; when categories are chosen under "Display restrictions", only in those.
+* **Course**: only roles assigned in a course itself, not in its activities, and only while the reader\'s enrolment in that course is active; when courses or categories are chosen under "Display restrictions", only in those courses and in the courses of those categories.
 
-System: only roles assigned at the system level, plus the Default role for all users.
+When to use each one:
 
-Course category: only roles assigned in a course category; when categories are chosen under Display restrictions, only in those.
+* A notice for everyone who teaches a course on the site: **Course**.
+* A notice for the site\'s managers: **System**.
+* A notice for the coordinators of one faculty: **Course category**, with that category chosen.
+* A notice for everyone who is logged in: **All**, with the Default role for all users selected.
 
-Course: only roles assigned in a course itself, not in its activities; when courses or categories are chosen under Display restrictions, only in those courses and in the courses of those categories.
+**Example**: with the role Teacher and the context **Course**, a teacher whose enrolment was suspended or has ended stops receiving the notice although the role is still assigned to them, and so does someone given the role in a course without being enrolled in it.
 
-The guest user counts as holding neither default role.';
+It changes nothing while no role is selected. The guest user counts as holding neither default role.';
 $string['filter_theme'] = 'Theme';
 $string['filters'] = 'Filters';
 $string['manage:empty:filtered'] = 'No notices match these filters.';

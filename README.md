@@ -22,9 +22,9 @@ This repository is currently maintained and evolved under the Awareness directio
 - Site-wide modal notices.
 - Three levels of insistence: informational, blocking, and must-acknowledge.
 - A named exit at every level, so a reader can always decline. At the two insistent levels the decline is recorded and the notice is shown again; an informational notice is dismissed once and stays dismissed.
-- Audience targeting by cohort, role (optionally scoped to a course or category),
-  course category, course, course format, theme, competency rules and, for a course
-  notice, the course's groups.
+- Audience targeting by cohort, role (optionally scoped to a course or category; a role held in a
+  course counts only with an active enrolment in it), course category, course, course format,
+  theme, competency rules and, for a course notice, the course's groups.
 - An audience estimate in the editor, showing the reach of the rules: refreshed as they are
   edited on a site with at most "Interactive audience estimate limit" users, and computed in the
   background on request (which needs cron) on a larger one.
@@ -145,7 +145,8 @@ site; a custom profile field shows only where its visibility setting lets the vi
 core's report builder checks at the site as well (a field visible to teachers needs
 `moodle/site:viewuseridentity` at the site, one visible to nobody `moodle/user:viewalldetails`). With
 core's default the reports show the email. The values are the user's current ones; a deleted user
-is still named but shows no identity data. The username and ID number copied into each row are kept
+is still named but shows no identity data. The five sources offered to custom reports read nothing
+of a deleted account: its row stays, with the account's columns empty. The username and ID number copied into each row are kept
 for the privacy export and offered only to custom report authors.
 
 A course also lists **Notice acknowledgements and dismissals** on its Reports page: one row per

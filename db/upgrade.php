@@ -62,5 +62,23 @@ function xmldb_local_awareness_upgrade($oldversion) {
         );
     }
 
+    if ($oldversion < 2026100505) {
+        /*
+         * The role rule now leaves out a role held in a course without an active enrolment there.
+         * A count stored under the old rule may be too high, and would go on reading as current:
+         * the hash a count is judged by covers the criteria, not what a rule means. Without its
+         * hash the count reads as out of date until the notice is recalculated or saved.
+         */
+        $DB->set_field_select(
+            'local_awareness',
+            'audiencehash',
+            null,
+            'audiencehash IS NOT NULL AND ' . $DB->sql_like('filtervalues', ':rolerule'),
+            ['rolerule' => '%"filter_role":%']
+        );
+
+        upgrade_plugin_savepoint(true, 2026100505, 'local', 'awareness');
+    }
+
     return true;
 }

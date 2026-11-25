@@ -63,8 +63,9 @@ is a local plugin with one branch per Moodle version (`main` is 5.3; 5.2, 5.1 an
   (checked as an http(s) URL, embedded by the site's multimedia filter) and `pathmatch`, a
   literal pattern whose only wildcard is `%`, matched piece by piece and never as a regular
   expression.
-- Five report builder datasources join the core user entity and add no capability of their
-  own: who may build or read a custom report on them is core's report builder model.
+- Five report builder datasources join the core user entity, live accounts only, and add no
+  capability of their own: who may build or read a custom report on them is core's report
+  builder model.
 - Privacy: a full provider (metadata, request, userlist) over every user-linked table,
   including `usermodified` on `local_awareness` and `_slides`.
 

@@ -6,6 +6,27 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [v5.3-r2] - Unreleased
 
+### Hardening after the second audit (version 2026100505)
+
+#### Changed
+
+- **A role held in a course counts for the Role rule only with an active enrolment in that course.**
+  Suspending or ending an enrolment leaves the role assignment, so a notice for "everyone who is a
+  teacher somewhere" (Role context *All* or *Course*) kept reaching, and serving its files to,
+  people who no longer taught. The rule now asks what Moodle asks of an active participant: an
+  active enrolment, in an enabled method, inside its dates. A role given in a course to someone
+  who is not enrolled in it stops counting too. Roles held at the system, in a category or on the
+  front page are unaffected, as is a role held only in an activity, and the audience estimate
+  counts the same people. The help of *Role context* says so. The upgrade marks the audience
+  counts already stored for notices with a Role rule as out of date, since some may be too high:
+  recalculate them from the list, or save the notice.
+- **The five report sources read nothing of a deleted account.** A custom report built on
+  Acknowledged notices, Dismissed notices, All notices, Link history or Notice views joined the user
+  whatever its state, and Moodle keeps the department, the institution and the old email (inside
+  the username) on a deleted user's row. The row stays in the report, with the account's columns
+  empty, as the three built-in reports' identity columns already were; the name and username
+  stored with an acknowledgement are still there.
+
 ### Second security audit of November 2026 (version 2026100504)
 
 #### Security

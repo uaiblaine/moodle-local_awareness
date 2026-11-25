@@ -40,9 +40,9 @@ use local_awareness\persistent\awareness;
  *  - filter_course is forced because a notice with no filters goes to the whole site
  *    (helper::check_filters() returns true on an empty set). Forcing it does not confine the role
  *    rule on its own: role_scope::sql() reads filter_course only inside its CONTEXT_COURSE branch.
- *  - filter_role_context is forced, not restricted, because role_scope::sql() has no else branch:
- *    the form's default of 0 restricts no context, and 0 or CONTEXT_SYSTEM also admit the
- *    default-user roles, which the estimator turns into a literal 1 = 1.
+ *  - filter_role_context is forced, not restricted, because role_scope::sql() reads any other
+ *    value as no context at all: the form's default of 0 restricts none, and 0 or CONTEXT_SYSTEM
+ *    also admit the default-user roles, which the estimator turns into a literal 1 = 1.
  *  - filter_category is forbidden because it is the one field that widens: under CONTEXT_COURSE
  *    the role lookup OR-joins "any course in a listed category" with the listed courses.
  *    filter_format and filter_theme are forbidden for tidiness only — with the course forced they
