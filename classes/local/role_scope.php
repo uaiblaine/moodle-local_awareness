@@ -33,6 +33,11 @@ namespace local_awareness\local;
  *
  * The fragments attach to the {role_assignments} row whose alias the caller passes ('ra' by
  * default).
+ *
+ * A role held in a course counts only with an active enrolment in that course
+ * ({@see self::active_enrolment_sql()}): suspending or ending an enrolment leaves the assignment,
+ * and a notice for the teachers of the site is not for the ones who no longer teach. Roles held
+ * in the system, a category or the front page have no enrolment to ask about.
  */
 class role_scope {
     /**
@@ -47,6 +52,9 @@ class role_scope {
      * fragment several times in one statement (the combined count and each rule's breakdown chip)
      * and fix_sql_params() rejects a named placeholder that appears more than once. The
      * context-level branches are mutually exclusive, so one call never emits rctxlvl twice.
+     *
+     * Any other value, 0 included, restricts no context: every assignment is read, and the ones
+     * held in a course are asked for their enrolment like the course branch's.
      *
      * @param array $filters Decoded filtervalues, or normalised estimator criteria.
      * @param int $rolectx Context level from filter_role_context; 0 means any context.
@@ -102,8 +110,55 @@ class role_scope {
             if (!empty($coursewheres)) {
                 $where = " AND (" . implode(" OR ", $coursewheres) . ")";
             }
+            [$enrolledsql, $enrolledparams] = self::active_enrolment_sql($ra, $ctx, $suffix);
+            $where .= " AND {$enrolledsql}";
+            $params += $enrolledparams;
+        } else {
+            // Left joined, so an assignment whose context row is gone still reads as held somewhere.
+            $join = " LEFT JOIN {context} {$ctx} ON {$ctx}.id = {$ra}.contextid";
+            [$enrolledsql, $enrolledparams] = self::active_enrolment_sql($ra, $ctx, $suffix);
+            $where = " AND (COALESCE({$ctx}.contextlevel, 0) <> :{$lvlparam} OR {$enrolledsql})";
+            $params[$lvlparam] = CONTEXT_COURSE;
+            $params += $enrolledparams;
         }
 
         return [$join, $where, $params];
+    }
+
+    /**
+     * A condition that the holder of a course-level assignment is actively enrolled in that course.
+     *
+     * The test core's get_enrolled_join() makes with $onlyactive: an active enrolment, in an
+     * enabled method, inside its dates, the clock rounded as core rounds it so the statement can
+     * be cached. And its one exception: nobody has an enrolment row on the front page, which
+     * every user belongs to, so a role assigned there needs none.
+     *
+     * @param string $ra Alias of the {role_assignments} row.
+     * @param string $ctx Alias of its {context} row, which must be a course context for the test to mean anything.
+     * @param string $suffix Appended to every alias and parameter name this builds.
+     * @return array [$sql, $params]
+     */
+    private static function active_enrolment_sql(string $ra, string $ctx, string $suffix): array {
+        $ue = 'rue' . $suffix;
+        $e = 're' . $suffix;
+        $now = (int) round(time(), -2);
+        $params = [
+            'rsite' . $suffix => SITEID,
+            'ractive' . $suffix => ENROL_USER_ACTIVE,
+            'renabled' . $suffix => ENROL_INSTANCE_ENABLED,
+            'rnow1' . $suffix => $now,
+            'rnow2' . $suffix => $now,
+        ];
+        $sql = "({$ctx}.instanceid = :rsite{$suffix} OR EXISTS (SELECT 1
+                    FROM {user_enrolments} {$ue}
+                    JOIN {enrol} {$e} ON {$e}.id = {$ue}.enrolid
+                   WHERE {$ue}.userid = {$ra}.userid
+                     AND {$e}.courseid = {$ctx}.instanceid
+                     AND {$ue}.status = :ractive{$suffix}
+                     AND {$e}.status = :renabled{$suffix}
+                     AND {$ue}.timestart < :rnow1{$suffix}
+                     AND ({$ue}.timeend = 0 OR {$ue}.timeend > :rnow2{$suffix})))";
+
+        return [$sql, $params];
     }
 }

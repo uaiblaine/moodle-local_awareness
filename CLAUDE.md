@@ -455,6 +455,18 @@ Behat site fails every scenario on the same core locator and looks like your bug
   job shared across scopes by criteria hash, not a notice. Pinned by
   `events_test::test_a_course_notice_logs_every_event_in_its_course`.
 
+- **A role held in a course counts only with an active enrolment in that course.**
+  `local\role_scope::sql()` adds it for the course branch and for the course-level rows of the
+  "any context" branch (`active_enrolment_sql()`, the test of core's `get_enrolled_join()` with
+  `$onlyactive`, the front page exempt because nobody has an enrolment row there), so the display
+  rule, the gate of the writes and files, and the estimate change together. A role given in a
+  course to someone not enrolled in it does not count; roles at the system or in a category are
+  unaffected, and so are assignments in an activity under role context "All".
+  `role_filter_test` pins the suspended, ended, not started and disabled-method cases beside
+  their controls, and `audience_estimator_test` that the count agrees. The upgrade step that
+  came with the rule (2026100505 on `main`; its own number on each branch) clears `audiencehash`
+  on notices with a role rule, so a count stored under the old rule reads as out of date.
+
 - **Core's implicit roles count where core holds them.** The default user role counts for role
   context "All" (0) and System; the front page role for "All" only, because core holds it in the
   site course's context and a course-level rule never means the site course; the guest holds
@@ -680,8 +692,9 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `is_visible()` in the notice's context, and `user_profile_fields` makes the column available only
   where `is_visible(system)` holds for another user (`SUPPORT_USER` is negative, so a teachers-only
   field asks `viewuseridentity` in `$COURSE`, the front page in a web service, and a private one
-  `viewalldetails` at the site); the plugin does not override it. The `user` entity still names a deleted user; the `identity` join reads
-  nothing of one, because `delete_user()` leaves the department and the old email (in the
+  `viewalldetails` at the site); the plugin does not override it. The `user` entity of the three system reports still names a deleted user; the `identity` join reads
+  nothing of one, and neither do the five datasources, whose own `user` join carries `deleted = 0`
+  (`datasource/deleted_user_test.php`), because `delete_user()` leaves the department and the old email (in the
   username) on the row. The snapshot `acknowledgement:username` and `:idnumber` are not offered
   there; the datasources keep them for report authors. `identity_fields_test` pins all three
   reports both ways; `course_notices_test::rows()` reads the title and action from the row's end,

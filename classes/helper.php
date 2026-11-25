@@ -2815,7 +2815,8 @@ class helper {
 
         // Resolve the course from the courseid passed by JS.
         $course = null;
-        if ($courseid > 1) { // 1 is the site/frontpage course, not a real course.
+        // Course 1 is the site course, the front page, and not a real course.
+        if ($courseid > 1) {
             $course = $DB->get_record('course', ['id' => $courseid]);
             /*
              * The course id is supplied by the browser, and the filters below use it to decide
