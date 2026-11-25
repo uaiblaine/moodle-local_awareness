@@ -16,6 +16,7 @@
 
 namespace local_awareness\external;
 
+use local_awareness\form\notice_form;
 use local_awareness\persistent\awareness;
 use local_awareness\persistent\slide;
 
@@ -158,6 +159,28 @@ final class preview_external_test extends \advanced_testcase {
         $bare = preview_notice::execute(0, 'x', '<p>x</p>', 'image', 'center', 'fade', 0, '', 0);
         $this->assertSame('classic', $bare['template'], 'an image layout with no picture previewed as an empty dialogue');
         $this->assertSame('', $bare['bgimageurl']);
+    }
+
+    /**
+     * The editor's preview renders no more slides than the form builds rows for.
+     *
+     * The list is the request's, and each slide is a draft area read and a render. One slide short
+     * of the limit all come back, the control that the cut is at the limit.
+     */
+    public function test_the_editor_preview_renders_no_more_slides_than_the_form_builds(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $slides = static fn(int $count): array => array_map(
+            static fn(int $i): array => ['imagedraftid' => 0, 'videourl' => '', 'caption' => "Slide {$i}"],
+            range(1, $count)
+        );
+        $rendered = static fn(array $rows): int => count(
+            preview_notice::execute(0, 'x', '<p>x</p>', 'carousel', 'center', 'none', 0, '', 0, '', '', $rows)['slides']
+        );
+
+        $this->assertSame(notice_form::SLIDES_MAX - 1, $rendered($slides(notice_form::SLIDES_MAX - 1)));
+        $this->assertSame(notice_form::SLIDES_MAX, $rendered($slides(notice_form::SLIDES_MAX + 5)));
     }
 
     /**

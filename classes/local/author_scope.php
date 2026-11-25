@@ -40,9 +40,9 @@ use local_awareness\persistent\awareness;
  *  - filter_course is forced because a notice with no filters goes to the whole site
  *    (helper::check_filters() returns true on an empty set). Forcing it does not confine the role
  *    rule on its own: role_scope::sql() reads filter_course only inside its CONTEXT_COURSE branch.
- *  - filter_role_context is forced, not restricted, because role_scope::sql() has no else branch:
- *    the form's default of 0 restricts no context, and 0 or CONTEXT_SYSTEM also admit the
- *    default-user roles, which the estimator turns into a literal 1 = 1.
+ *  - filter_role_context is forced, not restricted, because role_scope::sql() reads any other
+ *    value as no context at all: the form's default of 0 restricts none, and 0 or CONTEXT_SYSTEM
+ *    also admit the default-user roles, which the estimator turns into a literal 1 = 1.
  *  - filter_category is forbidden because it is the one field that widens: under CONTEXT_COURSE
  *    the role lookup OR-joins "any course in a listed category" with the listed courses.
  *    filter_format and filter_theme are forbidden for tidiness only — with the course forced they
@@ -311,12 +311,13 @@ final class author_scope {
      * apply() narrows the groups an author names to the ones they may address, and an empty list
      * passes it, because an empty list is not a value outside the scope: it is "everyone in the
      * course". For an author confined to their own groups ({@see group_scope::is_restricted()})
-     * that is exactly what they may not address, so a save asks this as well as apply(). The
-     * estimate and the collision check do not: they write nothing, and an author must be able to
-     * ask about the course before choosing a group.
+     * that is exactly what they may not address, so a save asks this as well as apply(), and so
+     * does the estimate, before it counts and before it hands over a count somebody else asked
+     * for: the whole course less the author's own groups is a count of everybody else's. The
+     * collision check does not, because it counts nobody.
      *
      * @param array $criteria The criteria as apply() left them.
-     * @return bool True when the save must be refused on filter_groups.
+     * @return bool True when the criteria must be refused on filter_groups.
      */
     public function addresses_unreachable_groups(array $criteria): bool {
         if ($this->is_site()) {

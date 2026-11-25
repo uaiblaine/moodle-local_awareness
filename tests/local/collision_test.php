@@ -240,12 +240,8 @@ final class collision_test extends \advanced_testcase {
 
         $course = author_scope::course((int) $mine->id);
         $this->assertSame(
-            [
-                'Own &amp; rival',
-                get_string('collision:redacted:course', 'local_awareness'),
-                get_string('collision:redacted:site', 'local_awareness'),
-            ],
-            collision::formatted_titles([$own, $theirs, $site], $course)
+            ['Own &amp; rival', get_string('collision:redacted:site', 'local_awareness')],
+            collision::formatted_titles([$own, $site], $course)
         );
         $this->assertSame(['Own & rival'], collision::formatted_titles([$own], $course, false));
 
@@ -253,6 +249,40 @@ final class collision_test extends \advanced_testcase {
         $this->assertSame(
             ['Own &amp; rival', 'Their &amp; rival', 'Site &amp; rival'],
             collision::formatted_titles([$own, $theirs, $site], author_scope::site())
+        );
+    }
+
+    /**
+     * Notices of two different courses never compete; a site notice competes with both.
+     *
+     * Every course notice carries the same forced reach and shows only on its own course's pages,
+     * so the patterns alone would pair them all. The three surfaces share the rule: the editor's
+     * warning, the list's badge and the list's filter. The site notice is the control that the
+     * course notices do compete, and for the same pages.
+     */
+    public function test_notices_of_two_courses_never_compete(): void {
+        $this->setAdminUser();
+        $first = $this->getDataGenerator()->create_course();
+        $second = $this->getDataGenerator()->create_course();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $reach = author_scope::COURSE_PATHMATCH;
+        $a = $generator->create_notice(['courseid' => $first->id, 'pathmatch' => $reach, 'resetinterval' => DAYSECS]);
+        $b = $generator->create_notice(['courseid' => $second->id, 'pathmatch' => $reach, 'resetinterval' => DAYSECS]);
+
+        $ida = (int) $a->get('id');
+        $idb = (int) $b->get('id');
+        $this->assertSame([], collision::clashes_for($ida, $reach, DAYSECS, 0, (int) $first->id));
+        $this->assertSame([$idb], array_keys(collision::clashes_for(0, $reach, DAYSECS, 0, (int) $second->id)), 'its own');
+        $this->assertSame([], collision::clashing_ids());
+        $this->assertSame([], collision::clash_titles_for([$a, $b]));
+
+        $site = $generator->create_notice(['title' => 'Every course', 'pathmatch' => '/course/%', 'resetinterval' => DAYSECS]);
+        $ids = [$ida, $idb, (int) $site->get('id')];
+        $this->assertSame([$ids[2]], array_keys(collision::clashes_for($ida, $reach, DAYSECS, 0, (int) $first->id)));
+        $this->assertSame($ids, collision::clashing_ids());
+        $this->assertSame(
+            [$ida => ['Every course'], $idb => ['Every course']],
+            array_intersect_key(collision::clash_titles_for([$a, $b, $site]), [$ida => true, $idb => true])
         );
     }
 

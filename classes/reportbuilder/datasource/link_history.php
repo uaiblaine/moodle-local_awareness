@@ -70,8 +70,9 @@ class link_history extends datasource {
         // User entity — join via userid.
         $userentity = new user();
         $useralias  = $userentity->get_table_alias('user');
+        // A deleted account keeps its department and its old email on the row: nothing of it is read.
         $this->add_entity($userentity->add_join(
-            "LEFT JOIN {user} {$useralias} ON {$useralias}.id = {$lhhalias}.userid"
+            "LEFT JOIN {user} {$useralias} ON {$useralias}.id = {$lhhalias}.userid AND {$useralias}.deleted = 0"
         ));
 
         $this->add_all_from_entities();

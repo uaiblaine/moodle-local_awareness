@@ -171,6 +171,36 @@ final class picker_render_test extends \advanced_testcase {
     }
 
     /**
+     * The request cannot ask the form for more slide rows than the limit.
+     *
+     * The counter is read from the request, on a plain GET too, and every row is built on the
+     * server. At the limit the form builds and offers no further batch, the control that the count
+     * itself is legal; one over is refused before a row is made.
+     */
+    public function test_the_slide_rows_a_request_may_ask_for_are_limited(): void {
+        $this->resetAfterTest();
+
+        $_GET['slide_repeats'] = notice_form::SLIDES_MAX - notice_form::SLIDES_MIN;
+        $xpath = $this->render();
+        $this->assertSame(1, $xpath->query('//input[@name="slide_add"]')->length, 'the control: room for another batch');
+
+        $_GET['slide_repeats'] = notice_form::SLIDES_MAX;
+        $xpath = $this->render();
+        $this->assertSame(notice_form::SLIDES_MAX, $xpath->query('//*[starts-with(@id, "fitem_id_slide_caption_")]')->length);
+        $this->assertSame(0, $xpath->query('//input[@name="slide_add"]')->length, 'no batch is offered past the limit');
+
+        $_GET['slide_repeats'] = notice_form::SLIDES_MAX + 1;
+        try {
+            $this->render();
+            $this->fail('the form built more slide rows than the limit');
+        } catch (\invalid_parameter_exception $e) {
+            $this->assertStringContainsString('slide_repeats', $e->getMessage());
+        } finally {
+            unset($_GET['slide_repeats']);
+        }
+    }
+
+    /**
      * Every control of a slide keeps its own row, and therefore its own label.
      *
      * The slide card is drawn across the slide's rows rather than around a group, because core

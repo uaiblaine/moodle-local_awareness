@@ -62,6 +62,7 @@ final class file_gate_hardening_test extends \advanced_testcase {
         $member = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $outsider = $this->getDataGenerator()->create_user();
 
+        set_config('enabled', 1, 'local_awareness');
         $this->setAdminUser();
         $everyone = $this->site_notice([]);
         $limited = $this->site_notice(['filter_course' => [(int) $course->id]]);
@@ -89,6 +90,7 @@ final class file_gate_hardening_test extends \advanced_testcase {
         $member = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $awaymember = $this->getDataGenerator()->create_and_enrol($away, 'student');
 
+        set_config('enabled', 1, 'local_awareness');
         $this->setAdminUser();
         $category = $this->site_notice(['filter_category' => [(int) $inside->id]]);
         $both = $this->site_notice(['filter_category' => [(int) $inside->id], 'filter_course' => [(int) $away->id]]);
@@ -107,6 +109,7 @@ final class file_gate_hardening_test extends \advanced_testcase {
      */
     public function test_a_reports_reader_is_served_an_unpublished_notice_s_files(): void {
         $this->resetAfterTest();
+        set_config('enabled', 1, 'local_awareness');
         $this->setAdminUser();
         $notice = $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice(['enabled' => 0]);
 
@@ -119,6 +122,52 @@ final class file_gate_hardening_test extends \advanced_testcase {
         role_assign($roleid, $reader->id, \context_system::instance()->id);
         $this->setUser($reader);
         $this->assertTrue(helper::may_serve_files_of($notice));
+    }
+
+    /**
+     * With delivery switched off, a reader is served nothing and an author still is.
+     *
+     * The same reader with delivery on is the control.
+     */
+    public function test_delivery_switched_off_serves_a_reader_nothing(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $notice = $this->site_notice([]);
+        $reader = $this->getDataGenerator()->create_user();
+
+        set_config('enabled', 1, 'local_awareness');
+        $this->setUser($reader);
+        $this->assertTrue(helper::may_serve_files_of($notice), 'the control: delivery is on');
+
+        set_config('enabled', 0, 'local_awareness');
+        $this->assertFalse(helper::may_serve_files_of($notice));
+
+        $this->setAdminUser();
+        $this->assertTrue(helper::may_serve_files_of($notice), 'an author stages a notice while delivery is off');
+    }
+
+    /**
+     * A notice that has ended serves only the session it was shown to while it was live.
+     *
+     * A live notice needs no delivery, which is the control that nothing else refuses the reader.
+     */
+    public function test_an_ended_notice_serves_only_the_session_it_was_shown_to(): void {
+        global $USER;
+
+        $this->resetAfterTest();
+        set_config('enabled', 1, 'local_awareness');
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $live = $generator->create_notice(['timestart' => time() - WEEKSECS, 'timeend' => time() + DAYSECS]);
+        $ended = $generator->create_notice(['timestart' => time() - WEEKSECS, 'timeend' => time() - DAYSECS]);
+
+        $this->setUser($this->getDataGenerator()->create_user());
+        $this->assertTrue(helper::may_serve_files_of($live), 'the control: a live notice asks for no delivery');
+        $this->assertFalse(helper::may_serve_files_of($ended));
+
+        // What select_for_display() records when it hands a notice to the dialogue.
+        $USER->awarenessshown[$ended->get('id')] = true;
+        $this->assertTrue(helper::may_serve_files_of($ended), 'the dialogue left open across the end keeps its files');
     }
 
     /**
