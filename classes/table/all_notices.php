@@ -937,8 +937,22 @@ class all_notices extends table_sql implements \core_table\dynamic, renderable {
                 }
             }
             $this->groupnames = [];
-            foreach ($DB->get_records_list('groups', 'id', array_keys($ids), '', 'id, name, courseid') as $group) {
-                $context = \context_course::instance((int) $group->courseid, IGNORE_MISSING) ?: \context_system::instance();
+            $visible = [];
+            foreach ($DB->get_records_list('groups', 'id', array_keys($ids), '', 'id, name, courseid, visibility') as $group) {
+                $courseid = (int) $group->courseid;
+                /*
+                 * A group core keeps from the viewer is not named to them; the line still says a
+                 * group is named, as it does for a deleted one. Asked of core per course, and only
+                 * for a course that has such a group.
+                 */
+                if ((int) $group->visibility !== GROUPS_VISIBILITY_ALL) {
+                    $visible[$courseid] ??= groups_get_all_groups($courseid, 0, 0, 'g.id');
+                    if (!isset($visible[$courseid][$group->id])) {
+                        $this->groupnames[(int) $group->id] = get_string('notice:audience:hiddengroup', 'local_awareness');
+                        continue;
+                    }
+                }
+                $context = \context_course::instance($courseid, IGNORE_MISSING) ?: \context_system::instance();
                 // Unescaped: the line and the list reach double stashes, which escape them.
                 $this->groupnames[(int) $group->id] = format_string($group->name, true, ['context' => $context, 'escape' => false]);
             }

@@ -49,6 +49,8 @@ final class lib_test extends \advanced_testcase {
      * @return awareness The stored notice.
      */
     private function seed_notice_with_file(int $enabled): awareness {
+        // Delivery on: with it off the gate serves a reader nothing, whatever the notice.
+        set_config('enabled', 1, 'local_awareness');
         $this->setAdminUser();
         helper::create_new_notice((object) [
             'title' => 'Policy update',
@@ -370,6 +372,7 @@ final class lib_test extends \advanced_testcase {
         $this->resetAfterTest();
 
         $course = $this->getDataGenerator()->create_course();
+        set_config('enabled', 1, 'local_awareness');
         $this->setAdminUser();
         $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
         $coursenotice = $generator->create_notice(['courseid' => $course->id]);

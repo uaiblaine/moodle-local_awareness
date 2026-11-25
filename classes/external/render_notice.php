@@ -52,7 +52,8 @@ class render_notice extends external_api {
      *
      * Both verbs open the manage list, and the list offers the preview to both; a reports-only
      * viewer reads the notice they report on. The context is the notice's own scope, resolved
-     * server-side from the id.
+     * server-side from the id. A course notice's body is cleaned for a viewer whose authority
+     * comes from the site ({@see helper::preview_needs_cleaning()}).
      *
      * Every refusal is the same "no such notice", as {@see helper::resolve_notice_as_author()}
      * answers the pages: an id naming nothing, a notice outside the viewer's authority, and one
@@ -81,7 +82,7 @@ class render_notice extends external_api {
         // capability for it at the system context, so that is the context validated.
         self::validate_context($scope->exists() ? $scope->context() : \context_system::instance());
 
-        return notice_payload::build($notice);
+        return notice_payload::build($notice, helper::preview_needs_cleaning($notice));
     }
 
     /**

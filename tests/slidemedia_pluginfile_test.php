@@ -46,6 +46,8 @@ final class slidemedia_pluginfile_test extends \advanced_testcase {
      * @return slide The slide carrying the image.
      */
     private function seed_slide(int $enabled): slide {
+        // Delivery on: with it off the gate serves a reader nothing, whatever the notice.
+        set_config('enabled', 1, 'local_awareness');
         $notice = new awareness(0, (object) [
             'title' => 'News', 'content' => '<p>News.</p>', 'template' => 'carousel', 'enabled' => $enabled,
         ]);

@@ -71,13 +71,16 @@ class get_estimate extends external_api {
          * A job is shared by criteria hash between whoever asks the same question, so it is bound
          * to the scope rather than to a user: under a course scope the job's criteria must name
          * exactly that course as filter_course, which every job made under the scope does and a job
-         * made elsewhere does only if it targeted that one course alone. A job outside the scope
-         * reads as no job at all, so a jobid is not an oracle over what other authors have asked.
+         * made elsewhere does only if it targeted that one course alone. Inside the course, the job
+         * must count groups the caller may address, as estimate_audience::execute() asks before it
+         * makes one: a colleague's count of the whole course is not for an author kept to their own
+         * groups. A job outside the scope or the reach reads as no job at all, so a jobid is not an
+         * oracle over what other authors have asked.
          */
         if ($job && !$scope->is_site()) {
             $jobcriteria = json_decode($job->get('criteria'), true) ?: [];
             $jobcourses = array_map('intval', (array) ($jobcriteria['filter_course'] ?? []));
-            if ($jobcourses !== [$scope->get_courseid()]) {
+            if ($jobcourses !== [$scope->get_courseid()] || $scope->addresses_unreachable_groups($jobcriteria)) {
                 $job = null;
             }
         }
@@ -124,7 +127,8 @@ class get_estimate extends external_api {
             'breakdown' => json_encode($breakdown),
             'context_only_filters' => json_encode($contextrules),
             'has_audience_rules' => $hasaudience,
-            'errormsg' => $job->get('errormsg'),
+            // What failed is the administrator's to read, as core keeps an exception's detail for developer debugging.
+            'errormsg' => debugging('', DEBUG_DEVELOPER) ? $job->get('errormsg') : null,
             'timecompleted' => $job->get('timecompleted'),
         ];
     }

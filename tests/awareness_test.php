@@ -283,7 +283,8 @@ final class awareness_test extends \advanced_testcase {
         $this->assertEquals(2, count($usernotices));
         $this->assertEquals(1, count($USER->viewednotices));
 
-        // User 1 acknowledged cohort notice 1, there will be 1 notice for the user.
+        // User 1 acknowledged cohort notice 1, there will be 1 notice for the user. It asks for the answer first.
+        $cohortnotice1->set('reqack', 1)->update();
         helper::acknowledge_notice($cohortnotice1);
         $usernotices = helper::retrieve_user_notices('/my/');
         $this->assertEquals(1, count($usernotices));
