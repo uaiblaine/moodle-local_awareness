@@ -24,6 +24,7 @@ use core_external\external_value;
 use local_awareness\helper;
 use local_awareness\local\author_scope;
 use local_awareness\local\collision;
+use local_awareness\persistent\awareness;
 
 /**
  * Repeating notices that would compete with this one for the same pages.
@@ -118,10 +119,11 @@ class check_collision extends external_api {
         $end = (!$params['perpetual'] && $params['timeend'] !== null) ? self::selector_time($params['timeend']) : 0;
 
         $clashes = collision::clashes_for(
-            (int) $params['noticeid'],
+            self::edited_notice_id((int) $params['noticeid'], $scope),
             $reach,
             !empty($params['repeats']) ? 1 : 0,
-            $end
+            $end,
+            $scope->get_courseid()
         );
 
         return [
@@ -132,6 +134,27 @@ class check_collision extends external_api {
              */
             'titles' => collision::formatted_titles($clashes, $scope, false),
         ];
+    }
+
+    /**
+     * The id of the notice being edited, when it is the caller's to edit under this scope; 0 otherwise.
+     *
+     * The id does one thing, take the notice out of its own rivals. An id from outside the scope
+     * or the caller's group reach would do the same to a rival the answer describes without
+     * naming, and the line that went missing would say that the id names a competing notice
+     * there. Such an id is read as a new notice, which no editor the caller can open would send.
+     *
+     * @param int $noticeid The id from the request.
+     * @param author_scope $scope The scope the request was gated under.
+     * @return int
+     */
+    private static function edited_notice_id(int $noticeid, author_scope $scope): int {
+        $notice = $noticeid > 0 ? awareness::get_record(['id' => $noticeid]) : false;
+        if (!$notice || author_scope::of($notice)->get_courseid() !== $scope->get_courseid()) {
+            return 0;
+        }
+
+        return helper::may_write_groups($notice) ? $noticeid : 0;
     }
 
     /**

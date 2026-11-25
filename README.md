@@ -22,9 +22,9 @@ This repository is currently maintained and evolved under the Awareness directio
 - Site-wide modal notices.
 - Three levels of insistence: informational, blocking, and must-acknowledge.
 - A named exit at every level, so a reader can always decline. At the two insistent levels the decline is recorded and the notice is shown again; an informational notice is dismissed once and stays dismissed.
-- Audience targeting by cohort, role (optionally scoped to a course or category),
-  course category, course, course format, theme, competency rules and, for a course
-  notice, the course's groups.
+- Audience targeting by cohort, role (optionally scoped to a course or category; a role held in a
+  course counts only with an active enrolment in it), course category, course, course format,
+  theme, competency rules and, for a course notice, the course's groups.
 - An audience estimate in the editor, showing the reach of the rules: refreshed as they are
   edited on a site with at most "Interactive audience estimate limit" users, and computed in the
   background on request (which needs cron) on a larger one.
@@ -145,7 +145,8 @@ site; a custom profile field shows only where its visibility setting lets the vi
 core's report builder checks at the site as well (a field visible to teachers needs
 `moodle/site:viewuseridentity` at the site, one visible to nobody `moodle/user:viewalldetails`). With
 core's default the reports show the email. The values are the user's current ones; a deleted user
-is still named but shows no identity data. The username and ID number copied into each row are kept
+is still named but shows no identity data. The five sources offered to custom reports read nothing
+of a deleted account: its row stays, with the account's columns empty. The username and ID number copied into each row are kept
 for the privacy export and offered only to custom report authors.
 
 A course also lists **Notice acknowledgements and dismissals** on its Reports page: one row per
@@ -188,15 +189,18 @@ author its notices, and `local/awareness:viewreportscourse` to whoever may read 
 neither has a default archetype. The holder also needs an active enrolment, or to hold
 `moodle/course:view`: the pages live inside the course and `require_login()` is a gate of its own,
 and the plugin asks the same of every route to the course's notices and reports, so suspending or
-ending a tutor's enrolment closes them even though the role assignment stays. A course notice appears on its course's main page, to anyone who can open it — guests
+ending a tutor's enrolment closes them even though the role assignment stays, and so does hiding
+the course from a role without `moodle/course:viewhiddencourses`. A course notice appears on its course's main page, to anyone who can open it — guests
 included where the course allows guest access — so add a role, cohort or group rule to narrow it
 further; category, theme and course-format filters do not apply to it, and it does not travel with a
 course backup. Groups follow the course's group mode the way Moodle applies it everywhere else: in
 separate groups mode an author without `moodle/site:accessallgroups` may address only their own
 groups, and must choose at least one: a notice for everyone in the course holds the groups they are
 kept from, so they read one but may not publish, change, switch, reset or delete it. They see the
-notices aimed at their groups and those for the whole course, and the reports list them only the
-participants who share one of their groups; otherwise, any group of the course. The course's
+notices aimed at their groups and those for the whole course, the reports list them only the
+participants who share one of their groups, and the editor's audience estimate counts only the
+groups they may address; otherwise, any group of the course. A group Moodle shows to its members
+only is not named in the list to someone who cannot see it. The course's
 group mode does not have to be set for a notice to address a group — that setting governs how
 activities separate participants, not who a notice reaches. The same separation applies to the
 list's preview and to both reports. A holder of `viewreportscourse` alone sees the course's list

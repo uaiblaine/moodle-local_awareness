@@ -6,6 +6,78 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [v5.2-r2] - Unreleased
 
+### Hardening after the second audit (version 2026042004)
+
+#### Changed
+
+- **A role held in a course counts for the Role rule only with an active enrolment in that course.**
+  Suspending or ending an enrolment leaves the role assignment, so a notice for "everyone who is a
+  teacher somewhere" (Role context *All* or *Course*) kept reaching, and serving its files to,
+  people who no longer taught. The rule now asks what Moodle asks of an active participant: an
+  active enrolment, in an enabled method, inside its dates. A role given in a course to someone
+  who is not enrolled in it stops counting too. Roles held at the system, in a category or on the
+  front page are unaffected, as is a role held only in an activity, and the audience estimate
+  counts the same people. The help of *Role context* says so. The upgrade marks the audience
+  counts already stored for notices with a Role rule as out of date, since some may be too high:
+  recalculate them from the list, or save the notice.
+- **The five report sources read nothing of a deleted account.** A custom report built on
+  Acknowledged notices, Dismissed notices, All notices, Link history or Notice views joined the user
+  whatever its state, and Moodle keeps the department, the institution and the old email (inside
+  the username) on a deleted user's row. The row stays in the report, with the account's columns
+  empty, as the three built-in reports' identity columns already were; the name and username
+  stored with an acknowledgement are still there.
+
+### Second security audit of November 2026 (version 2026042003)
+
+#### Security
+
+- **A hidden course closes its notices and reports to a role that may not enter it.** The
+  per-notice report pages, core's report web service, the report download and the file gate's
+  author branch asked for the course capability and an active enrolment, and not what Moodle asks
+  first of a hidden course. A capability held in a course, and not at the system level, now also
+  needs `moodle/course:viewhiddencourses` while the course is hidden.
+- **Switching delivery off stops the notice files too.** With *Enable notices* off, a reader in a
+  notice's audience could still fetch its content, background and slide files by their address.
+  Authors and report readers still reach them, so a notice can be staged.
+- **A notice that has ended serves its files only to a session it was shown to.** They used to stay
+  available to the whole audience for ever; the dialogue left open across the end keeps its pictures.
+- **Separate groups hold for the audience estimate.** An author kept to their own groups could ask
+  the editor's estimate for the whole course, with any rule, and subtract their own group's count;
+  they could also read a colleague's count of the whole course by its job id. Both are refused, as
+  the save already was.
+- **The conflict warning no longer reports other courses' notices, and cannot be used to probe
+  ids.** Every repeating course notice was listed to every other course's authors as "a notice in
+  another course", because all course notices share one page pattern, although notices of two
+  courses never meet; and the id of the notice being edited, which only takes it out of its own
+  rivals, was accepted for any notice, so the rival that disappeared told whether an id named a
+  competing notice elsewhere. Notices of different courses no longer compete (editor, list badge
+  and list filter), and the id counts only for a notice the caller may edit under that scope.
+- **The list does not name a group Moodle hides from the viewer.** A group visible to its members
+  only was named in the audience column to anyone who could open the list; they now read "a group
+  you cannot see".
+- **The list's preview cleans a course notice for site-level viewers.** The site list offers every
+  course's notices, drafts included, so a course author's script could run in a site manager's or
+  site report reader's session from Site administration. The course's own authors and readers still
+  get the body as written, and site notices are unchanged.
+- **Page patterns are matched without a regular expression.** The pattern was turned into one and
+  run against the page address the browser sends, so a long, almost-matching address against a
+  pattern with several `%` cost the server up to seconds of backtracking per notice, for any
+  logged-in user or guest. The result is the same for every address without a line break.
+- **An Informational notice records no acceptance.** Its dialogue offers none, but the web service
+  accepted one from a reader it had been shown to, and the row appeared in the acknowledgement
+  reports.
+- **What made an audience estimate fail is shown only under developer debugging.** The stored
+  exception text, which on cron can hold the statement and its values, was returned to every author.
+- **The slide rows a request may ask for are limited to 50** (or the notice's own count, when it
+  already holds more), in the form and in the editor's preview, and a video link in the preview
+  must be a URL, as a saved one already is.
+- **Links in a saved notice carry `rel="noopener noreferrer"`** beside the `target="_blank"` they
+  were already given; notices saved before keep their links until the next save.
+
+#### Changed
+
+- New string `notice:audience:hiddengroup`; `collision:redacted:course` is removed.
+
 ### Security audit of November 2026 (version 2026042002)
 
 #### Security
