@@ -90,6 +90,114 @@ final class role_filter_test extends \advanced_testcase {
     }
 
     /**
+     * A role held in a course counts only while the enrolment in that course is active.
+     *
+     * Suspending or ending an enrolment leaves the role assignment, which is what the rule used to
+     * read alone. Asked under both contexts that reach a course role, at the display rule and at
+     * the gate the writes and the files share. The same teacher before the change is the control,
+     * and so is the enrolment made active again.
+     */
+    public function test_a_course_role_counts_only_with_an_active_enrolment(): void {
+        global $DB;
+
+        set_config('enabled', 1, 'local_awareness');
+        $teacherroleid = $this->role_id('editingteacher');
+        $course = $this->getDataGenerator()->create_course();
+        $context = \context_course::instance($course->id);
+        $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
+        $instance = $DB->get_record('enrol', ['courseid' => $course->id, 'enrol' => 'manual'], '*', MUST_EXIST);
+        $manual = enrol_get_plugin('manual');
+
+        $rules = [
+            'a course' => $this->filters(['filter_role' => [$teacherroleid], 'filter_role_context' => CONTEXT_COURSE]),
+            'any context' => $this->filters(['filter_role' => [$teacherroleid]]),
+        ];
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $notice = $generator->create_notice(['filtervalues' => $rules['a course']]);
+
+        $admitted = function () use ($rules, $notice, $teacher, $teacherroleid, $context): array {
+            $this->assertTrue(
+                user_has_role_assignment($teacher->id, $teacherroleid, $context->id),
+                'the role must survive the enrolment change, or nothing here tests the gap'
+            );
+            $this->setUser($teacher);
+
+            return array_map(helper::check_filters(...), $rules) + ['the gate' => helper::is_notice_available_to_user($notice)];
+        };
+        $yes = ['a course' => true, 'any context' => true, 'the gate' => true];
+        $no = ['a course' => false, 'any context' => false, 'the gate' => false];
+
+        $this->assertSame($yes, $admitted(), 'the control: an active enrolment');
+
+        $manual->update_user_enrol($instance, $teacher->id, ENROL_USER_SUSPENDED);
+        $this->assertSame($no, $admitted(), 'a suspended enrolment');
+
+        $manual->update_user_enrol($instance, $teacher->id, ENROL_USER_ACTIVE, 0, time() - DAYSECS);
+        $this->assertSame($no, $admitted(), 'an enrolment that has ended');
+
+        $manual->update_user_enrol($instance, $teacher->id, ENROL_USER_ACTIVE, time() + DAYSECS, 0);
+        $this->assertSame($no, $admitted(), 'an enrolment that has not started');
+
+        $manual->update_user_enrol($instance, $teacher->id, ENROL_USER_ACTIVE, 0, 0);
+        $manual->update_status($instance, ENROL_INSTANCE_DISABLED);
+        $this->assertSame($no, $admitted(), 'an enrolment method switched off');
+
+        $manual->update_status($instance, ENROL_INSTANCE_ENABLED);
+        $this->assertSame($yes, $admitted(), 'active again');
+    }
+
+    /**
+     * A role given in a course to someone who is not enrolled in it does not count there.
+     *
+     * The enrolled colleague holding the same role is the control.
+     */
+    public function test_a_course_role_without_an_enrolment_does_not_count(): void {
+        $teacherroleid = $this->role_id('editingteacher');
+        $course = $this->getDataGenerator()->create_course();
+        $visitor = $this->getDataGenerator()->create_user();
+        role_assign($teacherroleid, $visitor->id, \context_course::instance($course->id)->id);
+        $enrolled = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
+
+        foreach ([CONTEXT_COURSE, 0] as $rolectx) {
+            $filters = $this->filters(['filter_role' => [$teacherroleid], 'filter_role_context' => $rolectx]);
+            $this->setUser($enrolled);
+            $this->assertTrue(helper::check_filters($filters));
+            $this->setUser($visitor);
+            $this->assertFalse(helper::check_filters($filters));
+        }
+    }
+
+    /**
+     * A role held where nobody enrols needs no enrolment: the system, a category, the front page.
+     *
+     * The limit of the rule above. The front page is a course context every user belongs to
+     * without an enrolment row, so a role assigned there counts as before, under both contexts
+     * that reach it.
+     */
+    public function test_a_role_held_where_nobody_enrols_needs_no_enrolment(): void {
+        $managerroleid = $this->role_id('manager');
+        $category = $this->getDataGenerator()->create_category();
+        $contexts = [
+            'the system' => [\context_system::instance(), [0, CONTEXT_SYSTEM]],
+            'a category' => [\context_coursecat::instance($category->id), [0, CONTEXT_COURSECAT]],
+            'the front page' => [\context_course::instance(SITEID), [0, CONTEXT_COURSE]],
+        ];
+
+        foreach ($contexts as $where => [$context, $rolecontexts]) {
+            $holder = $this->getDataGenerator()->create_user();
+            role_assign($managerroleid, $holder->id, $context->id);
+            $this->setUser($holder);
+            foreach ($rolecontexts as $rolectx) {
+                $this->assertTrue(
+                    helper::check_filters($this->filters(['filter_role' => [$managerroleid], 'filter_role_context' => $rolectx])),
+                    "a role held in {$where} stopped counting under role context {$rolectx}"
+                );
+            }
+        }
+    }
+
+    /**
      * A system role context looks only at system-level assignments.
      */
     public function test_system_role_context_ignores_course_level_assignments(): void {

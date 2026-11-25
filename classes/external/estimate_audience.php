@@ -65,6 +65,7 @@ class estimate_audience extends external_api {
      * @param int $courseid The course the editor is scoped to, 0 for the site.
      * @return array
      * @throws \invalid_parameter_exception When the criteria name something the scope does not admit.
+     * @throws \moodle_exception When an author kept to their own groups names none of them.
      */
     public static function execute(string $criteria, int $courseid = 0): array {
         global $USER;
@@ -102,6 +103,14 @@ class estimate_audience extends external_api {
             throw new \invalid_parameter_exception(
                 'criteria name something the scope does not admit: ' . implode(', ', $scoped->problem_fields())
             );
+        }
+        /*
+         * And the same reach: an author kept to their own groups counts only what they may address.
+         * The whole course, which is what no group means, minus a count of their own groups would be
+         * a count of everybody else's.
+         */
+        if ($scope->addresses_unreachable_groups($scoped->criteria())) {
+            throw new \moodle_exception('scope:problem:filter_groups:own', 'local_awareness');
         }
         $raw = helper::cap_criteria_lists($scoped->criteria());
         if (!$scope->is_site()) {
