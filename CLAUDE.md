@@ -148,6 +148,12 @@ Behat site fails every scenario on the same core locator and looks like your bug
   document from `saveHTML()`. Titles go through `format_string()` at every
   output point for the same reason.
 
+- **`pathmatch` is matched piece by piece, never as a regular expression**
+  (`helper::reach_matches()`): the page URL is the client's, and several `%` against a long URL
+  that almost matches is unbounded backtracking. Anchored at the start, `%` is any run, the end is
+  anchored only without a `%`; `check_filters_test` pins the cases and runs one with the
+  expression engine allowed no backtracking.
+
 - **`title` and `pathmatch` are `PARAM_RAW`** in the persistent, and
   `html_writer::tag()` does not escape its contents. Anything emitting either
   needs `format_string()` (title, which is prose) or `s()` (pathmatch, which is
@@ -174,7 +180,9 @@ Behat site fails every scenario on the same core locator and looks like your bug
   nothing reads it at runtime, and there is no `require_logout()` and no
   `is_siteadmin()` exemption anywhere in this plugin any more. Callers ask
   `>= INSISTENCE_BLOCKING`, never `=== `, so a level added above Acknowledge
-  does not silently fall out of those tests. The Behat generator maps an
+  does not silently fall out of those tests. `helper::acknowledge_notice()` records nothing below
+  Blocking, as `dismiss_notice()` writes no compliance row there: a default notice is Informational
+  (`outsideclick` defaults to 1), so a test that acknowledges sets `reqack` or `outsideclick => 0`. The Behat generator maps an
   `insistence` column through the same `awareness::INSISTENCE_*` constants: only
   the file's top level runs before `config.php`, and a step body runs after it,
   so the classes autoload there. Only the two `>=` comparisons are repeated
@@ -256,7 +264,8 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `notification:coursenotfound`, and anyone else gets core's `invalidcourseid`;
   `tests/deleted_course_link_test.php` pins it.
   `tests/editnotice_orphan_test.php` pins it. `helper::may_serve_files_of()` is the file gate:
-  author bypass in the notice's scope, then course access for a course notice, then the audience.
+  author bypass in the notice's scope, then the delivery switch, then, for a notice that has ended,
+  a delivery to this session, then course access for a course notice, then the audience.
   Course deletion purges through the `before_course_deleted` hook —
   the `course_deleted` event fires after the course and its context are gone — via
   `helper::purge_notice()`, which is not a verb and asks nothing; `delete_notice()` is the verb.
@@ -277,9 +286,11 @@ Behat site fails every scenario on the same core locator and looks like your bug
   needs an active enrolment or `moodle/course:view` beside `managecourse`, and
   `helper::require_author()` itself asks it whenever the capability is not held at the system
   level: a suspended or ended enrolment keeps its role assignment, and core's report web services
-  and `download.php` ask only `can_view()`. Tests granting a course role must enrol the user
-  (`enrol_user(..., 0)`, no extra role); `course_place_test` pins the suspended, ended and
-  category-manager cases. A save joins an editor's draft audience job only when the job's `userid`
+  and `download.php` ask only `can_view()`. A hidden course also asks
+  `moodle/course:viewhiddencourses` (`helper::may_enter_course()`), as `require_login()` does
+  before it looks at the enrolment. Tests granting a course role must enrol the user
+  (`enrol_user(..., 0)`, no extra role); `course_place_test` pins the suspended, ended, hidden
+  and category-manager cases. A save joins an editor's draft audience job only when the job's `userid`
   is the saver's (`notice_audience::refresh()`): the hash names no author or scope, and the job's
   user is who is told the result.
 
@@ -355,7 +366,10 @@ Behat site fails every scenario on the same core locator and looks like your bug
   editor's) and `render_notice` (the manage list's); `build()` fills it for `get_notices` and
   `render_notice`, while `preview_notice` builds its own payload from the author's draft areas. A
   field added to `build()` without `structure()` is stripped by `clean_returnvalue()` in silence, and
-  `tests/external/notice_external_test.php` pins the exact key set. The video link is wrapped in a
+  `tests/external/notice_external_test.php` pins the exact key set. `render_notice` builds a course
+  notice with the body cleaned for a viewer holding either plugin capability at the system level
+  (`helper::preview_needs_cleaning()`): the site list shows them every course's drafts, and a
+  course author's `RISK_XSS` is granted for the course. The editor's own preview stays unclean. The video link is wrapped in a
   real anchor before `format_text()` — the multimedia filter embeds nothing from a bare URL — and the
   captions are `PARAM_RAW` on the way out, escaped once by the template's double stash.
 
@@ -393,6 +407,8 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `notification:noticedoesnotexist` the pages give, and gates BEFORE `validate_context()`, whose
   login check on another course's context would otherwise refuse differently and say the id
   exists.
+  The list's group line names a group of visibility other than "everyone" only to a viewer
+  `groups_get_all_groups()` returns it to (`all_notices_test` pins it); the reports name no group.
   **Reading and writing are two gates.** `admits()` / `helper::may_reach_groups()` answer who may
   READ (the list, the preview, the reports, the file gate's author branch) and admit a notice for
   the whole course; `may_write()` / `helper::may_write_groups()` answer who may CHANGE it and refuse
@@ -401,7 +417,9 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `resolve_notice_as_author()` for the manage verb (the editor page) and the list's row actions; a
   save asks `author_scope::addresses_unreachable_groups()` beside `apply()` (both write paths and
   `notice_form::extra_validation()`, which renders the picker for every confined author so the
-  refusal has a field). Separation also cuts the PEOPLE: the three system reports add
+  refusal has a field), and so do the two estimate services, `estimate_audience` before it makes a
+  job and `get_estimate` before it reads one: the whole course less the author's own group is a
+  count of the others. Separation also cuts the PEOPLE: the three system reports add
   `group_scope::members_only_sql()` on the row's `userid`, so a confined reader sees only members
   of their groups, whatever notice the row is for. `separate_groups_confinement_test` pins all of it.
   `narrow()` and `admits()` answer DIFFERENT questions — what may be SAVED, and who may REACH what
@@ -484,6 +502,14 @@ Behat site fails every scenario on the same core locator and looks like your bug
   `dismissed_notices_test` pins it through real reports, and
   `acknowledged_notices_test::test_a_fractional_average_is_not_read_as_an_action` calls the
   formatter with the arguments 4.5 passes.
+
+- **Notices of two courses never compete.** `collision::may_meet()` is the one pair rule behind
+  `clashes_for()`, `clash_titles_for()` and `clashing_ids()`: every course notice carries the same
+  forced reach and shows only in its own course, so the patterns alone paired them all and told
+  each author how many repeating notices the other courses hold. The only rival outside a course
+  scope is a site notice, described as one. `check_collision` passes the `noticeid` on only for a
+  notice of the request's scope the caller may write (`edited_notice_id()`): the id takes a notice
+  out of its own rivals, and for any other notice the missing line would confirm the id.
 
 - **Competing notices are enabled repeaters that have not ended.** `collision::enabled_repeating_notices()`
   applies only the upper bound of the window (`window::open_prefilter_sql()`), so a notice scheduled

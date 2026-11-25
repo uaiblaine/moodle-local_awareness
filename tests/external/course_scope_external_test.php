@@ -17,7 +17,9 @@
 namespace local_awareness\external;
 
 use core_external\external_api;
+use local_awareness\external\render_notice;
 use local_awareness\persistent\audience_job;
+use local_awareness\persistent\awareness;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
@@ -309,13 +311,9 @@ final class course_scope_external_test extends \advanced_testcase {
         );
         $titles = $response['data']['titles'];
         sort($titles);
-        $expected = [
-            get_string('collision:redacted:course', 'local_awareness'),
-            get_string('collision:redacted:site', 'local_awareness'),
-            'Own course rival',
-        ];
+        $expected = [get_string('collision:redacted:site', 'local_awareness'), 'Own course rival'];
         sort($expected);
-        $this->assertSame($expected, $titles);
+        $this->assertSame($expected, $titles, 'and another course\'s notice is no rival at all');
 
         $this->setAdminUser();
         $response = $this->call('check_collision', ['noticeid' => 0, 'pathmatch' => '/my/%', 'repeats' => true, 'courseid' => 0]);
@@ -326,5 +324,80 @@ final class course_scope_external_test extends \advanced_testcase {
             $site,
             'the site sees every title: the control'
         );
+    }
+
+    /**
+     * The list's preview cleans a course notice's body for a viewer who holds the site's authority.
+     *
+     * A course author's markup runs for the people of that course, which is what the course
+     * capability's XSS risk is granted for; the site list offers every course's notices to people
+     * who did not open the course. The author's own preview keeps the script, the control that the
+     * body holds one, and a site notice is not cleaned for the people who write site notices.
+     */
+    public function test_the_list_preview_cleans_a_course_notice_for_a_site_viewer(): void {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $body = '<p>Read me</p><script>window.awarenessran = 1;</script>';
+        $course = $generator->create_notice(['content' => $body, 'courseid' => $this->mine->id, 'enabled' => 0]);
+        $site = $generator->create_notice(['content' => $body, 'enabled' => 0]);
+
+        // The site list's preview validates the notice's course, so a site reader needs a way into it.
+        $reader = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        foreach (['local/awareness:viewreports', 'moodle/course:view'] as $capability) {
+            assign_capability($capability, CAP_ALLOW, $roleid, \context_system::instance()->id, true);
+        }
+        role_assign($roleid, $reader->id, \context_system::instance()->id);
+
+        $content = fn(awareness $notice): string => render_notice::execute((int) $notice->get('id'))['content'];
+
+        $this->setUser($this->author);
+        $this->assertStringContainsString('<script>', $content($course), 'the control: inside the course the body is as written');
+
+        foreach (['a site manager' => get_admin(), 'a site reports reader' => $reader] as $who => $user) {
+            $this->setUser($user);
+            $cleaned = $content($course);
+            $this->assertStringNotContainsString('<script', $cleaned, "{$who} ran a course author's script");
+            $this->assertStringContainsString('Read me', $cleaned);
+            $this->assertStringContainsString('<script>', $content($site), "a site notice is not cleaned for {$who}");
+        }
+    }
+
+    /**
+     * The id of the notice being edited takes only a notice of the scope out of the rivals.
+     *
+     * A rival outside the scope is described, so an id that removed its line would say that the id
+     * names a competing notice there. The author's own notice is the control that an id does
+     * remove a line.
+     */
+    public function test_an_id_outside_the_scope_removes_no_rival(): void {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('local_awareness');
+        $site = $generator->create_notice(['title' => 'Dashboard rival', 'resetinterval' => WEEKSECS]);
+        $own = $generator->create_notice([
+            'title' => 'Own course rival',
+            'resetinterval' => WEEKSECS,
+            'courseid' => $this->mine->id,
+        ]);
+
+        $this->setUser($this->author);
+        $titles = function (int $noticeid): array {
+            $response = $this->call(
+                'check_collision',
+                ['noticeid' => $noticeid, 'pathmatch' => '', 'repeats' => true, 'courseid' => (int) $this->mine->id]
+            );
+            $this->assertFalse($response['error']);
+            $titles = $response['data']['titles'];
+            sort($titles);
+
+            return $titles;
+        };
+        $described = get_string('collision:redacted:site', 'local_awareness');
+
+        $both = ['Own course rival', $described];
+        sort($both);
+        $this->assertSame($both, $titles(0));
+        $this->assertSame([$described], $titles((int) $own->get('id')), 'the control: the edited notice leaves its rivals');
+        $this->assertSame($both, $titles((int) $site->get('id')));
     }
 }

@@ -61,7 +61,8 @@ is a local plugin with one branch per Moodle version (`main` is 5.3; 5.2, 5.1 an
   `estimate_audience`. No observers.
 - User-controlled input rendered as markup or code: the editor's rich text, the video link
   (checked as an http(s) URL, embedded by the site's multimedia filter) and `pathmatch`, a
-  quoted pattern whose only wildcard is `%`, never an author-written regular expression.
+  literal pattern whose only wildcard is `%`, matched piece by piece and never as a regular
+  expression.
 - Five report builder datasources join the core user entity and add no capability of their
   own: who may build or read a custom report on them is core's report builder model.
 - Privacy: a full provider (metadata, request, userlist) over every user-linked table,
@@ -71,23 +72,26 @@ is a local plugin with one branch per Moodle version (`main` is 5.3; 5.2, 5.1 an
 
 - **`noclean` on notice content is the feature** (embedded media must survive) in the dialogue
   and the previews. It is safe only because authoring is gated as above. The report builder's
-  Content column cleans, because a custom report lists every scope's notices. Content is stored as typed, with
+  Content column cleans, because a custom report lists every scope's notices, and the list's
+  preview cleans a course notice for a viewer whose authority comes from the site. Content is stored as typed, with
   `@@PLUGINFILE@@` placeholders, and resolved at render so multilang notices work; do not
   clean at save time. Titles go through `format_string()` and `pathmatch` through `s()` at
   every output; both columns are `PARAM_RAW`.
 - **The file gate is partial by construction.** A file URL carries a notice id but no page,
-  so the gate checks authorship in scope, course access for a course notice, a place in a
-  listed course for a site notice limited to courses or categories, and audience, but not the
-  other page rules (theme, format, competency).
+  so the gate checks authorship in scope, then the delivery switch, course access for a course
+  notice, a place in a listed course for a site notice limited to courses or categories, and
+  audience, but not the other page rules (theme, format, competency). A notice that has ended
+  serves only a session it was delivered to.
 - **`pageurl` and `pathmatch` are client assertions** on the read path; forging them costs a
   reader no more than forging a write would.
 - **Guests are not rejected.** They get a session-only marker, because all guest sessions
   share one user id and a shared row would corrupt the reports.
 - **Link clicks are not rate-limited**: each click is a row of the link history report, and
   the table is bounded by age through `purge_link_history`.
-- **A course author never sees site-wide numbers.** Estimates are confined to the course,
-  the per-rule breakdown is withheld under a course scope, and `get_estimate` checks a shared
-  job against the caller's scope. Under the site scope `search_courses` lists every course
+- **A course author never sees site-wide numbers.** Estimates are confined to the course and,
+  under separate groups, to the groups the author may address; the per-rule breakdown is
+  withheld under a course scope, and `get_estimate` checks a shared job against the caller's
+  scope and group reach. Under the site scope `search_courses` lists every course
   name, hidden ones included, to a `manage` holder.
 - **Saving expires recorded acceptances** (`timemodified` is what the acceptance check
   compares), and a notice whose referent is gone (required course, theme) is withheld, never

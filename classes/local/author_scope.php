@@ -311,12 +311,13 @@ final class author_scope {
      * apply() narrows the groups an author names to the ones they may address, and an empty list
      * passes it, because an empty list is not a value outside the scope: it is "everyone in the
      * course". For an author confined to their own groups ({@see group_scope::is_restricted()})
-     * that is exactly what they may not address, so a save asks this as well as apply(). The
-     * estimate and the collision check do not: they write nothing, and an author must be able to
-     * ask about the course before choosing a group.
+     * that is exactly what they may not address, so a save asks this as well as apply(), and so
+     * does the estimate, before it counts and before it hands over a count somebody else asked
+     * for: the whole course less the author's own groups is a count of everybody else's. The
+     * collision check does not, because it counts nobody.
      *
      * @param array $criteria The criteria as apply() left them.
-     * @return bool True when the save must be refused on filter_groups.
+     * @return bool True when the criteria must be refused on filter_groups.
      */
     public function addresses_unreachable_groups(array $criteria): bool {
         if ($this->is_site()) {

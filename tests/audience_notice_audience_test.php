@@ -425,7 +425,7 @@ final class audience_notice_audience_test extends \advanced_testcase {
         global $DB, $USER;
 
         set_config('audience_sync_limit', 100000, 'local_awareness');
-        helper::create_new_notice($this->form_data(['title' => 'Counted']));
+        helper::create_new_notice($this->form_data(['title' => 'Counted', 'reqack' => 1]));
         $notice = awareness::get_record(['title' => 'Counted']);
 
         // Push the notice and the user's view of it into the past, so the comparison is real.

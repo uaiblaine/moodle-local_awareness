@@ -583,6 +583,36 @@ final class audience_external_test extends \advanced_testcase {
     }
 
     /**
+     * What made an estimate fail is read only under developer debugging.
+     *
+     * The stored text is an exception's own, and under developer debugging on cron that includes
+     * the statement and its values. PHPUnit runs at that level, which makes the first read the
+     * control that the text is there to be withheld.
+     */
+    public function test_a_failure_s_text_is_kept_for_developer_debugging(): void {
+        global $CFG;
+
+        $this->setAdminUser();
+        (new audience_job(0, (object) [
+            'jobid' => 'failedjob2',
+            'userid' => 2,
+            'criteriahash' => str_repeat('d', 64),
+            'criteria' => '[]',
+            'status' => audience_job::STATUS_ERROR,
+            'errormsg' => 'Error reading from database (SELECT secret FROM {user})',
+        ]))->create();
+
+        $read = get_estimate::execute('failedjob2');
+        $this->assertSame('error', $read['status']);
+        $this->assertStringContainsString('SELECT secret', (string) $read['errormsg']);
+
+        $CFG->debug = DEBUG_NORMAL;
+        $read = get_estimate::execute('failedjob2');
+        $this->assertSame('error', $read['status'], 'the failure itself is still reported');
+        $this->assertNull($read['errormsg']);
+    }
+
+    /**
      * A failed job records no audience count, and does not look current afterwards.
      *
      * An errored job's resultcount of 0 is not a measurement, and stamping the criteria hash would

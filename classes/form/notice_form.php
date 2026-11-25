@@ -42,6 +42,9 @@ class notice_form extends \core\form\persistent {
     /** @var int A carousel starts with this many empty slides, adds this many per click, and needs this many to save. */
     public const SLIDES_MIN = 2;
 
+    /** @var int The most slide rows a request may ask the form to build, unless the notice already holds more. */
+    public const SLIDES_MAX = 50;
+
     /**
      * The positions in the reading order of the 3x3 grid the stylesheet draws: the top row, the
      * centre, the bottom row. awareness::POSITIONS puts the default first, which is right for a
@@ -948,10 +951,22 @@ class notice_form extends \core\form\persistent {
          * gate below needs the indices and the method returns none; it must agree with
          * lib/formslib.php::repeat_elements(), which is where the two lines come from.
          */
-        $repeats = max(self::SLIDES_MIN, count($this->existing_slides()));
+        $stored = count($this->existing_slides());
+        $repeats = max(self::SLIDES_MIN, $stored);
         $repeats = $this->optional_param('slide_repeats', $repeats, PARAM_INT);
         if ($this->optional_param('slide_add', '', PARAM_TEXT)) {
             $repeats += self::SLIDES_MIN;
+        }
+
+        /*
+         * The count is the request's, on a plain GET as well, and each row is six elements built
+         * here: unbounded, one link builds a form of any size. Refused rather than trimmed, because
+         * core reads the same counter for itself; the Add button goes once another batch would
+         * pass the limit, so only a hand-made request gets here.
+         */
+        $limit = max(self::SLIDES_MAX, $stored);
+        if ($repeats > $limit) {
+            throw new \invalid_parameter_exception("slide_repeats is over the limit of {$limit}");
         }
 
         /*
@@ -1048,7 +1063,11 @@ class notice_form extends \core\form\persistent {
             $mform->hideIf("slide_image[{$i}]", "slide_media[{$i}]", 'eq', slide::MEDIA_VIDEO);
             $mform->hideIf("slide_videourl[{$i}]", "slide_media[{$i}]", 'eq', slide::MEDIA_IMAGE);
         }
-        $mform->hideIf('slide_add', 'template', 'neq', 'carousel');
+        if ($repeats + self::SLIDES_MIN > $limit) {
+            $mform->removeElement('slide_add');
+        } else {
+            $mform->hideIf('slide_add', 'template', 'neq', 'carousel');
+        }
     }
 
     /**
