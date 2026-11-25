@@ -55,6 +55,26 @@ final class course_place_test extends \advanced_testcase {
     /** @var awareness A notice of the course. */
     private awareness $notice;
 
+    /** @var bool[] Every route open. */
+    private const OPEN = [
+        'manage' => true,
+        'viewreports' => true,
+        'files' => true,
+        'report page' => true,
+        'notice report' => true,
+        'course report' => true,
+    ];
+
+    /** @var bool[] Every route closed. */
+    private const CLOSED = [
+        'manage' => false,
+        'viewreports' => false,
+        'files' => false,
+        'report page' => false,
+        'notice report' => false,
+        'course report' => false,
+    ];
+
     /**
      * A course, a teacher with both course capabilities, and a notice.
      */
@@ -98,7 +118,10 @@ final class course_place_test extends \advanced_testcase {
     }
 
     /**
-     * Whether the tutor may read the reports, by every route: the verb, the notice's report and the course report.
+     * Whether the tutor may read the reports, by every route.
+     *
+     * The verb, the file gate (delivery is off, so only its author branch can open), the gate of
+     * the notice's report pages, and the two reports core builds from client parameters.
      *
      * @return bool[] Keyed by route.
      */
@@ -108,7 +131,14 @@ final class course_place_test extends \advanced_testcase {
         $routes = [
             'manage' => helper::require_author($scope, 'manage', false),
             'viewreports' => helper::require_author($scope, 'viewreports', false),
+            'files' => helper::may_serve_files_of($this->notice),
         ];
+        try {
+            helper::resolve_notice_as_author((int) $this->notice->get('id'), 'viewreports');
+            $routes['report page'] = true;
+        } catch (\moodle_exception $e) {
+            $routes['report page'] = false;
+        }
         $reports = [
             'notice report' => [acknowledged_notice::class, ['noticeid' => $this->notice->get('id')]],
             'course report' => [course_notices::class, ['courseid' => $this->course->id]],
@@ -130,13 +160,10 @@ final class course_place_test extends \advanced_testcase {
      * An active enrolment opens every route; a suspended one closes them all.
      */
     public function test_a_suspended_enrolment_closes_the_reports(): void {
-        $open = ['manage' => true, 'viewreports' => true, 'notice report' => true, 'course report' => true];
-        $closed = array_map(static fn() => false, $open);
-
-        $this->assertSame($open, $this->routes(), 'the control: an active enrolment opens every route');
+        $this->assertSame(self::OPEN, $this->routes(), 'the control: an active enrolment opens every route');
         $this->setAdminUser();
         $this->enrolment(ENROL_USER_SUSPENDED);
-        $this->assertSame($closed, $this->routes());
+        $this->assertSame(self::CLOSED, $this->routes());
     }
 
     /**
@@ -144,10 +171,48 @@ final class course_place_test extends \advanced_testcase {
      */
     public function test_an_ended_enrolment_closes_the_reports(): void {
         $this->enrolment(ENROL_USER_ACTIVE, time() - DAYSECS);
-        $this->assertSame(
-            ['manage' => false, 'viewreports' => false, 'notice report' => false, 'course report' => false],
-            $this->routes()
-        );
+        $this->assertSame(self::CLOSED, $this->routes());
+    }
+
+    /**
+     * A hidden course closes every route to an enrolled role that may not enter it.
+     *
+     * Core refuses such a user the course before it looks at the enrolment, so the role is no place
+     * in it. The same course shown is the control, and the capability core asks opens it again.
+     */
+    public function test_a_hidden_course_closes_the_reports_to_whoever_may_not_enter_it(): void {
+        global $DB;
+
+        $context = \context_course::instance($this->course->id);
+        $roleid = (int) $DB->get_field('role', 'id', ['shortname' => 'teacher']);
+        assign_capability('moodle/course:viewhiddencourses', CAP_PROHIBIT, $roleid, $context->id, true);
+        accesslib_clear_all_caches_for_unit_testing();
+        $this->assertSame(self::OPEN, $this->routes(), 'the control: the course is shown');
+
+        $DB->set_field('course', 'visible', 0, ['id' => $this->course->id]);
+        $this->assertSame(self::CLOSED, $this->routes());
+
+        assign_capability('moodle/course:viewhiddencourses', CAP_ALLOW, $roleid, $context->id, true);
+        accesslib_clear_all_caches_for_unit_testing();
+        $this->assertSame(self::OPEN, $this->routes(), 'whoever may enter a hidden course keeps the routes');
+    }
+
+    /**
+     * A holder of the site capability is not asked for a place in a hidden course.
+     */
+    public function test_a_site_reports_reader_reaches_a_hidden_course_s_notice(): void {
+        global $DB;
+
+        $reader = $this->getDataGenerator()->create_user();
+        $roleid = $this->getDataGenerator()->create_role();
+        assign_capability('local/awareness:viewreports', CAP_ALLOW, $roleid, \context_system::instance()->id, true);
+        role_assign($roleid, $reader->id, \context_system::instance()->id);
+        $DB->set_field('course', 'visible', 0, ['id' => $this->course->id]);
+
+        $this->setUser($reader);
+        $context = \context_course::instance($this->course->id);
+        $this->assertFalse(has_capability('moodle/course:viewhiddencourses', $context), 'or the course is not closed to them');
+        $this->assertTrue(helper::require_author(author_scope::course((int) $this->course->id), 'viewreports', false));
     }
 
     /**

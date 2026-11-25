@@ -549,6 +549,7 @@ final class notice_external_test extends \advanced_testcase {
         $data = new \stdClass();
         $data->title = 'Teachers only';
         $data->content = '<p>Teachers must confirm this.</p>';
+        $data->reqack = 1;
         $data->filter_role = [$teacherroleid];
         helper::create_new_notice($data);
 
@@ -983,6 +984,31 @@ final class notice_external_test extends \advanced_testcase {
             get_notices::execute('/my/', 0)['notices'],
             'an accepted notice must not come back at the next session'
         );
+    }
+
+    /**
+     * An Informational notice records no acceptance: it asks for none, and its dialogue offers none.
+     *
+     * The same notice at Blocking, served to the same session, is the control.
+     */
+    public function test_an_informational_notice_records_no_acceptance(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $notice = $this->getDataGenerator()->get_plugin_generator('local_awareness')->create_notice(['outsideclick' => 1]);
+        $this->assertSame(awareness::INSISTENCE_INFORMATIONAL, $notice->get_insistence());
+
+        $this->setUser($this->getDataGenerator()->create_user());
+        $this->deliver($notice);
+        $this->assertFalse($this->call_status('acknowledge', ['noticeid' => (int) $notice->get('id')]));
+        $this->assertSame(0, $this->count_acks($notice));
+        $this->assertFalse($DB->record_exists('local_awareness_lastview', ['noticeid' => $notice->get('id')]));
+
+        $notice->set('outsideclick', 0)->update();
+        $this->assertSame(awareness::INSISTENCE_BLOCKING, $notice->get_insistence());
+        $this->deliver($notice);
+        $this->assertTrue($this->call_status('acknowledge', ['noticeid' => (int) $notice->get('id')]));
+        $this->assertSame(1, $this->count_acks($notice));
     }
 
     /**
