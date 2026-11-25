@@ -510,6 +510,9 @@ class helper {
             // ID to use for link tracking in javascript.
             $node->setAttribute('data-linkid', $linkid);
             $node->setAttribute('target', '_blank');
+            // The page opened gets no handle on this one and no referrer, whatever else the author set.
+            $rel = preg_split('/\s+/', strtolower($node->getAttribute('rel')), -1, PREG_SPLIT_NO_EMPTY);
+            $node->setAttribute('rel', implode(' ', array_unique(array_merge($rel, ['noopener', 'noreferrer']))));
         }
 
         /*
@@ -1601,6 +1604,15 @@ class helper {
     public static function acknowledge_notice(awareness $notice): array {
         global $USER;
 
+        /*
+         * An Informational notice asks for nothing, so there is nothing to accept: its dialogue
+         * has no Accept, and a row here would be consent nobody was asked for, in the table the
+         * acknowledgement reports read. The same line dismiss_notice() draws for its own row.
+         */
+        if ($notice->get_insistence() < awareness::INSISTENCE_BLOCKING) {
+            return ['status' => false];
+        }
+
         $result = ['status' => true];
         $isguest = isguestuser();
 
@@ -1763,16 +1775,14 @@ class helper {
          * downloads core builds from client parameters ask only this method. So a capability held
          * in the course, and not at the system level, counts only for someone with a place in the
          * course: an active enrolment, or moodle/course:view (is_viewing()), the two require_login()
-         * accepts besides guest access, which grants nobody an author's authority. Either verb's
-         * capability held at the system level is a site-wide grant no enrolment gave or can end.
+         * accepts besides guest access, which grants nobody an author's authority. A hidden course
+         * admits neither without moodle/course:viewhiddencourses, which require_login() asks before
+         * it looks at the enrolment. Either verb's capability held at the system level is a
+         * site-wide grant no enrolment gave or can end, and no course's visibility takes away.
          */
-        if ($allowed && !$scope->is_site()) {
-            $system = \context_system::instance();
-            $sitewide = has_capability($sitecapability, $system)
-                || ($coursecapability !== null && has_capability($coursecapability, $system));
-            if (!$sitewide) {
-                $allowed = is_enrolled($context, null, '', true) || is_viewing($context);
-            }
+        if ($allowed && !$scope->is_site() && !self::holds_sitewide($verb)) {
+            $allowed = is_enrolled($context, null, '', true) || is_viewing($context);
+            $allowed = $allowed && self::may_enter_course($scope);
         }
         if (!$allowed && $throw) {
             $refused = $scope->is_site() ? $sitecapability : ($coursecapability ?? $sitecapability);
@@ -1780,6 +1790,46 @@ class helper {
         }
 
         return $allowed;
+    }
+
+    /**
+     * Whether the current user holds a verb's authority at the site, and not through a course.
+     *
+     * Either of the verb's capabilities held at the system level: a grant no enrolment gave, which
+     * reaches every course's notices from the site list.
+     *
+     * @param string $verb One of the keys of VERB_CAPABILITIES.
+     * @return bool
+     */
+    private static function holds_sitewide(string $verb): bool {
+        $system = \context_system::instance();
+        foreach (array_filter(self::VERB_CAPABILITIES[$verb]) as $capability) {
+            if (has_capability($capability, $system)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the visibility of a scope's course lets the current user into it.
+     *
+     * The first thing require_login() and can_access_course() ask of a course, and the reason a
+     * role in a hidden course is not a place in it.
+     *
+     * @param author_scope $scope A course scope.
+     * @return bool False as well for a course deleted since the scope was asked whether it exists.
+     */
+    private static function may_enter_course(author_scope $scope): bool {
+        try {
+            // Not cloned: read only, and the page's own course costs no query.
+            $course = get_course($scope->get_courseid(), false);
+        } catch (\dml_missing_record_exception $e) {
+            return false;
+        }
+
+        return $course->visible || has_capability('moodle/course:viewhiddencourses', $scope->context());
     }
 
     /**
@@ -1841,6 +1891,20 @@ class helper {
         $author = self::require_author($scope, 'manage', false) || self::require_author($scope, 'viewreports', false);
         if ($author && self::may_reach_groups($notice)) {
             return true;
+        }
+
+        // Delivery switched off stops the files as it stops the dialogue that shows them.
+        if (!self::is_delivery_enabled()) {
+            return false;
+        }
+
+        /*
+         * A notice that has ended serves a reader only what their session was shown while it was
+         * live: the dialogue left open across the end keeps its pictures, and nobody else has a
+         * dialogue to fill. is_notice_available_to_user() leaves the end out for the writes' sake.
+         */
+        if (!self::is_within_active_window($notice) && !self::was_notice_delivered($notice)) {
+            return false;
         }
 
         /*
@@ -2193,15 +2257,38 @@ class helper {
      * file_rewrite_pluginfile_urls() replaces only the placeholder.
      *
      * @param awareness $notice Notice.
+     * @param bool $clean Whether to clean the body; see render_content_parts().
      * @return string HTML ready to place in the modal.
      * @throws \coding_exception
      */
-    public static function render_content(awareness $notice): string {
+    public static function render_content(awareness $notice, bool $clean = false): string {
         return self::render_content_parts(
             (string) $notice->get('content'),
             (int) $notice->get('contentformat'),
-            (int) $notice->get('id')
+            (int) $notice->get('id'),
+            $clean
         );
+    }
+
+    /**
+     * Whether a preview of this notice must show its body cleaned to the current user.
+     *
+     * A course notice is written under local/awareness:managecourse, whose RISK_XSS is granted for
+     * one course. Someone whose authority over the notice comes from the site did not open that
+     * course to look at it: the site list offers them every course's notices, drafts included, so
+     * unclean there, a course author's script would run in a site manager's session from Site
+     * administration. The course's own authors and report readers are inside the course, where
+     * the dialogue would show them the same body as readers.
+     *
+     * @param awareness $notice The notice about to be previewed.
+     * @return bool
+     */
+    public static function preview_needs_cleaning(awareness $notice): bool {
+        if (author_scope::of($notice)->is_site()) {
+            return false;
+        }
+
+        return self::holds_sitewide('manage') || self::holds_sitewide('viewreports');
     }
 
     /**
@@ -2218,7 +2305,8 @@ class helper {
      * declares: its reader opened a page the notice was published on. A report cell is cleaned,
      * because a custom report lists every notice of the site, course notices included, to an
      * administrator who opened a report, not a course: unclean there, any course author's script
-     * would run in that session without anyone choosing to look at their notice.
+     * would run in that session without anyone choosing to look at their notice. The list's
+     * preview is cleaned for the same viewer ({@see self::preview_needs_cleaning()}).
      *
      * @param string $content Stored content, as the author wrote it.
      * @param int $contentformat One of the FORMAT_* constants.
@@ -2273,7 +2361,8 @@ class helper {
     public static function render_media_link(string $url): string {
         global $OUTPUT;
 
-        $url = trim($url);
+        // A stored link is a URL already; the editor's preview hands over what the author typed.
+        $url = clean_param(trim($url), PARAM_URL);
         if ($url === '') {
             return '';
         }
@@ -2639,21 +2728,51 @@ class helper {
             $targets[] = substr($target, strlen($wwwrootpath));
         }
 
-        $pattern = preg_quote($pathmatch, '@');
-        if (strpos($pattern, '%') !== false) {
-            $pattern = str_replace('%', '.*', $pattern);
-        } else {
-            $pattern .= '$';
-        }
-        $pattern = '^' . $pattern;
-
         foreach ($targets as $candidate) {
-            if (preg_match("@{$pattern}@", $candidate)) {
+            if (self::reach_matches($pathmatch, $candidate)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Whether a page-reach pattern matches one local URL.
+     *
+     * Anchored at the start; each '%' stands for any run of characters, and a pattern carrying
+     * none must match to the end. Compared piece by piece in one pass, and never as a regular
+     * expression: the URL is the client's to choose, and several wildcards against a long URL
+     * that almost matches is the backtracking an expression engine does worst.
+     *
+     * @param string $pathmatch The pattern, not empty.
+     * @param string $candidate The URL.
+     * @return bool
+     */
+    private static function reach_matches(string $pathmatch, string $candidate): bool {
+        if (strpos($pathmatch, '%') === false) {
+            return $candidate === $pathmatch;
+        }
+
+        $pieces = explode('%', $pathmatch);
+        $start = array_shift($pieces);
+        if (strncmp($candidate, $start, strlen($start)) !== 0) {
+            return false;
+        }
+        // The leftmost place each piece fits leaves the most room for the pieces after it.
+        $offset = strlen($start);
+        foreach ($pieces as $piece) {
+            if ($piece === '') {
+                continue;
+            }
+            $found = strpos($candidate, $piece, $offset);
+            if ($found === false) {
+                return false;
+            }
+            $offset = $found + strlen($piece);
+        }
+
+        return true;
     }
 
     /**
@@ -2696,7 +2815,8 @@ class helper {
 
         // Resolve the course from the courseid passed by JS.
         $course = null;
-        if ($courseid > 1) { // 1 is the site/frontpage course, not a real course.
+        // Course 1 is the site course, the front page, and not a real course.
+        if ($courseid > 1) {
             $course = $DB->get_record('course', ['id' => $courseid]);
             /*
              * The course id is supplied by the browser, and the filters below use it to decide

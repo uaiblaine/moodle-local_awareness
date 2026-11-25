@@ -18,6 +18,9 @@ namespace local_awareness;
 
 use core_external\external_api;
 use core_reportbuilder\external\systemreports\retrieve;
+use local_awareness\external\check_collision;
+use local_awareness\external\estimate_audience;
+use local_awareness\external\get_estimate;
 use local_awareness\form\notice_form;
 use local_awareness\local\author_scope;
 use local_awareness\local\collision;
@@ -49,6 +52,9 @@ use local_awareness\table\all_notices;
  * @covers \local_awareness\local\group_scope
  * @covers \local_awareness\local\author_scope
  * @covers \local_awareness\helper
+ * @covers \local_awareness\external\check_collision
+ * @covers \local_awareness\external\estimate_audience
+ * @covers \local_awareness\external\get_estimate
  * @covers \local_awareness\form\notice_form
  * @covers \local_awareness\table\all_notices
  * @covers \local_awareness\local\collision
@@ -208,6 +214,45 @@ final class separate_groups_confinement_test extends \advanced_testcase {
     }
 
     /**
+     * A confined author may not count the whole course, nor read a colleague's count of it.
+     *
+     * An estimate of everyone under some rule, less the same estimate of their own group, would be
+     * a count of the groups they are kept from. Their own group is the control on both services,
+     * and the editing teacher asking for the whole course the control that the question is legal.
+     */
+    public function test_a_confined_author_may_not_count_the_whole_course(): void {
+        global $DB;
+
+        $courseid = (int) $this->course->id;
+        $red = json_encode(['filter_groups' => [(int) $this->red->id]]);
+
+        $this->setUser($this->editor);
+        $everyone = estimate_audience::execute(json_encode([]), $courseid);
+        $this->assertSame('ready', get_estimate::execute($everyone['jobid'], $courseid)['status']);
+
+        $this->setUser($this->teacher);
+        $mine = estimate_audience::execute($red, $courseid);
+        $this->assertSame('ready', get_estimate::execute($mine['jobid'], $courseid)['status'], 'the control: their own group');
+
+        $jobs = $DB->count_records('local_awareness_audience_jobs');
+        foreach (['no group' => [], 'another group' => ['filter_groups' => [(int) $this->blue->id]]] as $case => $criteria) {
+            try {
+                estimate_audience::execute(json_encode($criteria), $courseid);
+                $this->fail("a confined author counted the course with {$case}");
+            } catch (\invalid_parameter_exception $e) {
+                $this->assertSame('another group', $case);
+            } catch (\moodle_exception $e) {
+                $this->assertSame('scope:problem:filter_groups:own', $e->errorcode);
+            }
+        }
+        $this->assertSame($jobs, $DB->count_records('local_awareness_audience_jobs'), 'a refusal makes no job');
+
+        $read = get_estimate::execute($everyone['jobid'], $courseid);
+        $this->assertSame('error', $read['status'], 'the colleague\'s count of the whole course reads as no job');
+        $this->assertNull($read['count']);
+    }
+
+    /**
      * The control: an author who may access all groups addresses the whole course.
      */
     public function test_an_author_who_may_access_all_groups_addresses_the_whole_course(): void {
@@ -339,6 +384,27 @@ final class separate_groups_confinement_test extends \advanced_testcase {
         $this->setUser($this->editor);
         $this->assertSame('Blue briefing', collision::visible_title($this->forblue, $scope));
         $this->assertSame(3, $this->listed_count());
+    }
+
+    /**
+     * The editor's warning keeps the line of a rival for another group, whatever id is sent with it.
+     *
+     * The id takes the edited notice out of its own rivals; sent for a notice the author may not
+     * edit, the missing line would say that the id names it. The editing teacher is the control.
+     */
+    public function test_an_id_of_another_group_s_notice_removes_no_rival(): void {
+        $this->forblue->set('resetinterval', WEEKSECS)->update();
+        $blueid = (int) $this->forblue->get('id');
+        $courseid = (int) $this->course->id;
+        $redacted = get_string('collision:redacted:group', 'local_awareness');
+
+        $this->setUser($this->teacher);
+        $this->assertSame([$redacted], check_collision::execute(0, '', true, $courseid)['titles']);
+        $this->assertSame([$redacted], check_collision::execute($blueid, '', true, $courseid)['titles']);
+
+        $this->setUser($this->editor);
+        $this->assertSame(['Blue briefing'], check_collision::execute(0, '', true, $courseid)['titles']);
+        $this->assertSame([], check_collision::execute($blueid, '', true, $courseid)['titles']);
     }
 
     /**

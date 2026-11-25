@@ -15,6 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace local_awareness\persistent;
+
 use core\persistent;
 
 /**
